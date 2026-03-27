@@ -1,0 +1,210 @@
+Scan the entire existing codebase, database schema, APIs, UI, workflows, and logic. Upgrade and complete the system into a fully functional, production-grade Audit Firm Management Software suitable for 200+ staff, without breaking existing functionality, UI, or data.
+
+🔍 PHASE 1 — FULL SYSTEM SCAN & STABILIZATION
+Scan:
+All frontend pages, tabs, subtabs
+Backend routes, controllers, services
+Database schema (Prisma/Postgres)
+Authentication system
+All forms, APIs, and workflows
+Identify and fix:
+Broken links, buttons, APIs
+Duplicate modules or services
+Missing validations
+Unlinked workflows
+Data loss issues (especially refresh/reset issues)
+Autosave failures
+Enforce:
+Auto-save on every input (timestamp + user ID)
+No data deletion on refresh
+Persistent storage integrity
+🔐 PHASE 2 — ROLE-BASED ACCESS CONTROL (RBAC)
+
+Create a complete authentication + authorization system with the following roles:
+
+Roles:
+Admin (Super Control)
+Partner (Approval Authority)
+Manager (Review Level)
+Trainee (Execution Level)
+Requirements:
+Secure login (JWT / session-based)
+Role-based dashboard views
+Page-level access control
+API-level permission enforcement
+Activity logs per user
+👤 PHASE 3 — USER PROFILE MANAGEMENT
+
+Create a complete user master module:
+
+Fields:
+Full Name
+Role
+Email
+Phone Number
+Mobile Number
+Profile Picture Upload
+CNIC (optional)
+Status (Active / Inactive)
+Features:
+Profile edit
+Profile picture upload (stored securely)
+Admin can create/update/delete users
+Audit trail for all changes
+🏢 PHASE 4 — CLIENT MASTER + SECURE CREDENTIAL VAULT
+
+Create a Client Management System with secure credential storage:
+
+Client Details:
+Client Name
+NTN / Registration No.
+Contact Person
+Email
+Phone
+Address
+Secure Credential Vault (Encrypted Storage):
+FBR Login ID & Password
+SECP Login ID & Password
+PRA Login ID & Password
+Other portals
+Security:
+AES-256 encryption for credentials
+Role-restricted access (only Partner/Admin)
+No plain-text display
+Masked view with “Reveal” option
+📊 PHASE 5 — INVOICE & BILLING MODULE (ADVANCED)
+
+Create a complete billing engine:
+
+Features:
+Invoice Generation:
+Client-wise invoices
+Engagement-wise billing
+Editable templates
+Recurring Invoices:
+Monthly / Quarterly / Yearly
+Auto-generation scheduler
+Tax Handling:
+Withholding Income Tax (WHT)
+Sales Tax (GST/PRA)
+Configurable tax rates
+Financial Calculation:
+Gross Amount
+Tax Deduction
+Net Received
+Outstanding balance
+Payment Tracking:
+Paid / Partially Paid / Unpaid
+Payment date logs
+Outputs:
+PDF invoice generation
+Download & email option
+💰 PHASE 6 — PAYROLL MANAGEMENT (STAFF 200+ READY)
+
+Build payroll system:
+
+Features:
+Salary structure per employee
+Attendance integration
+Allowances & deductions
+Tax calculation
+Payslip generation
+Monthly payroll reports
+🕒 PHASE 7 — ATTENDANCE & TIME TRACKING
+Features:
+Daily check-in / check-out
+IP-based tracking
+Timestamp logging
+Leave tracking
+Engagement time allocation
+📁 PHASE 8 — ENGAGEMENT & CLIENT WORKFLOW
+Features:
+Client assignment to staff
+Engagement lifecycle tracking
+Phase-wise progress:
+Planning
+Execution
+Review
+Completion
+Role-based approvals:
+Trainee → Manager → Partner
+📎 PHASE 9 — DOCUMENT & FILE MANAGEMENT
+Features:
+Upload:
+TB
+GL
+Bank statements
+Scanned files
+AI Processing:
+Extract and tabulate data
+Convert to structured format
+Export to Excel
+Version control
+Secure storage
+🔄 PHASE 10 — AUTO-SAVE & AUDIT TRAIL (CRITICAL)
+Implement:
+Every action logged:
+User
+Timestamp
+Action performed
+Full audit trail:
+Edits
+Deletions
+Approvals
+Immutable logs (no deletion allowed)
+📊 PHASE 11 — DASHBOARD & REPORTING
+Dashboards:
+Admin:
+Total clients
+Active engagements
+Revenue
+Staff utilization
+Partner:
+Pending approvals
+Engagement status
+Manager:
+Team workload
+Trainee:
+Assigned tasks
+🔐 PHASE 12 — ENTERPRISE SECURITY
+Implement:
+Encrypted sensitive data
+Role-based data isolation
+API authentication
+Rate limiting
+Error logging system
+⚙️ PHASE 13 — SYSTEM INTEGRATION & FINALIZATION
+Ensure:
+All modules interconnected
+No broken workflow
+Seamless navigation across:
+Tabs
+Phases
+Modules
+Real-time updates across system
+Multi-user concurrency handling
+🚀 PHASE 14 — PRODUCTION HARDENING
+Final checks:
+No crashes or errors
+Clean database relations
+Fast loading performance
+Scalable for 200+ users
+❗ CRITICAL INSTRUCTIONS
+DO NOT change:
+Existing UI design
+Existing workflows
+Existing data
+ONLY:
+Fix
+Complete
+Connect
+Enhance
+Ensure:
+No data loss
+No duplication
+No broken logic
+✅ FINAL OUTPUT REQUIRED
+Fully working system
+All roles functional
+All modules connected
+Enterprise-ready audit firm software

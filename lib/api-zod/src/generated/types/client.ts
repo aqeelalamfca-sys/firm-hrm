@@ -16,6 +16,8 @@ export interface Client {
   phone?: string | null;
   address?: string | null;
   industry?: string | null;
+  ntn?: string | null;
+  registrationNo?: string | null;
   status: ClientStatus;
   totalBilled: number;
   totalPaid: number;

@@ -5,3 +5,7 @@ export * from "./leaves";
 export * from "./payroll";
 export * from "./clients";
 export * from "./invoices";
+export * from "./activity_logs";
+export * from "./client_credentials";
+export * from "./engagements";
+export * from "./documents";

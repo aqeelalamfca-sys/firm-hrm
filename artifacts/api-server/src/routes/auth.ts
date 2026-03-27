@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
+import { logActivity } from "../middleware/activity-logger";
 
 const router = Router();
 
@@ -28,6 +29,16 @@ router.post("/login", async (req, res) => {
   }
 
   const token = generateToken(user.id);
+
+  await logActivity({
+    userId: user.id,
+    userName: user.name,
+    action: "login",
+    module: "auth",
+    description: `User ${user.name} (${user.email}) logged in`,
+    ipAddress: req.ip,
+  });
+
   res.json({
     token,
     user: {

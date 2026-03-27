@@ -27,6 +27,16 @@ tags:
     description: Dashboard & Analytics
   - name: reports
     description: Reports
+  - name: users
+    description: User Management
+  - name: activity-logs
+    description: Activity Logs & Audit Trail
+  - name: client-credentials
+    description: Client Credential Vault
+  - name: engagements
+    description: Engagement Management
+  - name: documents
+    description: Document Management
 
 paths:
   /healthz:
@@ -632,6 +642,529 @@ paths:
               schema:
                 $ref: "#/components/schemas/InvoiceSummary"
 
+  /users:
+    get:
+      operationId: getUsers
+      tags: [users]
+      summary: List all users
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserProfile"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /users/{id}:
+    get:
+      operationId: getUserById
+      tags: [users]
+      summary: Get user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+    put:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /users/profile:
+    put:
+      operationId: updateProfile
+      tags: [users]
+      summary: Update own profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /users/change-password:
+    put:
+      operationId: changePassword
+      tags: [users]
+      summary: Change own password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /activity-logs:
+    get:
+      operationId: getActivityLogs
+      tags: [activity-logs]
+      summary: Get activity logs
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: integer
+        - name: module
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Activity logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ActivityLog"
+                  total:
+                    type: integer
+                required:
+                  - logs
+                  - total
+
+  /clients/{clientId}/credentials:
+    get:
+      operationId: getClientCredentials
+      tags: [client-credentials]
+      summary: Get client credentials (masked)
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Client credentials
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClientCredential"
+    post:
+      operationId: createClientCredential
+      tags: [client-credentials]
+      summary: Add client credential
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateClientCredentialRequest"
+      responses:
+        "201":
+          description: Credential created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientCredential"
+
+  /clients/{clientId}/credentials/{id}:
+    put:
+      operationId: updateClientCredential
+      tags: [client-credentials]
+      summary: Update client credential
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateClientCredentialRequest"
+      responses:
+        "200":
+          description: Credential updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientCredential"
+    delete:
+      operationId: deleteClientCredential
+      tags: [client-credentials]
+      summary: Delete client credential
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Credential deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /clients/{clientId}/credentials/{id}/reveal:
+    get:
+      operationId: revealClientCredential
+      tags: [client-credentials]
+      summary: Reveal credential password (Partner/Admin only)
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Decrypted credential
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  password:
+                    type: string
+                required:
+                  - password
+
+  /engagements:
+    get:
+      operationId: getEngagements
+      tags: [engagements]
+      summary: List engagements
+      parameters:
+        - name: clientId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of engagements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EngagementResponse"
+    post:
+      operationId: createEngagement
+      tags: [engagements]
+      summary: Create engagement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEngagementRequest"
+      responses:
+        "201":
+          description: Engagement created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EngagementResponse"
+
+  /engagements/{id}:
+    get:
+      operationId: getEngagement
+      tags: [engagements]
+      summary: Get engagement by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Engagement details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EngagementResponse"
+    put:
+      operationId: updateEngagement
+      tags: [engagements]
+      summary: Update engagement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEngagementRequest"
+      responses:
+        "200":
+          description: Engagement updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EngagementResponse"
+
+  /engagements/{id}/assignments:
+    get:
+      operationId: getEngagementAssignments
+      tags: [engagements]
+      summary: Get engagement team assignments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EngagementAssignment"
+    post:
+      operationId: addEngagementAssignment
+      tags: [engagements]
+      summary: Assign staff to engagement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAssignmentRequest"
+      responses:
+        "201":
+          description: Assignment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EngagementAssignment"
+
+  /documents:
+    get:
+      operationId: getDocuments
+      tags: [documents]
+      summary: List documents
+      parameters:
+        - name: clientId
+          in: query
+          schema:
+            type: integer
+        - name: engagementId
+          in: query
+          schema:
+            type: integer
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DocumentResponse"
+    post:
+      operationId: uploadDocument
+      tags: [documents]
+      summary: Upload a document
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                category:
+                  type: string
+                clientId:
+                  type: integer
+                engagementId:
+                  type: integer
+                description:
+                  type: string
+      responses:
+        "201":
+          description: Document uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentResponse"
+
+  /documents/{id}:
+    get:
+      operationId: getDocument
+      tags: [documents]
+      summary: Get document details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Document details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentResponse"
+    delete:
+      operationId: deleteDocument
+      tags: [documents]
+      summary: Delete document
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Document deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
 components:
   schemas:
     HealthStatus:
@@ -1070,6 +1603,12 @@ components:
         industry:
           type: string
           nullable: true
+        ntn:
+          type: string
+          nullable: true
+        registrationNo:
+          type: string
+          nullable: true
         status:
           type: string
           enum: [active, inactive]
@@ -1107,6 +1646,10 @@ components:
         address:
           type: string
         industry:
+          type: string
+        ntn:
+          type: string
+        registrationNo:
           type: string
       required:
         - name
@@ -1407,3 +1950,413 @@ components:
         - month
         - revenue
         - invoices
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, hr_admin, finance_officer, manager, employee, partner, trainee]
+        employeeId:
+          type: integer
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        mobile:
+          type: string
+          nullable: true
+        cnic:
+          type: string
+          nullable: true
+        profilePicture:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, inactive]
+        createdAt:
+          type: string
+      required:
+        - id
+        - email
+        - name
+        - role
+        - status
+        - createdAt
+
+    CreateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, hr_admin, finance_officer, manager, employee, partner, trainee]
+        phone:
+          type: string
+        mobile:
+          type: string
+        cnic:
+          type: string
+        employeeId:
+          type: integer
+      required:
+        - email
+        - name
+        - password
+        - role
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, hr_admin, finance_officer, manager, employee, partner, trainee]
+        phone:
+          type: string
+        mobile:
+          type: string
+        cnic:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+        employeeId:
+          type: integer
+        password:
+          type: string
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        mobile:
+          type: string
+        cnic:
+          type: string
+        profilePicture:
+          type: string
+
+    ChangePasswordRequest:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+      required:
+        - currentPassword
+        - newPassword
+
+    ActivityLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        action:
+          type: string
+          enum: [create, update, delete, login, logout, approve, reject, status_change, view, download, upload]
+        module:
+          type: string
+        entityId:
+          type: integer
+          nullable: true
+        entityType:
+          type: string
+          nullable: true
+        description:
+          type: string
+        ipAddress:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - userId
+        - userName
+        - action
+        - module
+        - description
+        - createdAt
+
+    ClientCredential:
+      type: object
+      properties:
+        id:
+          type: integer
+        clientId:
+          type: integer
+        portalName:
+          type: string
+        loginId:
+          type: string
+        maskedPassword:
+          type: string
+        portalUrl:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - clientId
+        - portalName
+        - loginId
+        - maskedPassword
+        - createdAt
+
+    CreateClientCredentialRequest:
+      type: object
+      properties:
+        portalName:
+          type: string
+        loginId:
+          type: string
+        password:
+          type: string
+        portalUrl:
+          type: string
+        notes:
+          type: string
+      required:
+        - portalName
+        - loginId
+        - password
+
+    EngagementResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        engagementCode:
+          type: string
+        clientId:
+          type: integer
+        clientName:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+          enum: [audit, tax, advisory, accounting, compliance, other]
+        status:
+          type: string
+          enum: [planning, execution, review, completed, on_hold, cancelled]
+        description:
+          type: string
+          nullable: true
+        startDate:
+          type: string
+        endDate:
+          type: string
+          nullable: true
+        partnerId:
+          type: integer
+          nullable: true
+        partnerName:
+          type: string
+          nullable: true
+        managerId:
+          type: integer
+          nullable: true
+        managerName:
+          type: string
+          nullable: true
+        budget:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        assignmentCount:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - engagementCode
+        - clientId
+        - clientName
+        - title
+        - type
+        - status
+        - startDate
+        - assignmentCount
+        - createdAt
+
+    CreateEngagementRequest:
+      type: object
+      properties:
+        clientId:
+          type: integer
+        title:
+          type: string
+        type:
+          type: string
+          enum: [audit, tax, advisory, accounting, compliance, other]
+        description:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        partnerId:
+          type: integer
+        managerId:
+          type: integer
+        budget:
+          type: string
+        notes:
+          type: string
+      required:
+        - clientId
+        - title
+        - type
+        - startDate
+
+    UpdateEngagementRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        type:
+          type: string
+          enum: [audit, tax, advisory, accounting, compliance, other]
+        status:
+          type: string
+          enum: [planning, execution, review, completed, on_hold, cancelled]
+        description:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        partnerId:
+          type: integer
+        managerId:
+          type: integer
+        budget:
+          type: string
+        notes:
+          type: string
+
+    EngagementAssignment:
+      type: object
+      properties:
+        id:
+          type: integer
+        engagementId:
+          type: integer
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        role:
+          type: string
+        hoursAllocated:
+          type: integer
+          nullable: true
+        hoursWorked:
+          type: integer
+        notes:
+          type: string
+          nullable: true
+        assignedAt:
+          type: string
+      required:
+        - id
+        - engagementId
+        - employeeId
+        - employeeName
+        - role
+        - hoursWorked
+        - assignedAt
+
+    CreateAssignmentRequest:
+      type: object
+      properties:
+        employeeId:
+          type: integer
+        role:
+          type: string
+        hoursAllocated:
+          type: integer
+        notes:
+          type: string
+      required:
+        - employeeId
+        - role
+
+    DocumentResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        fileName:
+          type: string
+        originalName:
+          type: string
+        fileSize:
+          type: integer
+        mimeType:
+          type: string
+        category:
+          type: string
+          enum: [trial_balance, general_ledger, bank_statement, tax_return, audit_report, engagement_letter, financial_statement, correspondence, other]
+        clientId:
+          type: integer
+          nullable: true
+        clientName:
+          type: string
+          nullable: true
+        engagementId:
+          type: integer
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        version:
+          type: integer
+        uploadedById:
+          type: integer
+        uploadedByName:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - fileName
+        - originalName
+        - fileSize
+        - mimeType
+        - category
+        - version
+        - uploadedById
+        - uploadedByName
+        - createdAt

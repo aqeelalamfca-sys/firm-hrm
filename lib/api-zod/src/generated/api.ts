@@ -421,6 +421,8 @@ export const GetClientsResponseItem = zod.object({
   phone: zod.string().nullish(),
   address: zod.string().nullish(),
   industry: zod.string().nullish(),
+  ntn: zod.string().nullish(),
+  registrationNo: zod.string().nullish(),
   status: zod.enum(["active", "inactive"]),
   totalBilled: zod.number(),
   totalPaid: zod.number(),
@@ -439,6 +441,8 @@ export const CreateClientBody = zod.object({
   phone: zod.string().optional(),
   address: zod.string().optional(),
   industry: zod.string().optional(),
+  ntn: zod.string().optional(),
+  registrationNo: zod.string().optional(),
 });
 
 /**
@@ -457,6 +461,8 @@ export const GetClientResponse = zod.object({
   phone: zod.string().nullish(),
   address: zod.string().nullish(),
   industry: zod.string().nullish(),
+  ntn: zod.string().nullish(),
+  registrationNo: zod.string().nullish(),
   status: zod.enum(["active", "inactive"]),
   totalBilled: zod.number(),
   totalPaid: zod.number(),
@@ -490,6 +496,8 @@ export const UpdateClientResponse = zod.object({
   phone: zod.string().nullish(),
   address: zod.string().nullish(),
   industry: zod.string().nullish(),
+  ntn: zod.string().nullish(),
+  registrationNo: zod.string().nullish(),
   status: zod.enum(["active", "inactive"]),
   totalBilled: zod.number(),
   totalPaid: zod.number(),
@@ -799,4 +807,615 @@ export const GetInvoiceSummaryResponse = zod.object({
       invoices: zod.number(),
     }),
   ),
+});
+
+/**
+ * @summary List all users
+ */
+export const GetUsersQueryParams = zod.object({
+  role: zod.coerce.string().optional(),
+  status: zod.coerce.string().optional(),
+});
+
+export const GetUsersResponseItem = zod.object({
+  id: zod.number(),
+  email: zod.string(),
+  name: zod.string(),
+  role: zod.enum([
+    "super_admin",
+    "hr_admin",
+    "finance_officer",
+    "manager",
+    "employee",
+    "partner",
+    "trainee",
+  ]),
+  employeeId: zod.number().nullish(),
+  phone: zod.string().nullish(),
+  mobile: zod.string().nullish(),
+  cnic: zod.string().nullish(),
+  profilePicture: zod.string().nullish(),
+  status: zod.enum(["active", "inactive"]),
+  createdAt: zod.string(),
+});
+export const GetUsersResponse = zod.array(GetUsersResponseItem);
+
+/**
+ * @summary Create a new user
+ */
+export const CreateUserBody = zod.object({
+  email: zod.string(),
+  name: zod.string(),
+  password: zod.string(),
+  role: zod.enum([
+    "super_admin",
+    "hr_admin",
+    "finance_officer",
+    "manager",
+    "employee",
+    "partner",
+    "trainee",
+  ]),
+  phone: zod.string().optional(),
+  mobile: zod.string().optional(),
+  cnic: zod.string().optional(),
+  employeeId: zod.number().optional(),
+});
+
+/**
+ * @summary Get user by ID
+ */
+export const GetUserByIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetUserByIdResponse = zod.object({
+  id: zod.number(),
+  email: zod.string(),
+  name: zod.string(),
+  role: zod.enum([
+    "super_admin",
+    "hr_admin",
+    "finance_officer",
+    "manager",
+    "employee",
+    "partner",
+    "trainee",
+  ]),
+  employeeId: zod.number().nullish(),
+  phone: zod.string().nullish(),
+  mobile: zod.string().nullish(),
+  cnic: zod.string().nullish(),
+  profilePicture: zod.string().nullish(),
+  status: zod.enum(["active", "inactive"]),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Update user
+ */
+export const UpdateUserParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateUserBody = zod.object({
+  name: zod.string().optional(),
+  email: zod.string().optional(),
+  role: zod
+    .enum([
+      "super_admin",
+      "hr_admin",
+      "finance_officer",
+      "manager",
+      "employee",
+      "partner",
+      "trainee",
+    ])
+    .optional(),
+  phone: zod.string().optional(),
+  mobile: zod.string().optional(),
+  cnic: zod.string().optional(),
+  status: zod.enum(["active", "inactive"]).optional(),
+  employeeId: zod.number().optional(),
+  password: zod.string().optional(),
+});
+
+export const UpdateUserResponse = zod.object({
+  id: zod.number(),
+  email: zod.string(),
+  name: zod.string(),
+  role: zod.enum([
+    "super_admin",
+    "hr_admin",
+    "finance_officer",
+    "manager",
+    "employee",
+    "partner",
+    "trainee",
+  ]),
+  employeeId: zod.number().nullish(),
+  phone: zod.string().nullish(),
+  mobile: zod.string().nullish(),
+  cnic: zod.string().nullish(),
+  profilePicture: zod.string().nullish(),
+  status: zod.enum(["active", "inactive"]),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Update own profile
+ */
+export const UpdateProfileBody = zod.object({
+  name: zod.string().optional(),
+  phone: zod.string().optional(),
+  mobile: zod.string().optional(),
+  cnic: zod.string().optional(),
+  profilePicture: zod.string().optional(),
+});
+
+export const UpdateProfileResponse = zod.object({
+  id: zod.number(),
+  email: zod.string(),
+  name: zod.string(),
+  role: zod.enum([
+    "super_admin",
+    "hr_admin",
+    "finance_officer",
+    "manager",
+    "employee",
+    "partner",
+    "trainee",
+  ]),
+  employeeId: zod.number().nullish(),
+  phone: zod.string().nullish(),
+  mobile: zod.string().nullish(),
+  cnic: zod.string().nullish(),
+  profilePicture: zod.string().nullish(),
+  status: zod.enum(["active", "inactive"]),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Change own password
+ */
+export const ChangePasswordBody = zod.object({
+  currentPassword: zod.string(),
+  newPassword: zod.string(),
+});
+
+export const ChangePasswordResponse = zod.object({
+  message: zod.string().optional(),
+});
+
+/**
+ * @summary Get activity logs
+ */
+export const GetActivityLogsQueryParams = zod.object({
+  userId: zod.coerce.number().optional(),
+  module: zod.coerce.string().optional(),
+  action: zod.coerce.string().optional(),
+  limit: zod.coerce.number().optional(),
+  offset: zod.coerce.number().optional(),
+});
+
+export const GetActivityLogsResponse = zod.object({
+  logs: zod.array(
+    zod.object({
+      id: zod.number(),
+      userId: zod.number(),
+      userName: zod.string(),
+      action: zod.enum([
+        "create",
+        "update",
+        "delete",
+        "login",
+        "logout",
+        "approve",
+        "reject",
+        "status_change",
+        "view",
+        "download",
+        "upload",
+      ]),
+      module: zod.string(),
+      entityId: zod.number().nullish(),
+      entityType: zod.string().nullish(),
+      description: zod.string(),
+      ipAddress: zod.string().nullish(),
+      createdAt: zod.string(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
+ * @summary Get client credentials (masked)
+ */
+export const GetClientCredentialsParams = zod.object({
+  clientId: zod.coerce.number(),
+});
+
+export const GetClientCredentialsResponseItem = zod.object({
+  id: zod.number(),
+  clientId: zod.number(),
+  portalName: zod.string(),
+  loginId: zod.string(),
+  maskedPassword: zod.string(),
+  portalUrl: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+export const GetClientCredentialsResponse = zod.array(
+  GetClientCredentialsResponseItem,
+);
+
+/**
+ * @summary Add client credential
+ */
+export const CreateClientCredentialParams = zod.object({
+  clientId: zod.coerce.number(),
+});
+
+export const CreateClientCredentialBody = zod.object({
+  portalName: zod.string(),
+  loginId: zod.string(),
+  password: zod.string(),
+  portalUrl: zod.string().optional(),
+  notes: zod.string().optional(),
+});
+
+/**
+ * @summary Update client credential
+ */
+export const UpdateClientCredentialParams = zod.object({
+  clientId: zod.coerce.number(),
+  id: zod.coerce.number(),
+});
+
+export const UpdateClientCredentialBody = zod.object({
+  portalName: zod.string(),
+  loginId: zod.string(),
+  password: zod.string(),
+  portalUrl: zod.string().optional(),
+  notes: zod.string().optional(),
+});
+
+export const UpdateClientCredentialResponse = zod.object({
+  id: zod.number(),
+  clientId: zod.number(),
+  portalName: zod.string(),
+  loginId: zod.string(),
+  maskedPassword: zod.string(),
+  portalUrl: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Delete client credential
+ */
+export const DeleteClientCredentialParams = zod.object({
+  clientId: zod.coerce.number(),
+  id: zod.coerce.number(),
+});
+
+export const DeleteClientCredentialResponse = zod.object({
+  message: zod.string().optional(),
+});
+
+/**
+ * @summary Reveal credential password (Partner/Admin only)
+ */
+export const RevealClientCredentialParams = zod.object({
+  clientId: zod.coerce.number(),
+  id: zod.coerce.number(),
+});
+
+export const RevealClientCredentialResponse = zod.object({
+  password: zod.string(),
+});
+
+/**
+ * @summary List engagements
+ */
+export const GetEngagementsQueryParams = zod.object({
+  clientId: zod.coerce.number().optional(),
+  status: zod.coerce.string().optional(),
+  type: zod.coerce.string().optional(),
+});
+
+export const GetEngagementsResponseItem = zod.object({
+  id: zod.number(),
+  engagementCode: zod.string(),
+  clientId: zod.number(),
+  clientName: zod.string(),
+  title: zod.string(),
+  type: zod.enum([
+    "audit",
+    "tax",
+    "advisory",
+    "accounting",
+    "compliance",
+    "other",
+  ]),
+  status: zod.enum([
+    "planning",
+    "execution",
+    "review",
+    "completed",
+    "on_hold",
+    "cancelled",
+  ]),
+  description: zod.string().nullish(),
+  startDate: zod.string(),
+  endDate: zod.string().nullish(),
+  partnerId: zod.number().nullish(),
+  partnerName: zod.string().nullish(),
+  managerId: zod.number().nullish(),
+  managerName: zod.string().nullish(),
+  budget: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  assignmentCount: zod.number(),
+  createdAt: zod.string(),
+});
+export const GetEngagementsResponse = zod.array(GetEngagementsResponseItem);
+
+/**
+ * @summary Create engagement
+ */
+export const CreateEngagementBody = zod.object({
+  clientId: zod.number(),
+  title: zod.string(),
+  type: zod.enum([
+    "audit",
+    "tax",
+    "advisory",
+    "accounting",
+    "compliance",
+    "other",
+  ]),
+  description: zod.string().optional(),
+  startDate: zod.string(),
+  endDate: zod.string().optional(),
+  partnerId: zod.number().optional(),
+  managerId: zod.number().optional(),
+  budget: zod.string().optional(),
+  notes: zod.string().optional(),
+});
+
+/**
+ * @summary Get engagement by ID
+ */
+export const GetEngagementParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEngagementResponse = zod.object({
+  id: zod.number(),
+  engagementCode: zod.string(),
+  clientId: zod.number(),
+  clientName: zod.string(),
+  title: zod.string(),
+  type: zod.enum([
+    "audit",
+    "tax",
+    "advisory",
+    "accounting",
+    "compliance",
+    "other",
+  ]),
+  status: zod.enum([
+    "planning",
+    "execution",
+    "review",
+    "completed",
+    "on_hold",
+    "cancelled",
+  ]),
+  description: zod.string().nullish(),
+  startDate: zod.string(),
+  endDate: zod.string().nullish(),
+  partnerId: zod.number().nullish(),
+  partnerName: zod.string().nullish(),
+  managerId: zod.number().nullish(),
+  managerName: zod.string().nullish(),
+  budget: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  assignmentCount: zod.number(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Update engagement
+ */
+export const UpdateEngagementParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateEngagementBody = zod.object({
+  title: zod.string().optional(),
+  type: zod
+    .enum(["audit", "tax", "advisory", "accounting", "compliance", "other"])
+    .optional(),
+  status: zod
+    .enum([
+      "planning",
+      "execution",
+      "review",
+      "completed",
+      "on_hold",
+      "cancelled",
+    ])
+    .optional(),
+  description: zod.string().optional(),
+  startDate: zod.string().optional(),
+  endDate: zod.string().optional(),
+  partnerId: zod.number().optional(),
+  managerId: zod.number().optional(),
+  budget: zod.string().optional(),
+  notes: zod.string().optional(),
+});
+
+export const UpdateEngagementResponse = zod.object({
+  id: zod.number(),
+  engagementCode: zod.string(),
+  clientId: zod.number(),
+  clientName: zod.string(),
+  title: zod.string(),
+  type: zod.enum([
+    "audit",
+    "tax",
+    "advisory",
+    "accounting",
+    "compliance",
+    "other",
+  ]),
+  status: zod.enum([
+    "planning",
+    "execution",
+    "review",
+    "completed",
+    "on_hold",
+    "cancelled",
+  ]),
+  description: zod.string().nullish(),
+  startDate: zod.string(),
+  endDate: zod.string().nullish(),
+  partnerId: zod.number().nullish(),
+  partnerName: zod.string().nullish(),
+  managerId: zod.number().nullish(),
+  managerName: zod.string().nullish(),
+  budget: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  assignmentCount: zod.number(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Get engagement team assignments
+ */
+export const GetEngagementAssignmentsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEngagementAssignmentsResponseItem = zod.object({
+  id: zod.number(),
+  engagementId: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string(),
+  role: zod.string(),
+  hoursAllocated: zod.number().nullish(),
+  hoursWorked: zod.number(),
+  notes: zod.string().nullish(),
+  assignedAt: zod.string(),
+});
+export const GetEngagementAssignmentsResponse = zod.array(
+  GetEngagementAssignmentsResponseItem,
+);
+
+/**
+ * @summary Assign staff to engagement
+ */
+export const AddEngagementAssignmentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddEngagementAssignmentBody = zod.object({
+  employeeId: zod.number(),
+  role: zod.string(),
+  hoursAllocated: zod.number().optional(),
+  notes: zod.string().optional(),
+});
+
+/**
+ * @summary List documents
+ */
+export const GetDocumentsQueryParams = zod.object({
+  clientId: zod.coerce.number().optional(),
+  engagementId: zod.coerce.number().optional(),
+  category: zod.coerce.string().optional(),
+});
+
+export const GetDocumentsResponseItem = zod.object({
+  id: zod.number(),
+  fileName: zod.string(),
+  originalName: zod.string(),
+  fileSize: zod.number(),
+  mimeType: zod.string(),
+  category: zod.enum([
+    "trial_balance",
+    "general_ledger",
+    "bank_statement",
+    "tax_return",
+    "audit_report",
+    "engagement_letter",
+    "financial_statement",
+    "correspondence",
+    "other",
+  ]),
+  clientId: zod.number().nullish(),
+  clientName: zod.string().nullish(),
+  engagementId: zod.number().nullish(),
+  description: zod.string().nullish(),
+  version: zod.number(),
+  uploadedById: zod.number(),
+  uploadedByName: zod.string(),
+  createdAt: zod.string(),
+});
+export const GetDocumentsResponse = zod.array(GetDocumentsResponseItem);
+
+/**
+ * @summary Upload a document
+ */
+export const UploadDocumentBody = zod.object({
+  file: zod.instanceof(File).optional(),
+  category: zod.string().optional(),
+  clientId: zod.number().optional(),
+  engagementId: zod.number().optional(),
+  description: zod.string().optional(),
+});
+
+/**
+ * @summary Get document details
+ */
+export const GetDocumentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetDocumentResponse = zod.object({
+  id: zod.number(),
+  fileName: zod.string(),
+  originalName: zod.string(),
+  fileSize: zod.number(),
+  mimeType: zod.string(),
+  category: zod.enum([
+    "trial_balance",
+    "general_ledger",
+    "bank_statement",
+    "tax_return",
+    "audit_report",
+    "engagement_letter",
+    "financial_statement",
+    "correspondence",
+    "other",
+  ]),
+  clientId: zod.number().nullish(),
+  clientName: zod.string().nullish(),
+  engagementId: zod.number().nullish(),
+  description: zod.string().nullish(),
+  version: zod.number(),
+  uploadedById: zod.number(),
+  uploadedByName: zod.string(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Delete document
+ */
+export const DeleteDocumentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteDocumentResponse = zod.object({
+  message: zod.string().optional(),
 });

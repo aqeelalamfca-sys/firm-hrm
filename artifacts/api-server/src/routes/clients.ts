@@ -35,6 +35,8 @@ router.get("/", async (req, res) => {
         phone: c.phone,
         address: c.address,
         industry: c.industry,
+        ntn: c.ntn,
+        registrationNo: c.registrationNo,
         status: c.status,
         ...financials,
         createdAt: c.createdAt,
@@ -61,6 +63,8 @@ router.get("/:id", async (req, res) => {
     phone: c.phone,
     address: c.address,
     industry: c.industry,
+    ntn: c.ntn,
+    registrationNo: c.registrationNo,
     status: c.status,
     ...financials,
     createdAt: c.createdAt,
@@ -68,7 +72,7 @@ router.get("/:id", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { name, contactPerson, email, phone, address, industry } = req.body;
+  const { name, contactPerson, email, phone, address, industry, ntn, registrationNo } = req.body;
   if (!name || !contactPerson || !email) {
     return res.status(400).json({ error: "Name, contact person, and email are required" });
   }
@@ -82,6 +86,8 @@ router.post("/", async (req, res) => {
     phone: phone || null,
     address: address || null,
     industry: industry || null,
+    ntn: ntn || null,
+    registrationNo: registrationNo || null,
   }).returning();
 
   res.status(201).json({
@@ -95,7 +101,7 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const updates: Record<string, any> = { updatedAt: new Date() };
-  const fields = ["name", "contactPerson", "email", "phone", "address", "industry", "status"];
+  const fields = ["name", "contactPerson", "email", "phone", "address", "industry", "status", "ntn", "registrationNo"];
   for (const f of fields) {
     if (req.body[f] !== undefined) updates[f] = req.body[f];
   }

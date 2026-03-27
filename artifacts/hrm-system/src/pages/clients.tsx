@@ -47,6 +47,8 @@ export default function Clients() {
         email: fd.get('email') as string,
         phone: fd.get('phone') as string,
         industry: fd.get('industry') as string,
+        ntn: (fd.get('ntn') as string) || undefined,
+        registrationNo: (fd.get('registrationNo') as string) || undefined,
       }
     });
   };
@@ -99,6 +101,16 @@ export default function Clients() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Phone</label>
                   <Input name="phone" className="bg-muted/40 border-border/50" placeholder="+91 98765 43210" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">NTN</label>
+                  <Input name="ntn" className="bg-muted/40 border-border/50" placeholder="1234567-8" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Registration No.</label>
+                  <Input name="registrationNo" className="bg-muted/40 border-border/50" placeholder="REG-12345" />
                 </div>
               </div>
               <div className="pt-4 flex justify-end gap-3 border-t border-border/50">
@@ -209,7 +221,13 @@ export default function Clients() {
                   )}
                 </div>
 
-                {/* Footer */}
+                {client.ntn && (
+                  <div className="flex items-center gap-2.5 text-sm text-foreground/80">
+                    <Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-xs">NTN: {client.ntn}</span>
+                  </div>
+                )}
+
                 <div className="pt-4 border-t border-border/50 flex items-center justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground mb-0.5">Outstanding</p>

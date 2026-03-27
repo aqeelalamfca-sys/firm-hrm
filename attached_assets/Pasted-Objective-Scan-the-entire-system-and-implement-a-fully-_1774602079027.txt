@@ -1,0 +1,176 @@
+Objective:
+Scan the entire system and implement a fully integrated Project & Task Scheduling Module with Calendar View, enabling assignment, tracking, deadlines, and status management across all roles (Admin, Partner, Manager, Trainee), without breaking existing functionality, UI, or workflows.
+
+🔍 PHASE 1 — SYSTEM INTEGRATION SCAN
+Identify:
+Existing modules: Clients, Engagements, Users
+Existing role system (RBAC)
+Existing dashboard and navigation
+Ensure:
+New module integrates with:
+Client
+Engagement
+User (staff allocation)
+No duplication of data models
+🗂️ PHASE 2 — DATA MODEL (PRISMA / DATABASE)
+
+Create the following models:
+
+1. Project / Engagement Task
+Task {
+  id
+  title
+  description
+  clientId
+  engagementId
+  assignedTo (User ID)
+  assignedBy
+  roleLevel (Trainee/Manager/Partner)
+  startDate
+  dueDate
+  status (Pending / In Progress / Completed / Delayed)
+  priority (Low / Medium / High / Critical)
+  progressPercentage
+  remarks
+  createdAt
+  updatedAt
+}
+2. Task Activity Log
+TaskLog {
+  id
+  taskId
+  action (Created / Updated / Status Changed / Reassigned)
+  performedBy
+  timestamp
+}
+📅 PHASE 3 — CALENDAR MODULE (CORE FEATURE)
+Build a Calendar Interface (Full View):
+Month View
+Week View
+Day View
+Features:
+Display all tasks on calendar by:
+Due Date
+Start Date
+Color coding:
+Pending → Gray
+In Progress → Blue
+Completed → Green
+Delayed → Red
+Click event → open task details modal
+🧩 PHASE 4 — TASK MANAGEMENT FEATURES
+Create Task:
+Title
+Description
+Client selection (dropdown)
+Engagement selection
+Assign to user
+Set:
+Start Date
+Due Date
+Priority
+Status
+Edit Task:
+All fields editable (based on role)
+Maintain change logs
+Task Allocation:
+Manager → assign to Trainee
+Partner → assign to Manager
+Admin → full control
+Status Workflow:
+Pending → In Progress → Completed
+Auto-flag:
+If due date passed → Status = Delayed
+🔐 PHASE 5 — ROLE-BASED CONTROL
+Permissions:
+Role	Permissions
+Admin	Full access
+Partner	View all + assign + approve
+Manager	Assign to trainees + update
+Trainee	View assigned + update status
+📊 PHASE 6 — DASHBOARD INTEGRATION
+
+Add widgets:
+
+Admin Dashboard:
+Total Tasks
+Overdue Tasks
+Completed Tasks %
+Partner Dashboard:
+Pending Approvals
+Critical Tasks
+Manager Dashboard:
+Team Task Load
+Upcoming Deadlines
+Trainee Dashboard:
+My Tasks
+Due Today
+Overdue
+🔔 PHASE 7 — NOTIFICATIONS SYSTEM
+
+Implement:
+
+Task Assigned → Notify user
+Due Date Reminder → 1 day before
+Overdue Alert → After due date
+Status Change → Notify Manager
+🔄 PHASE 8 — AUTO SYNC & REAL-TIME UPDATE
+Calendar updates instantly on:
+Task creation
+Status change
+Reassignment
+Use:
+WebSockets or polling (if needed)
+📎 PHASE 9 — LINK WITH ENGAGEMENT WORKFLOW
+
+Ensure:
+
+Tasks linked to:
+Specific Client
+Specific Engagement
+Specific Audit Phase
+🧾 PHASE 10 — AUDIT TRAIL (MANDATORY)
+
+Log:
+
+Task creation
+Edits
+Status changes
+Assignment changes
+
+Include:
+
+User
+Timestamp
+Action
+⚙️ PHASE 11 — UI/UX REQUIREMENTS
+DO NOT change existing UI
+Add:
+“Task Scheduler / Calendar” tab
+Keep:
+Compact layout
+Role-based views
+Smooth navigation
+🚀 PHASE 12 — PERFORMANCE & SCALABILITY
+
+Ensure:
+
+Handles 200+ users
+Fast loading calendar
+Optimized queries
+No duplication
+❗ CRITICAL INSTRUCTIONS
+DO NOT:
+Break existing modules
+Change database structure unnecessarily
+Remove existing data
+MUST:
+Integrate cleanly
+Maintain data integrity
+Ensure zero data loss
+✅ FINAL OUTPUT
+Fully working Calendar-based Task Management System
+Role-based assignment and tracking
+Real-time updates
+Audit-ready logs
+Seamless integration with AuditWise

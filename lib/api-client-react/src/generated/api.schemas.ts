@@ -290,6 +290,8 @@ export interface Client {
   phone?: string | null;
   address?: string | null;
   industry?: string | null;
+  ntn?: string | null;
+  registrationNo?: string | null;
   status: ClientStatus;
   totalBilled: number;
   totalPaid: number;
@@ -304,6 +306,8 @@ export interface CreateClientRequest {
   phone?: string;
   address?: string;
   industry?: string;
+  ntn?: string;
+  registrationNo?: string;
 }
 
 export type UpdateClientRequestStatus =
@@ -472,6 +476,318 @@ export interface InvoiceSummary {
   monthlyRevenue: MonthlyRevenue[];
 }
 
+export type UserProfileRole =
+  (typeof UserProfileRole)[keyof typeof UserProfileRole];
+
+export const UserProfileRole = {
+  super_admin: "super_admin",
+  hr_admin: "hr_admin",
+  finance_officer: "finance_officer",
+  manager: "manager",
+  employee: "employee",
+  partner: "partner",
+  trainee: "trainee",
+} as const;
+
+export type UserProfileStatus =
+  (typeof UserProfileStatus)[keyof typeof UserProfileStatus];
+
+export const UserProfileStatus = {
+  active: "active",
+  inactive: "inactive",
+} as const;
+
+export interface UserProfile {
+  id: number;
+  email: string;
+  name: string;
+  role: UserProfileRole;
+  employeeId?: number | null;
+  phone?: string | null;
+  mobile?: string | null;
+  cnic?: string | null;
+  profilePicture?: string | null;
+  status: UserProfileStatus;
+  createdAt: string;
+}
+
+export type CreateUserRequestRole =
+  (typeof CreateUserRequestRole)[keyof typeof CreateUserRequestRole];
+
+export const CreateUserRequestRole = {
+  super_admin: "super_admin",
+  hr_admin: "hr_admin",
+  finance_officer: "finance_officer",
+  manager: "manager",
+  employee: "employee",
+  partner: "partner",
+  trainee: "trainee",
+} as const;
+
+export interface CreateUserRequest {
+  email: string;
+  name: string;
+  password: string;
+  role: CreateUserRequestRole;
+  phone?: string;
+  mobile?: string;
+  cnic?: string;
+  employeeId?: number;
+}
+
+export type UpdateUserRequestRole =
+  (typeof UpdateUserRequestRole)[keyof typeof UpdateUserRequestRole];
+
+export const UpdateUserRequestRole = {
+  super_admin: "super_admin",
+  hr_admin: "hr_admin",
+  finance_officer: "finance_officer",
+  manager: "manager",
+  employee: "employee",
+  partner: "partner",
+  trainee: "trainee",
+} as const;
+
+export type UpdateUserRequestStatus =
+  (typeof UpdateUserRequestStatus)[keyof typeof UpdateUserRequestStatus];
+
+export const UpdateUserRequestStatus = {
+  active: "active",
+  inactive: "inactive",
+} as const;
+
+export interface UpdateUserRequest {
+  name?: string;
+  email?: string;
+  role?: UpdateUserRequestRole;
+  phone?: string;
+  mobile?: string;
+  cnic?: string;
+  status?: UpdateUserRequestStatus;
+  employeeId?: number;
+  password?: string;
+}
+
+export interface UpdateProfileRequest {
+  name?: string;
+  phone?: string;
+  mobile?: string;
+  cnic?: string;
+  profilePicture?: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export type ActivityLogAction =
+  (typeof ActivityLogAction)[keyof typeof ActivityLogAction];
+
+export const ActivityLogAction = {
+  create: "create",
+  update: "update",
+  delete: "delete",
+  login: "login",
+  logout: "logout",
+  approve: "approve",
+  reject: "reject",
+  status_change: "status_change",
+  view: "view",
+  download: "download",
+  upload: "upload",
+} as const;
+
+export interface ActivityLog {
+  id: number;
+  userId: number;
+  userName: string;
+  action: ActivityLogAction;
+  module: string;
+  entityId?: number | null;
+  entityType?: string | null;
+  description: string;
+  ipAddress?: string | null;
+  createdAt: string;
+}
+
+export interface ClientCredential {
+  id: number;
+  clientId: number;
+  portalName: string;
+  loginId: string;
+  maskedPassword: string;
+  portalUrl?: string | null;
+  notes?: string | null;
+  createdAt: string;
+}
+
+export interface CreateClientCredentialRequest {
+  portalName: string;
+  loginId: string;
+  password: string;
+  portalUrl?: string;
+  notes?: string;
+}
+
+export type EngagementResponseType =
+  (typeof EngagementResponseType)[keyof typeof EngagementResponseType];
+
+export const EngagementResponseType = {
+  audit: "audit",
+  tax: "tax",
+  advisory: "advisory",
+  accounting: "accounting",
+  compliance: "compliance",
+  other: "other",
+} as const;
+
+export type EngagementResponseStatus =
+  (typeof EngagementResponseStatus)[keyof typeof EngagementResponseStatus];
+
+export const EngagementResponseStatus = {
+  planning: "planning",
+  execution: "execution",
+  review: "review",
+  completed: "completed",
+  on_hold: "on_hold",
+  cancelled: "cancelled",
+} as const;
+
+export interface EngagementResponse {
+  id: number;
+  engagementCode: string;
+  clientId: number;
+  clientName: string;
+  title: string;
+  type: EngagementResponseType;
+  status: EngagementResponseStatus;
+  description?: string | null;
+  startDate: string;
+  endDate?: string | null;
+  partnerId?: number | null;
+  partnerName?: string | null;
+  managerId?: number | null;
+  managerName?: string | null;
+  budget?: string | null;
+  notes?: string | null;
+  assignmentCount: number;
+  createdAt: string;
+}
+
+export type CreateEngagementRequestType =
+  (typeof CreateEngagementRequestType)[keyof typeof CreateEngagementRequestType];
+
+export const CreateEngagementRequestType = {
+  audit: "audit",
+  tax: "tax",
+  advisory: "advisory",
+  accounting: "accounting",
+  compliance: "compliance",
+  other: "other",
+} as const;
+
+export interface CreateEngagementRequest {
+  clientId: number;
+  title: string;
+  type: CreateEngagementRequestType;
+  description?: string;
+  startDate: string;
+  endDate?: string;
+  partnerId?: number;
+  managerId?: number;
+  budget?: string;
+  notes?: string;
+}
+
+export type UpdateEngagementRequestType =
+  (typeof UpdateEngagementRequestType)[keyof typeof UpdateEngagementRequestType];
+
+export const UpdateEngagementRequestType = {
+  audit: "audit",
+  tax: "tax",
+  advisory: "advisory",
+  accounting: "accounting",
+  compliance: "compliance",
+  other: "other",
+} as const;
+
+export type UpdateEngagementRequestStatus =
+  (typeof UpdateEngagementRequestStatus)[keyof typeof UpdateEngagementRequestStatus];
+
+export const UpdateEngagementRequestStatus = {
+  planning: "planning",
+  execution: "execution",
+  review: "review",
+  completed: "completed",
+  on_hold: "on_hold",
+  cancelled: "cancelled",
+} as const;
+
+export interface UpdateEngagementRequest {
+  title?: string;
+  type?: UpdateEngagementRequestType;
+  status?: UpdateEngagementRequestStatus;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  partnerId?: number;
+  managerId?: number;
+  budget?: string;
+  notes?: string;
+}
+
+export interface EngagementAssignment {
+  id: number;
+  engagementId: number;
+  employeeId: number;
+  employeeName: string;
+  role: string;
+  hoursAllocated?: number | null;
+  hoursWorked: number;
+  notes?: string | null;
+  assignedAt: string;
+}
+
+export interface CreateAssignmentRequest {
+  employeeId: number;
+  role: string;
+  hoursAllocated?: number;
+  notes?: string;
+}
+
+export type DocumentResponseCategory =
+  (typeof DocumentResponseCategory)[keyof typeof DocumentResponseCategory];
+
+export const DocumentResponseCategory = {
+  trial_balance: "trial_balance",
+  general_ledger: "general_ledger",
+  bank_statement: "bank_statement",
+  tax_return: "tax_return",
+  audit_report: "audit_report",
+  engagement_letter: "engagement_letter",
+  financial_statement: "financial_statement",
+  correspondence: "correspondence",
+  other: "other",
+} as const;
+
+export interface DocumentResponse {
+  id: number;
+  fileName: string;
+  originalName: string;
+  fileSize: number;
+  mimeType: string;
+  category: DocumentResponseCategory;
+  clientId?: number | null;
+  clientName?: string | null;
+  engagementId?: number | null;
+  description?: string | null;
+  version: number;
+  uploadedById: number;
+  uploadedByName: string;
+  createdAt: string;
+}
+
 export type GetEmployeesParams = {
   department?: string;
   status?: string;
@@ -508,4 +824,58 @@ export type GetInvoicesParams = {
   status?: string;
   fromDate?: string;
   toDate?: string;
+};
+
+export type GetUsersParams = {
+  role?: string;
+  status?: string;
+};
+
+export type ChangePassword200 = {
+  message?: string;
+};
+
+export type GetActivityLogsParams = {
+  userId?: number;
+  module?: string;
+  action?: string;
+  limit?: number;
+  offset?: number;
+};
+
+export type GetActivityLogs200 = {
+  logs: ActivityLog[];
+  total: number;
+};
+
+export type DeleteClientCredential200 = {
+  message?: string;
+};
+
+export type RevealClientCredential200 = {
+  password: string;
+};
+
+export type GetEngagementsParams = {
+  clientId?: number;
+  status?: string;
+  type?: string;
+};
+
+export type GetDocumentsParams = {
+  clientId?: number;
+  engagementId?: number;
+  category?: string;
+};
+
+export type UploadDocumentBody = {
+  file?: Blob;
+  category?: string;
+  clientId?: number;
+  engagementId?: number;
+  description?: string;
+};
+
+export type DeleteDocument200 = {
+  message?: string;
 };

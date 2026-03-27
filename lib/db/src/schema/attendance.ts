@@ -19,6 +19,7 @@ export const attendanceTable = pgTable("attendance", {
   status: attendanceStatusEnum("status").notNull(),
   hoursWorked: decimal("hours_worked", { precision: 5, scale: 2 }),
   notes: text("notes"),
+  ipAddress: text("ip_address"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

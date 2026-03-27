@@ -8,7 +8,11 @@ export const userRoleEnum = pgEnum("user_role", [
   "finance_officer",
   "manager",
   "employee",
+  "partner",
+  "trainee",
 ]);
+
+export const userStatusEnum = pgEnum("user_status", ["active", "inactive"]);
 
 export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -17,6 +21,11 @@ export const usersTable = pgTable("users", {
   name: text("name").notNull(),
   role: userRoleEnum("role").notNull().default("employee"),
   employeeId: integer("employee_id"),
+  phone: text("phone"),
+  mobile: text("mobile"),
+  cnic: text("cnic"),
+  profilePicture: text("profile_picture"),
+  status: userStatusEnum("user_status").notNull().default("active"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

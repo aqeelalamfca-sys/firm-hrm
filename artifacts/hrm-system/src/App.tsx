@@ -16,6 +16,10 @@ import Payroll from "@/pages/payroll";
 import Clients from "@/pages/clients";
 import Invoices from "@/pages/invoices";
 import Reports from "@/pages/reports";
+import Engagements from "@/pages/engagements";
+import Documents from "@/pages/documents";
+import AuditTrail from "@/pages/audit-trail";
+import UserManagement from "@/pages/user-management";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -105,6 +109,10 @@ function Router() {
       <Route path="/clients"><ProtectedRoute component={Clients} /></Route>
       <Route path="/invoices"><ProtectedRoute component={Invoices} /></Route>
       <Route path="/reports"><ProtectedRoute component={Reports} /></Route>
+      <Route path="/engagements"><ProtectedRoute component={Engagements} /></Route>
+      <Route path="/documents"><ProtectedRoute component={Documents} /></Route>
+      <Route path="/audit-trail"><ProtectedRoute component={AuditTrail} /></Route>
+      <Route path="/user-management"><ProtectedRoute component={UserManagement} /></Route>
       <Route path="/"><ProtectedRoute component={Dashboard} /></Route>
       <Route component={NotFound} />
     </Switch>

@@ -13,4 +13,6 @@ export interface CreateClientRequest {
   phone?: string;
   address?: string;
   industry?: string;
+  ntn?: string;
+  registrationNo?: string;
 }
