@@ -1,0 +1,182 @@
+Below is a clean, developer-ready “Ultimate Replit Prompt” to design and implement a simple, attractive, role-based dashboard system using Figma principles, fully aligned with your requirements and audit-firm workflow.
+
+✅ ULTIMATE REPLIT PROMPT — ROLE-BASED DASHBOARD (FIGMA-INSPIRED UI)
+
+Objective:
+Redesign and implement role-based dashboards (Trainee, Manager, Partner) using Figma-inspired design principles to make the system:
+
+Simple
+Clean
+Easy to use
+Visually attractive
+Fast and minimal
+
+⚠️ Do NOT change backend logic, database, or existing workflows. Only improve dashboard UI + structure + usability.
+
+🎨 PHASE 1 — DESIGN SYSTEM (FIGMA STYLE)
+Use:
+Card-based layout
+Soft shadows
+Clean spacing
+Rounded corners (12–16px)
+Minimal text
+Typography:
+Clean modern font (IBM Plex / Inter)
+Clear hierarchy:
+Heading
+Subheading
+Data
+Color System:
+Element	Color
+Primary	Blue
+Success	Green
+Warning	Orange
+Danger	Red
+Neutral	Gray
+Role Accent Colors:
+Trainee → Light Blue
+Manager → Green
+Partner → Deep Red
+🧩 PHASE 2 — DASHBOARD STRUCTURE (COMMON)
+
+Each dashboard must include:
+
+Top Section:
+Welcome message
+Date & Time (Pakistan Time)
+User role badge
+Middle Section:
+Key action cards
+Bottom Section:
+Lists / tables (tasks, approvals, etc.)
+👨‍💻 PHASE 3 — TRAINEE DASHBOARD
+Cards (Top Row):
+⏱ Attendance
+Button:
+“Time In”
+After click → show “Time Out”
+Show:
+Current status (In / Out)
+
+👉 Logic:
+
+If Time In → Time Out visible
+Reset automatically at 12:00 AM Pakistan Time
+📝 Apply Leave
+Simple button
+Popup form
+📋 My Tasks
+Total tasks
+Pending / Completed
+Main Section:
+Task List:
+Task name
+Due date
+Status (color-based)
+👨‍💼 PHASE 4 — MANAGER DASHBOARD
+Cards:
+⏱ Attendance (same as trainee)
+📝 Apply Leave
+👥 Staff Status
+Present count
+Absent count
+💰 Reimbursements
+Pending approvals count
+Main Sections:
+1. Leave Requests (Approval Table)
+Employee name
+Date
+Approve / Reject buttons
+2. Staff Attendance List
+Present / Absent list
+3. Reimbursement Approval
+Amount
+Employee
+Approve / Reject
+4. Task Lists:
+Tasks assigned TO manager
+Tasks assigned BY manager
+5. Payroll Run
+Button:
+👉 “Run Payroll”
+👨‍⚖️ PHASE 5 — PARTNER DASHBOARD
+Cards:
+👥 Leave Requests
+Total pending approvals
+📊 Staff Status
+Present / Absent summary
+💰 Reimbursements
+Pending approvals
+📄 Invoices
+Paid / Unpaid / Overdue
+Main Sections:
+1. Leave Approvals
+Manager + Trainee requests
+2. Staff Attendance Summary
+3. Reimbursement Approvals
+4. Task Oversight
+Tasks assigned by partner
+5. Payroll Approval
+Button:
+👉 “Approve Payroll”
+6. Invoice Status
+List:
+Paid (Green)
+Pending (Yellow)
+Overdue (Red)
+⏱ PHASE 6 — ATTENDANCE LOGIC (IMPORTANT)
+Rules:
+Only one Time In per day
+Time Out only after Time In
+Reset daily at:
+👉 12:00 AM Pakistan Time
+Implementation:
+Use server-side timezone (PKT)
+Cron job or scheduled reset
+📊 PHASE 7 — UI COMPONENT RULES
+Buttons:
+Large, clear
+Icons + text
+Tables:
+Minimal columns
+Clean spacing
+Cards:
+Show only key data
+No clutter
+🔄 PHASE 8 — REAL-TIME BEHAVIOR
+Dashboard auto-refresh on:
+Task updates
+Leave approvals
+Attendance
+⚙️ PHASE 9 — FILTERS
+
+Add filters:
+
+Date
+Department
+User
+🔐 PHASE 10 — ACCESS CONTROL
+Trainee → only own data
+Manager → team data
+Partner → full access
+❗ CRITICAL INSTRUCTIONS
+DO NOT:
+Change backend logic
+Break existing workflows
+Modify database unnecessarily
+MUST:
+Keep UI simple
+Ensure fast performance
+Maintain clarity
+✅ FINAL OUTPUT
+Clean, modern dashboards (Figma-level UI)
+Role-based views
+Attendance system working with reset
+Task + approval flows visible
+Minimal, intuitive interface
+Fully usable for 200+ staff
+🔥 OPTIONAL (IF POSSIBLE)
+Add:
+Mini charts (attendance trend)
+Notifications panel
+Quick actions bar

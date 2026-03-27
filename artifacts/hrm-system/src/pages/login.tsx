@@ -31,66 +31,62 @@ export default function Login() {
 
   return (
     <div className="min-h-screen w-full flex bg-background">
-      <div className="hidden lg:flex w-1/2 bg-sidebar relative overflow-hidden items-center justify-center">
-        <img 
-          src={`${import.meta.env.BASE_URL}images/login-bg.png`} 
-          alt="Abstract geometric background" 
-          className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay"
-        />
-        <div className="relative z-10 p-12 text-sidebar-foreground max-w-lg">
-          <div className="flex items-center gap-3 mb-8">
-            <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-12 h-12 rounded-xl shadow-lg" />
-            <h1 className="text-4xl font-display font-bold">Vertex HR</h1>
+      <div className="hidden lg:flex w-[45%] bg-sidebar relative overflow-hidden items-center justify-center">
+        <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }} />
+        <div className="relative z-10 p-16 max-w-lg">
+          <div className="flex items-center gap-3 mb-10">
+            <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-11 h-11 rounded-xl shadow-lg" />
+            <h1 className="text-3xl font-bold tracking-tight text-sidebar-foreground">Vertex HR</h1>
           </div>
-          <p className="text-xl text-sidebar-foreground/80 leading-relaxed font-light">
+          <p className="text-lg leading-relaxed text-sidebar-foreground/65 font-light">
             Enterprise resource planning and intelligent invoicing designed specifically for modern CA and professional services firms.
           </p>
         </div>
       </div>
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background relative">
-        {/* Subtle decorative blob */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-3xl -z-10 transform translate-x-1/2 -translate-y-1/2"></div>
-        
-        <Card className="w-full max-w-md border-border/50 shadow-2xl shadow-primary/5 bg-card/80 backdrop-blur-sm">
-          <CardHeader className="space-y-2 text-center pt-8">
-            <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-2 text-primary">
-              <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-10 h-10 rounded-lg" />
+
+      <div className="w-full lg:w-[55%] flex items-center justify-center p-8 bg-background relative">
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/[0.04] rounded-full blur-3xl -z-10 transform translate-x-1/3 -translate-y-1/3" />
+
+        <Card className="w-full max-w-[420px] border-border/40 bg-card shadow-lg">
+          <CardHeader className="space-y-2 text-center pt-8 pb-2">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-1 bg-primary/[0.08]">
+              <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-9 h-9 rounded-lg" />
             </div>
-            <CardTitle className="text-2xl font-display font-bold">Welcome back</CardTitle>
-            <CardDescription className="text-base">Sign in to your account to continue</CardDescription>
+            <CardTitle className="text-2xl font-bold tracking-tight">Welcome back</CardTitle>
+            <CardDescription className="text-base text-muted-foreground">Sign in to your account to continue</CardDescription>
           </CardHeader>
-          <CardContent className="pb-8 px-8">
+          <CardContent className="pb-8 px-8 pt-4">
             <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-foreground/80 font-medium">Email Address</Label>
-                <Input 
-                  id="email" 
-                  type="email" 
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-sm font-medium text-foreground/70">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@firm.com" 
-                  required 
-                  className="h-12 bg-background border-border/50 focus:bg-background transition-colors"
+                  placeholder="name@firm.com"
+                  required
+                  className="h-11 bg-background/60 border-border/60 focus:border-primary/40 focus:bg-background transition-all"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-foreground/80 font-medium">Password</Label>
+                  <Label htmlFor="password" className="text-sm font-medium text-foreground/70">Password</Label>
                   <a href="#" className="text-sm font-medium text-primary hover:text-primary/80 transition-colors">Forgot password?</a>
                 </div>
-                <Input 
-                  id="password" 
-                  type="password" 
+                <Input
+                  id="password"
+                  type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••" 
-                  required 
-                  className="h-12 bg-background border-border/50 focus:bg-background transition-colors"
+                  placeholder="••••••••"
+                  required
+                  className="h-11 bg-background/60 border-border/60 focus:border-primary/40 focus:bg-background transition-all"
                 />
               </div>
               {error && <p className="text-sm text-destructive font-medium">{error}</p>}
-              <Button type="submit" className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/25 mt-4" disabled={loading}>
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Sign in"}
+              <Button type="submit" className="w-full h-11 text-sm font-semibold mt-2 shadow-md transition-all" disabled={loading}>
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign in"}
               </Button>
             </form>
           </CardContent>

@@ -80,24 +80,23 @@ export default function Dashboard() {
   const recentLeaves: any[] = safeStats.recentLeaves || [];
 
   return (
-    <div className="space-y-8 pb-10">
-      {/* Page Header */}
+    <div className="space-y-6 pb-10">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
-          <p className="text-sm text-muted-foreground font-medium">
+          <p className="text-sm text-muted-foreground/70 font-medium">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
-          <h1 className="text-3xl font-display font-bold mt-1">Dashboard</h1>
+          <h1 className="text-2xl font-bold mt-0.5 tracking-tight">Dashboard</h1>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <Link href="/attendance">
-            <Button variant="outline" size="sm" className="gap-2 shadow-sm">
-              <CalendarCheck className="w-4 h-4" /> Mark Attendance
+            <Button variant="outline" size="sm" className="gap-2 text-[13px] h-8">
+              <CalendarCheck className="w-3.5 h-3.5" /> Mark Attendance
             </Button>
           </Link>
           <Link href="/invoices">
-            <Button size="sm" className="gap-2 shadow-md shadow-primary/20">
-              <FileText className="w-4 h-4" /> New Invoice
+            <Button size="sm" className="gap-2 text-[13px] h-8 shadow-sm">
+              <FileText className="w-3.5 h-3.5" /> New Invoice
             </Button>
           </Link>
         </div>
@@ -140,7 +139,7 @@ export default function Dashboard() {
       </div>
 
       {roleStats && roleStats.type === "executive" && (
-        <Card className="shadow-sm border-border/60 bg-gradient-to-r from-violet-50 to-blue-50">
+        <Card className="border-border/50 bg-gradient-to-r from-violet-50 to-blue-50">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">Executive Overview</CardTitle>
             <CardDescription className="text-xs">Firm-wide performance metrics</CardDescription>
@@ -169,7 +168,7 @@ export default function Dashboard() {
       )}
 
       {roleStats && roleStats.type === "finance" && (
-        <Card className="shadow-sm border-border/60 bg-gradient-to-r from-emerald-50 to-blue-50">
+        <Card className="border-border/50 bg-gradient-to-r from-emerald-50 to-blue-50">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">Finance Overview</CardTitle>
             <CardDescription className="text-xs">Billing and collections summary</CardDescription>
@@ -198,7 +197,7 @@ export default function Dashboard() {
       )}
 
       {roleStats && roleStats.type === "hr" && (
-        <Card className="shadow-sm border-border/60 bg-gradient-to-r from-blue-50 to-indigo-50">
+        <Card className="border-border/50 bg-gradient-to-r from-blue-50 to-indigo-50">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">HR Overview</CardTitle>
             <CardDescription className="text-xs">Workforce and attendance summary</CardDescription>
@@ -227,9 +226,8 @@ export default function Dashboard() {
       )}
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Attendance Trend - Area Chart */}
-        <Card className="lg:col-span-2 shadow-sm border-border/60">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <Card className="lg:col-span-2 border-border/50 shadow-xs">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
@@ -271,8 +269,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Invoice Status - Donut */}
-        <Card className="shadow-sm border-border/60">
+        <Card className="border-border/50 shadow-xs">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
@@ -323,7 +320,7 @@ export default function Dashboard() {
 
       {taskStats && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="shadow-sm border-border/60">
+          <Card className="border-border/50">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div>
@@ -367,7 +364,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-border/60">
+          <Card className="border-border/50">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div>
@@ -409,7 +406,7 @@ export default function Dashboard() {
       {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Leave Requests */}
-        <Card className="shadow-sm border-border/60">
+        <Card className="border-border/50">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base font-semibold">Recent Leave Requests</CardTitle>
@@ -450,7 +447,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Quick Actions */}
-        <Card className="shadow-sm border-border/60">
+        <Card className="border-border/50">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
             <CardDescription className="text-xs">Common tasks at a glance</CardDescription>
@@ -486,16 +483,16 @@ function KPICard({
   title: string; value: string; subtitle: string; icon: any; iconColor: string; trend: "up" | "down" | "neutral";
 }) {
   return (
-    <Card className="shadow-sm border-border/60 hover:shadow-md transition-shadow duration-200">
+    <Card className="border-border/50 hover:border-border/80 shadow-xs transition-all duration-200">
       <CardContent className="p-5">
-        <div className="flex items-start justify-between mb-4">
-          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${iconColor}`}>
-            <Icon className="w-5 h-5" />
+        <div className="flex items-start justify-between mb-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${iconColor}`}>
+            <Icon className="w-[18px] h-[18px]" />
           </div>
-          <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
+          <div className={`flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-md ${
             trend === 'up' ? 'bg-emerald-50 text-emerald-600' :
             trend === 'down' ? 'bg-red-50 text-red-600' :
-            'bg-slate-50 text-slate-500'
+            'bg-slate-50 text-slate-400'
           }`}>
             {trend === 'up' && <TrendingUp className="w-3 h-3" />}
             {trend === 'down' && <TrendingDown className="w-3 h-3" />}
@@ -504,9 +501,9 @@ function KPICard({
           </div>
         </div>
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">{title}</p>
-          <p className="text-2xl font-display font-bold text-foreground tracking-tight">{value}</p>
-          <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">{title}</p>
+          <p className="text-2xl font-bold text-foreground tracking-tight">{value}</p>
+          <p className="text-xs text-muted-foreground/70 mt-0.5">{subtitle}</p>
         </div>
       </CardContent>
     </Card>

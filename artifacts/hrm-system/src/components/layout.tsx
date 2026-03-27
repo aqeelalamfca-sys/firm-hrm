@@ -64,15 +64,15 @@ const sections: { key: string; label: string }[] = [
 ];
 
 const NOTIF_TYPE_ICONS: Record<string, { icon: any; color: string }> = {
-  task_assigned: { icon: Calendar, color: "text-blue-600 bg-blue-100" },
-  task_due: { icon: Calendar, color: "text-amber-600 bg-amber-100" },
-  task_overdue: { icon: Calendar, color: "text-red-600 bg-red-100" },
-  task_status_changed: { icon: Check, color: "text-green-600 bg-green-100" },
-  invoice_created: { icon: FileText, color: "text-violet-600 bg-violet-100" },
-  invoice_status_changed: { icon: FileText, color: "text-emerald-600 bg-emerald-100" },
-  leave_approved: { icon: Palmtree, color: "text-green-600 bg-green-100" },
-  leave_rejected: { icon: Palmtree, color: "text-red-600 bg-red-100" },
-  system: { icon: Bell, color: "text-gray-600 bg-gray-100" },
+  task_assigned: { icon: Calendar, color: "text-blue-600 bg-blue-50" },
+  task_due: { icon: Calendar, color: "text-amber-600 bg-amber-50" },
+  task_overdue: { icon: Calendar, color: "text-red-600 bg-red-50" },
+  task_status_changed: { icon: Check, color: "text-green-600 bg-green-50" },
+  invoice_created: { icon: FileText, color: "text-violet-600 bg-violet-50" },
+  invoice_status_changed: { icon: FileText, color: "text-emerald-600 bg-emerald-50" },
+  leave_approved: { icon: Palmtree, color: "text-green-600 bg-green-50" },
+  leave_rejected: { icon: Palmtree, color: "text-red-600 bg-red-50" },
+  system: { icon: Bell, color: "text-gray-600 bg-gray-50" },
 };
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -152,30 +152,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row overflow-hidden">
       <div className="md:hidden flex items-center justify-between p-4 bg-sidebar text-sidebar-foreground">
-        <div className="flex items-center gap-2 font-display font-bold text-xl">
-          <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-8 h-8 rounded-md" />
+        <div className="flex items-center gap-2.5 font-bold text-lg tracking-tight">
+          <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-7 h-7 rounded-lg" />
           Vertex HR
         </div>
         <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-white hover:bg-sidebar-accent">
-          <Menu className="w-6 h-6" />
+          <Menu className="w-5 h-5" />
         </Button>
       </div>
 
       <motion.aside 
         initial={false}
-        animate={{ width: isSidebarOpen ? 260 : 0 }}
-        className={`bg-sidebar text-sidebar-foreground flex flex-col transition-all duration-300 ease-in-out shrink-0 ${isSidebarOpen ? 'w-[260px]' : 'w-0'} md:block overflow-hidden`}
+        animate={{ width: isSidebarOpen ? 252 : 0 }}
+        className={`bg-sidebar text-sidebar-foreground flex flex-col transition-all duration-300 ease-in-out shrink-0 ${isSidebarOpen ? 'w-[252px]' : 'w-0'} md:block overflow-hidden`}
       >
-        <div className="p-6 flex items-center gap-3 font-display font-bold text-2xl tracking-wide border-b border-sidebar-border">
-          <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-8 h-8 rounded-md shadow-sm" />
-          Vertex HR
+        <div className="px-5 py-5 flex items-center gap-2.5 font-bold text-lg tracking-tight border-b border-sidebar-border/60">
+          <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-8 h-8 rounded-lg" />
+          <span className="text-white">Vertex HR</span>
         </div>
         
-        <div className="p-4 flex-1 overflow-y-auto space-y-1">
+        <div className="px-3 py-3 flex-1 overflow-y-auto scrollbar-thin space-y-0.5">
           {activeSections.map((section, idx) => (
             <React.Fragment key={section.key}>
               {idx > 0 && <div className="pt-3" />}
-              <p className="text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2 px-2">{section.label}</p>
+              <p className="text-[11px] font-semibold text-sidebar-foreground/50 uppercase tracking-[0.08em] mb-1.5 px-3">{section.label}</p>
               {filteredItems
                 .filter((item) => item.section === section.key)
                 .map((item) => {
@@ -185,13 +185,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   return (
                     <Link key={item.href} href={item.href} className="block">
                       <div className={`
-                        flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group cursor-pointer
+                        flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 group cursor-pointer
                         ${isActive 
-                          ? 'bg-sidebar-primary text-sidebar-primary-foreground font-medium shadow-md shadow-black/10' 
-                          : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                          ? 'bg-sidebar-primary text-white font-medium' 
+                          : 'text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                         }
-                      `}>
-                        <Icon className={`w-5 h-5 ${isActive ? 'opacity-100' : 'opacity-70 group-hover:opacity-100 transition-opacity'}`} />
+                      `}
+                      style={isActive ? { boxShadow: '0 1px 3px rgba(0,0,0,0.12)' } : undefined}
+                      >
+                        <Icon className={`w-[18px] h-[18px] ${isActive ? 'opacity-100' : 'opacity-60 group-hover:opacity-90 transition-opacity'}`} />
                         {item.label}
                       </div>
                     </Link>
@@ -201,21 +203,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
           ))}
         </div>
 
-        <div className="p-4 border-t border-sidebar-border bg-sidebar-accent/30">
+        <div className="px-3 py-3 border-t border-sidebar-border/50">
           <Link href="/profile" className="block">
-            <div className="flex items-center gap-3 mb-3 px-2 cursor-pointer rounded-lg hover:bg-sidebar-accent/50 py-2 transition-colors">
-              <div className="w-10 h-10 rounded-full bg-sidebar-primary flex items-center justify-center font-bold text-white shadow-inner">
+            <div className="flex items-center gap-2.5 mb-2 px-2 cursor-pointer rounded-lg hover:bg-sidebar-accent/60 py-2 transition-colors">
+              <div className="w-9 h-9 rounded-full bg-sidebar-primary flex items-center justify-center text-sm font-semibold text-sidebar-primary-foreground">
                 {user.name.charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate text-white">{user.name}</p>
-                <p className="text-xs text-sidebar-foreground/60 truncate capitalize">{user.role.replace(/_/g, ' ')}</p>
+                <p className="text-sm font-medium truncate text-white/90">{user.name}</p>
+                <p className="text-[11px] text-sidebar-foreground/55 truncate capitalize">{user.role.replace(/_/g, ' ')}</p>
               </div>
             </div>
           </Link>
           <Button 
             variant="ghost" 
-            className="w-full justify-start text-sidebar-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
+            className="w-full justify-start text-sidebar-foreground/60 hover:text-red-400 hover:bg-destructive/10 transition-colors text-[13px] h-9"
             onClick={logout}
           >
             <LogOut className="w-4 h-4 mr-2" />
@@ -225,21 +227,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </motion.aside>
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-0">
-        <header className="h-16 bg-card/80 backdrop-blur-md border-b border-border flex items-center justify-between px-8 sticky top-0 z-10 hidden md:flex">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-muted-foreground hover:text-foreground">
-              <Menu className="w-5 h-5" />
+        <header className="h-14 bg-card border-b border-border/70 flex items-center justify-between px-6 sticky top-0 z-10 hidden md:flex">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-muted-foreground hover:text-foreground h-8 w-8">
+              <Menu className="w-4 h-4" />
             </Button>
-            <h2 className="font-display font-semibold text-lg text-foreground capitalize">
+            <h2 className="font-semibold text-[15px] text-foreground capitalize tracking-tight">
               {location === "/" ? "Dashboard" : location.split('/')[1].replace(/-/g, ' ')}
             </h2>
           </div>
-          <div className="flex items-center gap-4 relative" ref={notifRef}>
+          <div className="flex items-center gap-3 relative" ref={notifRef}>
             <Select
               value={selectedDepartmentId ? String(selectedDepartmentId) : "all"}
               onValueChange={(v) => setSelectedDepartmentId(v === "all" ? null : Number(v))}
             >
-              <SelectTrigger className="w-[160px] h-9 text-xs border-border/50 bg-background/50">
+              <SelectTrigger className="w-[150px] h-8 text-xs border-border/50 bg-background/60">
                 <SelectValue placeholder="All Departments" />
               </SelectTrigger>
               <SelectContent>
@@ -255,22 +257,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </SelectContent>
             </Select>
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
-              className="rounded-full relative border-border/50 bg-background/50 shadow-sm"
+              className="relative h-8 w-8 text-muted-foreground hover:text-foreground"
               onClick={() => setNotifOpen(!notifOpen)}
             >
-              <Bell className="w-4 h-4 text-muted-foreground" />
+              <Bell className="w-4 h-4" />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
                   {unreadCount > 99 ? "99+" : unreadCount}
                 </span>
               )}
             </Button>
 
             {notifOpen && (
-              <div className="absolute right-0 top-12 w-[380px] bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-muted/30">
+              <div className="absolute right-0 top-12 w-[360px] bg-card border border-border/70 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50">
                   <h3 className="font-semibold text-sm">Notifications</h3>
                   <div className="flex items-center gap-2">
                     {unreadCount > 0 && (
@@ -283,10 +285,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     </button>
                   </div>
                 </div>
-                <div className="max-h-[400px] overflow-y-auto">
+                <div className="max-h-[380px] overflow-y-auto scrollbar-thin">
                   {notifications.length === 0 ? (
                     <div className="py-12 text-center text-muted-foreground text-sm">
-                      <Bell className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      <Bell className="w-7 h-7 mx-auto mb-2 opacity-20" />
                       No notifications yet
                     </div>
                   ) : (
@@ -296,18 +298,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       return (
                         <div
                           key={n.id}
-                          className={`flex items-start gap-3 px-4 py-3 border-b border-border/30 hover:bg-muted/30 transition-colors cursor-pointer ${!n.isRead ? "bg-primary/5" : ""}`}
+                          className={`flex items-start gap-3 px-4 py-3 border-b border-border/20 hover:bg-muted/40 transition-colors cursor-pointer ${!n.isRead ? "bg-primary/[0.03]" : ""}`}
                           onClick={() => !n.isRead && markAsRead(n.id)}
                         >
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${typeConfig.color}`}>
-                            <NIcon className="w-4 h-4" />
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${typeConfig.color}`}>
+                            <NIcon className="w-3.5 h-3.5" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm ${!n.isRead ? "font-semibold" : ""}`}>{n.title}</p>
+                            <p className={`text-sm leading-snug ${!n.isRead ? "font-semibold" : ""}`}>{n.title}</p>
                             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
                             <p className="text-[10px] text-muted-foreground/70 mt-1">{timeAgo(n.createdAt)}</p>
                           </div>
-                          {!n.isRead && <div className="w-2 h-2 rounded-full bg-primary shrink-0 mt-2" />}
+                          {!n.isRead && <div className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mt-2" />}
                         </div>
                       );
                     })
@@ -317,8 +319,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
             )}
           </div>
         </header>
-        <div className="flex-1 overflow-auto p-4 md:p-8">
-          <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-400">
             {children}
           </div>
         </div>
