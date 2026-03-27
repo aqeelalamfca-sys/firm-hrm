@@ -172,7 +172,7 @@ All under `/api`:
 
 17 pages total:
 - `/login` - Login page
-- `/` - Dashboard (with role-specific Executive/Finance/HR overview cards)
+- `/` - Dashboard (role-based: Trainee=Light Blue tasks/attendance, Manager=Green staff/leave approvals, Partner/Admin=Deep Red executive overview with invoices/payroll/staff; all roles get Time In/Out card, leave apply, PKT time)
 - `/employees` - Employee management
 - `/attendance` - Attendance tracking (with IP capture)
 - `/leaves` - Leave management
