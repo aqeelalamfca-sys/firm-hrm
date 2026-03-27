@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
   Plus, FileText, CheckCircle, Send, AlertTriangle, ChevronRight,
-  IndianRupee, Receipt, Eye, Download
+  Receipt, Eye, Download
 } from "lucide-react";
 import { useDepartments } from "@/hooks/use-departments";
 import { DepartmentBadge } from "@/components/department-badge";
@@ -196,8 +196,8 @@ export default function Invoices() {
     </div>
     <div class="meta-section" style="text-align:right">
       <h3>Invoice Details</h3>
-      <p>Issue: ${new Date(inv.issueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
-      <p>Due: ${new Date(inv.dueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+      <p>Issue: ${new Date(inv.issueDate).toLocaleDateString("en-PK", { day: "numeric", month: "short", year: "numeric" })}</p>
+      <p>Due: ${new Date(inv.dueDate).toLocaleDateString("en-PK", { day: "numeric", month: "short", year: "numeric" })}</p>
       <p style="margin-top:8px"><span class="status status-${inv.status}">${inv.status}</span></p>
     </div>
   </div>
@@ -289,7 +289,7 @@ export default function Invoices() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Base Amount (₹) *</Label>
+                  <Label>Base Amount (Rs.) *</Label>
                   <Input
                     type="number" step="0.01" required placeholder="0.00"
                     value={form.amount}
@@ -340,16 +340,16 @@ export default function Invoices() {
               {baseAmount > 0 && (
                 <Card className="bg-muted/30 border-border/50">
                   <CardContent className="p-4 space-y-2 text-sm">
-                    <div className="flex justify-between"><span>Base Amount</span><span>₹{baseAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+                    <div className="flex justify-between"><span>Base Amount</span><span>Rs. {baseAmount.toLocaleString("en-PK", { minimumFractionDigits: 2 })}</span></div>
                     {gstAmount > 0 && (
-                      <div className="flex justify-between text-green-700"><span>+ GST ({gstRate}%)</span><span>₹{gstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+                      <div className="flex justify-between text-green-700"><span>+ GST ({gstRate}%)</span><span>Rs. {gstAmount.toLocaleString("en-PK", { minimumFractionDigits: 2 })}</span></div>
                     )}
                     {whtAmount > 0 && (
-                      <div className="flex justify-between text-red-700"><span>- WHT ({whtRate}%)</span><span>₹{whtAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+                      <div className="flex justify-between text-red-700"><span>- WHT ({whtRate}%)</span><span>Rs. {whtAmount.toLocaleString("en-PK", { minimumFractionDigits: 2 })}</span></div>
                     )}
                     <div className="flex justify-between font-bold text-base pt-2 border-t">
                       <span>Net Payable</span>
-                      <span>₹{totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                      <span>Rs. {totalAmount.toLocaleString("en-PK", { minimumFractionDigits: 2 })}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -401,7 +401,7 @@ export default function Invoices() {
         <InvoiceStat label="Total Invoices" value={summary.total.toString()} color="blue" />
         <InvoiceStat label="Pending Payment" value={(summary.issued + summary.approved).toString()} color="amber" />
         <InvoiceStat label="Paid" value={summary.paid.toString()} color="emerald" />
-        <InvoiceStat label="Outstanding" value={`₹${(summary.outstanding / 1000).toFixed(0)}K`} color="red" />
+        <InvoiceStat label="Outstanding" value={`Rs. ${(summary.outstanding / 1000).toFixed(0)}K`} color="red" />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -467,18 +467,18 @@ export default function Invoices() {
                             </div>
                           </td>
                           <td className="px-5 py-4">
-                            <p className="font-bold text-sm">₹{inv.totalAmount?.toLocaleString("en-IN")}</p>
-                            <p className="text-xs text-muted-foreground">Base: ₹{inv.amount?.toLocaleString("en-IN")}</p>
+                            <p className="font-bold text-sm">Rs. {inv.totalAmount?.toLocaleString("en-PK")}</p>
+                            <p className="text-xs text-muted-foreground">Base: Rs. {inv.amount?.toLocaleString("en-PK")}</p>
                           </td>
                           <td className="px-5 py-4">
                             <div className="text-xs space-y-0.5">
-                              {inv.gstAmount > 0 && <p className="text-green-700">GST: ₹{inv.gstAmount?.toLocaleString("en-IN")}</p>}
-                              {inv.whtAmount > 0 && <p className="text-red-700">WHT: ₹{inv.whtAmount?.toLocaleString("en-IN")}</p>}
+                              {inv.gstAmount > 0 && <p className="text-green-700">GST: Rs. {inv.gstAmount?.toLocaleString("en-PK")}</p>}
+                              {inv.whtAmount > 0 && <p className="text-red-700">WHT: Rs. {inv.whtAmount?.toLocaleString("en-PK")}</p>}
                               {inv.gstAmount === 0 && inv.whtAmount === 0 && <p className="text-muted-foreground">No tax</p>}
                             </div>
                           </td>
                           <td className="px-5 py-4">
-                            <p className="text-sm">{new Date(inv.dueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+                            <p className="text-sm">{new Date(inv.dueDate).toLocaleDateString("en-PK", { day: "numeric", month: "short", year: "numeric" })}</p>
                             {inv.status === "overdue" && (
                               <p className="text-xs text-red-600 flex items-center gap-1 mt-0.5"><AlertTriangle className="w-3 h-3" /> Overdue</p>
                             )}
@@ -511,7 +511,7 @@ export default function Invoices() {
             {!loading && filteredInvoices.length > 0 && (
               <div className="px-5 py-3 bg-muted/20 border-t border-border/50 flex justify-between items-center">
                 <span className="text-xs text-muted-foreground">{filteredInvoices.length} invoice{filteredInvoices.length !== 1 ? "s" : ""}</span>
-                <span className="text-sm font-semibold">Outstanding: ₹{summary.outstanding.toLocaleString("en-IN")}</span>
+                <span className="text-sm font-semibold">Outstanding: Rs. {summary.outstanding.toLocaleString("en-PK")}</span>
               </div>
             )}
           </Card>
@@ -545,12 +545,12 @@ export default function Invoices() {
                 {detailInvoice.description && <p className="text-sm text-muted-foreground">{detailInvoice.description}</p>}
                 <Card className="bg-muted/30">
                   <CardContent className="p-4 space-y-2 text-sm">
-                    <div className="flex justify-between"><span>Base Amount</span><span>₹{detailInvoice.amount?.toLocaleString("en-IN")}</span></div>
-                    {detailInvoice.gstAmount > 0 && <div className="flex justify-between text-green-700"><span>+ GST</span><span>₹{detailInvoice.gstAmount?.toLocaleString("en-IN")}</span></div>}
-                    {detailInvoice.whtAmount > 0 && <div className="flex justify-between text-red-700"><span>- WHT</span><span>₹{detailInvoice.whtAmount?.toLocaleString("en-IN")}</span></div>}
-                    <div className="flex justify-between font-bold text-base pt-2 border-t"><span>Net Payable</span><span>₹{detailInvoice.totalAmount?.toLocaleString("en-IN")}</span></div>
+                    <div className="flex justify-between"><span>Base Amount</span><span>Rs. {detailInvoice.amount?.toLocaleString("en-PK")}</span></div>
+                    {detailInvoice.gstAmount > 0 && <div className="flex justify-between text-green-700"><span>+ GST</span><span>Rs. {detailInvoice.gstAmount?.toLocaleString("en-PK")}</span></div>}
+                    {detailInvoice.whtAmount > 0 && <div className="flex justify-between text-red-700"><span>- WHT</span><span>Rs. {detailInvoice.whtAmount?.toLocaleString("en-PK")}</span></div>}
+                    <div className="flex justify-between font-bold text-base pt-2 border-t"><span>Net Payable</span><span>Rs. {detailInvoice.totalAmount?.toLocaleString("en-PK")}</span></div>
                     {detailInvoice.paidAmount > 0 && (
-                      <div className="flex justify-between text-emerald-700 pt-1"><span>Paid</span><span>₹{detailInvoice.paidAmount?.toLocaleString("en-IN")}</span></div>
+                      <div className="flex justify-between text-emerald-700 pt-1"><span>Paid</span><span>Rs. {detailInvoice.paidAmount?.toLocaleString("en-PK")}</span></div>
                     )}
                   </CardContent>
                 </Card>

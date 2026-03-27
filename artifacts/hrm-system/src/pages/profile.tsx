@@ -206,7 +206,7 @@ export default function Profile() {
               <InfoField icon={Smartphone} label="Mobile" value={user.mobile || "Not set"} />
               <InfoField icon={CreditCard} label="CNIC" value={user.cnic || "Not set"} />
               <InfoField icon={Shield} label="Role" value={user.role?.replace("_", " ").toUpperCase()} />
-              <InfoField icon={Calendar} label="Member Since" value={user.createdAt ? new Date(user.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—"} />
+              <InfoField icon={Calendar} label="Member Since" value={user.createdAt ? new Date(user.createdAt).toLocaleDateString("en-PK", { day: "numeric", month: "long", year: "numeric" }) : "—"} />
             </div>
           </CardContent>
         </Card>

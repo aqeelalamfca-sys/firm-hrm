@@ -225,9 +225,9 @@ export default function Leaves() {
                             <div className="flex items-center gap-4 text-xs text-muted-foreground">
                               <span className="flex items-center gap-1">
                                 <CalendarDays className="w-3.5 h-3.5" />
-                                {new Date(leave.fromDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                {new Date(leave.fromDate).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })}
                                 {' → '}
-                                {new Date(leave.toDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                {new Date(leave.toDate).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}
                               </span>
                               <span className="font-medium text-foreground/70">{leave.totalDays} day{leave.totalDays !== 1 ? 's' : ''}</span>
                             </div>

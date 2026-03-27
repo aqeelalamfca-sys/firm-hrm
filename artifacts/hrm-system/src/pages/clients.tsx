@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, Briefcase, Phone, Mail, Building2, IndianRupee, TrendingDown } from "lucide-react";
+import { Search, Plus, Briefcase, Phone, Mail, Building2, TrendingDown } from "lucide-react";
 import { useDepartments } from "@/hooks/use-departments";
 import { DepartmentBadge } from "@/components/department-badge";
 import { DepartmentSelect } from "@/components/department-select";
@@ -158,7 +158,7 @@ export default function Clients() {
             <TrendingDown className="w-5 h-5 text-red-500" />
             <div>
               <p className="text-xs text-red-600 font-medium">Total Outstanding</p>
-              <p className="text-lg font-display font-bold text-red-700">₹{totalOutstanding.toLocaleString('en-IN')}</p>
+              <p className="text-lg font-display font-bold text-red-700">Rs. {totalOutstanding.toLocaleString('en-PK')}</p>
             </div>
           </div>
         </div>
@@ -248,7 +248,7 @@ export default function Clients() {
                   <div>
                     <p className="text-xs text-muted-foreground mb-0.5">Outstanding</p>
                     <p className={`font-bold text-sm ${client.outstandingBalance > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                      {client.outstandingBalance > 0 ? `₹${client.outstandingBalance.toLocaleString('en-IN')}` : 'Cleared ✓'}
+                      {client.outstandingBalance > 0 ? `Rs. ${client.outstandingBalance.toLocaleString('en-PK')}` : 'Cleared ✓'}
                     </p>
                   </div>
                   <p className="text-xs text-muted-foreground font-mono">{client.clientCode}</p>

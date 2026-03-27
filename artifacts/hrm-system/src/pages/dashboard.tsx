@@ -131,7 +131,7 @@ export default function Dashboard() {
         />
         <KPICard
           title="Outstanding Balance"
-          value={isLoading ? "—" : `₹${(safeStats.totalOutstanding / 1000).toFixed(0)}K`}
+          value={isLoading ? "—" : `Rs. ${(safeStats.totalOutstanding / 1000).toFixed(0)}K`}
           subtitle="Total receivables"
           icon={Banknote}
           iconColor="bg-violet-500/10 text-violet-600"
@@ -148,11 +148,11 @@ export default function Dashboard() {
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center p-3 bg-white/80 rounded-xl border border-violet-100">
-                <p className="text-lg font-bold text-violet-700">₹{(roleStats.totalRevenue / 1000).toFixed(0)}K</p>
+                <p className="text-lg font-bold text-violet-700">Rs. {(roleStats.totalRevenue / 1000).toFixed(0)}K</p>
                 <p className="text-[10px] text-violet-500 font-medium">Total Revenue</p>
               </div>
               <div className="text-center p-3 bg-white/80 rounded-xl border border-amber-100">
-                <p className="text-lg font-bold text-amber-700">₹{(roleStats.totalReceivables / 1000).toFixed(0)}K</p>
+                <p className="text-lg font-bold text-amber-700">Rs. {(roleStats.totalReceivables / 1000).toFixed(0)}K</p>
                 <p className="text-[10px] text-amber-500 font-medium">Receivables</p>
               </div>
               <div className="text-center p-3 bg-white/80 rounded-xl border border-blue-100">
@@ -177,11 +177,11 @@ export default function Dashboard() {
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center p-3 bg-white/80 rounded-xl border border-emerald-100">
-                <p className="text-lg font-bold text-emerald-700">₹{(roleStats.totalPaid / 1000).toFixed(0)}K</p>
+                <p className="text-lg font-bold text-emerald-700">Rs. {(roleStats.totalPaid / 1000).toFixed(0)}K</p>
                 <p className="text-[10px] text-emerald-500 font-medium">Total Collected</p>
               </div>
               <div className="text-center p-3 bg-white/80 rounded-xl border border-amber-100">
-                <p className="text-lg font-bold text-amber-700">₹{(roleStats.totalOutstanding / 1000).toFixed(0)}K</p>
+                <p className="text-lg font-bold text-amber-700">Rs. {(roleStats.totalOutstanding / 1000).toFixed(0)}K</p>
                 <p className="text-[10px] text-amber-500 font-medium">Outstanding</p>
               </div>
               <div className="text-center p-3 bg-white/80 rounded-xl border border-red-100">
@@ -189,7 +189,7 @@ export default function Dashboard() {
                 <p className="text-[10px] text-red-500 font-medium">Overdue Invoices</p>
               </div>
               <div className="text-center p-3 bg-white/80 rounded-xl border border-blue-100">
-                <p className="text-lg font-bold text-blue-700">₹{(roleStats.totalPayrollCost / 1000).toFixed(0)}K</p>
+                <p className="text-lg font-bold text-blue-700">Rs. {(roleStats.totalPayrollCost / 1000).toFixed(0)}K</p>
                 <p className="text-[10px] text-blue-500 font-medium">Total Payroll</p>
               </div>
             </div>

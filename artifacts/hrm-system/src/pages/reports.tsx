@@ -82,7 +82,7 @@ export default function Reports() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <ReportKPI label="Total Employees" value={employees.length.toString()} icon={Users} color="blue" />
         <ReportKPI label="Total Invoices" value={invoices.length.toString()} icon={FileText} color="violet" />
-        <ReportKPI label="Total Billed" value={`₹${(invoices.reduce((s: number, i: any) => s + (i.totalAmount || 0), 0) / 1000).toFixed(0)}K`} icon={Banknote} color="emerald" />
+        <ReportKPI label="Total Billed" value={`Rs. ${(invoices.reduce((s: number, i: any) => s + (i.totalAmount || 0), 0) / 1000).toFixed(0)}K`} icon={Banknote} color="emerald" />
         <ReportKPI
           label="Overdue Invoices"
           value={invoices.filter((i: any) => i.status === 'overdue').length.toString()}
@@ -166,18 +166,18 @@ export default function Reports() {
                               <p className="font-semibold text-foreground">{p.employeeName}</p>
                               <p className="text-muted-foreground font-mono">{p.employeeCode}</p>
                             </td>
-                            <td className="px-4 py-3 text-right">₹{p.basicSalary?.toLocaleString('en-IN')}</td>
-                            <td className="px-4 py-3 text-right text-emerald-600">+₹{p.allowances?.toLocaleString('en-IN')}</td>
-                            <td className="px-4 py-3 text-right text-red-600">-₹{p.deductions?.toLocaleString('en-IN')}</td>
-                            <td className="px-4 py-3 text-right font-bold text-foreground">₹{p.netSalary?.toLocaleString('en-IN')}</td>
+                            <td className="px-4 py-3 text-right">Rs. {p.basicSalary?.toLocaleString('en-PK')}</td>
+                            <td className="px-4 py-3 text-right text-emerald-600">+Rs. {p.allowances?.toLocaleString('en-PK')}</td>
+                            <td className="px-4 py-3 text-right text-red-600">-Rs. {p.deductions?.toLocaleString('en-PK')}</td>
+                            <td className="px-4 py-3 text-right font-bold text-foreground">Rs. {p.netSalary?.toLocaleString('en-PK')}</td>
                           </tr>
                         ))}
                         <tr className="bg-muted/30 font-semibold">
                           <td className="px-4 py-3 text-xs text-muted-foreground uppercase tracking-wide">Totals</td>
-                          <td className="px-4 py-3 text-right">₹{payroll.reduce((s: number, p: any) => s + p.basicSalary, 0).toLocaleString('en-IN')}</td>
-                          <td className="px-4 py-3 text-right text-emerald-600">+₹{payroll.reduce((s: number, p: any) => s + p.allowances, 0).toLocaleString('en-IN')}</td>
-                          <td className="px-4 py-3 text-right text-red-600">-₹{payroll.reduce((s: number, p: any) => s + p.deductions, 0).toLocaleString('en-IN')}</td>
-                          <td className="px-4 py-3 text-right font-bold">₹{payroll.reduce((s: number, p: any) => s + p.netSalary, 0).toLocaleString('en-IN')}</td>
+                          <td className="px-4 py-3 text-right">Rs. {payroll.reduce((s: number, p: any) => s + p.basicSalary, 0).toLocaleString('en-PK')}</td>
+                          <td className="px-4 py-3 text-right text-emerald-600">+Rs. {payroll.reduce((s: number, p: any) => s + p.allowances, 0).toLocaleString('en-PK')}</td>
+                          <td className="px-4 py-3 text-right text-red-600">-Rs. {payroll.reduce((s: number, p: any) => s + p.deductions, 0).toLocaleString('en-PK')}</td>
+                          <td className="px-4 py-3 text-right font-bold">Rs. {payroll.reduce((s: number, p: any) => s + p.netSalary, 0).toLocaleString('en-PK')}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -241,7 +241,7 @@ export default function Reports() {
                           <tr key={inv.id} className="hover:bg-muted/10">
                             <td className="px-4 py-3 font-mono text-primary font-semibold">#{inv.invoiceNumber}</td>
                             <td className="px-4 py-3 text-foreground">{inv.clientName}</td>
-                            <td className="px-4 py-3 text-right font-semibold">₹{inv.totalAmount?.toLocaleString('en-IN')}</td>
+                            <td className="px-4 py-3 text-right font-semibold">Rs. {inv.totalAmount?.toLocaleString('en-PK')}</td>
                             <td className="px-4 py-3">
                               <Badge variant="outline" className={`text-[10px] uppercase ${getStatusStyle(inv.status)}`}>
                                 {inv.status}
@@ -273,7 +273,7 @@ export default function Reports() {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                       <XAxis dataKey="bucket" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
                       <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
-                      <Tooltip contentStyle={{ borderRadius: '8px', fontSize: 12, border: '1px solid hsl(var(--border))' }} formatter={(v: any, n) => [`₹${Number(v).toLocaleString('en-IN')}`, 'Amount']} />
+                      <Tooltip contentStyle={{ borderRadius: '8px', fontSize: 12, border: '1px solid hsl(var(--border))' }} formatter={(v: any, n) => [`Rs. ${Number(v).toLocaleString('en-PK')}`, 'Amount']} />
                       <Bar dataKey="amount" name="Amount" radius={[6, 6, 0, 0]}>
                         {agingBuckets.map((_, i) => (
                           <Cell key={i} fill={['#10b981', '#f59e0b', '#f97316', '#ef4444'][i % 4]} />
@@ -298,7 +298,7 @@ export default function Reports() {
                       <p className="text-xs text-muted-foreground">{b.count} invoice{b.count !== 1 ? 's' : ''}</p>
                     </div>
                     <p className="text-sm font-bold" style={{ color: ['#10b981', '#f59e0b', '#f97316', '#ef4444'][i % 4] }}>
-                      ₹{b.amount.toLocaleString('en-IN')}
+                      Rs. {b.amount.toLocaleString('en-PK')}
                     </p>
                   </div>
                 ))}
@@ -333,8 +333,8 @@ export default function Reports() {
                         <tr key={inv.id} className="hover:bg-muted/10">
                           <td className="px-4 py-3 font-mono text-primary font-semibold">#{inv.invoiceNumber}</td>
                           <td className="px-4 py-3">{inv.clientName}</td>
-                          <td className="px-4 py-3 text-right font-semibold">₹{inv.totalAmount?.toLocaleString('en-IN')}</td>
-                          <td className="px-4 py-3 text-muted-foreground">{new Date(inv.dueDate).toLocaleDateString('en-IN')}</td>
+                          <td className="px-4 py-3 text-right font-semibold">Rs. {inv.totalAmount?.toLocaleString('en-PK')}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{new Date(inv.dueDate).toLocaleDateString('en-PK')}</td>
                           <td className="px-4 py-3 text-right">
                             <span className={inv.daysOverdue > 0 ? 'text-red-600 font-semibold' : 'text-emerald-600'}>
                               {inv.daysOverdue > 0 ? `+${inv.daysOverdue}` : 'Current'}

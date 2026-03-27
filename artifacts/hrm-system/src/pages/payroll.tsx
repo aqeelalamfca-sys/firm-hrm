@@ -74,8 +74,8 @@ export default function Payroll() {
 
       {payroll.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <PayrollStat label="Total Net Payout" value={`₹${totalNet.toLocaleString('en-IN')}`} icon={Banknote} color="violet" />
-          <PayrollStat label="Total Basic" value={`₹${totalBasic.toLocaleString('en-IN')}`} icon={TrendingUp} color="blue" />
+          <PayrollStat label="Total Net Payout" value={`Rs. ${totalNet.toLocaleString('en-PK')}`} icon={Banknote} color="violet" />
+          <PayrollStat label="Total Basic" value={`Rs. ${totalBasic.toLocaleString('en-PK')}`} icon={TrendingUp} color="blue" />
           <PayrollStat label="Employees" value={payroll.length.toString()} icon={Users} color="slate" />
           <PayrollStat label="Paid" value={`${paidCount}/${payroll.length}`} icon={CheckCircle} color="emerald" />
         </div>
@@ -140,10 +140,10 @@ export default function Payroll() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right text-sm font-medium tabular-nums">₹{record.basicSalary?.toLocaleString('en-IN')}</td>
-                    <td className="px-6 py-4 text-right text-sm text-red-600 tabular-nums">-₹{(record.taxAmount || 0).toLocaleString('en-IN')}</td>
-                    <td className="px-6 py-4 text-right text-sm text-red-600 tabular-nums">-₹{record.deductions?.toLocaleString('en-IN')}</td>
-                    <td className="px-6 py-4 text-right font-bold text-base tabular-nums">₹{record.netSalary?.toLocaleString('en-IN')}</td>
+                    <td className="px-6 py-4 text-right text-sm font-medium tabular-nums">Rs. {record.basicSalary?.toLocaleString('en-PK')}</td>
+                    <td className="px-6 py-4 text-right text-sm text-red-600 tabular-nums">-Rs. {(record.taxAmount || 0).toLocaleString('en-PK')}</td>
+                    <td className="px-6 py-4 text-right text-sm text-red-600 tabular-nums">-Rs. {record.deductions?.toLocaleString('en-PK')}</td>
+                    <td className="px-6 py-4 text-right font-bold text-base tabular-nums">Rs. {record.netSalary?.toLocaleString('en-PK')}</td>
                     <td className="px-6 py-4">
                       <Badge
                         variant="outline"
@@ -174,10 +174,10 @@ export default function Payroll() {
               <tfoot>
                 <tr className="bg-muted/30 border-t-2 border-border/70 font-semibold">
                   <td className="px-6 py-4 text-xs text-muted-foreground uppercase tracking-wide">Total ({payroll.length} employees)</td>
-                  <td className="px-6 py-4 text-right text-sm tabular-nums">₹{totalBasic.toLocaleString('en-IN')}</td>
-                  <td className="px-6 py-4 text-right text-sm text-red-600 tabular-nums">-₹{payroll.reduce((s: number, p: any) => s + (p.taxAmount || 0), 0).toLocaleString('en-IN')}</td>
-                  <td className="px-6 py-4 text-right text-sm text-red-600 tabular-nums">-₹{totalDeductions.toLocaleString('en-IN')}</td>
-                  <td className="px-6 py-4 text-right text-base font-bold text-primary tabular-nums">₹{totalNet.toLocaleString('en-IN')}</td>
+                  <td className="px-6 py-4 text-right text-sm tabular-nums">Rs. {totalBasic.toLocaleString('en-PK')}</td>
+                  <td className="px-6 py-4 text-right text-sm text-red-600 tabular-nums">-Rs. {payroll.reduce((s: number, p: any) => s + (p.taxAmount || 0), 0).toLocaleString('en-PK')}</td>
+                  <td className="px-6 py-4 text-right text-sm text-red-600 tabular-nums">-Rs. {totalDeductions.toLocaleString('en-PK')}</td>
+                  <td className="px-6 py-4 text-right text-base font-bold text-primary tabular-nums">Rs. {totalNet.toLocaleString('en-PK')}</td>
                   <td colSpan={2} className="px-6 py-4 text-right text-xs text-muted-foreground">
                     {paidCount}/{payroll.length} disbursed
                   </td>
@@ -232,7 +232,7 @@ export default function Payroll() {
                   <PayslipRow label="Advances" amount={payslipRecord.advances} negative />
                   <div className="px-4 py-3 flex justify-between items-center bg-primary/5 font-bold">
                     <span className="text-sm">Net Salary</span>
-                    <span className="text-lg text-primary tabular-nums">₹{payslipRecord.netSalary?.toLocaleString('en-IN')}</span>
+                    <span className="text-lg text-primary tabular-nums">Rs. {payslipRecord.netSalary?.toLocaleString('en-PK')}</span>
                   </div>
                 </div>
               </div>
@@ -259,7 +259,7 @@ function PayslipRow({ label, amount, positive, negative }: { label: string; amou
     <div className="px-4 py-2.5 flex justify-between items-center text-sm">
       <span className="text-muted-foreground">{label}</span>
       <span className={`tabular-nums font-medium ${negative ? 'text-red-600' : positive ? 'text-emerald-600' : ''}`}>
-        {negative ? '-' : positive ? '+' : ''}₹{Math.abs(amount).toLocaleString('en-IN')}
+        {negative ? '-' : positive ? '+' : ''}Rs. {Math.abs(amount).toLocaleString('en-PK')}
       </span>
     </div>
   );
