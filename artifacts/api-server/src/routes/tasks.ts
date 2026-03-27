@@ -6,10 +6,61 @@ import {
   clientsTable,
   engagementsTable,
   usersTable,
+  employeesTable,
 } from "@workspace/db";
 import { eq, desc, and, sql, gte, lte, or } from "drizzle-orm";
 import { requireRoles, type AuthenticatedRequest } from "../middleware/auth";
 import { logActivity } from "../middleware/activity-logger";
+import { createNotification } from "./notifications";
+
+const ROLE_HIERARCHY: Record<string, number> = {
+  super_admin: 100,
+  partner: 90,
+  hr_admin: 70,
+  manager: 60,
+  finance_officer: 50,
+  employee: 30,
+  trainee: 10,
+};
+
+function canAssign(assignerRole: string, targetRole: string, assignerJoining?: string | null, targetJoining?: string | null): { allowed: boolean; reason?: string } {
+  const assignerLevel = ROLE_HIERARCHY[assignerRole] ?? 0;
+  const targetLevel = ROLE_HIERARCHY[targetRole] ?? 0;
+
+  if (assignerRole === "super_admin") return { allowed: true };
+
+  if (assignerRole === "partner") {
+    if (targetLevel >= ROLE_HIERARCHY.partner) {
+      return { allowed: false, reason: "Partners can only assign to subordinates" };
+    }
+    return { allowed: true };
+  }
+
+  if (assignerRole === "manager") {
+    if (targetLevel <= ROLE_HIERARCHY.employee) return { allowed: true };
+    return { allowed: false, reason: "Managers can only assign to employees and trainees" };
+  }
+
+  if (assignerRole === "trainee" || assignerRole === "employee") {
+    if (targetLevel > ROLE_HIERARCHY.employee) {
+      return { allowed: false, reason: "Cannot assign tasks to seniors (manager and above)" };
+    }
+    if (!assignerJoining || !targetJoining) {
+      return { allowed: false, reason: "Joining date information required for peer assignment" };
+    }
+    const assignerDate = new Date(assignerJoining);
+    const targetDate = new Date(targetJoining);
+    const monthsDiff = (assignerDate.getFullYear() - targetDate.getFullYear()) * 12 + (assignerDate.getMonth() - targetDate.getMonth());
+    if (monthsDiff >= 0 && monthsDiff <= 5) return { allowed: true };
+    if (monthsDiff > 5) {
+      return { allowed: false, reason: "Cannot assign to someone who joined more than 5 months before you" };
+    }
+    return { allowed: true };
+  }
+
+  if (assignerLevel > targetLevel) return { allowed: true };
+  return { allowed: false, reason: "Cannot assign tasks to users of equal or higher rank" };
+}
 
 const router = Router();
 
@@ -112,6 +163,71 @@ router.get("/stats", async (req: AuthenticatedRequest, res) => {
   }
 });
 
+router.get("/eligible-users", async (req: AuthenticatedRequest, res) => {
+  try {
+    const currentUser = req.user!;
+    const allUsers = await db
+      .select({
+        id: usersTable.id,
+        name: usersTable.name,
+        role: usersTable.role,
+        status: usersTable.status,
+        employeeId: usersTable.employeeId,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.status, "active"));
+
+    const employeeRows = await db
+      .select({
+        id: employeesTable.id,
+        joiningDate: employeesTable.joiningDate,
+        designation: employeesTable.designation,
+      })
+      .from(employeesTable);
+
+    const empMap = new Map<number, { joiningDate: string; designation: string }>();
+    for (const emp of employeeRows) {
+      empMap.set(emp.id, { joiningDate: emp.joiningDate, designation: emp.designation });
+    }
+
+    const currentUserEmp = currentUser.employeeId ? empMap.get(currentUser.employeeId) : null;
+    const currentUserJoining = currentUserEmp?.joiningDate || null;
+
+    const eligible = allUsers
+      .filter((u) => u.id !== currentUser.id)
+      .map((u) => {
+        const targetEmp = u.employeeId ? empMap.get(u.employeeId) : null;
+        const targetJoining = targetEmp?.joiningDate || null;
+        const check = canAssign(currentUser.role, u.role, currentUserJoining, targetJoining);
+
+        let seniorityTag = "Peer";
+        if (currentUserJoining && targetJoining) {
+          const cDate = new Date(currentUserJoining);
+          const tDate = new Date(targetJoining);
+          const monthsDiff = (cDate.getFullYear() - tDate.getFullYear()) * 12 + (cDate.getMonth() - tDate.getMonth());
+          if (monthsDiff > 2) seniorityTag = "Senior";
+          else if (monthsDiff < -2) seniorityTag = "Junior";
+        }
+
+        return {
+          id: u.id,
+          name: u.name,
+          role: u.role,
+          joiningDate: targetJoining,
+          designation: targetEmp?.designation || null,
+          seniorityTag,
+          eligible: check.allowed,
+          reason: check.reason || null,
+        };
+      });
+
+    res.json(eligible);
+  } catch (error) {
+    console.error("Error fetching eligible users:", error);
+    res.status(500).json({ error: "Failed to fetch eligible users" });
+  }
+});
+
 router.get("/:id", async (req: AuthenticatedRequest, res) => {
   try {
     const id = Number(req.params.id);
@@ -153,13 +269,36 @@ router.get("/:id", async (req: AuthenticatedRequest, res) => {
 
 router.post(
   "/",
-  requireRoles("super_admin", "partner", "manager", "hr_admin"),
+  requireRoles("super_admin", "partner", "manager", "hr_admin", "employee", "trainee"),
   async (req: AuthenticatedRequest, res) => {
     try {
       const { title, description, clientId, engagementId, assignedTo, startDate, dueDate, priority, remarks } = req.body;
 
       if (!title || !startDate || !dueDate) {
         return res.status(400).json({ error: "Title, start date, and due date are required" });
+      }
+
+      if (assignedTo) {
+        const [targetUser] = await db.select({ role: usersTable.role, employeeId: usersTable.employeeId }).from(usersTable).where(eq(usersTable.id, assignedTo));
+        if (targetUser) {
+          const currentUser = req.user!;
+          let currentJoining: string | null = null;
+          let targetJoining: string | null = null;
+
+          if (currentUser.employeeId) {
+            const [emp] = await db.select({ joiningDate: employeesTable.joiningDate }).from(employeesTable).where(eq(employeesTable.id, currentUser.employeeId));
+            if (emp) currentJoining = emp.joiningDate;
+          }
+          if (targetUser.employeeId) {
+            const [emp] = await db.select({ joiningDate: employeesTable.joiningDate }).from(employeesTable).where(eq(employeesTable.id, targetUser.employeeId));
+            if (emp) targetJoining = emp.joiningDate;
+          }
+
+          const check = canAssign(currentUser.role, targetUser.role, currentJoining, targetJoining);
+          if (!check.allowed) {
+            return res.status(403).json({ error: check.reason || "You are not authorized to assign tasks to this user" });
+          }
+        }
       }
 
       let roleLevel: string | null = null;
@@ -200,6 +339,17 @@ router.post(
         ipAddress: req.ip,
       });
 
+      if (assignedTo && assignedTo !== req.user!.id) {
+        await createNotification({
+          userId: assignedTo,
+          type: "task_assigned",
+          title: "New Task Assigned",
+          message: `You have been assigned task "${title}" by ${req.user!.name}`,
+          relatedEntityType: "task",
+          relatedEntityId: task.id,
+        });
+      }
+
       res.status(201).json(task);
     } catch (error) {
       console.error("Error creating task:", error);
@@ -236,6 +386,17 @@ router.put("/:id", async (req: AuthenticatedRequest, res) => {
           oldValues: JSON.stringify({ status: existing.status }),
           newValues: JSON.stringify({ status }),
         });
+
+        if (existing.assignedBy && existing.assignedBy !== user.id) {
+          await createNotification({
+            userId: existing.assignedBy,
+            type: "task_status_changed",
+            title: "Task Status Updated",
+            message: `Task "${existing.title}" status changed to ${status} by ${user.name}`,
+            relatedEntityType: "task",
+            relatedEntityId: id,
+          });
+        }
       }
 
       return res.json(updated);
@@ -255,6 +416,26 @@ router.put("/:id", async (req: AuthenticatedRequest, res) => {
     if (remarks !== undefined) updateData.remarks = remarks;
 
     if (assignedTo !== undefined && assignedTo !== existing.assignedTo) {
+      if (assignedTo) {
+        const [targetUser] = await db.select({ role: usersTable.role, employeeId: usersTable.employeeId }).from(usersTable).where(eq(usersTable.id, assignedTo));
+        if (targetUser) {
+          let currentJoining: string | null = null;
+          let targetJoining: string | null = null;
+          if (user.employeeId) {
+            const [emp] = await db.select({ joiningDate: employeesTable.joiningDate }).from(employeesTable).where(eq(employeesTable.id, user.employeeId));
+            if (emp) currentJoining = emp.joiningDate;
+          }
+          if (targetUser.employeeId) {
+            const [emp] = await db.select({ joiningDate: employeesTable.joiningDate }).from(employeesTable).where(eq(employeesTable.id, targetUser.employeeId));
+            if (emp) targetJoining = emp.joiningDate;
+          }
+          const check = canAssign(user.role, targetUser.role, currentJoining, targetJoining);
+          if (!check.allowed) {
+            return res.status(403).json({ error: check.reason || "You are not authorized to assign tasks to this user" });
+          }
+        }
+      }
+
       updateData.assignedTo = assignedTo || null;
       updateData.assignedBy = user.id;
       if (assignedTo) {
@@ -269,6 +450,17 @@ router.put("/:id", async (req: AuthenticatedRequest, res) => {
         oldValues: JSON.stringify({ assignedTo: existing.assignedTo }),
         newValues: JSON.stringify({ assignedTo }),
       });
+
+      if (assignedTo && assignedTo !== user.id) {
+        await createNotification({
+          userId: assignedTo,
+          type: "task_assigned",
+          title: "Task Reassigned to You",
+          message: `Task "${existing.title}" has been reassigned to you by ${user.name}`,
+          relatedEntityType: "task",
+          relatedEntityId: id,
+        });
+      }
     }
 
     if (status && status !== existing.status) {
@@ -281,6 +473,17 @@ router.put("/:id", async (req: AuthenticatedRequest, res) => {
         oldValues: JSON.stringify({ status: existing.status }),
         newValues: JSON.stringify({ status }),
       });
+
+      if (existing.assignedTo && existing.assignedTo !== user.id) {
+        await createNotification({
+          userId: existing.assignedTo,
+          type: "task_status_changed",
+          title: "Task Status Updated",
+          message: `Task "${existing.title}" status changed to ${status} by ${user.name}`,
+          relatedEntityType: "task",
+          relatedEntityId: id,
+        });
+      }
     }
 
     if (Object.keys(updateData).length > 1) {

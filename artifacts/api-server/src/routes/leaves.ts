@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { leavesTable, employeesTable, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { createNotification } from "./notifications";
 
 const router = Router();
 
@@ -87,6 +88,20 @@ router.put("/:id", async (req, res) => {
 
   const emps = await db.select().from(employeesTable).where(eq(employeesTable.id, record.employeeId));
   const emp = emps[0];
+
+  if (emp && (status === "approved" || status === "rejected")) {
+    const [linkedUser] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.employeeId, record.employeeId));
+    if (linkedUser) {
+      await createNotification({
+        userId: linkedUser.id,
+        type: status === "approved" ? "leave_approved" : "leave_rejected",
+        title: `Leave ${status === "approved" ? "Approved" : "Rejected"}`,
+        message: `Your ${record.leaveType} leave from ${record.fromDate} to ${record.toDate} has been ${status}`,
+        relatedEntityType: "leave",
+        relatedEntityId: record.id,
+      });
+    }
+  }
 
   res.json({
     ...record,

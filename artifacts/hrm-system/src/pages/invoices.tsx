@@ -129,6 +129,90 @@ export default function Invoices() {
     });
   }
 
+  function escapeHtml(str: string): string {
+    if (!str) return "";
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  }
+
+  function handlePrintInvoice(inv: any) {
+    const printWindow = window.open("", "_blank", "width=800,height=900,noopener");
+    if (!printWindow) return;
+    const safeClient = escapeHtml(inv.clientName);
+    const safeDesc = escapeHtml(inv.description || inv.serviceType);
+    const safeService = escapeHtml(inv.serviceType?.replace("_", " "));
+    const safeNotes = escapeHtml(inv.notes);
+    const safeInvNum = escapeHtml(inv.invoiceNumber);
+    const html = `<!DOCTYPE html>
+<html><head><title>Invoice #${safeInvNum}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1a1a1a; max-width: 800px; margin: 0 auto; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; border-bottom: 3px solid #2563eb; padding-bottom: 20px; }
+  .company { font-size: 24px; font-weight: 700; color: #2563eb; }
+  .company-sub { font-size: 12px; color: #666; margin-top: 4px; }
+  .invoice-title { text-align: right; }
+  .invoice-title h1 { font-size: 28px; color: #1a1a1a; }
+  .invoice-title p { font-size: 13px; color: #666; margin-top: 4px; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px; }
+  .meta-section h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #999; margin-bottom: 8px; }
+  .meta-section p { font-size: 14px; margin-bottom: 4px; }
+  .status { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+  .status-paid { background: #dcfce7; color: #166534; }
+  .status-draft { background: #f1f5f9; color: #475569; }
+  .status-issued { background: #dbeafe; color: #1d4ed8; }
+  .status-approved { background: #ede9fe; color: #6d28d9; }
+  .status-overdue { background: #fef2f2; color: #dc2626; }
+  table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+  th { background: #f8fafc; padding: 12px 16px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+  td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+  .text-right { text-align: right; }
+  .total-section { margin-top: 20px; display: flex; justify-content: flex-end; }
+  .total-box { width: 280px; }
+  .total-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
+  .total-row.final { border-top: 2px solid #1a1a1a; font-weight: 700; font-size: 18px; padding-top: 12px; margin-top: 4px; }
+  .total-row.green { color: #16a34a; }
+  .total-row.red { color: #dc2626; }
+  .notes { margin-top: 30px; padding: 16px; background: #f8fafc; border-radius: 8px; font-size: 13px; color: #475569; }
+  .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+  @media print { body { padding: 20px; } .no-print { display: none; } }
+</style></head>
+<body>
+  <div class="header">
+    <div><div class="company">Vertex & Associates</div><div class="company-sub">Chartered Accountants</div></div>
+    <div class="invoice-title"><h1>INVOICE</h1><p>#${safeInvNum}</p></div>
+  </div>
+  <div class="meta">
+    <div class="meta-section">
+      <h3>Bill To</h3>
+      <p><strong>${safeClient}</strong></p>
+      <p style="text-transform:capitalize">${safeService}</p>
+    </div>
+    <div class="meta-section" style="text-align:right">
+      <h3>Invoice Details</h3>
+      <p>Issue: ${new Date(inv.issueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+      <p>Due: ${new Date(inv.dueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+      <p style="margin-top:8px"><span class="status status-${inv.status}">${inv.status}</span></p>
+    </div>
+  </div>
+  <table>
+    <thead><tr><th>Description</th><th class="text-right">Amount</th></tr></thead>
+    <tbody><tr><td>${safeDesc}</td><td class="text-right">Rs. ${Number(inv.amount).toLocaleString("en-PK", { minimumFractionDigits: 2 })}</td></tr></tbody>
+  </table>
+  <div class="total-section"><div class="total-box">
+    <div class="total-row"><span>Subtotal</span><span>Rs. ${Number(inv.amount).toLocaleString("en-PK", { minimumFractionDigits: 2 })}</span></div>
+    ${inv.gstAmount > 0 ? `<div class="total-row green"><span>+ GST</span><span>Rs. ${Number(inv.gstAmount).toLocaleString("en-PK", { minimumFractionDigits: 2 })}</span></div>` : ""}
+    ${inv.whtAmount > 0 ? `<div class="total-row red"><span>- WHT</span><span>Rs. ${Number(inv.whtAmount).toLocaleString("en-PK", { minimumFractionDigits: 2 })}</span></div>` : ""}
+    <div class="total-row final"><span>Net Payable</span><span>Rs. ${Number(inv.totalAmount).toLocaleString("en-PK", { minimumFractionDigits: 2 })}</span></div>
+    ${inv.paidAmount > 0 ? `<div class="total-row green"><span>Paid</span><span>Rs. ${Number(inv.paidAmount).toLocaleString("en-PK", { minimumFractionDigits: 2 })}</span></div>` : ""}
+  </div></div>
+  ${safeNotes ? `<div class="notes"><strong>Notes:</strong> ${safeNotes}</div>` : ""}
+  <div class="footer">This is a computer-generated invoice. | Vertex & Associates, Chartered Accountants</div>
+  <div class="no-print" style="text-align:center;margin-top:20px"><button onclick="window.print()" style="padding:10px 30px;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px">Print / Save as PDF</button></div>
+</body></html>`;
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
+
   const filteredInvoices = activeTab === "all" ? invoices : invoices.filter((i: any) => i.status === activeTab);
 
   const summary = useMemo(() => ({
@@ -452,6 +536,9 @@ export default function Invoices() {
                   </CardContent>
                 </Card>
                 {detailInvoice.notes && <p className="text-sm bg-muted/50 p-3 rounded-lg">{detailInvoice.notes}</p>}
+                <Button className="w-full gap-2 mt-2" variant="outline" onClick={() => handlePrintInvoice(detailInvoice)}>
+                  <Download className="w-4 h-4" /> Download / Print Invoice
+                </Button>
               </div>
             </>
           )}

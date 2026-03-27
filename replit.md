@@ -61,6 +61,9 @@ Tables:
 - `engagements` - Client engagement tracking (audit, tax, advisory) with lifecycle management
 - `engagement_assignments` - Team member assignments to engagements
 - `documents` - Document management with version control and categorization
+- `tasks` - Tasks with client/engagement links, status tracking, assignment logs
+- `task_logs` - Immutable log of all task actions (create, update, reassign, complete)
+- `notifications` - In-app notifications with types (task_assigned, task_due, leave_approved, etc.)
 
 ## Roles
 
@@ -92,6 +95,9 @@ Tables:
 15. **Credential Vault** - Encrypted storage for client portal credentials (FBR, SECP, PRA)
 16. **Task Scheduler** - Task management with calendar/list/week views, delayed status detection, priority levels
 17. **User Profile** - Profile view/edit, change password, mobile/CNIC fields
+18. **Notifications** - In-app notification system with bell icon, unread count badge, mark-read/mark-all-read, auto-refresh every 30s
+19. **Dynamic Task Allocation** - Seniority-based assignment rules (Admin→all, Partner→subordinates, Manager→employees/trainees, Trainee→peers within 5 months), eligible-users API with seniority tags
+20. **Invoice PDF** - Professional invoice print/download with company header, tax breakdown, and print-to-PDF support
 
 ### Security:
 - Auth middleware protects all API routes (except /auth and /healthz)
@@ -137,10 +143,14 @@ All under `/api`:
 - `POST /documents/:id/version` - Upload new version
 - `GET /documents/:id/versions` - Version history
 - `DELETE /documents/:id` - Delete document
-- `GET/POST /tasks` - Task management
+- `GET/POST /tasks` - Task management (with seniority-based assignment validation)
 - `GET /tasks/stats` - Task statistics
+- `GET /tasks/eligible-users` - Eligible assignees with seniority tags
 - `PUT /tasks/:id` - Update task
 - `GET /dashboard/role-stats` - Role-specific dashboard metrics
+- `GET /notifications` - User notifications (with unread count)
+- `PUT /notifications/:id/read` - Mark notification as read
+- `PUT /notifications/read-all` - Mark all notifications as read
 
 ## Auth & Middleware
 
