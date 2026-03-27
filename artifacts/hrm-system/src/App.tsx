@@ -26,6 +26,44 @@ const queryClient = new QueryClient({
   },
 });
 
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("App error:", error, info);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background p-8">
+          <div className="max-w-lg w-full bg-card border border-border rounded-xl p-8 shadow-lg">
+            <h2 className="text-xl font-bold text-destructive mb-2">Something went wrong</h2>
+            <p className="text-muted-foreground text-sm mb-4">{this.state.error.message}</p>
+            <button
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium"
+              onClick={() => { this.setState({ error: null }); window.location.href = "/"; }}
+            >
+              Reload App
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
   const [, navigate] = useLocation();
@@ -60,14 +98,14 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
-      <Route path="/" render={() => <ProtectedRoute component={Dashboard} />} />
-      <Route path="/employees" render={() => <ProtectedRoute component={Employees} />} />
-      <Route path="/attendance" render={() => <ProtectedRoute component={Attendance} />} />
-      <Route path="/leaves" render={() => <ProtectedRoute component={Leaves} />} />
-      <Route path="/payroll" render={() => <ProtectedRoute component={Payroll} />} />
-      <Route path="/clients" render={() => <ProtectedRoute component={Clients} />} />
-      <Route path="/invoices" render={() => <ProtectedRoute component={Invoices} />} />
-      <Route path="/reports" render={() => <ProtectedRoute component={Reports} />} />
+      <Route path="/employees"><ProtectedRoute component={Employees} /></Route>
+      <Route path="/attendance"><ProtectedRoute component={Attendance} /></Route>
+      <Route path="/leaves"><ProtectedRoute component={Leaves} /></Route>
+      <Route path="/payroll"><ProtectedRoute component={Payroll} /></Route>
+      <Route path="/clients"><ProtectedRoute component={Clients} /></Route>
+      <Route path="/invoices"><ProtectedRoute component={Invoices} /></Route>
+      <Route path="/reports"><ProtectedRoute component={Reports} /></Route>
+      <Route path="/"><ProtectedRoute component={Dashboard} /></Route>
       <Route component={NotFound} />
     </Switch>
   );
@@ -75,16 +113,18 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-          </WouterRouter>
-        </AuthProvider>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AuthProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+            </WouterRouter>
+          </AuthProvider>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -1,33 +1,54 @@
 import React, { useState } from "react";
-import { useGetLeaves, useUpdateLeave, useApplyLeave, useGetEmployees } from "@workspace/api-client-react";
+import { useGetLeaves, useUpdateLeave, useApplyLeave } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Check, X, Clock, Palmtree, Plus, CalendarDays, Smile, Stethoscope } from "lucide-react";
+
+const LEAVE_ICONS: Record<string, any> = {
+  annual: Smile,
+  sick: Stethoscope,
+  casual: CalendarDays,
+};
+
+const LEAVE_COLORS: Record<string, string> = {
+  annual: 'bg-blue-100 text-blue-700 border-blue-200',
+  sick: 'bg-rose-100 text-rose-700 border-rose-200',
+  casual: 'bg-violet-100 text-violet-700 border-violet-200',
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-amber-100 text-amber-700 border-amber-200',
+  approved: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  rejected: 'bg-red-100 text-red-700 border-red-200',
+};
 
 export default function Leaves() {
   const { token, user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("all");
 
   const requestOpts = { request: { headers: { Authorization: `Bearer ${token}` } } };
   const { data: leaves = [], isLoading } = useGetLeaves({}, requestOpts);
-  
+
   const applyMutation = useApplyLeave({
     ...requestOpts,
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["/api/leaves"] });
         setIsDialogOpen(false);
-        toast({ title: "Leave application submitted" });
-      }
+        toast({ title: "Leave application submitted successfully" });
+      },
+      onError: () => toast({ title: "Failed to submit leave application", variant: "destructive" })
     }
   });
 
@@ -41,16 +62,12 @@ export default function Leaves() {
     }
   });
 
-  const handleStatusChange = (id: number, status: 'approved' | 'rejected') => {
-    updateMutation.mutate({ id, data: { status } });
-  };
-
   const handleApply = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     applyMutation.mutate({
       data: {
-        employeeId: user?.employeeId || 1, // Fallback for demo
+        employeeId: (user as any)?.employeeId || 1,
         leaveType: fd.get('leaveType') as any,
         fromDate: fd.get('fromDate') as string,
         toDate: fd.get('toDate') as string,
@@ -59,26 +76,38 @@ export default function Leaves() {
     });
   };
 
+  const pending = leaves.filter((l: any) => l.status === 'pending');
+  const approved = leaves.filter((l: any) => l.status === 'approved');
+  const rejected = leaves.filter((l: any) => l.status === 'rejected');
+
+  const filtered = activeTab === 'all' ? leaves
+    : activeTab === 'pending' ? pending
+    : activeTab === 'approved' ? approved
+    : rejected;
+
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 pb-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold">Leave Requests</h1>
-          <p className="text-muted-foreground mt-1">Manage employee time off</p>
+          <p className="text-muted-foreground mt-1 text-sm">Manage employee time-off requests</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="shadow-md">Apply Leave</Button>
+            <Button className="shadow-md shadow-primary/20 gap-2">
+              <Plus className="w-4 h-4" /> Apply Leave
+            </Button>
           </DialogTrigger>
-          <DialogContent className="border-border/50">
+          <DialogContent className="border-border/60 sm:max-w-[440px]">
             <DialogHeader>
-              <DialogTitle>Apply for Leave</DialogTitle>
+              <DialogTitle className="font-display text-xl">Apply for Leave</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleApply} className="space-y-4 pt-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Leave Type</label>
+                <label className="text-sm font-medium">Leave Type *</label>
                 <Select name="leaveType" defaultValue="annual">
-                  <SelectTrigger className="bg-muted/50 border-0"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="bg-muted/40 border-border/50"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="annual">Annual Leave</SelectItem>
                     <SelectItem value="sick">Sick Leave</SelectItem>
@@ -88,68 +117,154 @@ export default function Leaves() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">From Date</label>
-                  <Input type="date" name="fromDate" required className="bg-muted/50 border-0" />
+                  <label className="text-sm font-medium">From Date *</label>
+                  <Input type="date" name="fromDate" required className="bg-muted/40 border-border/50" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">To Date</label>
-                  <Input type="date" name="toDate" required className="bg-muted/50 border-0" />
+                  <label className="text-sm font-medium">To Date *</label>
+                  <Input type="date" name="toDate" required className="bg-muted/40 border-border/50" />
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Reason</label>
-                <Input name="reason" required className="bg-muted/50 border-0" />
+                <label className="text-sm font-medium">Reason *</label>
+                <Input name="reason" required className="bg-muted/40 border-border/50" placeholder="Brief reason for leave..." />
               </div>
-              <div className="pt-4 flex justify-end gap-2">
+              <div className="pt-4 flex justify-end gap-3 border-t border-border/50">
                 <Button variant="ghost" type="button" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={applyMutation.isPending}>Submit Application</Button>
+                <Button type="submit" disabled={applyMutation.isPending} className="shadow-md shadow-primary/20">
+                  {applyMutation.isPending ? "Submitting..." : "Submit Application"}
+                </Button>
               </div>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="grid gap-4">
-        {isLoading ? (
-          <p className="text-muted-foreground">Loading requests...</p>
-        ) : leaves.length === 0 ? (
-          <Card className="p-12 text-center text-muted-foreground border-dashed">No leave requests found.</Card>
-        ) : (
-          leaves.map((leave) => (
-            <Card key={leave.id} className="p-5 flex flex-col md:flex-row justify-between gap-4 border-border/50 shadow-sm hover:shadow-md transition-shadow">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="font-semibold text-lg">{leave.employeeName}</h3>
-                  <Badge variant={
-                    leave.status === 'approved' ? 'default' : 
-                    leave.status === 'rejected' ? 'destructive' : 'secondary'
-                  } className={leave.status === 'approved' ? 'bg-green-500 hover:bg-green-600' : ''}>
-                    {leave.status}
-                  </Badge>
-                  <Badge variant="outline" className="text-muted-foreground capitalize">{leave.leaveType} Leave</Badge>
-                </div>
-                <p className="text-sm text-foreground/80 mb-1">{leave.reason}</p>
-                <p className="text-xs font-mono text-muted-foreground">
-                  {new Date(leave.fromDate).toLocaleDateString()} — {new Date(leave.toDate).toLocaleDateString()} ({leave.totalDays} days)
-                </p>
-              </div>
-              
-              {leave.status === 'pending' && (
-                <div className="flex items-center gap-2 md:self-center">
-                  <Button size="sm" variant="outline" className="border-green-200 text-green-600 hover:bg-green-50"
-                    onClick={() => handleStatusChange(leave.id, 'approved')} disabled={updateMutation.isPending}>
-                    <Check className="w-4 h-4 mr-1" /> Approve
-                  </Button>
-                  <Button size="sm" variant="outline" className="border-red-200 text-red-600 hover:bg-red-50"
-                    onClick={() => handleStatusChange(leave.id, 'rejected')} disabled={updateMutation.isPending}>
-                    <X className="w-4 h-4 mr-1" /> Reject
-                  </Button>
-                </div>
-              )}
-            </Card>
-          ))
-        )}
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="rounded-xl border border-amber-100 bg-amber-50 p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Clock className="w-4 h-4 text-amber-500" />
+            <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Pending</span>
+          </div>
+          <p className="text-2xl font-display font-bold text-amber-700">{pending.length}</p>
+        </div>
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Check className="w-4 h-4 text-emerald-500" />
+            <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Approved</span>
+          </div>
+          <p className="text-2xl font-display font-bold text-emerald-700">{approved.length}</p>
+        </div>
+        <div className="rounded-xl border border-red-100 bg-red-50 p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <X className="w-4 h-4 text-red-500" />
+            <span className="text-xs font-semibold text-red-700 uppercase tracking-wide">Rejected</span>
+          </div>
+          <p className="text-2xl font-display font-bold text-red-700">{rejected.length}</p>
+        </div>
       </div>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="bg-muted/40 border border-border/50 p-1 rounded-xl h-auto">
+          {[
+            { key: 'all', label: `All (${leaves.length})` },
+            { key: 'pending', label: `Pending (${pending.length})` },
+            { key: 'approved', label: `Approved (${approved.length})` },
+            { key: 'rejected', label: `Rejected (${rejected.length})` },
+          ].map(({ key, label }) => (
+            <TabsTrigger key={key} value={key} className="text-xs px-3 py-1.5 rounded-lg data-[state=active]:shadow-sm">
+              {label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        <TabsContent value={activeTab} className="mt-4">
+          {isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-24 bg-muted rounded-xl animate-pulse" />
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
+            <Card className="border-dashed border-border/60">
+              <CardContent className="py-16 text-center">
+                <Palmtree className="w-10 h-10 text-muted-foreground/20 mx-auto mb-3" />
+                <p className="text-muted-foreground text-sm font-medium">No leave requests found</p>
+                <p className="text-muted-foreground/60 text-xs mt-1">
+                  {activeTab === 'pending' ? 'All caught up!' : 'No records in this category'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {filtered.map((leave: any) => {
+                const LeaveIcon = LEAVE_ICONS[leave.leaveType] || CalendarDays;
+                return (
+                  <Card key={leave.id} className="border-border/60 shadow-sm hover:shadow-md transition-shadow">
+                    <CardContent className="p-5">
+                      <div className="flex flex-col sm:flex-row justify-between gap-4">
+                        <div className="flex items-start gap-4">
+                          {/* Avatar */}
+                          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">
+                            {leave.employeeName?.charAt(0) || 'E'}
+                          </div>
+                          <div>
+                            <div className="flex items-center flex-wrap gap-2 mb-1">
+                              <h3 className="font-semibold text-base text-foreground">{leave.employeeName}</h3>
+                              <Badge variant="outline" className={`text-[10px] uppercase tracking-wide px-2 py-0.5 ${STATUS_COLORS[leave.status] || ''}`}>
+                                {leave.status}
+                              </Badge>
+                              <Badge variant="outline" className={`text-[10px] capitalize px-2 py-0.5 ${LEAVE_COLORS[leave.leaveType] || ''}`}>
+                                <LeaveIcon className="w-3 h-3 mr-1" />
+                                {leave.leaveType} leave
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-foreground/80 mb-1.5">{leave.reason}</p>
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <CalendarDays className="w-3.5 h-3.5" />
+                                {new Date(leave.fromDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                {' → '}
+                                {new Date(leave.toDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </span>
+                              <span className="font-medium text-foreground/70">{leave.totalDays} day{leave.totalDays !== 1 ? 's' : ''}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        {leave.status === 'pending' && (
+                          <div className="flex items-center gap-2 sm:self-center shrink-0">
+                            <Button
+                              size="sm"
+                              className="bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20 gap-1.5 h-8"
+                              onClick={() => updateMutation.mutate({ id: leave.id, data: { status: 'approved' } })}
+                              disabled={updateMutation.isPending}
+                            >
+                              <Check className="w-3.5 h-3.5" /> Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-red-200 text-red-600 hover:bg-red-50 gap-1.5 h-8"
+                              onClick={() => updateMutation.mutate({ id: leave.id, data: { status: 'rejected' } })}
+                              disabled={updateMutation.isPending}
+                            >
+                              <X className="w-3.5 h-3.5" /> Reject
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

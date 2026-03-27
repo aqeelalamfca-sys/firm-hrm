@@ -3,104 +3,161 @@ import { useGetPayroll, useGeneratePayroll } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Play, Download } from "lucide-react";
+import { Play, Download, Banknote, TrendingUp, Users, CheckCircle } from "lucide-react";
 
 export default function Payroll() {
   const { token } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const currentDate = new Date();
-  const currentMonth = currentDate.toLocaleString('default', { month: 'long' });
+  const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const currentMonth = months[currentDate.getMonth()];
   const currentYear = currentDate.getFullYear();
-  
+
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
 
   const requestOpts = { request: { headers: { Authorization: `Bearer ${token}` } } };
-  const { data: payroll = [], isLoading } = useGetPayroll({ month: selectedMonth, year: currentYear.toString() }, requestOpts);
-  
+  const { data: payroll = [], isLoading } = useGetPayroll(
+    { month: selectedMonth, year: currentYear.toString() },
+    requestOpts
+  );
+
   const generateMutation = useGeneratePayroll({
     ...requestOpts,
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["/api/payroll"] });
-        toast({ title: "Payroll generated successfully" });
-      }
+        toast({ title: `Payroll generated for ${selectedMonth} ${currentYear}` });
+      },
+      onError: () => toast({ title: "Failed to generate payroll", variant: "destructive" })
     }
   });
 
-  const handleGenerate = () => {
-    generateMutation.mutate({
-      data: { month: selectedMonth, year: currentYear }
-    });
-  };
-
-  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const totalNet = payroll.reduce((s: number, p: any) => s + p.netSalary, 0);
+  const totalBasic = payroll.reduce((s: number, p: any) => s + p.basicSalary, 0);
+  const totalAllowances = payroll.reduce((s: number, p: any) => s + p.allowances, 0);
+  const totalDeductions = payroll.reduce((s: number, p: any) => s + p.deductions, 0);
+  const paidCount = payroll.filter((p: any) => p.paymentStatus === 'paid').length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-8">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold">Payroll Processing</h1>
-          <p className="text-muted-foreground mt-1">Generate and manage monthly salaries</p>
+          <p className="text-muted-foreground mt-1 text-sm">Generate and manage monthly employee salaries</p>
         </div>
         <div className="flex gap-3 items-center">
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[140px] bg-card border-border/50">
+            <SelectTrigger className="w-[150px] border-border/60 bg-card shadow-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              {months.map(m => <SelectItem key={m} value={m}>{m} {currentYear}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Button onClick={handleGenerate} disabled={generateMutation.isPending} className="shadow-md shadow-primary/20">
-            <Play className="w-4 h-4 mr-2" /> 
-            {generateMutation.isPending ? "Generating..." : "Run Payroll"}
+          <Button
+            onClick={() => generateMutation.mutate({ data: { month: selectedMonth, year: currentYear } })}
+            disabled={generateMutation.isPending}
+            className="shadow-md shadow-primary/20 gap-2"
+          >
+            <Play className="w-4 h-4" />
+            {generateMutation.isPending ? "Processing..." : "Run Payroll"}
           </Button>
         </div>
       </div>
 
-      <Card className="border-border/50 shadow-sm overflow-hidden">
+      {/* Summary Cards */}
+      {payroll.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <PayrollStat label="Total Net Payout" value={`₹${totalNet.toLocaleString('en-IN')}`} icon={Banknote} color="violet" />
+          <PayrollStat label="Total Basic" value={`₹${totalBasic.toLocaleString('en-IN')}`} icon={TrendingUp} color="blue" />
+          <PayrollStat label="Employees" value={payroll.length.toString()} icon={Users} color="slate" />
+          <PayrollStat label="Paid" value={`${paidCount}/${payroll.length}`} icon={CheckCircle} color="emerald" />
+        </div>
+      )}
+
+      {/* Payroll Table */}
+      <Card className="border-border/60 shadow-sm overflow-hidden">
+        <CardHeader className="py-4 px-6 bg-muted/20 border-b border-border/50">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold">
+              Payroll — {selectedMonth} {currentYear}
+            </CardTitle>
+            {payroll.length > 0 && (
+              <Badge variant="outline" className="text-xs font-medium">
+                {payroll.length} employee{payroll.length !== 1 ? 's' : ''}
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-muted-foreground uppercase bg-muted/30">
-              <tr>
-                <th className="px-6 py-4 font-semibold">Employee</th>
-                <th className="px-6 py-4 font-semibold text-right">Basic</th>
-                <th className="px-6 py-4 font-semibold text-right text-green-600">Alw</th>
-                <th className="px-6 py-4 font-semibold text-right text-red-600">Ded</th>
-                <th className="px-6 py-4 font-semibold text-right">Net Salary</th>
-                <th className="px-6 py-4 font-semibold">Status</th>
-                <th className="px-6 py-4 font-semibold text-right">Payslip</th>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border/50">
+                <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Employee</th>
+                <th className="px-6 py-3.5 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Basic</th>
+                <th className="px-6 py-3.5 text-right text-xs font-semibold text-emerald-600 uppercase tracking-wide">Allowances</th>
+                <th className="px-6 py-3.5 text-right text-xs font-semibold text-red-600 uppercase tracking-wide">Deductions</th>
+                <th className="px-6 py-3.5 text-right text-xs font-semibold text-foreground uppercase tracking-wide">Net Salary</th>
+                <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
+                <th className="px-6 py-3.5 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Payslip</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border/40">
               {isLoading ? (
-                <tr><td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">Loading payroll data...</td></tr>
+                Array.from({ length: 4 }).map((_, i) => (
+                  <tr key={i}>
+                    {Array.from({ length: 7 }).map((_, j) => (
+                      <td key={j} className="px-6 py-4">
+                        <div className="h-4 bg-muted rounded animate-pulse" />
+                      </td>
+                    ))}
+                  </tr>
+                ))
               ) : payroll.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-muted-foreground border-dashed">No payroll records generated for {selectedMonth} yet.</td></tr>
+                <tr>
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <Banknote className="w-10 h-10 text-muted-foreground/20 mx-auto mb-3" />
+                    <p className="text-muted-foreground text-sm font-medium">No payroll for {selectedMonth}</p>
+                    <p className="text-muted-foreground/60 text-xs mt-1">Click "Run Payroll" to generate salary records</p>
+                  </td>
+                </tr>
               ) : (
-                payroll.map((record) => (
-                  <tr key={record.id} className="border-b border-border/50 hover:bg-muted/10">
+                payroll.map((record: any) => (
+                  <tr key={record.id} className="hover:bg-muted/20 transition-colors">
                     <td className="px-6 py-4">
-                      <p className="font-semibold">{record.employeeName}</p>
-                      <p className="text-xs font-mono text-muted-foreground">{record.employeeCode}</p>
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                          {record.employeeName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-foreground text-sm">{record.employeeName}</p>
+                          <p className="text-xs text-muted-foreground font-mono">{record.employeeCode}</p>
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-6 py-4 text-right font-medium">${record.basicSalary.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-right text-green-600">+${record.allowances.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-right text-red-600">-${record.deductions.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-right font-bold text-base">${record.netSalary.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-right text-sm font-medium tabular-nums">₹{record.basicSalary?.toLocaleString('en-IN')}</td>
+                    <td className="px-6 py-4 text-right text-sm text-emerald-600 tabular-nums">+₹{record.allowances?.toLocaleString('en-IN')}</td>
+                    <td className="px-6 py-4 text-right text-sm text-red-600 tabular-nums">-₹{record.deductions?.toLocaleString('en-IN')}</td>
+                    <td className="px-6 py-4 text-right font-bold text-base tabular-nums">₹{record.netSalary?.toLocaleString('en-IN')}</td>
                     <td className="px-6 py-4">
-                      <Badge variant={record.paymentStatus === 'paid' ? 'default' : 'secondary'}
-                        className={record.paymentStatus === 'paid' ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''}>
-                        {record.paymentStatus}
+                      <Badge
+                        variant="outline"
+                        className={record.paymentStatus === 'paid'
+                          ? 'bg-emerald-100 text-emerald-700 border-emerald-200 text-[11px]'
+                          : 'bg-amber-100 text-amber-700 border-amber-200 text-[11px]'
+                        }
+                      >
+                        {record.paymentStatus === 'paid' ? '✓ Paid' : 'Pending'}
                       </Badge>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Button variant="ghost" size="icon" className="hover:bg-primary/10 hover:text-primary">
+                      <Button variant="ghost" size="icon" className="w-8 h-8 hover:bg-primary/10 hover:text-primary rounded-lg" title="Download Payslip">
                         <Download className="w-4 h-4" />
                       </Button>
                     </td>
@@ -108,9 +165,44 @@ export default function Payroll() {
                 ))
               )}
             </tbody>
+            {payroll.length > 0 && (
+              <tfoot>
+                <tr className="bg-muted/30 border-t-2 border-border/70 font-semibold">
+                  <td className="px-6 py-4 text-xs text-muted-foreground uppercase tracking-wide">Total ({payroll.length} employees)</td>
+                  <td className="px-6 py-4 text-right text-sm tabular-nums">₹{totalBasic.toLocaleString('en-IN')}</td>
+                  <td className="px-6 py-4 text-right text-sm text-emerald-600 tabular-nums">+₹{totalAllowances.toLocaleString('en-IN')}</td>
+                  <td className="px-6 py-4 text-right text-sm text-red-600 tabular-nums">-₹{totalDeductions.toLocaleString('en-IN')}</td>
+                  <td className="px-6 py-4 text-right text-base font-bold text-primary tabular-nums">₹{totalNet.toLocaleString('en-IN')}</td>
+                  <td colSpan={2} className="px-6 py-4 text-right text-xs text-muted-foreground">
+                    {paidCount}/{payroll.length} disbursed
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </Card>
+    </div>
+  );
+}
+
+function PayrollStat({ label, value, icon: Icon, color }: { label: string; value: string; icon: any; color: string }) {
+  const map: Record<string, string> = {
+    violet: 'bg-violet-50 border-violet-100 text-violet-700',
+    blue: 'bg-blue-50 border-blue-100 text-blue-700',
+    slate: 'bg-slate-50 border-slate-200 text-slate-700',
+    emerald: 'bg-emerald-50 border-emerald-100 text-emerald-700',
+  };
+  const iconMap: Record<string, string> = {
+    violet: 'text-violet-500', blue: 'text-blue-500', slate: 'text-slate-400', emerald: 'text-emerald-500'
+  };
+  return (
+    <div className={`rounded-xl border p-4 ${map[color]}`}>
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className={`w-4 h-4 ${iconMap[color]}`} />
+        <span className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</span>
+      </div>
+      <p className="text-xl font-display font-bold">{value}</p>
     </div>
   );
 }
