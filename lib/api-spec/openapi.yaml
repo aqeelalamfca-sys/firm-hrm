@@ -1,22 +1,39 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 1.0.0
+  description: HRM & Invoice Management System API for CA Firms
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: employees
+    description: Employee/Trainee Management
+  - name: attendance
+    description: Attendance Management
+  - name: leaves
+    description: Leave Management
+  - name: payroll
+    description: Payroll Management
+  - name: clients
+    description: Client Management
+  - name: invoices
+    description: Invoice Management
+  - name: dashboard
+    description: Dashboard & Analytics
+  - name: reports
+    description: Reports
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +41,597 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /employees:
+    get:
+      operationId: getEmployees
+      tags: [employees]
+      summary: List all employees
+      parameters:
+        - name: department
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of employees
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Employee"
+    post:
+      operationId: createEmployee
+      tags: [employees]
+      summary: Create a new employee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeRequest"
+      responses:
+        "201":
+          description: Employee created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employee"
+
+  /employees/{id}:
+    get:
+      operationId: getEmployee
+      tags: [employees]
+      summary: Get employee by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Employee details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employee"
+    put:
+      operationId: updateEmployee
+      tags: [employees]
+      summary: Update employee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEmployeeRequest"
+      responses:
+        "200":
+          description: Employee updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employee"
+
+  /attendance:
+    get:
+      operationId: getAttendance
+      tags: [attendance]
+      summary: Get attendance records
+      parameters:
+        - name: employeeId
+          in: query
+          schema:
+            type: integer
+        - name: month
+          in: query
+          schema:
+            type: string
+        - name: year
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Attendance records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AttendanceRecord"
+    post:
+      operationId: markAttendance
+      tags: [attendance]
+      summary: Mark attendance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkAttendanceRequest"
+      responses:
+        "201":
+          description: Attendance marked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceRecord"
+
+  /attendance/{id}:
+    put:
+      operationId: updateAttendance
+      tags: [attendance]
+      summary: Update/correct attendance record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAttendanceRequest"
+      responses:
+        "200":
+          description: Attendance updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceRecord"
+
+  /attendance/summary:
+    get:
+      operationId: getAttendanceSummary
+      tags: [attendance]
+      summary: Get attendance summary for all employees
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+        - name: year
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Attendance summary
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AttendanceSummary"
+
+  /leaves:
+    get:
+      operationId: getLeaves
+      tags: [leaves]
+      summary: Get leave applications
+      parameters:
+        - name: employeeId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Leave applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaveApplication"
+    post:
+      operationId: applyLeave
+      tags: [leaves]
+      summary: Apply for leave
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplyLeaveRequest"
+      responses:
+        "201":
+          description: Leave applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveApplication"
+
+  /leaves/{id}:
+    put:
+      operationId: updateLeave
+      tags: [leaves]
+      summary: Approve/reject leave
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLeaveRequest"
+      responses:
+        "200":
+          description: Leave updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveApplication"
+
+  /payroll:
+    get:
+      operationId: getPayroll
+      tags: [payroll]
+      summary: Get payroll records
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+        - name: year
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Payroll records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PayrollRecord"
+    post:
+      operationId: generatePayroll
+      tags: [payroll]
+      summary: Generate payroll for a period
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeneratePayrollRequest"
+      responses:
+        "201":
+          description: Payroll generated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PayrollRecord"
+
+  /payroll/{id}:
+    get:
+      operationId: getPayslip
+      tags: [payroll]
+      summary: Get payslip for an employee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Payslip details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayrollRecord"
+
+  /clients:
+    get:
+      operationId: getClients
+      tags: [clients]
+      summary: List all clients
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of clients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Client"
+    post:
+      operationId: createClient
+      tags: [clients]
+      summary: Create a client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateClientRequest"
+      responses:
+        "201":
+          description: Client created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+
+  /clients/{id}:
+    get:
+      operationId: getClient
+      tags: [clients]
+      summary: Get client by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Client details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+    put:
+      operationId: updateClient
+      tags: [clients]
+      summary: Update client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateClientRequest"
+      responses:
+        "200":
+          description: Client updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+
+  /invoices:
+    get:
+      operationId: getInvoices
+      tags: [invoices]
+      summary: List all invoices
+      parameters:
+        - name: clientId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: fromDate
+          in: query
+          schema:
+            type: string
+        - name: toDate
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of invoices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invoice"
+    post:
+      operationId: createInvoice
+      tags: [invoices]
+      summary: Create an invoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInvoiceRequest"
+      responses:
+        "201":
+          description: Invoice created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+  /invoices/{id}:
+    get:
+      operationId: getInvoice
+      tags: [invoices]
+      summary: Get invoice by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Invoice details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+    put:
+      operationId: updateInvoice
+      tags: [invoices]
+      summary: Update invoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateInvoiceRequest"
+      responses:
+        "200":
+          description: Invoice updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+  /invoices/{id}/status:
+    put:
+      operationId: updateInvoiceStatus
+      tags: [invoices]
+      summary: Update invoice status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateInvoiceStatusRequest"
+      responses:
+        "200":
+          description: Invoice status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+  /invoices/aging:
+    get:
+      operationId: getAgingReport
+      tags: [invoices]
+      summary: Get invoice aging report
+      responses:
+        "200":
+          description: Aging report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgingReport"
+
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: Get dashboard statistics
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /dashboard/attendance-trend:
+    get:
+      operationId: getAttendanceTrend
+      tags: [dashboard]
+      summary: Get attendance trend
+      responses:
+        "200":
+          description: Attendance trend data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrendDataPoint"
+
+  /dashboard/invoice-summary:
+    get:
+      operationId: getInvoiceSummary
+      tags: [dashboard]
+      summary: Get invoice summary
+      responses:
+        "200":
+          description: Invoice summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceSummary"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +642,768 @@ components:
       required:
         - status
 
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - token
+        - user
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, hr_admin, finance_officer, manager, employee]
+        employeeId:
+          type: integer
+          nullable: true
+      required:
+        - id
+        - email
+        - name
+        - role
+
+    Employee:
+      type: object
+      properties:
+        id:
+          type: integer
+        employeeCode:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        department:
+          type: string
+        designation:
+          type: string
+        joiningDate:
+          type: string
+        salary:
+          type: number
+        status:
+          type: string
+          enum: [active, inactive, on_leave, terminated]
+        reportingManagerId:
+          type: integer
+          nullable: true
+        reportingManagerName:
+          type: string
+          nullable: true
+        cnic:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        trainingPeriod:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - employeeCode
+        - firstName
+        - lastName
+        - email
+        - department
+        - designation
+        - joiningDate
+        - salary
+        - status
+        - createdAt
+
+    CreateEmployeeRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        department:
+          type: string
+        designation:
+          type: string
+        joiningDate:
+          type: string
+        salary:
+          type: number
+        reportingManagerId:
+          type: integer
+        cnic:
+          type: string
+        address:
+          type: string
+        trainingPeriod:
+          type: string
+      required:
+        - firstName
+        - lastName
+        - email
+        - department
+        - designation
+        - joiningDate
+        - salary
+
+    UpdateEmployeeRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: string
+        department:
+          type: string
+        designation:
+          type: string
+        salary:
+          type: number
+        status:
+          type: string
+        reportingManagerId:
+          type: integer
+        address:
+          type: string
+
+    AttendanceRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        employeeCode:
+          type: string
+        date:
+          type: string
+        checkIn:
+          type: string
+          nullable: true
+        checkOut:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [present, absent, late, half_day, leave]
+        hoursWorked:
+          type: number
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+      required:
+        - id
+        - employeeId
+        - employeeName
+        - employeeCode
+        - date
+        - status
+
+    MarkAttendanceRequest:
+      type: object
+      properties:
+        employeeId:
+          type: integer
+        date:
+          type: string
+        checkIn:
+          type: string
+        checkOut:
+          type: string
+        status:
+          type: string
+          enum: [present, absent, late, half_day, leave]
+        notes:
+          type: string
+      required:
+        - employeeId
+        - date
+        - status
+
+    UpdateAttendanceRequest:
+      type: object
+      properties:
+        checkIn:
+          type: string
+        checkOut:
+          type: string
+        status:
+          type: string
+          enum: [present, absent, late, half_day, leave]
+        notes:
+          type: string
+
+    AttendanceSummary:
+      type: object
+      properties:
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        employeeCode:
+          type: string
+        totalDays:
+          type: integer
+        presentDays:
+          type: integer
+        absentDays:
+          type: integer
+        lateDays:
+          type: integer
+        halfDays:
+          type: integer
+        leaveDays:
+          type: integer
+        attendancePercentage:
+          type: number
+      required:
+        - employeeId
+        - employeeName
+        - employeeCode
+        - totalDays
+        - presentDays
+        - absentDays
+        - lateDays
+        - halfDays
+        - leaveDays
+        - attendancePercentage
+
+    LeaveApplication:
+      type: object
+      properties:
+        id:
+          type: integer
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        leaveType:
+          type: string
+          enum: [annual, sick, casual, maternity, paternity, unpaid]
+        fromDate:
+          type: string
+        toDate:
+          type: string
+        totalDays:
+          type: integer
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected, cancelled]
+        approvedById:
+          type: integer
+          nullable: true
+        approvedByName:
+          type: string
+          nullable: true
+        approvalNotes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - employeeId
+        - employeeName
+        - leaveType
+        - fromDate
+        - toDate
+        - totalDays
+        - reason
+        - status
+        - createdAt
+
+    ApplyLeaveRequest:
+      type: object
+      properties:
+        employeeId:
+          type: integer
+        leaveType:
+          type: string
+          enum: [annual, sick, casual, maternity, paternity, unpaid]
+        fromDate:
+          type: string
+        toDate:
+          type: string
+        reason:
+          type: string
+      required:
+        - employeeId
+        - leaveType
+        - fromDate
+        - toDate
+        - reason
+
+    UpdateLeaveRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected, cancelled]
+        approvalNotes:
+          type: string
+      required:
+        - status
+
+    PayrollRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        employeeCode:
+          type: string
+        month:
+          type: string
+        year:
+          type: integer
+        basicSalary:
+          type: number
+        allowances:
+          type: number
+        deductions:
+          type: number
+        advances:
+          type: number
+        netSalary:
+          type: number
+        workingDays:
+          type: integer
+        presentDays:
+          type: integer
+        paymentStatus:
+          type: string
+          enum: [pending, paid, on_hold]
+        paidDate:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+      required:
+        - id
+        - employeeId
+        - employeeName
+        - employeeCode
+        - month
+        - year
+        - basicSalary
+        - allowances
+        - deductions
+        - advances
+        - netSalary
+        - workingDays
+        - presentDays
+        - paymentStatus
+
+    GeneratePayrollRequest:
+      type: object
+      properties:
+        month:
+          type: string
+        year:
+          type: integer
+      required:
+        - month
+        - year
+
+    Client:
+      type: object
+      properties:
+        id:
+          type: integer
+        clientCode:
+          type: string
+        name:
+          type: string
+        contactPerson:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        industry:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, inactive]
+        totalBilled:
+          type: number
+        totalPaid:
+          type: number
+        outstandingBalance:
+          type: number
+        createdAt:
+          type: string
+      required:
+        - id
+        - clientCode
+        - name
+        - contactPerson
+        - email
+        - status
+        - totalBilled
+        - totalPaid
+        - outstandingBalance
+        - createdAt
+
+    CreateClientRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        contactPerson:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        industry:
+          type: string
+      required:
+        - name
+        - contactPerson
+        - email
+
+    UpdateClientRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        contactPerson:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        industry:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: integer
+        invoiceNumber:
+          type: string
+        clientId:
+          type: integer
+        clientName:
+          type: string
+        serviceType:
+          type: string
+          enum: [audit, tax, advisory, accounting, other]
+        description:
+          type: string
+        amount:
+          type: number
+        tax:
+          type: number
+        totalAmount:
+          type: number
+        issueDate:
+          type: string
+        dueDate:
+          type: string
+        status:
+          type: string
+          enum: [draft, approved, issued, paid, overdue, cancelled]
+        paidAmount:
+          type: number
+        paidDate:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - invoiceNumber
+        - clientId
+        - clientName
+        - serviceType
+        - description
+        - amount
+        - tax
+        - totalAmount
+        - issueDate
+        - dueDate
+        - status
+        - paidAmount
+        - createdAt
+
+    CreateInvoiceRequest:
+      type: object
+      properties:
+        clientId:
+          type: integer
+        serviceType:
+          type: string
+          enum: [audit, tax, advisory, accounting, other]
+        description:
+          type: string
+        amount:
+          type: number
+        tax:
+          type: number
+        issueDate:
+          type: string
+        dueDate:
+          type: string
+        notes:
+          type: string
+      required:
+        - clientId
+        - serviceType
+        - description
+        - amount
+        - tax
+        - issueDate
+        - dueDate
+
+    UpdateInvoiceRequest:
+      type: object
+      properties:
+        serviceType:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        tax:
+          type: number
+        dueDate:
+          type: string
+        notes:
+          type: string
+
+    UpdateInvoiceStatusRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [draft, approved, issued, paid, overdue, cancelled]
+        paidAmount:
+          type: number
+        paidDate:
+          type: string
+        notes:
+          type: string
+      required:
+        - status
+
+    AgingReport:
+      type: object
+      properties:
+        current:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgingBucket"
+        thirtyDays:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgingBucket"
+        sixtyDays:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgingBucket"
+        ninetyDays:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgingBucket"
+        overNinetyDays:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgingBucket"
+        totalOutstanding:
+          type: number
+      required:
+        - current
+        - thirtyDays
+        - sixtyDays
+        - ninetyDays
+        - overNinetyDays
+        - totalOutstanding
+
+    AgingBucket:
+      type: object
+      properties:
+        clientId:
+          type: integer
+        clientName:
+          type: string
+        invoiceNumber:
+          type: string
+        amount:
+          type: number
+        dueDate:
+          type: string
+        daysOverdue:
+          type: integer
+      required:
+        - clientId
+        - clientName
+        - invoiceNumber
+        - amount
+        - dueDate
+        - daysOverdue
+
+    DashboardStats:
+      type: object
+      properties:
+        totalEmployees:
+          type: integer
+        activeEmployees:
+          type: integer
+        onLeave:
+          type: integer
+        todayPresent:
+          type: integer
+        todayAbsent:
+          type: integer
+        attendancePercentage:
+          type: number
+        totalClients:
+          type: integer
+        activeClients:
+          type: integer
+        pendingInvoices:
+          type: integer
+        overdueInvoices:
+          type: integer
+        totalOutstanding:
+          type: number
+        monthlyPayroll:
+          type: number
+        recentLeaves:
+          type: array
+          items:
+            $ref: "#/components/schemas/LeaveApplication"
+      required:
+        - totalEmployees
+        - activeEmployees
+        - onLeave
+        - todayPresent
+        - todayAbsent
+        - attendancePercentage
+        - totalClients
+        - activeClients
+        - pendingInvoices
+        - overdueInvoices
+        - totalOutstanding
+        - monthlyPayroll
+        - recentLeaves
+
+    TrendDataPoint:
+      type: object
+      properties:
+        date:
+          type: string
+        present:
+          type: integer
+        absent:
+          type: integer
+        late:
+          type: integer
+      required:
+        - date
+        - present
+        - absent
+        - late
+
+    InvoiceSummary:
+      type: object
+      properties:
+        draft:
+          type: number
+        approved:
+          type: number
+        issued:
+          type: number
+        paid:
+          type: number
+        overdue:
+          type: number
+        totalRevenue:
+          type: number
+        monthlyRevenue:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthlyRevenue"
+      required:
+        - draft
+        - approved
+        - issued
+        - paid
+        - overdue
+        - totalRevenue
+        - monthlyRevenue
+
+    MonthlyRevenue:
+      type: object
+      properties:
+        month:
+          type: string
+        revenue:
+          type: number
+        invoices:
+          type: integer
+      required:
+        - month
+        - revenue
+        - invoices

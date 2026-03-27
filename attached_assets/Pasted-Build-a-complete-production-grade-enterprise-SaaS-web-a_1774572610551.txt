@@ -1,0 +1,268 @@
+Build a complete, production-grade, enterprise SaaS web application for a Chartered Accountant firm to manage ICAP trainees, HR operations, attendance, client allocation, payroll, and invoice management.
+
+IMPORTANT:
+- Do NOT create a demo or partial system.
+- Build a fully functional, scalable, multi-tenant SaaS.
+- Follow real-world CA firm workflows, ICAP trainee structure, and audit firm operations.
+- All modules must be fully connected, no isolated features.
+
+--------------------------------------------------
+TECH STACK (MANDATORY)
+--------------------------------------------------
+Frontend: Next.js (latest) + TypeScript + Tailwind CSS
+Backend: .NET Core API OR Node.js (Express/NestJS)
+Database: PostgreSQL (with Prisma ORM)
+Auth: JWT + Role-Based Access Control (RBAC)
+File Storage: Local + Cloud-ready (S3 compatible)
+Deployment-ready: Docker + Nginx
+
+--------------------------------------------------
+CORE SYSTEM REQUIREMENTS
+--------------------------------------------------
+
+1. MULTI-TENANT ARCHITECTURE
+- Each firm has isolated data
+- Firm-level admin control
+- Row-level security enforced
+
+2. ROLE-BASED ACCESS CONTROL
+Roles:
+- Super Admin
+- Firm Admin
+- HR Admin
+- Training Admin
+- Partner
+- Manager
+- Payroll Officer
+- Finance Officer
+- Trainee
+
+Strict permission control across all modules.
+
+--------------------------------------------------
+MODULE 1: RECRUITMENT & APPLICATION
+--------------------------------------------------
+- Candidate registration portal
+- Profile creation (ICAP status, education, documents)
+- Document upload (CV, transcripts, CNIC)
+- Job application system
+- Application tracking dashboard
+
+--------------------------------------------------
+MODULE 2: ONLINE TEST ENGINE
+--------------------------------------------------
+- Question bank management
+- Random selection of 50 MCQs
+- Timer-based test
+- Auto evaluation
+- Passing criteria = 70%
+- Auto shortlist/reject logic
+- Anti-cheating basics (no refresh/re-entry)
+
+--------------------------------------------------
+MODULE 3: INTERVIEW MANAGEMENT
+--------------------------------------------------
+- Interview scheduling
+- Panel assignment
+- Evaluation forms
+- Status tracking (Selected / Waitlisted / Rejected)
+- Final approval workflow
+
+--------------------------------------------------
+MODULE 4: JOINING & DOCUMENT MANAGEMENT
+--------------------------------------------------
+- Offer letter generation
+- Digital acceptance
+- Online joining forms
+- Undertaking templates (editable from admin)
+- Digital agreement acceptance (checkbox + timestamp)
+- Document repository
+
+--------------------------------------------------
+MODULE 5: TRAINEE MASTER (HR CORE)
+--------------------------------------------------
+- Auto employee/trainee code generation
+- Training period (2.5 / 3.5 years)
+- Department assignment
+- Reporting manager
+- Salary/stipend structure
+- Status lifecycle
+
+--------------------------------------------------
+MODULE 6: ATTENDANCE SYSTEM (CRITICAL)
+--------------------------------------------------
+- Daily check-in / check-out
+- IP address capture
+- Timestamp logging
+- Geo/IP restriction option
+- Attendance auto-status:
+  Present / Late / Half Day / Absent / Leave
+- Manual correction workflow
+- Monthly attendance auto-generation
+
+--------------------------------------------------
+MODULE 7: CLIENT & ENGAGEMENT MANAGEMENT
+--------------------------------------------------
+- Client master
+- Engagement creation (Audit, Tax, Advisory)
+- Partner/Manager assignment
+- Engagement period tracking
+
+--------------------------------------------------
+MODULE 8: TRAINEE ALLOCATION SYSTEM
+--------------------------------------------------
+- Allocate trainee to client/engagement
+- Availability logic:
+  (attendance + leave + existing allocation)
+- Allocation history tracking
+- Assignment memo generation
+- Dashboard visibility
+
+--------------------------------------------------
+MODULE 9: TRAINING MANAGEMENT
+--------------------------------------------------
+- Online + Physical training modules
+- Training assignment
+- Completion tracking
+- Quiz/assessment integration
+- Training hours tracking
+- Certification upload
+
+--------------------------------------------------
+MODULE 10: APPRAISAL SYSTEM
+--------------------------------------------------
+- Periodic evaluations (monthly/quarterly)
+- Criteria-based scoring:
+  Technical, attendance, behavior, client work
+- Manager review + partner approval
+- Appraisal history
+- Improvement plan tracking
+
+--------------------------------------------------
+MODULE 11: LEAVE MANAGEMENT
+--------------------------------------------------
+- Leave application
+- Approval workflow
+- Leave balance tracking
+- Integration with attendance & payroll
+
+--------------------------------------------------
+MODULE 12: PAYROLL SYSTEM
+--------------------------------------------------
+- Salary/stipend setup
+- Attendance-based calculation
+- Allowances / deductions / advances
+- Auto payroll sheet
+- Payslip generation
+- Payment status tracking
+
+--------------------------------------------------
+MODULE 13: INVOICE MANAGEMENT
+--------------------------------------------------
+- Invoice creation linked to client & engagement
+- Auto pull client data
+- Invoice lifecycle:
+  Draft → Approved → Issued → Paid
+- Receivable tracking
+- Aging report
+- Payment recording
+
+--------------------------------------------------
+MODULE 14: DASHBOARDS
+--------------------------------------------------
+Different dashboards for:
+- HR
+- Admin
+- Payroll
+- Finance
+- Partner
+
+Metrics:
+- Active trainees
+- Attendance %
+- Allocation load
+- Payroll summary
+- Invoice & receivables
+
+--------------------------------------------------
+MODULE 15: REPORTING SYSTEM
+--------------------------------------------------
+Generate:
+- Attendance reports
+- Payroll register
+- Trainee history
+- Allocation reports
+- Invoice register
+- Receivable aging
+- Training compliance
+
+Export to Excel/PDF.
+
+--------------------------------------------------
+CRITICAL FEATURES (MANDATORY)
+--------------------------------------------------
+
+1. AUTO-SAVE EVERYWHERE
+- Save every input with timestamp + user
+
+2. FULL AUDIT TRAIL
+- Track who did what and when
+
+3. ADMIN CONTROL PANEL
+- Manage:
+  Templates
+  Pricing (future SaaS)
+  Question bank
+  Policies
+  Roles
+  Training modules
+
+4. FILE MANAGEMENT
+- Upload, preview, download
+- Tag to modules (HR, training, client)
+
+5. REAL-TIME DATA SYNC
+- No refresh required
+- Live updates
+
+6. ERROR HANDLING
+- No broken links
+- No blank pages
+- All forms validated
+
+--------------------------------------------------
+UI / UX REQUIREMENTS
+--------------------------------------------------
+- Enterprise-grade clean UI
+- Audit firm style (blue/grey professional)
+- Role-based dashboards
+- Sidebar navigation
+- Breadcrumb navigation
+- No unnecessary whitespace
+- Fast performance
+
+DO NOT:
+- Change logic midway
+- Leave modules incomplete
+- Build placeholders
+
+--------------------------------------------------
+FINAL OUTPUT REQUIRED
+--------------------------------------------------
+- Fully working application
+- Connected database
+- Complete API routes
+- Clean UI
+- No broken features
+- Ready for deployment
+
+--------------------------------------------------
+FINAL INSTRUCTION
+--------------------------------------------------
+Scan the entire system after build:
+- Fix missing links
+- Fix incomplete modules
+- Remove duplicates
+- Ensure full integration across modules
+
+The system must behave like a real enterprise HR + audit firm management platform, not a prototype.
