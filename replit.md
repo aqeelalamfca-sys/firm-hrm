@@ -78,18 +78,20 @@ Tables:
 1. **Authentication** - JWT-based login, role-based access
 2. **RBAC** - Auth middleware on all API routes, role-based sidebar visibility, role-restricted pages
 3. **Employee Management** - Add/edit employees, auto employee codes, department/designation tracking
-4. **Attendance** - Mark attendance, check-in/out times, status tracking
+4. **Attendance** - Mark attendance, check-in/out times, status tracking, IP address capture
 5. **Leave Management** - Apply leave, approval workflow, leave types
-6. **Payroll** - Generate monthly payroll, attendance-based calculation
+6. **Payroll** - Generate monthly payroll, Pakistan income tax slab calculation, payslip dialog with full salary breakdown
 7. **Client Management** - Client master with NTN, registration number, financials tracking
-8. **Invoice Management** - Full lifecycle (Draft→Approved→Issued→Paid/Overdue), aging report
+8. **Invoice Management** - Full lifecycle (Draft→Approved→Issued→Paid/Overdue), WHT/GST tax calculation, aging report
 9. **Engagements** - Client engagement tracking with lifecycle (planning→execution→review→completed)
-10. **Documents** - Document management with categories (trial balance, general ledger, tax return, etc.)
+10. **Documents** - Document management with categories, version control (upload new versions, version history)
 11. **Audit Trail** - Complete activity logging with filtering by module/action, pagination
 12. **User Management** - Admin CRUD for system users with role assignment and status control
-13. **Dashboard** - Key metrics, attendance trend chart, invoice summary, recent leaves
+13. **Dashboard** - Key metrics, role-specific views (Executive/Finance/HR), attendance trend, invoice summary, task overview
 14. **Reports** - Attendance, payroll, and invoice reports
 15. **Credential Vault** - Encrypted storage for client portal credentials (FBR, SECP, PRA)
+16. **Task Scheduler** - Task management with calendar/list/week views, delayed status detection, priority levels
+17. **User Profile** - Profile view/edit, change password, mobile/CNIC fields
 
 ### Security:
 - Auth middleware protects all API routes (except /auth and /healthz)
@@ -97,6 +99,8 @@ Tables:
 - AES-256-CBC encryption for credential vault
 - Activity logging on all CRUD operations and login events
 - Role-based sidebar navigation (admin sees all, restricted roles see limited menu)
+- Rate limiting: 500 requests/15min for API, 20 requests/15min for auth endpoints
+- Global error handler with structured logging via pino
 
 ## API Routes
 
@@ -120,14 +124,23 @@ All under `/api`:
 - `GET /dashboard/attendance-trend` - Trend data
 - `GET /dashboard/invoice-summary` - Invoice analytics
 - `GET/POST /users` - User management (admin only)
-- `PUT /users/:id` - Update user
+- `PUT /users/profile` - Update own profile
+- `PUT /users/change-password` - Change own password
+- `PUT /users/:id` - Update user (admin)
 - `GET /activity-logs` - Audit trail with filtering
 - `GET/POST /clients/:clientId/credentials` - Credential vault
 - `PUT/DELETE /clients/:clientId/credentials/:id` - Credential CRUD
+- `GET /clients/:clientId/credentials/:id/reveal` - Reveal credential (admin/partner)
 - `GET/POST /engagements` - Engagement management
 - `PUT /engagements/:id` - Update engagement
 - `GET/POST /documents` - Document management
+- `POST /documents/:id/version` - Upload new version
+- `GET /documents/:id/versions` - Version history
 - `DELETE /documents/:id` - Delete document
+- `GET/POST /tasks` - Task management
+- `GET /tasks/stats` - Task statistics
+- `PUT /tasks/:id` - Update task
+- `GET /dashboard/role-stats` - Role-specific dashboard metrics
 
 ## Auth & Middleware
 
@@ -139,20 +152,23 @@ All under `/api`:
 
 ## Frontend Pages
 
-12 pages total:
+17 pages total:
 - `/login` - Login page
-- `/` - Dashboard
+- `/` - Dashboard (with role-specific Executive/Finance/HR overview cards)
 - `/employees` - Employee management
-- `/attendance` - Attendance tracking
+- `/attendance` - Attendance tracking (with IP capture)
 - `/leaves` - Leave management
-- `/payroll` - Payroll processing
+- `/payroll` - Payroll processing (with tax calculation and payslip dialog)
 - `/clients` - Client management (with NTN/Registration fields)
-- `/invoices` - Invoice management
+- `/invoices` - Invoice management (with WHT/GST tax support)
 - `/reports` - Reports
 - `/engagements` - Engagement tracking
-- `/documents` - Document management
+- `/documents` - Document management (with version control)
 - `/audit-trail` - Audit trail (admin/partner/HR only)
 - `/user-management` - User management (admin/partner/HR only)
+- `/task-scheduler` - Task scheduler with calendar/list/week views
+- `/credential-vault` - Credential vault (admin/partner only)
+- `/profile` - User profile with edit and change password
 
 ## TypeScript & Composite Projects
 

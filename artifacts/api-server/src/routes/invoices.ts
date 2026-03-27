@@ -18,16 +18,21 @@ function formatInvoice(inv: any, clientName: string) {
     invoiceNumber: inv.invoiceNumber,
     clientId: inv.clientId,
     clientName,
+    engagementId: inv.engagementId,
     serviceType: inv.serviceType,
     description: inv.description,
     amount: Number(inv.amount),
     tax: Number(inv.tax),
+    whtAmount: Number(inv.whtAmount || 0),
+    gstAmount: Number(inv.gstAmount || 0),
     totalAmount: Number(inv.totalAmount),
     issueDate: inv.issueDate,
     dueDate: inv.dueDate,
     status: inv.status,
     paidAmount: Number(inv.paidAmount),
     paidDate: inv.paidDate,
+    isRecurring: inv.isRecurring,
+    recurringFrequency: inv.recurringFrequency,
     notes: inv.notes,
     createdAt: inv.createdAt,
   };
@@ -107,26 +112,37 @@ router.get("/:id", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { clientId, serviceType, description, amount, tax, issueDate, dueDate, notes } = req.body;
-  if (!clientId || !serviceType || !description || amount == null || tax == null || !issueDate || !dueDate) {
+  const { clientId, engagementId, serviceType, description, amount, tax, gstPercent, whtPercent, issueDate, dueDate, notes, isRecurring, recurringFrequency } = req.body;
+  if (!clientId || !serviceType || !description || amount == null || !issueDate || !dueDate) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
   const invoiceNumber = await generateInvoiceNumber();
-  const totalAmount = (Number(amount) + Number(tax)).toFixed(2);
+  const baseAmount = Number(amount);
+  const gstRate = Number(gstPercent || 0);
+  const whtRate = Number(whtPercent || 0);
+  const gstAmount = (baseAmount * gstRate / 100);
+  const whtAmount = (baseAmount * whtRate / 100);
+  const totalAmount = baseAmount + gstAmount - whtAmount;
+  const taxValue = Number(tax || gstAmount);
 
   const [inv] = await db.insert(invoicesTable).values({
     invoiceNumber,
     clientId: parseInt(clientId),
+    engagementId: engagementId ? parseInt(engagementId) : null,
     serviceType,
     description,
-    amount: Number(amount).toFixed(2),
-    tax: Number(tax).toFixed(2),
-    totalAmount,
+    amount: baseAmount.toFixed(2),
+    tax: taxValue.toFixed(2),
+    gstAmount: gstAmount.toFixed(2),
+    whtAmount: whtAmount.toFixed(2),
+    totalAmount: totalAmount.toFixed(2),
     issueDate,
     dueDate,
     status: "draft",
     paidAmount: "0",
+    isRecurring: isRecurring || false,
+    recurringFrequency: recurringFrequency || null,
     notes: notes || null,
   }).returning();
 

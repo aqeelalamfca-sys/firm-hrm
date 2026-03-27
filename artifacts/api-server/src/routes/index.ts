@@ -14,6 +14,7 @@ import activityLogsRouter from "./activity-logs";
 import clientCredentialsRouter from "./client-credentials";
 import engagementsRouter from "./engagements";
 import documentsRouter from "./documents";
+import tasksRouter from "./tasks";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use("/activity-logs", activityLogsRouter);
 router.use("/clients/:clientId/credentials", clientCredentialsRouter);
 router.use("/engagements", engagementsRouter);
 router.use("/documents", documentsRouter);
+router.use("/tasks", tasksRouter);
 
 export default router;

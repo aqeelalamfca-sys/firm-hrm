@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { attendanceTable, employeesTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
+import { type AuthenticatedRequest } from "../middleware/auth";
 
 const router = Router();
 
@@ -76,6 +77,7 @@ router.get("/", async (req, res) => {
         checkOut: r.checkOut,
         status: r.status,
         hoursWorked: r.hoursWorked ? Number(r.hoursWorked) : null,
+        ipAddress: (r as any).ipAddress || null,
         notes: r.notes,
       };
     })
@@ -84,7 +86,7 @@ router.get("/", async (req, res) => {
   res.json(result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 });
 
-router.post("/", async (req, res) => {
+router.post("/", async (req: AuthenticatedRequest, res) => {
   const { employeeId, date, checkIn, checkOut, status, notes } = req.body;
   if (!employeeId || !date || !status) {
     return res.status(400).json({ error: "Missing required fields" });
@@ -105,6 +107,7 @@ router.post("/", async (req, res) => {
     status,
     hoursWorked: hoursWorked?.toString() || null,
     notes: notes || null,
+    ipAddress: req.ip || null,
   }).returning();
 
   const { name, code } = await getEmployeeName(record.employeeId);
@@ -118,6 +121,7 @@ router.post("/", async (req, res) => {
     checkOut: record.checkOut,
     status: record.status,
     hoursWorked: record.hoursWorked ? Number(record.hoursWorked) : null,
+    ipAddress: (record as any).ipAddress || null,
     notes: record.notes,
   });
 });

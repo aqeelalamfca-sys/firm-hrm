@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Play, Download, Banknote, TrendingUp, Users, CheckCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Play, Download, Banknote, TrendingUp, Users, CheckCircle, X } from "lucide-react";
 
 export default function Payroll() {
   const { token } = useAuth();
@@ -19,6 +20,7 @@ export default function Payroll() {
   const currentYear = currentDate.getFullYear();
 
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [payslipRecord, setPayslipRecord] = useState<any>(null);
 
   const requestOpts = { request: { headers: { Authorization: `Bearer ${token}` } } };
   const { data: payroll = [], isLoading } = useGetPayroll(
@@ -45,7 +47,6 @@ export default function Payroll() {
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold">Payroll Processing</h1>
@@ -71,7 +72,6 @@ export default function Payroll() {
         </div>
       </div>
 
-      {/* Summary Cards */}
       {payroll.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <PayrollStat label="Total Net Payout" value={`₹${totalNet.toLocaleString('en-IN')}`} icon={Banknote} color="violet" />
@@ -81,7 +81,6 @@ export default function Payroll() {
         </div>
       )}
 
-      {/* Payroll Table */}
       <Card className="border-border/60 shadow-sm overflow-hidden">
         <CardHeader className="py-4 px-6 bg-muted/20 border-b border-border/50">
           <div className="flex items-center justify-between">
@@ -101,7 +100,7 @@ export default function Payroll() {
               <tr className="border-b border-border/50">
                 <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Employee</th>
                 <th className="px-6 py-3.5 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Basic</th>
-                <th className="px-6 py-3.5 text-right text-xs font-semibold text-emerald-600 uppercase tracking-wide">Allowances</th>
+                <th className="px-6 py-3.5 text-right text-xs font-semibold text-red-600 uppercase tracking-wide">Tax</th>
                 <th className="px-6 py-3.5 text-right text-xs font-semibold text-red-600 uppercase tracking-wide">Deductions</th>
                 <th className="px-6 py-3.5 text-right text-xs font-semibold text-foreground uppercase tracking-wide">Net Salary</th>
                 <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
@@ -142,7 +141,7 @@ export default function Payroll() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-medium tabular-nums">₹{record.basicSalary?.toLocaleString('en-IN')}</td>
-                    <td className="px-6 py-4 text-right text-sm text-emerald-600 tabular-nums">+₹{record.allowances?.toLocaleString('en-IN')}</td>
+                    <td className="px-6 py-4 text-right text-sm text-red-600 tabular-nums">-₹{(record.taxAmount || 0).toLocaleString('en-IN')}</td>
                     <td className="px-6 py-4 text-right text-sm text-red-600 tabular-nums">-₹{record.deductions?.toLocaleString('en-IN')}</td>
                     <td className="px-6 py-4 text-right font-bold text-base tabular-nums">₹{record.netSalary?.toLocaleString('en-IN')}</td>
                     <td className="px-6 py-4">
@@ -157,7 +156,13 @@ export default function Payroll() {
                       </Badge>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Button variant="ghost" size="icon" className="w-8 h-8 hover:bg-primary/10 hover:text-primary rounded-lg" title="Download Payslip">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="w-8 h-8 hover:bg-primary/10 hover:text-primary rounded-lg"
+                        title="View Payslip"
+                        onClick={() => setPayslipRecord(record)}
+                      >
                         <Download className="w-4 h-4" />
                       </Button>
                     </td>
@@ -170,7 +175,7 @@ export default function Payroll() {
                 <tr className="bg-muted/30 border-t-2 border-border/70 font-semibold">
                   <td className="px-6 py-4 text-xs text-muted-foreground uppercase tracking-wide">Total ({payroll.length} employees)</td>
                   <td className="px-6 py-4 text-right text-sm tabular-nums">₹{totalBasic.toLocaleString('en-IN')}</td>
-                  <td className="px-6 py-4 text-right text-sm text-emerald-600 tabular-nums">+₹{totalAllowances.toLocaleString('en-IN')}</td>
+                  <td className="px-6 py-4 text-right text-sm text-red-600 tabular-nums">-₹{payroll.reduce((s: number, p: any) => s + (p.taxAmount || 0), 0).toLocaleString('en-IN')}</td>
                   <td className="px-6 py-4 text-right text-sm text-red-600 tabular-nums">-₹{totalDeductions.toLocaleString('en-IN')}</td>
                   <td className="px-6 py-4 text-right text-base font-bold text-primary tabular-nums">₹{totalNet.toLocaleString('en-IN')}</td>
                   <td colSpan={2} className="px-6 py-4 text-right text-xs text-muted-foreground">
@@ -182,6 +187,80 @@ export default function Payroll() {
           </table>
         </div>
       </Card>
+
+      <Dialog open={!!payslipRecord} onOpenChange={() => setPayslipRecord(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Banknote className="w-5 h-5 text-primary" />
+              Payslip — {payslipRecord?.month} {payslipRecord?.year}
+            </DialogTitle>
+          </DialogHeader>
+          {payslipRecord && (
+            <div className="space-y-5">
+              <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl">
+                <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">
+                  {payslipRecord.employeeName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                </div>
+                <div>
+                  <p className="font-semibold text-lg">{payslipRecord.employeeName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {payslipRecord.employeeCode} {payslipRecord.designation ? `· ${payslipRecord.designation}` : ""} {payslipRecord.department ? `· ${payslipRecord.department}` : ""}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
+                  <p className="text-xs text-blue-600 font-medium">Working Days</p>
+                  <p className="text-lg font-bold text-blue-700">{payslipRecord.workingDays}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100">
+                  <p className="text-xs text-emerald-600 font-medium">Days Present</p>
+                  <p className="text-lg font-bold text-emerald-700">{payslipRecord.presentDays}</p>
+                </div>
+              </div>
+
+              <div className="border rounded-xl overflow-hidden">
+                <div className="bg-muted/20 px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Salary Breakdown</div>
+                <div className="divide-y divide-border/40">
+                  <PayslipRow label="Basic Salary" amount={payslipRecord.basicSalary} />
+                  <PayslipRow label="Allowances" amount={payslipRecord.allowances} positive />
+                  <PayslipRow label="Overtime Pay" amount={payslipRecord.overtimePay || 0} positive />
+                  <PayslipRow label="Income Tax (Pakistan Slab)" amount={payslipRecord.taxAmount || 0} negative />
+                  <PayslipRow label="Other Deductions" amount={payslipRecord.deductions - (payslipRecord.taxAmount || 0)} negative />
+                  <PayslipRow label="Advances" amount={payslipRecord.advances} negative />
+                  <div className="px-4 py-3 flex justify-between items-center bg-primary/5 font-bold">
+                    <span className="text-sm">Net Salary</span>
+                    <span className="text-lg text-primary tabular-nums">₹{payslipRecord.netSalary?.toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <Badge variant="outline" className={payslipRecord.paymentStatus === 'paid' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200'}>
+                  {payslipRecord.paymentStatus === 'paid' ? '✓ Paid' : 'Payment Pending'}
+                </Badge>
+                {payslipRecord.paidDate && (
+                  <span className="text-xs text-muted-foreground">Paid on {payslipRecord.paidDate}</span>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function PayslipRow({ label, amount, positive, negative }: { label: string; amount: number; positive?: boolean; negative?: boolean }) {
+  if (amount === 0 && (positive || negative)) return null;
+  return (
+    <div className="px-4 py-2.5 flex justify-between items-center text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={`tabular-nums font-medium ${negative ? 'text-red-600' : positive ? 'text-emerald-600' : ''}`}>
+        {negative ? '-' : positive ? '+' : ''}₹{Math.abs(amount).toLocaleString('en-IN')}
+      </span>
     </div>
   );
 }

@@ -1,0 +1,242 @@
+Below is your FINAL, COMPLETE “ULTIMATE REPLIT DEPLOYMENT PROMPT” — combining:
+
+HR Management
+Client Management
+Invoice Management
+Task + Calendar Management
+Dynamic Hierarchy Allocation
+Full system stabilization & production deployment
+
+This prompt is designed to scan, fix, integrate, and deploy everything into your current app without breaking anything.
+
+✅ ULTIMATE REPLIT PROMPT — FULL SYSTEM INTEGRATION + DEPLOYMENT (AUDIT FIRM ERP)
+
+Objective:
+Scan the entire codebase, database, APIs, UI, workflows, and existing modules. Fix, complete, integrate, and deploy a fully functional, production-grade Audit Firm ERP system suitable for 200+ staff, ensuring stability, scalability, and zero data loss.
+
+Reference system requirements and feature structure:
+
+🔍 PHASE 1 — FULL SYSTEM AUDIT (MANDATORY)
+
+Scan completely:
+
+Frontend (pages, tabs, UI components)
+Backend (routes, controllers, services)
+Database (Prisma/Postgres schema)
+Authentication & sessions
+All workflows (HR, Client, Invoice, Tasks)
+Fix:
+Broken links, buttons, APIs
+Missing connections between modules
+Duplicate logic/modules
+Data reset / data loss issues
+Incomplete save flows
+Enforce:
+Auto-save on every input (user + timestamp)
+No data loss on refresh
+Persistent storage integrity
+🧩 PHASE 2 — MODULE INTEGRATION (CORE SYSTEM)
+
+Ensure all modules are fully connected:
+
+Modules:
+HR Management
+Client Management
+Invoice Management
+Task & Calendar Management
+Integration Rules:
+Client → Engagement → Task → Invoice → Reporting (linked flow)
+User → HR → Task → Payroll → Performance (linked flow)
+No isolated module allowed
+🔐 PHASE 3 — AUTHENTICATION & RBAC
+
+Implement secure login:
+
+Roles:
+Admin
+Partner
+Manager
+Trainee
+Features:
+Role-based dashboards
+Page-level and API-level permissions
+Secure session handling
+Activity tracking
+👤 PHASE 4 — HR MANAGEMENT MODULE
+Features:
+Employee master (profile + photo + contact)
+Attendance (IP + timestamp)
+Leave management
+Payroll system
+Performance appraisal
+Requirements:
+One-page profile view
+Minimal clicks
+Clean UI
+🏢 PHASE 5 — CLIENT MANAGEMENT MODULE
+Features:
+Client master (single view)
+Engagement mapping
+Document storage
+Client timeline
+🔐 Secure Credential Vault:
+FBR login
+SECP login
+PRA login
+Security:
+AES-256 encryption
+Masked display
+Role-restricted access
+💰 PHASE 6 — INVOICE MANAGEMENT MODULE
+Features:
+1. Invoice Creation
+Client + engagement linked
+Editable layout
+2. Recurring Invoices
+Monthly / Quarterly automation
+3. Tax Handling:
+Withholding Income Tax
+Sales Tax (GST/PRA)
+4. Calculation:
+Gross
+Tax
+Net Received
+5. Payment Tracking:
+Paid / Partial / Unpaid
+Aging system
+6. Output:
+PDF download
+Email sending
+📅 PHASE 7 — TASK + CALENDAR MANAGEMENT
+Features:
+Calendar view (Month / Week / Day)
+Task creation, assignment, tracking
+Drag & drop scheduling
+Task Fields:
+Title
+Client
+Engagement
+Assigned To
+Due Date
+Status
+Priority
+⚙️ PHASE 8 — DYNAMIC TASK ALLOCATION (UPDATED LOGIC)
+RULES:
+ADMIN
+Can assign to anyone
+PARTNER
+Can assign to all subordinates
+MANAGER
+Can assign to trainees only
+TRAINEE (SMART LOGIC)
+
+A trainee can assign tasks based on seniority (date of joining):
+
+✔ Allowed if:
+
+Same joining month
+OR within 0–5 months difference
+OR junior user
+
+❌ Not allowed if:
+
+Target user is senior beyond 5 months
+Manager / Partner / Admin
+Implementation:
+monthsDifference = differenceInMonths(currentUser.dateOfJoining, targetUser.dateOfJoining)
+
+ALLOW if:
+monthsDifference >= 0 AND monthsDifference <= 5
+🔄 PHASE 9 — VALIDATION & UI FILTERING
+Assignment dropdown shows ONLY eligible users
+Show:
+Role badge
+Joining date
+Seniority tag (Senior / Peer / Junior)
+Block invalid assignments with message
+🔐 PHASE 10 — AUDIT TRAIL SYSTEM (CRITICAL)
+
+Track everything:
+
+Task creation / assignment / update
+Invoice changes
+User updates
+Login activity
+Logs must include:
+User
+Timestamp
+Action
+Old vs New values
+
+👉 Logs must be immutable
+
+🔔 PHASE 11 — NOTIFICATIONS
+Task assigned → notify user
+Due date → reminder
+Overdue → alert
+Status change → notify manager
+📊 PHASE 12 — DASHBOARD SYSTEM
+Admin:
+Total users
+Revenue
+Active engagements
+Partner:
+Pending approvals
+Critical tasks
+Manager:
+Team workload
+Deadlines
+Trainee:
+My tasks
+Due today
+⚙️ PHASE 13 — PERFORMANCE & SCALABILITY
+
+Ensure:
+
+Works smoothly for 200+ users
+Fast loading queries
+Optimized DB calls
+No duplication
+🔐 PHASE 14 — SECURITY HARDENING
+Encrypted sensitive data
+Role-based isolation
+API authentication
+Error logging
+No unauthorized access
+🚀 PHASE 15 — DEPLOYMENT (AUTOMATED)
+Implement:
+1. GitHub Sync
+Auto push/pull
+2. VPS Deployment (Dockerized)
+Backend
+Frontend
+Database
+Nginx
+3. One Command Deploy:
+Pull latest code
+Build containers
+Run services
+Configure domain + SSL
+❗ CRITICAL INSTRUCTIONS
+DO NOT:
+Break existing UI
+Remove existing data
+Change working flows unnecessarily
+MUST:
+Fix everything incomplete
+Connect all modules
+Ensure zero data loss
+Ensure production readiness
+✅ FINAL OUTPUT REQUIRED
+Fully working Audit Firm ERP
+All modules integrated
+Role-based system active
+Dynamic task allocation working
+Calendar system functional
+Invoice + HR + Client fully connected
+Secure, scalable, audit-ready system
+🔥 OPTIONAL (IF REPLIT CAN HANDLE)
+AI assistant for task suggestions
+Auto workload balancing
+Resource utilization dashboard
+Gantt chart planning

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import {
   Users, FileText, Banknote, CalendarCheck, TrendingUp, TrendingDown,
-  ArrowRight, Clock, AlertCircle, CheckCircle, ChevronRight
+  ArrowRight, Clock, AlertCircle, CheckCircle, ChevronRight, ListTodo, Calendar
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
@@ -23,12 +23,28 @@ const PIE_COLORS = {
 };
 
 export default function Dashboard() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const requestOpts = { request: { headers: { Authorization: `Bearer ${token}` } } };
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
 
   const { data: stats, isLoading: statsLoading } = useGetDashboardStats(requestOpts);
   const { data: trend, isLoading: trendLoading } = useGetAttendanceTrend(requestOpts);
   const { data: invoiceSummary, isLoading: invoiceLoading } = useGetInvoiceSummary(requestOpts);
+
+  const [taskStats, setTaskStats] = React.useState<any>(null);
+  const [upcomingTasks, setUpcomingTasks] = React.useState<any[]>([]);
+  const [roleStats, setRoleStats] = React.useState<any>(null);
+  React.useEffect(() => {
+    fetch("/api/tasks/stats", { headers }).then((r) => r.json()).then(setTaskStats).catch(() => {});
+    fetch("/api/tasks", { headers }).then((r) => r.json()).then((tasks: any[]) => {
+      const upcoming = tasks
+        .filter((t: any) => t.status !== "completed")
+        .sort((a: any, b: any) => (a.dueDate || "").localeCompare(b.dueDate || ""))
+        .slice(0, 5);
+      setUpcomingTasks(upcoming);
+    }).catch(() => {});
+    fetch("/api/dashboard/role-stats", { headers }).then((r) => r.json()).then(setRoleStats).catch(() => {});
+  }, [token]);
 
   const isLoading = statsLoading || trendLoading || invoiceLoading;
 
@@ -122,6 +138,93 @@ export default function Dashboard() {
           trend="neutral"
         />
       </div>
+
+      {roleStats && roleStats.type === "executive" && (
+        <Card className="shadow-sm border-border/60 bg-gradient-to-r from-violet-50 to-blue-50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold">Executive Overview</CardTitle>
+            <CardDescription className="text-xs">Firm-wide performance metrics</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center p-3 bg-white/80 rounded-xl border border-violet-100">
+                <p className="text-lg font-bold text-violet-700">₹{(roleStats.totalRevenue / 1000).toFixed(0)}K</p>
+                <p className="text-[10px] text-violet-500 font-medium">Total Revenue</p>
+              </div>
+              <div className="text-center p-3 bg-white/80 rounded-xl border border-amber-100">
+                <p className="text-lg font-bold text-amber-700">₹{(roleStats.totalReceivables / 1000).toFixed(0)}K</p>
+                <p className="text-[10px] text-amber-500 font-medium">Receivables</p>
+              </div>
+              <div className="text-center p-3 bg-white/80 rounded-xl border border-blue-100">
+                <p className="text-lg font-bold text-blue-700">{roleStats.activeEngagements}</p>
+                <p className="text-[10px] text-blue-500 font-medium">Active Engagements</p>
+              </div>
+              <div className="text-center p-3 bg-white/80 rounded-xl border border-emerald-100">
+                <p className="text-lg font-bold text-emerald-700">{roleStats.activeClients}/{roleStats.totalClients}</p>
+                <p className="text-[10px] text-emerald-500 font-medium">Active Clients</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {roleStats && roleStats.type === "finance" && (
+        <Card className="shadow-sm border-border/60 bg-gradient-to-r from-emerald-50 to-blue-50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold">Finance Overview</CardTitle>
+            <CardDescription className="text-xs">Billing and collections summary</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center p-3 bg-white/80 rounded-xl border border-emerald-100">
+                <p className="text-lg font-bold text-emerald-700">₹{(roleStats.totalPaid / 1000).toFixed(0)}K</p>
+                <p className="text-[10px] text-emerald-500 font-medium">Total Collected</p>
+              </div>
+              <div className="text-center p-3 bg-white/80 rounded-xl border border-amber-100">
+                <p className="text-lg font-bold text-amber-700">₹{(roleStats.totalOutstanding / 1000).toFixed(0)}K</p>
+                <p className="text-[10px] text-amber-500 font-medium">Outstanding</p>
+              </div>
+              <div className="text-center p-3 bg-white/80 rounded-xl border border-red-100">
+                <p className="text-lg font-bold text-red-700">{roleStats.overdueInvoices}</p>
+                <p className="text-[10px] text-red-500 font-medium">Overdue Invoices</p>
+              </div>
+              <div className="text-center p-3 bg-white/80 rounded-xl border border-blue-100">
+                <p className="text-lg font-bold text-blue-700">₹{(roleStats.totalPayrollCost / 1000).toFixed(0)}K</p>
+                <p className="text-[10px] text-blue-500 font-medium">Total Payroll</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {roleStats && roleStats.type === "hr" && (
+        <Card className="shadow-sm border-border/60 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold">HR Overview</CardTitle>
+            <CardDescription className="text-xs">Workforce and attendance summary</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center p-3 bg-white/80 rounded-xl border border-blue-100">
+                <p className="text-lg font-bold text-blue-700">{roleStats.activeEmployees}/{roleStats.totalEmployees}</p>
+                <p className="text-[10px] text-blue-500 font-medium">Active Employees</p>
+              </div>
+              <div className="text-center p-3 bg-white/80 rounded-xl border border-emerald-100">
+                <p className="text-lg font-bold text-emerald-700">{roleStats.todayPresent}</p>
+                <p className="text-[10px] text-emerald-500 font-medium">Present Today</p>
+              </div>
+              <div className="text-center p-3 bg-white/80 rounded-xl border border-red-100">
+                <p className="text-lg font-bold text-red-700">{roleStats.todayAbsent}</p>
+                <p className="text-[10px] text-red-500 font-medium">Absent Today</p>
+              </div>
+              <div className="text-center p-3 bg-white/80 rounded-xl border border-amber-100">
+                <p className="text-lg font-bold text-amber-700">{roleStats.pendingLeaves}</p>
+                <p className="text-[10px] text-amber-500 font-medium">Pending Leaves</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -217,6 +320,91 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {taskStats && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="shadow-sm border-border/60">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <ListTodo className="w-4 h-4 text-primary" /> Task Overview
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-0.5">Current task status</CardDescription>
+                </div>
+                <Link href="/task-scheduler">
+                  <Button variant="ghost" size="sm" className="text-xs text-muted-foreground gap-1">
+                    View All <ChevronRight className="w-3 h-3" />
+                  </Button>
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-4 gap-3 mb-4">
+                <div className="text-center p-2 rounded-lg bg-gray-50">
+                  <p className="text-lg font-bold text-gray-700">{taskStats.pending}</p>
+                  <p className="text-[10px] text-gray-500">Pending</p>
+                </div>
+                <div className="text-center p-2 rounded-lg bg-blue-50">
+                  <p className="text-lg font-bold text-blue-700">{taskStats.inProgress}</p>
+                  <p className="text-[10px] text-blue-500">Active</p>
+                </div>
+                <div className="text-center p-2 rounded-lg bg-green-50">
+                  <p className="text-lg font-bold text-green-700">{taskStats.completed}</p>
+                  <p className="text-[10px] text-green-500">Done</p>
+                </div>
+                <div className="text-center p-2 rounded-lg bg-red-50">
+                  <p className="text-lg font-bold text-red-700">{taskStats.overdue}</p>
+                  <p className="text-[10px] text-red-500">Overdue</p>
+                </div>
+              </div>
+              {taskStats.dueToday > 0 && (
+                <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  <span><strong>{taskStats.dueToday}</strong> task{taskStats.dueToday > 1 ? "s" : ""} due today</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border-border/60">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-primary" /> Upcoming Deadlines
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-0.5">Next tasks due</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {upcomingTasks.length === 0 ? (
+                <div className="text-center py-6">
+                  <CheckCircle className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No upcoming tasks</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {upcomingTasks.map((t: any) => {
+                    const isOverdue = t.status !== "completed" && t.dueDate < new Date().toISOString().split("T")[0];
+                    return (
+                      <div key={t.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                        <div className={`w-1.5 h-8 rounded-full ${isOverdue ? "bg-red-500" : t.status === "in_progress" ? "bg-blue-500" : "bg-gray-300"}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{t.title}</p>
+                          <p className="text-xs text-muted-foreground">Due: {t.dueDate} {t.assignedToName ? `· ${t.assignedToName}` : ""}</p>
+                        </div>
+                        {isOverdue && <Badge className="bg-red-100 text-red-700 text-[10px]">Overdue</Badge>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -9,3 +9,4 @@ export * from "./activity_logs";
 export * from "./client_credentials";
 export * from "./engagements";
 export * from "./documents";
+export * from "./tasks";

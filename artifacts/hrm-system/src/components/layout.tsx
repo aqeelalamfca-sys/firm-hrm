@@ -18,6 +18,9 @@ import {
   ClipboardList,
   ScrollText,
   UserCog,
+  Calendar,
+  KeyRound,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
@@ -38,6 +41,8 @@ const navItems: NavItem[] = [
   { href: "/payroll", label: "Payroll", icon: Banknote, section: "finance", roles: ["super_admin", "partner", "hr_admin", "finance_officer", "manager"] },
   { href: "/clients", label: "Clients", icon: Briefcase, section: "finance" },
   { href: "/invoices", label: "Invoices", icon: FileText, section: "finance", roles: ["super_admin", "partner", "finance_officer", "manager"] },
+  { href: "/credential-vault", label: "Credential Vault", icon: KeyRound, section: "finance", roles: ["super_admin", "partner"] },
+  { href: "/task-scheduler", label: "Task Scheduler", icon: Calendar, section: "work" },
   { href: "/engagements", label: "Engagements", icon: ClipboardList, section: "work" },
   { href: "/documents", label: "Documents", icon: FolderOpen, section: "work" },
   { href: "/reports", label: "Reports", icon: BarChart3, section: "analytics", roles: ["super_admin", "partner", "hr_admin", "finance_officer", "manager"] },
@@ -122,15 +127,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="p-4 border-t border-sidebar-border bg-sidebar-accent/30">
-          <div className="flex items-center gap-3 mb-4 px-2">
-            <div className="w-10 h-10 rounded-full bg-sidebar-primary flex items-center justify-center font-bold text-white shadow-inner">
-              {user.name.charAt(0)}
+          <Link href="/profile" className="block">
+            <div className="flex items-center gap-3 mb-3 px-2 cursor-pointer rounded-lg hover:bg-sidebar-accent/50 py-2 transition-colors">
+              <div className="w-10 h-10 rounded-full bg-sidebar-primary flex items-center justify-center font-bold text-white shadow-inner">
+                {user.name.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate text-white">{user.name}</p>
+                <p className="text-xs text-sidebar-foreground/60 truncate capitalize">{user.role.replace(/_/g, ' ')}</p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate text-white">{user.name}</p>
-              <p className="text-xs text-sidebar-foreground/60 truncate capitalize">{user.role.replace(/_/g, ' ')}</p>
-            </div>
-          </div>
+          </Link>
           <Button 
             variant="ghost" 
             className="w-full justify-start text-sidebar-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"

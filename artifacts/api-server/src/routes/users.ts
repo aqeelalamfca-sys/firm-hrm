@@ -118,54 +118,6 @@ router.post("/", requireRoles("super_admin", "partner"), async (req: Authenticat
   }
 });
 
-router.put("/:id", requireRoles("super_admin", "partner"), async (req: AuthenticatedRequest, res) => {
-  try {
-    const id = Number(req.params.id);
-    const { name, email, role, phone, mobile, cnic, status, employeeId, password } = req.body;
-
-    const updateData: any = { updatedAt: new Date() };
-    if (name) updateData.name = name;
-    if (email) updateData.email = email;
-    if (role) updateData.role = role;
-    if (phone !== undefined) updateData.phone = phone;
-    if (mobile !== undefined) updateData.mobile = mobile;
-    if (cnic !== undefined) updateData.cnic = cnic;
-    if (status) updateData.status = status;
-    if (employeeId !== undefined) updateData.employeeId = employeeId;
-    if (password) updateData.passwordHash = hashPassword(password);
-
-    const [user] = await db.update(usersTable).set(updateData).where(eq(usersTable.id, id)).returning();
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    await logActivity({
-      userId: req.user!.id,
-      userName: req.user!.name,
-      action: "update",
-      module: "users",
-      entityId: id,
-      entityType: "user",
-      description: `Updated user ${user.name}`,
-      ipAddress: req.ip,
-    });
-
-    res.json({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      employeeId: user.employeeId,
-      phone: user.phone,
-      mobile: user.mobile,
-      cnic: user.cnic,
-      profilePicture: user.profilePicture,
-      status: user.status,
-      createdAt: user.createdAt,
-    });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to update user" });
-  }
-});
-
 router.put("/profile", async (req: AuthenticatedRequest, res) => {
   try {
     const { name, phone, mobile, cnic, profilePicture } = req.body;
@@ -213,6 +165,54 @@ router.put("/change-password", async (req: AuthenticatedRequest, res) => {
     res.json({ message: "Password changed successfully" });
   } catch (error) {
     res.status(500).json({ error: "Failed to change password" });
+  }
+});
+
+router.put("/:id", requireRoles("super_admin", "partner"), async (req: AuthenticatedRequest, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { name, email, role, phone, mobile, cnic, status, employeeId, password } = req.body;
+
+    const updateData: any = { updatedAt: new Date() };
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
+    if (role) updateData.role = role;
+    if (phone !== undefined) updateData.phone = phone;
+    if (mobile !== undefined) updateData.mobile = mobile;
+    if (cnic !== undefined) updateData.cnic = cnic;
+    if (status) updateData.status = status;
+    if (employeeId !== undefined) updateData.employeeId = employeeId;
+    if (password) updateData.passwordHash = hashPassword(password);
+
+    const [user] = await db.update(usersTable).set(updateData).where(eq(usersTable.id, id)).returning();
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    await logActivity({
+      userId: req.user!.id,
+      userName: req.user!.name,
+      action: "update",
+      module: "users",
+      entityId: id,
+      entityType: "user",
+      description: `Updated user ${user.name}`,
+      ipAddress: req.ip,
+    });
+
+    res.json({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      employeeId: user.employeeId,
+      phone: user.phone,
+      mobile: user.mobile,
+      cnic: user.cnic,
+      profilePicture: user.profilePicture,
+      status: user.status,
+      createdAt: user.createdAt,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update user" });
   }
 });
 

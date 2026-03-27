@@ -1,0 +1,245 @@
+refined, production-grade “Ultimate Replit Prompt” with Department-wise structure fully integrated across:
+
+HR
+Client
+Tasks
+Documents
+Invoices
+
+This ensures your system works like a true audit firm operating model (Audit, Tax, Corporate, Advisory, Others), while keeping it simple, user-friendly, and scalable.
+
+✅ ULTIMATE REPLIT PROMPT — DATA + TASK + DEPARTMENT MANAGEMENT SYSTEM (AUDIT FIRM ERP)
+
+Objective:
+Scan the entire application and upgrade it into a department-driven, easy-to-use Data + Task + Client + Invoice Management System, ensuring:
+
+Simple UI (Google Drive–like)
+Department-wise segregation
+Secure access control
+Cloud storage integration
+Task linkage with documents
+30-day recovery system
+No complexity, no data loss
+🧩 PHASE 1 — ADD DEPARTMENT STRUCTURE (CORE CHANGE)
+Define Departments:
+Department:
+- Audit
+- Tax
+- Corporate
+- Advisory
+- Others
+Apply Department Field To:
+Users
+Clients
+Engagements
+Tasks
+Documents
+Invoices
+
+👉 Every record MUST have:
+
+departmentId
+👤 PHASE 2 — HR MODULE (DEPARTMENT BASED)
+Update User Model:
+User {
+  id
+  name
+  role
+  departmentId
+  dateOfJoining
+  email
+  phone
+  profilePicture
+  status
+}
+Features:
+Department-wise staff view
+Filter users by department
+Assign tasks within department
+🏢 PHASE 3 — CLIENT MANAGEMENT (DEPARTMENT LINKED)
+Client:
+Assign primary department
+Allow multi-department tagging (if needed)
+Engagement:
+Each engagement MUST belong to a department
+Example:
+Audit → Statutory Audit
+Tax → Return Filing
+Corporate → SECP Filing
+📁 PHASE 4 — DOCUMENT MANAGEMENT (UPDATED)
+Folder Structure (Auto-generated):
+Department /
+   Client /
+      Engagement /
+         Documents
+Upload Features:
+Drag & drop
+Multi-upload
+Tag:
+Department
+Client
+Engagement
+File Actions:
+View
+Download
+Copy Link
+Attach to Task
+Rename
+Delete (restricted)
+🔐 PERMISSIONS (UPDATED)
+Role	Upload	View	Edit	Delete
+Admin	✔	✔	✔	✔
+Partner	✔	✔	✔	✔
+Manager	✔	✔	✔	✔
+Trainee	✔	✔	❌	❌
+♻️ PHASE 5 — SOFT DELETE SYSTEM
+Deleted files → move to Trash
+Retain for 30 days
+Allow:
+Restore
+Permanent delete (Partner/Admin)
+☁️ PHASE 6 — CLOUD STORAGE (GOOGLE DRIVE / ONEDRIVE)
+Settings Page:
+Add credentials:
+Google Drive API
+OneDrive API
+Upload Behavior:
+Store file in:
+Selected cloud OR local storage
+Save:
+File URL
+Department mapping
+📅 PHASE 7 — TASK MANAGEMENT (DEPARTMENT BASED)
+Task MUST include:
+Task {
+  title
+  departmentId
+  clientId
+  engagementId
+  assignedTo
+  dueDate
+  status
+}
+Calendar View:
+Filter by:
+Department
+User
+Client
+⚙️ PHASE 8 — TASK ALLOCATION (UPDATED LOGIC)
+Rules:
+ADMIN
+Assign to anyone
+PARTNER
+Assign within ALL departments
+MANAGER
+Assign to trainees within same department
+TRAINEE (SMART SENIORITY)
+
+✔ Can assign:
+
+Same department users
+Same joining month OR
+Within 0–5 months junior
+
+❌ Cannot assign:
+
+Other departments
+Senior beyond 5 months
+Manager / Partner / Admin
+🔗 PHASE 9 — FILE LINKING WITH TASKS
+In Task:
+Add:
+👉 Attach File (Dropdown)
+
+Options:
+
+Browse documents (filtered by department)
+Paste link
+💰 PHASE 10 — INVOICE MANAGEMENT (DEPARTMENT LINKED)
+Invoice must include:
+Department
+Client
+Engagement
+Features:
+Recurring invoices
+Tax:
+WHT
+Sales Tax
+Net received
+📊 PHASE 11 — FILTERS (VERY IMPORTANT)
+
+Add global filters everywhere:
+
+Department
+Client
+Engagement
+User
+Status
+🧾 PHASE 12 — AUDIT TRAIL
+
+Track:
+
+Upload
+Edit
+Delete
+Restore
+Task assignment
+
+Include:
+
+User
+Department
+Timestamp
+🔐 PHASE 13 — SECURITY
+Department-level data visibility
+Role-based access
+Encrypted credentials
+No public file access
+🎯 UI/UX RULES (STRICT)
+Keep:
+Clean layout
+Minimal clicks
+Fast navigation
+Structure:
+Dashboard
+Departments
+Clients
+Tasks (Calendar)
+Documents
+Invoices
+HR
+Reports
+Design Rules:
+Color coding:
+Audit → Blue
+Tax → Green
+Corporate → Purple
+Advisory → Orange
+Others → Gray
+⚙️ PHASE 14 — PERFORMANCE
+Fast loading
+Lazy loading files
+Optimized queries
+Handle 200+ users
+❗ CRITICAL INSTRUCTIONS
+DO NOT:
+Break existing UI
+Overcomplicate system
+Remove existing data
+MUST:
+Integrate departments everywhere
+Keep system simple
+Ensure zero data loss
+Maintain audit compliance
+✅ FINAL OUTPUT
+Department-driven system
+Simple document management
+Task + file linking
+Secure cloud storage
+Role-based control
+30-day recovery system
+Clean, fast, user-friendly interface
+🔥 OPTIONAL (NEXT LEVEL)
+Department-wise profitability
+Resource utilization per department
+AI-based task allocation

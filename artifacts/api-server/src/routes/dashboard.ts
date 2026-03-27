@@ -1,9 +1,99 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { employeesTable, attendanceTable, leavesTable, invoicesTable, clientsTable, payrollTable } from "@workspace/db";
+import { employeesTable, attendanceTable, leavesTable, invoicesTable, clientsTable, payrollTable, engagementsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
+import { type AuthenticatedRequest } from "../middleware/auth";
 
 const router = Router();
+
+router.get("/role-stats", async (req: AuthenticatedRequest, res) => {
+  try {
+    const role = req.user!.role;
+    const userId = req.user!.id;
+
+    if (role === "super_admin" || role === "partner") {
+      const invoices = await db.select().from(invoicesTable);
+      const totalRevenue = invoices.filter(i => i.status === "paid").reduce((s, i) => s + Number(i.totalAmount), 0);
+      const totalReceivables = invoices.filter(i => i.status !== "paid" && i.status !== "cancelled" && i.status !== "draft").reduce((s, i) => s + Number(i.totalAmount), 0);
+      const engagements = await db.select().from(engagementsTable);
+      const activeEngagements = engagements.filter(e => e.status === "execution" || e.status === "planning").length;
+      const completedEngagements = engagements.filter(e => e.status === "completed").length;
+      const clients = await db.select().from(clientsTable);
+      const employees = await db.select().from(employeesTable);
+
+      return res.json({
+        type: "executive",
+        totalRevenue,
+        totalReceivables,
+        activeEngagements,
+        completedEngagements,
+        totalClients: clients.length,
+        activeClients: clients.filter(c => c.status === "active").length,
+        totalEmployees: employees.length,
+        activeEmployees: employees.filter(e => e.status === "active").length,
+      });
+    }
+
+    if (role === "finance_officer") {
+      const invoices = await db.select().from(invoicesTable);
+      const totalBilled = invoices.reduce((s, i) => s + Number(i.totalAmount), 0);
+      const totalPaid = invoices.filter(i => i.status === "paid").reduce((s, i) => s + Number(i.totalAmount), 0);
+      const overdueCount = invoices.filter(i => i.status === "overdue").length;
+      const payroll = await db.select().from(payrollTable);
+      const totalPayroll = payroll.reduce((s, p) => s + Number(p.netSalary), 0);
+
+      return res.json({
+        type: "finance",
+        totalBilled,
+        totalPaid,
+        totalOutstanding: totalBilled - totalPaid,
+        overdueInvoices: overdueCount,
+        totalPayrollCost: totalPayroll,
+        invoiceCount: invoices.length,
+      });
+    }
+
+    if (role === "hr_admin") {
+      const employees = await db.select().from(employeesTable);
+      const leaves = await db.select().from(leavesTable);
+      const pendingLeaves = leaves.filter(l => l.status === "pending").length;
+      const today = new Date().toISOString().split("T")[0];
+      const attendance = await db.select().from(attendanceTable);
+      const todayPresent = attendance.filter(r => r.date === today && (r.status === "present" || r.status === "late")).length;
+
+      return res.json({
+        type: "hr",
+        totalEmployees: employees.length,
+        activeEmployees: employees.filter(e => e.status === "active").length,
+        pendingLeaves,
+        todayPresent,
+        todayAbsent: employees.filter(e => e.status === "active").length - todayPresent,
+        departmentBreakdown: Object.entries(employees.reduce((acc: Record<string, number>, e) => {
+          acc[e.department || "Other"] = (acc[e.department || "Other"] || 0) + 1;
+          return acc;
+        }, {})).map(([dept, count]) => ({ department: dept, count })),
+      });
+    }
+
+    const employees = await db.select().from(employeesTable);
+    const today = new Date().toISOString().split("T")[0];
+    const attendance = await db.select().from(attendanceTable);
+    const myAttendance = attendance.filter(r => {
+      const emp = employees.find(e => e.id === r.employeeId);
+      return emp !== undefined;
+    });
+    const todayPresent = attendance.filter(r => r.date === today && (r.status === "present" || r.status === "late")).length;
+
+    return res.json({
+      type: "employee",
+      todayPresent,
+      totalEmployees: employees.length,
+    });
+  } catch (error) {
+    console.error("Error fetching role stats:", error);
+    res.status(500).json({ error: "Failed to fetch role stats" });
+  }
+});
 
 router.get("/stats", async (req, res) => {
   const employees = await db.select().from(employeesTable);

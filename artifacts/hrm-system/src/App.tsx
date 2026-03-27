@@ -20,6 +20,9 @@ import Engagements from "@/pages/engagements";
 import Documents from "@/pages/documents";
 import AuditTrail from "@/pages/audit-trail";
 import UserManagement from "@/pages/user-management";
+import TaskScheduler from "@/pages/task-scheduler";
+import CredentialVault from "@/pages/credential-vault";
+import Profile from "@/pages/profile";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -113,6 +116,9 @@ function Router() {
       <Route path="/documents"><ProtectedRoute component={Documents} /></Route>
       <Route path="/audit-trail"><ProtectedRoute component={AuditTrail} /></Route>
       <Route path="/user-management"><ProtectedRoute component={UserManagement} /></Route>
+      <Route path="/task-scheduler"><ProtectedRoute component={TaskScheduler} /></Route>
+      <Route path="/credential-vault"><ProtectedRoute component={CredentialVault} /></Route>
+      <Route path="/profile"><ProtectedRoute component={Profile} /></Route>
       <Route path="/"><ProtectedRoute component={Dashboard} /></Route>
       <Route component={NotFound} />
     </Switch>

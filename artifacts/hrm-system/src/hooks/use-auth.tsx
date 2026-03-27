@@ -6,8 +6,14 @@ interface User {
   id: number;
   email: string;
   name: string;
-  role: "super_admin" | "hr_admin" | "finance_officer" | "manager" | "employee";
+  role: string;
   employeeId?: number | null;
+  phone?: string | null;
+  mobile?: string | null;
+  cnic?: string | null;
+  profilePicture?: string | null;
+  status?: string;
+  createdAt?: string;
 }
 
 interface AuthContextType {
@@ -16,6 +22,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (credentials: { email: string; password: string }) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -62,8 +69,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
+  const refreshUser = async () => {
+    try {
+      const userData = await getCurrentUser();
+      setUser(userData as User);
+    } catch (error) {
+      console.error("Failed to refresh user:", error);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

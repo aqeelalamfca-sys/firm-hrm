@@ -2,8 +2,19 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { payrollTable, employeesTable, attendanceTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { type AuthenticatedRequest } from "../middleware/auth";
+import { logActivity } from "../middleware/activity-logger";
 
 const router = Router();
+
+function calculatePakistanTax(annualIncome: number): number {
+  if (annualIncome <= 600000) return 0;
+  if (annualIncome <= 1200000) return (annualIncome - 600000) * 0.025;
+  if (annualIncome <= 2400000) return 15000 + (annualIncome - 1200000) * 0.125;
+  if (annualIncome <= 3600000) return 165000 + (annualIncome - 2400000) * 0.225;
+  if (annualIncome <= 6000000) return 435000 + (annualIncome - 3600000) * 0.275;
+  return 1095000 + (annualIncome - 6000000) * 0.35;
+}
 
 router.get("/", async (req, res) => {
   const { month, year } = req.query;
@@ -20,11 +31,16 @@ router.get("/", async (req, res) => {
         employeeId: r.employeeId,
         employeeName: emp ? `${emp.firstName} ${emp.lastName}` : "Unknown",
         employeeCode: emp?.employeeCode || "???",
+        designation: emp?.designation || "",
+        department: emp?.department || "",
         month: r.month,
         year: r.year,
         basicSalary: Number(r.basicSalary),
         allowances: Number(r.allowances),
         deductions: Number(r.deductions),
+        taxAmount: Number((r as any).taxAmount || 0),
+        overtimeHours: Number((r as any).overtimeHours || 0),
+        overtimePay: Number((r as any).overtimePay || 0),
         advances: Number(r.advances),
         netSalary: Number(r.netSalary),
         workingDays: r.workingDays,
@@ -53,11 +69,16 @@ router.get("/:id", async (req, res) => {
     employeeId: r.employeeId,
     employeeName: emp ? `${emp.firstName} ${emp.lastName}` : "Unknown",
     employeeCode: emp?.employeeCode || "???",
+    designation: emp?.designation || "",
+    department: emp?.department || "",
     month: r.month,
     year: r.year,
     basicSalary: Number(r.basicSalary),
     allowances: Number(r.allowances),
     deductions: Number(r.deductions),
+    taxAmount: Number((r as any).taxAmount || 0),
+    overtimeHours: Number((r as any).overtimeHours || 0),
+    overtimePay: Number((r as any).overtimePay || 0),
     advances: Number(r.advances),
     netSalary: Number(r.netSalary),
     workingDays: r.workingDays,
@@ -93,7 +114,11 @@ router.post("/", async (req, res) => {
       const presentDays = monthAttendance.filter(r => r.status === "present" || r.status === "late").length;
       const basicSalary = Number(emp.salary);
       const perDaySalary = basicSalary / workingDays;
-      const netSalary = presentDays > 0 ? (perDaySalary * presentDays) : basicSalary;
+      const grossSalary = presentDays > 0 ? (perDaySalary * presentDays) : basicSalary;
+      const annualProjection = basicSalary * 12;
+      const annualTax = calculatePakistanTax(annualProjection);
+      const monthlyTax = Math.round(annualTax / 12);
+      const netSalary = grossSalary - monthlyTax;
 
       const [record] = await db.insert(payrollTable).values({
         employeeId: emp.id,
@@ -101,7 +126,10 @@ router.post("/", async (req, res) => {
         year: parseInt(year),
         basicSalary: basicSalary.toString(),
         allowances: "0",
-        deductions: "0",
+        deductions: monthlyTax.toString(),
+        taxAmount: monthlyTax.toString(),
+        overtimeHours: "0",
+        overtimePay: "0",
         advances: "0",
         netSalary: netSalary.toFixed(2),
         workingDays,

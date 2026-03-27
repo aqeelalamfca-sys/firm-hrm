@@ -1,200 +1,320 @@
-import React, { useState } from "react";
-import { useGetInvoices, useCreateInvoice, useUpdateInvoiceStatus, useGetClients } from "@workspace/api-client-react";
+import React, { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import { Plus, FileText, CheckCircle, Send, IndianRupee, AlertTriangle, ChevronRight } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import {
+  Plus, FileText, CheckCircle, Send, AlertTriangle, ChevronRight,
+  IndianRupee, Receipt, Eye, Download
+} from "lucide-react";
 
-const STATUS_FLOW: Record<string, string> = {
-  draft: 'issued',
-  issued: 'paid',
-};
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Issue',
-  issued: 'Mark Paid',
-};
-const STATUS_ICONS: Record<string, any> = {
-  draft: Send,
-  issued: CheckCircle,
-};
+const STATUS_FLOW: Record<string, string> = { draft: "approved", approved: "issued", issued: "paid" };
+const STATUS_LABELS: Record<string, string> = { draft: "Approve", approved: "Issue", issued: "Mark Paid" };
+const STATUS_ICONS: Record<string, any> = { draft: CheckCircle, approved: Send, issued: CheckCircle };
 
 function getStatusStyle(status: string) {
   switch (status) {
-    case 'paid': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-    case 'draft': return 'bg-slate-100 text-slate-600 border-slate-200';
-    case 'issued': return 'bg-blue-100 text-blue-700 border-blue-200';
-    case 'approved': return 'bg-violet-100 text-violet-700 border-violet-200';
-    case 'overdue': return 'bg-red-100 text-red-700 border-red-200';
-    default: return 'bg-slate-100 text-slate-600 border-slate-200';
+    case "paid": return "bg-emerald-100 text-emerald-700 border-emerald-200";
+    case "draft": return "bg-slate-100 text-slate-600 border-slate-200";
+    case "issued": return "bg-blue-100 text-blue-700 border-blue-200";
+    case "approved": return "bg-violet-100 text-violet-700 border-violet-200";
+    case "overdue": return "bg-red-100 text-red-700 border-red-200";
+    case "cancelled": return "bg-gray-100 text-gray-500 border-gray-200";
+    default: return "bg-slate-100 text-slate-600 border-slate-200";
   }
 }
 
 export default function Invoices() {
   const { token } = useAuth();
-  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [detailInvoice, setDetailInvoice] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("all");
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
+  const [engagements, setEngagements] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const requestOpts = { request: { headers: { Authorization: `Bearer ${token}` } } };
-  const { data: invoices = [], isLoading } = useGetInvoices({}, requestOpts);
-  const { data: clients = [] } = useGetClients({}, requestOpts);
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-  const createMutation = useCreateInvoice({
-    ...requestOpts,
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-        setIsDialogOpen(false);
-        toast({ title: "Invoice created successfully" });
-      },
-      onError: () => toast({ title: "Failed to create invoice", variant: "destructive" })
-    }
+  const [form, setForm] = useState({
+    clientId: "", engagementId: "", serviceType: "audit", description: "",
+    amount: "", gstPercent: "18", whtPercent: "0",
+    issueDate: new Date().toISOString().split("T")[0], dueDate: "",
+    notes: "", isRecurring: false, recurringFrequency: "monthly",
   });
 
-  const statusMutation = useUpdateInvoiceStatus({
-    ...requestOpts,
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-        toast({ title: "Invoice status updated" });
-      }
-    }
-  });
-
-  const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    createMutation.mutate({
-      data: {
-        clientId: parseInt(fd.get('clientId') as string),
-        serviceType: fd.get('serviceType') as any,
-        description: fd.get('description') as string,
-        amount: parseFloat(fd.get('amount') as string),
-        tax: parseFloat(fd.get('tax') as string || '0'),
-        issueDate: fd.get('issueDate') as string,
-        dueDate: fd.get('dueDate') as string,
-      }
+  React.useEffect(() => {
+    Promise.all([
+      fetch("/api/invoices", { headers }).then((r) => r.json()),
+      fetch("/api/clients", { headers }).then((r) => r.json()),
+      fetch("/api/engagements", { headers }).then((r) => r.json()).catch(() => []),
+    ]).then(([inv, cl, eng]) => {
+      setInvoices(inv);
+      setClients(cl);
+      setEngagements(eng);
+      setLoading(false);
     });
-  };
+  }, [token]);
 
-  const filteredInvoices = activeTab === 'all'
-    ? invoices
-    : invoices.filter((inv: any) => inv.status === activeTab);
+  const baseAmount = Number(form.amount) || 0;
+  const gstRate = Number(form.gstPercent) || 0;
+  const whtRate = Number(form.whtPercent) || 0;
+  const gstAmount = baseAmount * gstRate / 100;
+  const whtAmount = baseAmount * whtRate / 100;
+  const totalAmount = baseAmount + gstAmount - whtAmount;
 
-  const summary = {
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    const res = await fetch("/api/invoices", {
+      method: "POST", headers,
+      body: JSON.stringify({
+        clientId: Number(form.clientId),
+        engagementId: form.engagementId ? Number(form.engagementId) : null,
+        serviceType: form.serviceType,
+        description: form.description,
+        amount: baseAmount,
+        gstPercent: gstRate,
+        whtPercent: whtRate,
+        issueDate: form.issueDate,
+        dueDate: form.dueDate,
+        notes: form.notes || null,
+        isRecurring: form.isRecurring,
+        recurringFrequency: form.isRecurring ? form.recurringFrequency : null,
+      }),
+    });
+    if (res.ok) {
+      const inv = await res.json();
+      setInvoices([inv, ...invoices]);
+      setIsDialogOpen(false);
+      resetForm();
+      toast({ title: "Invoice created successfully" });
+    } else {
+      toast({ title: "Failed to create invoice", variant: "destructive" });
+    }
+  }
+
+  async function handleStatusChange(id: number, status: string, paidAmount?: number) {
+    const body: any = { status };
+    if (status === "paid") {
+      const inv = invoices.find((i: any) => i.id === id);
+      body.paidAmount = paidAmount ?? inv?.totalAmount;
+      body.paidDate = new Date().toISOString().split("T")[0];
+    }
+    const res = await fetch(`/api/invoices/${id}/status`, {
+      method: "PUT", headers,
+      body: JSON.stringify(body),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setInvoices(invoices.map((i: any) => i.id === id ? updated : i));
+      toast({ title: "Invoice status updated" });
+    }
+  }
+
+  function resetForm() {
+    setForm({
+      clientId: "", engagementId: "", serviceType: "audit", description: "",
+      amount: "", gstPercent: "18", whtPercent: "0",
+      issueDate: new Date().toISOString().split("T")[0], dueDate: "",
+      notes: "", isRecurring: false, recurringFrequency: "monthly",
+    });
+  }
+
+  const filteredInvoices = activeTab === "all" ? invoices : invoices.filter((i: any) => i.status === activeTab);
+
+  const summary = useMemo(() => ({
     total: invoices.length,
-    draft: invoices.filter((i: any) => i.status === 'draft').length,
-    issued: invoices.filter((i: any) => i.status === 'issued').length,
-    paid: invoices.filter((i: any) => i.status === 'paid').length,
-    overdue: invoices.filter((i: any) => i.status === 'overdue').length,
+    draft: invoices.filter((i: any) => i.status === "draft").length,
+    approved: invoices.filter((i: any) => i.status === "approved").length,
+    issued: invoices.filter((i: any) => i.status === "issued").length,
+    paid: invoices.filter((i: any) => i.status === "paid").length,
+    overdue: invoices.filter((i: any) => i.status === "overdue").length,
     totalAmount: invoices.reduce((s: number, i: any) => s + (i.totalAmount || 0), 0),
-    outstanding: invoices.filter((i: any) => i.status !== 'paid').reduce((s: number, i: any) => s + (i.totalAmount || 0), 0),
-  };
+    outstanding: invoices.filter((i: any) => !["paid", "cancelled"].includes(i.status)).reduce((s: number, i: any) => s + ((i.totalAmount || 0) - (i.paidAmount || 0)), 0),
+  }), [invoices]);
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold">Invoices</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Client billing and receivables management</p>
+          <p className="text-muted-foreground mt-1 text-sm">Client billing, WHT & GST management</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
-            <Button className="shadow-md shadow-primary/20 gap-2">
-              <Plus className="w-4 h-4" /> Create Invoice
-            </Button>
+            <Button className="shadow-md shadow-primary/20 gap-2"><Plus className="w-4 h-4" /> Create Invoice</Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[520px]">
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="font-display text-xl">Create New Invoice</DialogTitle>
+              <DialogDescription>Fill in the invoice details with tax calculations</DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleCreate} className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Client *</label>
-                <Select name="clientId" required>
-                  <SelectTrigger className="bg-muted/40 border-border/50">
-                    <SelectValue placeholder="Select a client" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((c: any) => (
-                      <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Service Type *</label>
-                <Select name="serviceType" defaultValue="accounting">
-                  <SelectTrigger className="bg-muted/40 border-border/50"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="audit">Statutory Audit</SelectItem>
-                    <SelectItem value="tax">Tax Compliance</SelectItem>
-                    <SelectItem value="advisory">Business Advisory</SelectItem>
-                    <SelectItem value="accounting">Accounting & Bookkeeping</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Description *</label>
-                <Input name="description" required className="bg-muted/40 border-border/50" placeholder="Brief description of services..." />
-              </div>
+            <form onSubmit={handleCreate} className="space-y-4 pt-2">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Amount (₹) *</label>
-                  <Input type="number" name="amount" required step="0.01" className="bg-muted/40 border-border/50" placeholder="0.00" />
+                  <Label>Client *</Label>
+                  <Select value={form.clientId} onValueChange={(v) => setForm({ ...form, clientId: v })}>
+                    <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
+                    <SelectContent>
+                      {clients.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">GST (%)</label>
-                  <Input type="number" name="tax" defaultValue="18" className="bg-muted/40 border-border/50" />
+                  <Label>Engagement</Label>
+                  <Select value={form.engagementId} onValueChange={(v) => setForm({ ...form, engagementId: v })}>
+                    <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {engagements.map((e: any) => <SelectItem key={e.id} value={String(e.id)}>{e.title}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Issue Date *</label>
-                  <Input type="date" name="issueDate" required defaultValue={new Date().toISOString().split('T')[0]} className="bg-muted/40 border-border/50" />
+                  <Label>Service Type *</Label>
+                  <Select value={form.serviceType} onValueChange={(v) => setForm({ ...form, serviceType: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="audit">Statutory Audit</SelectItem>
+                      <SelectItem value="tax">Tax Compliance</SelectItem>
+                      <SelectItem value="advisory">Business Advisory</SelectItem>
+                      <SelectItem value="accounting">Accounting & Bookkeeping</SelectItem>
+                      <SelectItem value="other">Other Services</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Due Date *</label>
-                  <Input type="date" name="dueDate" required className="bg-muted/40 border-border/50" />
+                  <Label>Base Amount (₹) *</Label>
+                  <Input
+                    type="number" step="0.01" required placeholder="0.00"
+                    value={form.amount}
+                    onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                  />
                 </div>
               </div>
-              <div className="pt-4 flex justify-end gap-3 border-t border-border/50">
-                <Button variant="ghost" type="button" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={createMutation.isPending} className="shadow-md shadow-primary/20">
-                  {createMutation.isPending ? "Creating..." : "Create Invoice"}
-                </Button>
+
+              <div className="space-y-2">
+                <Label>Description *</Label>
+                <Input
+                  required placeholder="Brief description of services..."
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                />
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>GST Rate (%)</Label>
+                  <Select value={form.gstPercent} onValueChange={(v) => setForm({ ...form, gstPercent: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">0% - Exempt</SelectItem>
+                      <SelectItem value="13">13% - Reduced</SelectItem>
+                      <SelectItem value="16">16% - Standard (Punjab)</SelectItem>
+                      <SelectItem value="17">17% - Standard (Federal)</SelectItem>
+                      <SelectItem value="18">18% - Standard</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>WHT Rate (%)</Label>
+                  <Select value={form.whtPercent} onValueChange={(v) => setForm({ ...form, whtPercent: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">0% - None</SelectItem>
+                      <SelectItem value="3">3% - Individual/AOP</SelectItem>
+                      <SelectItem value="5">5% - Company (Filer)</SelectItem>
+                      <SelectItem value="8">8% - Company</SelectItem>
+                      <SelectItem value="10">10% - Non-Filer</SelectItem>
+                      <SelectItem value="15">15% - Non-Filer (Company)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {baseAmount > 0 && (
+                <Card className="bg-muted/30 border-border/50">
+                  <CardContent className="p-4 space-y-2 text-sm">
+                    <div className="flex justify-between"><span>Base Amount</span><span>₹{baseAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+                    {gstAmount > 0 && (
+                      <div className="flex justify-between text-green-700"><span>+ GST ({gstRate}%)</span><span>₹{gstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+                    )}
+                    {whtAmount > 0 && (
+                      <div className="flex justify-between text-red-700"><span>- WHT ({whtRate}%)</span><span>₹{whtAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+                    )}
+                    <div className="flex justify-between font-bold text-base pt-2 border-t">
+                      <span>Net Payable</span>
+                      <span>₹{totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Issue Date *</Label>
+                  <Input type="date" required value={form.issueDate} onChange={(e) => setForm({ ...form, issueDate: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Due Date *</Label>
+                  <Input type="date" required value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Notes</Label>
+                <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} placeholder="Payment terms, bank details..." />
+              </div>
+
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                <Switch checked={form.isRecurring} onCheckedChange={(v) => setForm({ ...form, isRecurring: v })} />
+                <Label className="cursor-pointer">Recurring Invoice</Label>
+                {form.isRecurring && (
+                  <Select value={form.recurringFrequency} onValueChange={(v) => setForm({ ...form, recurringFrequency: v })}>
+                    <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="quarterly">Quarterly</SelectItem>
+                      <SelectItem value="yearly">Yearly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <Button type="submit" className="w-full">Create Invoice</Button>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Summary Strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <InvoiceStat label="Total Invoices" value={summary.total.toString()} color="blue" />
-        <InvoiceStat label="Pending Payment" value={summary.issued.toString()} color="amber" />
+        <InvoiceStat label="Pending Payment" value={(summary.issued + summary.approved).toString()} color="amber" />
         <InvoiceStat label="Paid" value={summary.paid.toString()} color="emerald" />
-        <InvoiceStat label="Overdue" value={summary.overdue.toString()} color="red" />
+        <InvoiceStat label="Outstanding" value={`₹${(summary.outstanding / 1000).toFixed(0)}K`} color="red" />
       </div>
 
-      {/* Tabs + Table */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-muted/40 border border-border/50 p-1 rounded-xl h-auto">
+        <TabsList className="bg-muted/40 border border-border/50 p-1 rounded-xl h-auto flex-wrap">
           {[
-            { key: 'all', label: `All (${summary.total})` },
-            { key: 'draft', label: `Draft (${summary.draft})` },
-            { key: 'issued', label: `Issued (${summary.issued})` },
-            { key: 'paid', label: `Paid (${summary.paid})` },
-            { key: 'overdue', label: `Overdue (${summary.overdue})` },
+            { key: "all", label: `All (${summary.total})` },
+            { key: "draft", label: `Draft (${summary.draft})` },
+            { key: "approved", label: `Approved (${summary.approved})` },
+            { key: "issued", label: `Issued (${summary.issued})` },
+            { key: "paid", label: `Paid (${summary.paid})` },
+            { key: "overdue", label: `Overdue (${summary.overdue})` },
           ].map(({ key, label }) => (
             <TabsTrigger key={key} value={key} className="text-xs px-3 py-1.5 rounded-lg data-[state=active]:shadow-sm">
               {label}
@@ -208,31 +328,25 @@ export default function Invoices() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-muted/20 border-b border-border/50">
-                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Invoice #</th>
-                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Client & Service</th>
-                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Amount</th>
-                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Due Date</th>
-                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
-                    <th className="px-6 py-3.5 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Action</th>
+                    <th className="px-5 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Invoice #</th>
+                    <th className="px-5 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Client & Service</th>
+                    <th className="px-5 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Amount</th>
+                    <th className="px-5 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tax</th>
+                    <th className="px-5 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Due Date</th>
+                    <th className="px-5 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
+                    <th className="px-5 py-3.5 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
-                  {isLoading ? (
+                  {loading ? (
                     Array.from({ length: 3 }).map((_, i) => (
-                      <tr key={i}>
-                        {Array.from({ length: 6 }).map((_, j) => (
-                          <td key={j} className="px-6 py-4">
-                            <div className="h-4 bg-muted rounded animate-pulse" />
-                          </td>
-                        ))}
-                      </tr>
+                      <tr key={i}>{Array.from({ length: 7 }).map((_, j) => <td key={j} className="px-5 py-4"><div className="h-4 bg-muted rounded animate-pulse" /></td>)}</tr>
                     ))
                   ) : filteredInvoices.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-16 text-center">
+                      <td colSpan={7} className="px-5 py-16 text-center">
                         <FileText className="w-10 h-10 text-muted-foreground/20 mx-auto mb-3" />
                         <p className="text-muted-foreground text-sm">No invoices found</p>
-                        <p className="text-muted-foreground/60 text-xs mt-1">Create your first invoice to get started</p>
                       </td>
                     </tr>
                   ) : (
@@ -240,45 +354,44 @@ export default function Invoices() {
                       const ActionIcon = STATUS_ICONS[inv.status];
                       const nextStatus = STATUS_FLOW[inv.status];
                       return (
-                        <tr key={inv.id} className="hover:bg-muted/20 transition-colors">
-                          <td className="px-6 py-4">
+                        <tr key={inv.id} className="hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => setDetailInvoice(inv)}>
+                          <td className="px-5 py-4">
                             <span className="font-mono font-semibold text-primary text-sm">#{inv.invoiceNumber}</span>
+                            {inv.isRecurring && <Badge className="ml-2 text-[9px] bg-purple-100 text-purple-700">Recurring</Badge>}
                           </td>
-                          <td className="px-6 py-4">
-                            <p className="font-semibold text-sm text-foreground">{inv.clientName}</p>
-                            <p className="text-xs text-muted-foreground capitalize mt-0.5">{inv.serviceType?.replace('_', ' ')}</p>
+                          <td className="px-5 py-4">
+                            <p className="font-semibold text-sm">{inv.clientName}</p>
+                            <p className="text-xs text-muted-foreground capitalize mt-0.5">{inv.serviceType?.replace("_", " ")}</p>
                           </td>
-                          <td className="px-6 py-4">
-                            <div>
-                              <p className="font-bold text-sm">₹{inv.totalAmount?.toLocaleString('en-IN')}</p>
-                              {inv.tax > 0 && (
-                                <p className="text-xs text-muted-foreground">incl. {inv.tax}% GST</p>
-                              )}
+                          <td className="px-5 py-4">
+                            <p className="font-bold text-sm">₹{inv.totalAmount?.toLocaleString("en-IN")}</p>
+                            <p className="text-xs text-muted-foreground">Base: ₹{inv.amount?.toLocaleString("en-IN")}</p>
+                          </td>
+                          <td className="px-5 py-4">
+                            <div className="text-xs space-y-0.5">
+                              {inv.gstAmount > 0 && <p className="text-green-700">GST: ₹{inv.gstAmount?.toLocaleString("en-IN")}</p>}
+                              {inv.whtAmount > 0 && <p className="text-red-700">WHT: ₹{inv.whtAmount?.toLocaleString("en-IN")}</p>}
+                              {inv.gstAmount === 0 && inv.whtAmount === 0 && <p className="text-muted-foreground">No tax</p>}
                             </div>
                           </td>
-                          <td className="px-6 py-4">
-                            <div>
-                              <p className="text-sm text-foreground">{new Date(inv.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                              {inv.status === 'overdue' && (
-                                <p className="text-xs text-red-600 flex items-center gap-1 mt-0.5">
-                                  <AlertTriangle className="w-3 h-3" /> Overdue
-                                </p>
-                              )}
-                            </div>
+                          <td className="px-5 py-4">
+                            <p className="text-sm">{new Date(inv.dueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+                            {inv.status === "overdue" && (
+                              <p className="text-xs text-red-600 flex items-center gap-1 mt-0.5"><AlertTriangle className="w-3 h-3" /> Overdue</p>
+                            )}
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-5 py-4">
                             <Badge variant="outline" className={`uppercase tracking-wide text-[10px] px-2.5 py-0.5 font-semibold ${getStatusStyle(inv.status)}`}>
                               {inv.status}
                             </Badge>
                           </td>
-                          <td className="px-6 py-4 text-right">
+                          <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                             {nextStatus && (
                               <Button
                                 size="sm"
-                                variant={inv.status === 'issued' ? 'default' : 'outline'}
-                                className={`h-8 text-xs gap-1.5 ${inv.status === 'issued' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20' : ''}`}
-                                disabled={statusMutation.isPending}
-                                onClick={() => statusMutation.mutate({ id: inv.id, data: { status: nextStatus as any } })}
+                                variant={inv.status === "issued" ? "default" : "outline"}
+                                className={`h-8 text-xs gap-1.5 ${inv.status === "issued" ? "bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20" : ""}`}
+                                onClick={() => handleStatusChange(inv.id, nextStatus)}
                               >
                                 {ActionIcon && <ActionIcon className="w-3.5 h-3.5" />}
                                 {STATUS_LABELS[inv.status]}
@@ -292,27 +405,68 @@ export default function Invoices() {
                 </tbody>
               </table>
             </div>
-            {!isLoading && filteredInvoices.length > 0 && (
-              <div className="px-6 py-3 bg-muted/20 border-t border-border/50 flex justify-between items-center">
-                <span className="text-xs text-muted-foreground">{filteredInvoices.length} invoice{filteredInvoices.length !== 1 ? 's' : ''}</span>
-                <span className="text-sm font-semibold">
-                  Outstanding: ₹{summary.outstanding.toLocaleString('en-IN')}
-                </span>
+            {!loading && filteredInvoices.length > 0 && (
+              <div className="px-5 py-3 bg-muted/20 border-t border-border/50 flex justify-between items-center">
+                <span className="text-xs text-muted-foreground">{filteredInvoices.length} invoice{filteredInvoices.length !== 1 ? "s" : ""}</span>
+                <span className="text-sm font-semibold">Outstanding: ₹{summary.outstanding.toLocaleString("en-IN")}</span>
               </div>
             )}
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!detailInvoice} onOpenChange={(open) => { if (!open) setDetailInvoice(null); }}>
+        <DialogContent className="sm:max-w-[500px]">
+          {detailInvoice && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Receipt className="w-5 h-5 text-primary" />
+                  Invoice #{detailInvoice.invoiceNumber}
+                </DialogTitle>
+                <DialogDescription>Invoice details and breakdown</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className={`uppercase text-[10px] font-semibold ${getStatusStyle(detailInvoice.status)}`}>
+                    {detailInvoice.status}
+                  </Badge>
+                  {detailInvoice.isRecurring && <Badge className="bg-purple-100 text-purple-700 text-[10px]">Recurring ({detailInvoice.recurringFrequency})</Badge>}
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div><span className="text-muted-foreground">Client:</span> <span className="font-medium">{detailInvoice.clientName}</span></div>
+                  <div><span className="text-muted-foreground">Service:</span> <span className="font-medium capitalize">{detailInvoice.serviceType}</span></div>
+                  <div><span className="text-muted-foreground">Issue:</span> <span>{detailInvoice.issueDate}</span></div>
+                  <div><span className="text-muted-foreground">Due:</span> <span>{detailInvoice.dueDate}</span></div>
+                </div>
+                {detailInvoice.description && <p className="text-sm text-muted-foreground">{detailInvoice.description}</p>}
+                <Card className="bg-muted/30">
+                  <CardContent className="p-4 space-y-2 text-sm">
+                    <div className="flex justify-between"><span>Base Amount</span><span>₹{detailInvoice.amount?.toLocaleString("en-IN")}</span></div>
+                    {detailInvoice.gstAmount > 0 && <div className="flex justify-between text-green-700"><span>+ GST</span><span>₹{detailInvoice.gstAmount?.toLocaleString("en-IN")}</span></div>}
+                    {detailInvoice.whtAmount > 0 && <div className="flex justify-between text-red-700"><span>- WHT</span><span>₹{detailInvoice.whtAmount?.toLocaleString("en-IN")}</span></div>}
+                    <div className="flex justify-between font-bold text-base pt-2 border-t"><span>Net Payable</span><span>₹{detailInvoice.totalAmount?.toLocaleString("en-IN")}</span></div>
+                    {detailInvoice.paidAmount > 0 && (
+                      <div className="flex justify-between text-emerald-700 pt-1"><span>Paid</span><span>₹{detailInvoice.paidAmount?.toLocaleString("en-IN")}</span></div>
+                    )}
+                  </CardContent>
+                </Card>
+                {detailInvoice.notes && <p className="text-sm bg-muted/50 p-3 rounded-lg">{detailInvoice.notes}</p>}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 function InvoiceStat({ label, value, color }: { label: string; value: string; color: string }) {
   const colorMap: Record<string, string> = {
-    blue: 'bg-blue-50 border-blue-100 text-blue-700',
-    amber: 'bg-amber-50 border-amber-100 text-amber-700',
-    emerald: 'bg-emerald-50 border-emerald-100 text-emerald-700',
-    red: 'bg-red-50 border-red-100 text-red-700',
+    blue: "bg-blue-50 border-blue-100 text-blue-700",
+    amber: "bg-amber-50 border-amber-100 text-amber-700",
+    emerald: "bg-emerald-50 border-emerald-100 text-emerald-700",
+    red: "bg-red-50 border-red-100 text-red-700",
   };
   return (
     <div className={`rounded-xl border p-4 ${colorMap[color]}`}>
