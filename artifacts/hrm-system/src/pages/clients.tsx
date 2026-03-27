@@ -9,6 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Search, Plus, Briefcase, Phone, Mail, Building2, IndianRupee, TrendingDown } from "lucide-react";
+import { useDepartments } from "@/hooks/use-departments";
+import { DepartmentBadge } from "@/components/department-badge";
+import { DepartmentSelect } from "@/components/department-select";
 
 const CLIENT_COLORS = [
   'bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500',
@@ -21,6 +24,8 @@ export default function Clients() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [formDeptId, setFormDeptId] = useState("");
+  const { selectedDepartmentId } = useDepartments();
 
   const requestOpts = { request: { headers: { Authorization: `Bearer ${token}` } } };
   const { data: clients = [], isLoading } = useGetClients({}, requestOpts);
@@ -49,13 +54,17 @@ export default function Clients() {
         industry: fd.get('industry') as string,
         ntn: (fd.get('ntn') as string) || undefined,
         registrationNo: (fd.get('registrationNo') as string) || undefined,
-      }
+        departmentId: formDeptId ? Number(formDeptId) : undefined,
+      } as any,
     });
+    setFormDeptId("");
   };
 
-  const filtered = clients.filter((c: any) =>
-    `${c.name} ${c.contactPerson} ${c.industry}`.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = clients
+    .filter((c: any) => !selectedDepartmentId || c.departmentId === selectedDepartmentId)
+    .filter((c: any) =>
+      `${c.name} ${c.contactPerson} ${c.industry}`.toLowerCase().includes(search.toLowerCase())
+    );
 
   const totalOutstanding = clients.reduce((s: number, c: any) => s + (c.outstandingBalance || 0), 0);
   const activeCount = clients.filter((c: any) => c.status === 'active').length;
@@ -112,6 +121,10 @@ export default function Clients() {
                   <label className="text-sm font-medium">Registration No.</label>
                   <Input name="registrationNo" className="bg-muted/40 border-border/50" placeholder="REG-12345" />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Department</label>
+                <DepartmentSelect value={formDeptId} onValueChange={(v) => setFormDeptId(v === "none" ? "" : v)} showAll={false} className="bg-muted/40 border-border/50" />
               </div>
               <div className="pt-4 flex justify-end gap-3 border-t border-border/50">
                 <Button variant="ghost" type="button" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
@@ -201,7 +214,10 @@ export default function Clients() {
                 <h3 className="font-display font-bold text-lg text-foreground mb-0.5 truncate" title={client.name}>
                   {client.name}
                 </h3>
-                <p className="text-xs text-muted-foreground mb-4">{client.industry || "General Services"}</p>
+                <div className="flex items-center gap-2 mb-4">
+                  <p className="text-xs text-muted-foreground">{client.industry || "General Services"}</p>
+                  <DepartmentBadge departmentId={client.departmentId} />
+                </div>
 
                 {/* Contact Details */}
                 <div className="space-y-2 mb-5">

@@ -15,6 +15,9 @@ import {
   Plus, FileText, CheckCircle, Send, AlertTriangle, ChevronRight,
   IndianRupee, Receipt, Eye, Download
 } from "lucide-react";
+import { useDepartments } from "@/hooks/use-departments";
+import { DepartmentBadge } from "@/components/department-badge";
+import { DepartmentSelect } from "@/components/department-select";
 
 const STATUS_FLOW: Record<string, string> = { draft: "approved", approved: "issued", issued: "paid" };
 const STATUS_LABELS: Record<string, string> = { draft: "Approve", approved: "Issue", issued: "Mark Paid" };
@@ -35,6 +38,7 @@ function getStatusStyle(status: string) {
 export default function Invoices() {
   const { token } = useAuth();
   const { toast } = useToast();
+  const { selectedDepartmentId } = useDepartments();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [detailInvoice, setDetailInvoice] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("all");
@@ -50,6 +54,7 @@ export default function Invoices() {
     amount: "", gstPercent: "18", whtPercent: "0",
     issueDate: new Date().toISOString().split("T")[0], dueDate: "",
     notes: "", isRecurring: false, recurringFrequency: "monthly",
+    departmentId: "",
   });
 
   React.useEffect(() => {
@@ -89,6 +94,7 @@ export default function Invoices() {
         notes: form.notes || null,
         isRecurring: form.isRecurring,
         recurringFrequency: form.isRecurring ? form.recurringFrequency : null,
+        departmentId: form.departmentId ? Number(form.departmentId) : null,
       }),
     });
     if (res.ok) {
@@ -126,6 +132,7 @@ export default function Invoices() {
       amount: "", gstPercent: "18", whtPercent: "0",
       issueDate: new Date().toISOString().split("T")[0], dueDate: "",
       notes: "", isRecurring: false, recurringFrequency: "monthly",
+      departmentId: "",
     });
   }
 
@@ -213,7 +220,9 @@ export default function Invoices() {
     printWindow.document.close();
   }
 
-  const filteredInvoices = activeTab === "all" ? invoices : invoices.filter((i: any) => i.status === activeTab);
+  const filteredInvoices = invoices
+    .filter((i: any) => activeTab === "all" || i.status === activeTab)
+    .filter((i: any) => !selectedDepartmentId || i.departmentId === selectedDepartmentId);
 
   const summary = useMemo(() => ({
     total: invoices.length,
@@ -362,6 +371,11 @@ export default function Invoices() {
                 <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} placeholder="Payment terms, bank details..." />
               </div>
 
+              <div className="space-y-2">
+                <Label>Department</Label>
+                <DepartmentSelect value={form.departmentId} onValueChange={(v) => setForm({ ...form, departmentId: v === "none" ? "" : v })} showAll={false} />
+              </div>
+
               <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
                 <Switch checked={form.isRecurring} onCheckedChange={(v) => setForm({ ...form, isRecurring: v })} />
                 <Label className="cursor-pointer">Recurring Invoice</Label>
@@ -444,8 +458,13 @@ export default function Invoices() {
                             {inv.isRecurring && <Badge className="ml-2 text-[9px] bg-purple-100 text-purple-700">Recurring</Badge>}
                           </td>
                           <td className="px-5 py-4">
-                            <p className="font-semibold text-sm">{inv.clientName}</p>
-                            <p className="text-xs text-muted-foreground capitalize mt-0.5">{inv.serviceType?.replace("_", " ")}</p>
+                            <div className="flex items-center gap-2">
+                              <div>
+                                <p className="font-semibold text-sm">{inv.clientName}</p>
+                                <p className="text-xs text-muted-foreground capitalize mt-0.5">{inv.serviceType?.replace("_", " ")}</p>
+                              </div>
+                              <DepartmentBadge departmentId={inv.departmentId} />
+                            </div>
                           </td>
                           <td className="px-5 py-4">
                             <p className="font-bold text-sm">₹{inv.totalAmount?.toLocaleString("en-IN")}</p>

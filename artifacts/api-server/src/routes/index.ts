@@ -16,6 +16,7 @@ import engagementsRouter from "./engagements";
 import documentsRouter from "./documents";
 import tasksRouter from "./tasks";
 import notificationsRouter from "./notifications";
+import departmentsRouter from "./departments";
 
 const router: IRouter = Router();
 
@@ -38,5 +39,6 @@ router.use("/engagements", engagementsRouter);
 router.use("/documents", documentsRouter);
 router.use("/tasks", tasksRouter);
 router.use("/notifications", notificationsRouter);
+router.use("/departments", departmentsRouter);
 
 export default router;

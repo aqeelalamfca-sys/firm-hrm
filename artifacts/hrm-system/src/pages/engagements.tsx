@@ -9,6 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, ClipboardList, Calendar, Users, ArrowRight, Building2 } from "lucide-react";
+import { useDepartments } from "@/hooks/use-departments";
+import { DepartmentBadge } from "@/components/department-badge";
+import { DepartmentSelect } from "@/components/department-select";
 
 const statusColors: Record<string, string> = {
   planning: "bg-blue-100 text-blue-800",
@@ -30,6 +33,7 @@ const typeColors: Record<string, string> = {
 
 export default function Engagements() {
   const { token } = useAuth();
+  const { selectedDepartmentId } = useDepartments();
   const [engagements, setEngagements] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +46,7 @@ export default function Engagements() {
     description: "",
     startDate: new Date().toISOString().split("T")[0],
     endDate: "",
+    departmentId: "",
   });
 
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
@@ -57,9 +62,9 @@ export default function Engagements() {
     });
   }, [token]);
 
-  const filteredEngagements = filterStatus === "all" 
-    ? engagements 
-    : engagements.filter((e: any) => e.status === filterStatus);
+  const filteredEngagements = engagements
+    .filter((e: any) => filterStatus === "all" || e.status === filterStatus)
+    .filter((e: any) => !selectedDepartmentId || e.departmentId === selectedDepartmentId);
 
   const stats = {
     total: engagements.length,
@@ -72,13 +77,13 @@ export default function Engagements() {
     const res = await fetch("/api/engagements", {
       method: "POST",
       headers,
-      body: JSON.stringify({ ...form, clientId: Number(form.clientId) }),
+      body: JSON.stringify({ ...form, clientId: Number(form.clientId), departmentId: form.departmentId ? Number(form.departmentId) : null }),
     });
     if (res.ok) {
       const eng = await res.json();
       setEngagements([eng, ...engagements]);
       setDialogOpen(false);
-      setForm({ clientId: "", title: "", type: "audit", description: "", startDate: new Date().toISOString().split("T")[0], endDate: "" });
+      setForm({ clientId: "", title: "", type: "audit", description: "", startDate: new Date().toISOString().split("T")[0], endDate: "", departmentId: "" });
     }
   }
 
@@ -138,9 +143,13 @@ export default function Engagements() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Start Date</Label>
-                  <Input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} required />
+                  <Label>Department</Label>
+                  <DepartmentSelect value={form.departmentId} onValueChange={(v) => setForm({ ...form, departmentId: v === "none" ? "" : v })} showAll={false} />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Start Date</Label>
+                <Input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} required />
               </div>
               <div className="space-y-2">
                 <Label>Description</Label>
@@ -188,6 +197,7 @@ export default function Engagements() {
                       <h3 className="font-semibold text-lg">{eng.title}</h3>
                       <Badge className={typeColors[eng.type] || "bg-gray-100"}>{eng.type}</Badge>
                       <Badge className={statusColors[eng.status] || "bg-gray-100"}>{eng.status.replace("_", " ")}</Badge>
+                      <DepartmentBadge departmentId={eng.departmentId} />
                     </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1"><Building2 className="w-3.5 h-3.5" /> {eng.clientName}</span>

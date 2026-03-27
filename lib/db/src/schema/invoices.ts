@@ -1,4 +1,5 @@
 import { pgTable, serial, integer, text, decimal, timestamp, pgEnum, date, boolean } from "drizzle-orm/pg-core";
+import { departmentsTable } from "./departments";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -30,6 +31,7 @@ export const invoicesTable = pgTable("invoices", {
   invoiceNumber: text("invoice_number").notNull().unique(),
   clientId: integer("client_id").notNull(),
   engagementId: integer("engagement_id"),
+  departmentId: integer("department_id").references(() => departmentsTable.id),
   serviceType: serviceTypeEnum("service_type").notNull(),
   description: text("description").notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),

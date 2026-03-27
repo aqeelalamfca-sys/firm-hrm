@@ -14,13 +14,14 @@ function hashPassword(password: string): string {
 
 router.get("/", requireRoles("super_admin", "partner", "hr_admin"), async (req: AuthenticatedRequest, res) => {
   try {
-    const { role, status } = req.query;
+    const { role, status, departmentId } = req.query;
     let query = db.select({
       id: usersTable.id,
       email: usersTable.email,
       name: usersTable.name,
       role: usersTable.role,
       employeeId: usersTable.employeeId,
+      departmentId: usersTable.departmentId,
       phone: usersTable.phone,
       mobile: usersTable.mobile,
       cnic: usersTable.cnic,
@@ -32,6 +33,7 @@ router.get("/", requireRoles("super_admin", "partner", "hr_admin"), async (req: 
     const conditions: any[] = [];
     if (role) conditions.push(eq(usersTable.role, role as any));
     if (status) conditions.push(eq(usersTable.status, status as any));
+    if (departmentId) conditions.push(eq(usersTable.departmentId, Number(departmentId)));
 
     if (conditions.length > 0) {
       for (const c of conditions) {
@@ -72,7 +74,7 @@ router.get("/:id", requireRoles("super_admin", "partner", "hr_admin"), async (re
 
 router.post("/", requireRoles("super_admin", "partner"), async (req: AuthenticatedRequest, res) => {
   try {
-    const { email, name, password, role, phone, mobile, cnic, employeeId } = req.body;
+    const { email, name, password, role, phone, mobile, cnic, employeeId, departmentId } = req.body;
 
     const existing = await db.select().from(usersTable).where(eq(usersTable.email, email));
     if (existing.length > 0) return res.status(400).json({ error: "Email already exists" });
@@ -86,6 +88,7 @@ router.post("/", requireRoles("super_admin", "partner"), async (req: Authenticat
       mobile: mobile || null,
       cnic: cnic || null,
       employeeId: employeeId || null,
+      departmentId: departmentId || null,
     }).returning();
 
     await logActivity({
@@ -105,6 +108,7 @@ router.post("/", requireRoles("super_admin", "partner"), async (req: Authenticat
       name: user.name,
       role: user.role,
       employeeId: user.employeeId,
+      departmentId: user.departmentId,
       phone: user.phone,
       mobile: user.mobile,
       cnic: user.cnic,
@@ -171,7 +175,7 @@ router.put("/change-password", async (req: AuthenticatedRequest, res) => {
 router.put("/:id", requireRoles("super_admin", "partner"), async (req: AuthenticatedRequest, res) => {
   try {
     const id = Number(req.params.id);
-    const { name, email, role, phone, mobile, cnic, status, employeeId, password } = req.body;
+    const { name, email, role, phone, mobile, cnic, status, employeeId, password, departmentId } = req.body;
 
     const updateData: any = { updatedAt: new Date() };
     if (name) updateData.name = name;
@@ -183,6 +187,7 @@ router.put("/:id", requireRoles("super_admin", "partner"), async (req: Authentic
     if (status) updateData.status = status;
     if (employeeId !== undefined) updateData.employeeId = employeeId;
     if (password) updateData.passwordHash = hashPassword(password);
+    if (departmentId !== undefined) updateData.departmentId = departmentId || null;
 
     const [user] = await db.update(usersTable).set(updateData).where(eq(usersTable.id, id)).returning();
     if (!user) return res.status(404).json({ error: "User not found" });

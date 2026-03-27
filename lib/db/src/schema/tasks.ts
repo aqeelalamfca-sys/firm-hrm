@@ -2,6 +2,7 @@ import { pgTable, serial, text, integer, date, timestamp, pgEnum } from "drizzle
 import { usersTable } from "./users";
 import { clientsTable } from "./clients";
 import { engagementsTable } from "./engagements";
+import { departmentsTable } from "./departments";
 
 export const taskStatusEnum = pgEnum("task_status", [
   "pending",
@@ -23,6 +24,7 @@ export const tasksTable = pgTable("tasks", {
   description: text("description"),
   clientId: integer("client_id").references(() => clientsTable.id),
   engagementId: integer("engagement_id").references(() => engagementsTable.id),
+  departmentId: integer("department_id").references(() => departmentsTable.id),
   assignedTo: integer("assigned_to").references(() => usersTable.id),
   assignedBy: integer("assigned_by").references(() => usersTable.id),
   roleLevel: text("role_level"),

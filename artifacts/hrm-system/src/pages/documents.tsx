@@ -7,8 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, FileText, Download, Trash2, FolderOpen, Search, FileSpreadsheet, File, Upload, History } from "lucide-react";
+import { Plus, FileText, Download, Trash2, FolderOpen, Search, FileSpreadsheet, File, Upload, History, RotateCcw, Archive } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useDepartments } from "@/hooks/use-departments";
+import { DepartmentBadge } from "@/components/department-badge";
+import { DepartmentSelect } from "@/components/department-select";
 
 const categories = [
   { value: "trial_balance", label: "Trial Balance" },
@@ -43,7 +46,9 @@ function formatFileSize(bytes: number): string {
 export default function Documents() {
   const { token } = useAuth();
   const { toast } = useToast();
+  const { selectedDepartmentId } = useDepartments();
   const [documents, setDocuments] = useState<any[]>([]);
+  const [trashDocs, setTrashDocs] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -53,25 +58,39 @@ export default function Documents() {
   const [versionHistory, setVersionHistory] = useState<any[]>([]);
   const [filterCategory, setFilterCategory] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [form, setForm] = useState({ originalName: "", category: "other", clientId: "", description: "" });
+  const [showTrash, setShowTrash] = useState(false);
+  const [form, setForm] = useState({ originalName: "", category: "other", clientId: "", description: "", departmentId: "" });
   const [versionForm, setVersionForm] = useState({ originalName: "", description: "" });
 
   const headers: Record<string, string> = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-  React.useEffect(() => {
-    Promise.all([
+  async function loadData() {
+    const [docs, cli] = await Promise.all([
       fetch("/api/documents", { headers }).then((r) => r.json()),
       fetch("/api/clients", { headers }).then((r) => r.json()),
-    ]).then(([docs, cli]) => {
-      setDocuments(docs);
-      setClients(cli);
-      setLoading(false);
-    });
+    ]);
+    setDocuments(docs);
+    setClients(cli);
+    setLoading(false);
+  }
+
+  async function loadTrash() {
+    const res = await fetch("/api/documents/trash", { headers });
+    if (res.ok) setTrashDocs(await res.json());
+  }
+
+  React.useEffect(() => {
+    loadData();
   }, [token]);
+
+  React.useEffect(() => {
+    if (showTrash) loadTrash();
+  }, [showTrash]);
 
   const filtered = documents
     .filter((d: any) => !d.parentDocumentId)
     .filter((d: any) => filterCategory === "all" || d.category === filterCategory)
+    .filter((d: any) => !selectedDepartmentId || d.departmentId === selectedDepartmentId)
     .filter((d: any) => !searchTerm || d.originalName.toLowerCase().includes(searchTerm.toLowerCase()));
 
   async function handleUpload(e: React.FormEvent) {
@@ -86,6 +105,7 @@ export default function Documents() {
         mimeType: "application/pdf",
         category: form.category,
         clientId: form.clientId ? Number(form.clientId) : null,
+        departmentId: form.departmentId ? Number(form.departmentId) : null,
         description: form.description || null,
         filePath: `/uploads/${form.originalName}`,
       }),
@@ -94,7 +114,7 @@ export default function Documents() {
       const doc = await res.json();
       setDocuments([doc, ...documents]);
       setDialogOpen(false);
-      setForm({ originalName: "", category: "other", clientId: "", description: "" });
+      setForm({ originalName: "", category: "other", clientId: "", description: "", departmentId: "" });
       toast({ title: "Document uploaded successfully" });
     }
   }
@@ -135,11 +155,30 @@ export default function Documents() {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm("Are you sure you want to delete this document?")) return;
+    if (!confirm("Move this document to trash?")) return;
     const res = await fetch(`/api/documents/${id}`, { method: "DELETE", headers });
     if (res.ok) {
       setDocuments(documents.filter((d: any) => d.id !== id));
-      toast({ title: "Document deleted" });
+      toast({ title: "Document moved to trash" });
+    }
+  }
+
+  async function handleRestore(id: number) {
+    const res = await fetch(`/api/documents/${id}/restore`, { method: "PUT", headers });
+    if (res.ok) {
+      const restored = await res.json();
+      setTrashDocs(trashDocs.filter((d: any) => d.id !== id));
+      setDocuments([restored, ...documents]);
+      toast({ title: "Document restored" });
+    }
+  }
+
+  async function handlePermanentDelete(id: number) {
+    if (!confirm("Permanently delete this document? This cannot be undone.")) return;
+    const res = await fetch(`/api/documents/${id}/permanent`, { method: "DELETE", headers });
+    if (res.ok) {
+      setTrashDocs(trashDocs.filter((d: any) => d.id !== id));
+      toast({ title: "Document permanently deleted" });
     }
   }
 
@@ -154,113 +193,165 @@ export default function Documents() {
           <h1 className="text-2xl font-display font-bold text-foreground">Documents</h1>
           <p className="text-muted-foreground mt-1">Manage files, reports, and working papers</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2 shadow-lg shadow-primary/25"><Plus className="w-4 h-4" /> Upload Document</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Upload Document</DialogTitle></DialogHeader>
-            <form onSubmit={handleUpload} className="space-y-4">
-              <div className="space-y-2">
-                <Label>File Name</Label>
-                <Input value={form.originalName} onChange={(e) => setForm({ ...form, originalName: e.target.value })} placeholder="e.g., TB_March_2026.xlsx" required />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {categories.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Client (optional)</Label>
-                  <Select value={form.clientId} onValueChange={(v) => setForm({ ...form, clientId: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                    <SelectContent>
-                      {clients.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-              </div>
-              <Button type="submit" className="w-full">Upload</Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search documents..." className="pl-10" />
-        </div>
-        <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-[200px]"><SelectValue placeholder="Filter by category" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {categories.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {filtered.length === 0 ? (
-        <Card><CardContent className="p-12 text-center">
-          <FolderOpen className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-muted-foreground">No documents found</p>
-        </CardContent></Card>
-      ) : (
-        <div className="grid gap-3">
-          {filtered.map((doc: any) => {
-            const Icon = categoryIcons[doc.category] || File;
-            return (
-              <Card key={doc.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4 flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <Icon className="w-5 h-5 text-primary" />
+        <div className="flex gap-2">
+          <Button
+            variant={showTrash ? "default" : "outline"}
+            onClick={() => setShowTrash(!showTrash)}
+            className="gap-2"
+          >
+            <Archive className="w-4 h-4" />
+            {showTrash ? "Back to Documents" : `Trash${trashDocs.length > 0 ? ` (${trashDocs.length})` : ""}`}
+          </Button>
+          {!showTrash && (
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2 shadow-lg shadow-primary/25"><Plus className="w-4 h-4" /> Upload Document</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Upload Document</DialogTitle></DialogHeader>
+                <form onSubmit={handleUpload} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>File Name</Label>
+                    <Input value={form.originalName} onChange={(e) => setForm({ ...form, originalName: e.target.value })} placeholder="e.g., TB_March_2026.xlsx" required />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{doc.originalName}</p>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                      <Badge variant="secondary" className="text-xs">{categories.find((c) => c.value === doc.category)?.label || doc.category}</Badge>
-                      <span>{formatFileSize(doc.fileSize)}</span>
-                      {doc.clientName && <span>{doc.clientName}</span>}
-                      <Badge variant="outline" className="text-[10px] px-1.5">v{doc.version}</Badge>
-                      <span>by {doc.uploadedByName}</span>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Category</Label>
+                      <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {categories.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Department</Label>
+                      <DepartmentSelect value={form.departmentId} onValueChange={(v) => setForm({ ...form, departmentId: v === "none" ? "" : v })} showAll={false} />
                     </div>
                   </div>
-                  <div className="flex gap-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="text-muted-foreground hover:text-blue-600"
-                      title="Upload New Version"
-                      onClick={() => { setSelectedDoc(doc); setVersionDialogOpen(true); }}
-                    >
-                      <Upload className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="text-muted-foreground hover:text-violet-600"
-                      title="Version History"
-                      onClick={() => handleViewHistory(doc)}
-                    >
-                      <History className="w-4 h-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-primary"><Download className="w-4 h-4" /></Button>
-                    <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(doc.id)}><Trash2 className="w-4 h-4" /></Button>
+                  <div className="space-y-2">
+                    <Label>Client (optional)</Label>
+                    <Select value={form.clientId} onValueChange={(v) => setForm({ ...form, clientId: v })}>
+                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                      <SelectContent>
+                        {clients.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                  <div className="space-y-2">
+                    <Label>Description</Label>
+                    <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                  </div>
+                  <Button type="submit" className="w-full">Upload</Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
+      </div>
+
+      {showTrash ? (
+        <div className="space-y-4">
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            Documents in trash are automatically deleted after 30 days.
+          </div>
+          {trashDocs.filter((d: any) => !selectedDepartmentId || d.departmentId === selectedDepartmentId).length === 0 ? (
+            <Card><CardContent className="p-12 text-center">
+              <Archive className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">Trash is empty</p>
+            </CardContent></Card>
+          ) : (
+            <div className="grid gap-3">
+              {trashDocs.filter((d: any) => !selectedDepartmentId || d.departmentId === selectedDepartmentId).map((doc: any) => {
+                const Icon = categoryIcons[doc.category] || File;
+                return (
+                  <Card key={doc.id} className="border-red-100 bg-red-50/30">
+                    <CardContent className="p-4 flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
+                        <Icon className="w-5 h-5 text-red-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{doc.originalName}</p>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                          <span>Deleted by {doc.deletedByName}</span>
+                          <span>{doc.daysRemaining} days remaining</span>
+                          <DepartmentBadge departmentId={doc.departmentId} />
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="outline" className="gap-1 text-green-700 border-green-200 hover:bg-green-50" onClick={() => handleRestore(doc.id)}>
+                          <RotateCcw className="w-3 h-3" /> Restore
+                        </Button>
+                        <Button size="sm" variant="outline" className="gap-1 text-red-700 border-red-200 hover:bg-red-50" onClick={() => handlePermanentDelete(doc.id)}>
+                          <Trash2 className="w-3 h-3" /> Delete
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search documents..." className="pl-10" />
+            </div>
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger className="w-[200px]"><SelectValue placeholder="Filter by category" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {filtered.length === 0 ? (
+            <Card><CardContent className="p-12 text-center">
+              <FolderOpen className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No documents found</p>
+            </CardContent></Card>
+          ) : (
+            <div className="grid gap-3">
+              {filtered.map((doc: any) => {
+                const Icon = categoryIcons[doc.category] || File;
+                return (
+                  <Card key={doc.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4 flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <Icon className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{doc.originalName}</p>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                          <Badge variant="secondary" className="text-xs">{categories.find((c) => c.value === doc.category)?.label || doc.category}</Badge>
+                          <span>{formatFileSize(doc.fileSize)}</span>
+                          {doc.clientName && <span>{doc.clientName}</span>}
+                          <Badge variant="outline" className="text-[10px] px-1.5">v{doc.version}</Badge>
+                          <span>by {doc.uploadedByName}</span>
+                          <DepartmentBadge departmentId={doc.departmentId} />
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-blue-600" title="Upload New Version" onClick={() => { setSelectedDoc(doc); setVersionDialogOpen(true); }}>
+                          <Upload className="w-4 h-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-violet-600" title="Version History" onClick={() => handleViewHistory(doc)}>
+                          <History className="w-4 h-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-primary"><Download className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(doc.id)}><Trash2 className="w-4 h-4" /></Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
 
       <Dialog open={versionDialogOpen} onOpenChange={setVersionDialogOpen}>

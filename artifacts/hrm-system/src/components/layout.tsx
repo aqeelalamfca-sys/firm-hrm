@@ -26,7 +26,9 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
+import { useDepartments } from "@/hooks/use-departments";
 
 interface NavItem {
   href: string;
@@ -81,6 +83,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = React.useState<any[]>([]);
   const [unreadCount, setUnreadCount] = React.useState(0);
   const notifRef = React.useRef<HTMLDivElement>(null);
+  const { departments, selectedDepartmentId, setSelectedDepartmentId } = useDepartments();
 
   const headers = React.useMemo(() => ({ Authorization: `Bearer ${token}`, "Content-Type": "application/json" }), [token]);
 
@@ -232,6 +235,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </h2>
           </div>
           <div className="flex items-center gap-4 relative" ref={notifRef}>
+            <Select
+              value={selectedDepartmentId ? String(selectedDepartmentId) : "all"}
+              onValueChange={(v) => setSelectedDepartmentId(v === "all" ? null : Number(v))}
+            >
+              <SelectTrigger className="w-[160px] h-9 text-xs border-border/50 bg-background/50">
+                <SelectValue placeholder="All Departments" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.map((d) => (
+                  <SelectItem key={d.id} value={String(d.id)}>
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
+                      {d.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
               size="icon"

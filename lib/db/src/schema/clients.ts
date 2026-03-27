@@ -1,4 +1,5 @@
-import { pgTable, serial, text, decimal, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, decimal, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { departmentsTable } from "./departments";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -15,6 +16,7 @@ export const clientsTable = pgTable("clients", {
   industry: text("industry"),
   ntn: text("ntn"),
   registrationNo: text("registration_no"),
+  departmentId: integer("department_id").references(() => departmentsTable.id),
   status: clientStatusEnum("status").notNull().default("active"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

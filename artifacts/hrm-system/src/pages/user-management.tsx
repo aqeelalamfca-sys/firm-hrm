@@ -9,6 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, UserCog, Shield, Edit, Search } from "lucide-react";
+import { useDepartments } from "@/hooks/use-departments";
+import { DepartmentBadge } from "@/components/department-badge";
+import { DepartmentSelect } from "@/components/department-select";
 
 const roleLabels: Record<string, string> = {
   super_admin: "Admin",
@@ -32,6 +35,7 @@ const roleColors: Record<string, string> = {
 
 export default function UserManagement() {
   const { token, user: currentUser } = useAuth();
+  const { selectedDepartmentId } = useDepartments();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -39,7 +43,7 @@ export default function UserManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [form, setForm] = useState({
     name: "", email: "", password: "", role: "employee",
-    phone: "", mobile: "", cnic: "",
+    phone: "", mobile: "", cnic: "", departmentId: "",
   });
 
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
@@ -50,15 +54,17 @@ export default function UserManagement() {
       .then((data) => { setUsers(data); setLoading(false); });
   }, [token]);
 
-  const filtered = users.filter((u: any) =>
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filtered = users
+    .filter((u: any) => !selectedDepartmentId || u.departmentId === selectedDepartmentId)
+    .filter((u: any) =>
+      u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (editUser) {
-      const updateData: any = { name: form.name, email: form.email, role: form.role, phone: form.phone, mobile: form.mobile, cnic: form.cnic };
+      const updateData: any = { name: form.name, email: form.email, role: form.role, phone: form.phone, mobile: form.mobile, cnic: form.cnic, departmentId: form.departmentId ? Number(form.departmentId) : null };
       if (form.password) updateData.password = form.password;
       const res = await fetch(`/api/users/${editUser.id}`, { method: "PUT", headers, body: JSON.stringify(updateData) });
       if (res.ok) {
@@ -66,7 +72,7 @@ export default function UserManagement() {
         setUsers(users.map((u: any) => (u.id === editUser.id ? updated : u)));
       }
     } else {
-      const res = await fetch("/api/users", { method: "POST", headers, body: JSON.stringify(form) });
+      const res = await fetch("/api/users", { method: "POST", headers, body: JSON.stringify({ ...form, departmentId: form.departmentId ? Number(form.departmentId) : null }) });
       if (res.ok) {
         const newUser = await res.json();
         setUsers([...users, newUser]);
@@ -74,12 +80,12 @@ export default function UserManagement() {
     }
     setDialogOpen(false);
     setEditUser(null);
-    setForm({ name: "", email: "", password: "", role: "employee", phone: "", mobile: "", cnic: "" });
+    setForm({ name: "", email: "", password: "", role: "employee", phone: "", mobile: "", cnic: "", departmentId: "" });
   }
 
   function openEdit(u: any) {
     setEditUser(u);
-    setForm({ name: u.name, email: u.email, password: "", role: u.role, phone: u.phone || "", mobile: u.mobile || "", cnic: u.cnic || "" });
+    setForm({ name: u.name, email: u.email, password: "", role: u.role, phone: u.phone || "", mobile: u.mobile || "", cnic: u.cnic || "", departmentId: u.departmentId ? String(u.departmentId) : "" });
     setDialogOpen(true);
   }
 
@@ -153,6 +159,10 @@ export default function UserManagement() {
                   <Input value={form.cnic} onChange={(e) => setForm({ ...form, cnic: e.target.value })} />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label>Department</Label>
+                <DepartmentSelect value={form.departmentId} onValueChange={(v) => setForm({ ...form, departmentId: v === "none" ? "" : v })} showAll={false} />
+              </div>
               <Button type="submit" className="w-full">{editUser ? "Update User" : "Create User"}</Button>
             </form>
           </DialogContent>
@@ -173,6 +183,7 @@ export default function UserManagement() {
               <TableRow>
                 <TableHead>User</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Department</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -197,6 +208,9 @@ export default function UserManagement() {
                       <Shield className="w-3 h-3 mr-1" />
                       {roleLabels[u.role] || u.role}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <DepartmentBadge departmentId={u.departmentId} />
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {u.phone || u.mobile || "—"}

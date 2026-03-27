@@ -14,11 +14,12 @@ function generateEngagementCode(): string {
 
 router.get("/", async (req: AuthenticatedRequest, res) => {
   try {
-    const { clientId, status, type } = req.query;
+    const { clientId, status, type, departmentId } = req.query;
     const conditions: any[] = [];
     if (clientId) conditions.push(eq(engagementsTable.clientId, Number(clientId)));
     if (status) conditions.push(eq(engagementsTable.status, status as any));
     if (type) conditions.push(eq(engagementsTable.type, type as any));
+    if (departmentId) conditions.push(eq(engagementsTable.departmentId, Number(departmentId as string)));
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -26,6 +27,7 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
       id: engagementsTable.id,
       engagementCode: engagementsTable.engagementCode,
       clientId: engagementsTable.clientId,
+      departmentId: engagementsTable.departmentId,
       title: engagementsTable.title,
       type: engagementsTable.type,
       status: engagementsTable.status,
@@ -106,11 +108,12 @@ router.get("/:id", async (req: AuthenticatedRequest, res) => {
 
 router.post("/", async (req: AuthenticatedRequest, res) => {
   try {
-    const { clientId, title, type, description, startDate, endDate, partnerId, managerId, budget, notes } = req.body;
+    const { clientId, title, type, description, startDate, endDate, partnerId, managerId, budget, notes, departmentId } = req.body;
 
     const [eng] = await db.insert(engagementsTable).values({
       engagementCode: generateEngagementCode(),
       clientId,
+      departmentId: departmentId || null,
       title,
       type,
       description: description || null,
@@ -151,9 +154,10 @@ router.post("/", async (req: AuthenticatedRequest, res) => {
 router.put("/:id", async (req: AuthenticatedRequest, res) => {
   try {
     const id = Number(req.params.id);
-    const { title, type, status, description, startDate, endDate, partnerId, managerId, budget, notes } = req.body;
+    const { title, type, status, description, startDate, endDate, partnerId, managerId, budget, notes, departmentId } = req.body;
 
     const updateData: any = { updatedAt: new Date() };
+    if (departmentId !== undefined) updateData.departmentId = departmentId || null;
     if (title) updateData.title = title;
     if (type) updateData.type = type;
     if (status) updateData.status = status;

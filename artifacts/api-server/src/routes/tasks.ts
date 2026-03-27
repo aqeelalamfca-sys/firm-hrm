@@ -66,7 +66,7 @@ const router = Router();
 
 router.get("/", async (req: AuthenticatedRequest, res) => {
   try {
-    const { clientId, engagementId, status, priority, assignedTo, startDate, endDate } = req.query;
+    const { clientId, engagementId, status, priority, assignedTo, startDate, endDate, departmentId } = req.query;
     const conditions: any[] = [];
 
     if (clientId) conditions.push(eq(tasksTable.clientId, Number(clientId)));
@@ -74,6 +74,7 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
     if (status) conditions.push(eq(tasksTable.status, status as any));
     if (priority) conditions.push(eq(tasksTable.priority, priority as any));
     if (assignedTo) conditions.push(eq(tasksTable.assignedTo, Number(assignedTo)));
+    if (departmentId) conditions.push(eq(tasksTable.departmentId, Number(departmentId as string)));
 
     if (startDate && endDate) {
       conditions.push(
@@ -101,6 +102,7 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
         clientName: clientsTable.name,
         engagementId: tasksTable.engagementId,
         engagementTitle: engagementsTable.title,
+        departmentId: tasksTable.departmentId,
         assignedTo: tasksTable.assignedTo,
         assignedToName: sql<string>`(SELECT name FROM users WHERE id = ${tasksTable.assignedTo})`,
         assignedBy: tasksTable.assignedBy,
@@ -272,7 +274,7 @@ router.post(
   requireRoles("super_admin", "partner", "manager", "hr_admin", "employee", "trainee"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { title, description, clientId, engagementId, assignedTo, startDate, dueDate, priority, remarks } = req.body;
+      const { title, description, clientId, engagementId, assignedTo, startDate, dueDate, priority, remarks, departmentId } = req.body;
 
       if (!title || !startDate || !dueDate) {
         return res.status(400).json({ error: "Title, start date, and due date are required" });
@@ -312,6 +314,7 @@ router.post(
         description: description || null,
         clientId: clientId || null,
         engagementId: engagementId || null,
+        departmentId: departmentId || null,
         assignedTo: assignedTo || null,
         assignedBy: req.user!.id,
         roleLevel,
@@ -408,6 +411,7 @@ router.put("/:id", async (req: AuthenticatedRequest, res) => {
     if (description !== undefined) updateData.description = description;
     if (clientId !== undefined) updateData.clientId = clientId || null;
     if (engagementId !== undefined) updateData.engagementId = engagementId || null;
+    if (req.body.departmentId !== undefined) updateData.departmentId = req.body.departmentId || null;
     if (startDate !== undefined) updateData.startDate = startDate;
     if (dueDate !== undefined) updateData.dueDate = dueDate;
     if (status !== undefined) updateData.status = status;

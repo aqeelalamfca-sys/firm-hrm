@@ -60,7 +60,8 @@ Tables:
 - `client_credentials` - Encrypted credential vault (FBR, SECP, PRA logins) using AES-256-CBC
 - `engagements` - Client engagement tracking (audit, tax, advisory) with lifecycle management
 - `engagement_assignments` - Team member assignments to engagements
-- `documents` - Document management with version control and categorization
+- `departments` - Department master (Audit, Tax, Corporate, Advisory, Others) with color coding
+- `documents` - Document management with version control, categorization, soft delete (isDeleted/deletedAt/deletedById), and task linking (taskId)
 - `tasks` - Tasks with client/engagement links, status tracking, assignment logs
 - `task_logs` - Immutable log of all task actions (create, update, reassign, complete)
 - `notifications` - In-app notifications with types (task_assigned, task_due, leave_approved, etc.)
@@ -98,6 +99,8 @@ Tables:
 18. **Notifications** - In-app notification system with bell icon, unread count badge, mark-read/mark-all-read, auto-refresh every 30s
 19. **Dynamic Task Allocation** - Seniority-based assignment rules (Admin→all, Partner→subordinates, Manager→employees/trainees, Trainee→peers within 5 months), eligible-users API with seniority tags
 20. **Invoice PDF** - Professional invoice print/download with company header, tax breakdown, and print-to-PDF support
+21. **Department System** - 5 departments (Audit/Blue, Tax/Green, Corporate/Purple, Advisory/Orange, Others/Gray) with global header filter, color-coded badges across all pages, department field in all create/edit forms
+22. **Document Trash/Restore** - Soft delete (moves to trash), trash view with 30-day retention indicator, restore from trash, permanent delete
 
 ### Security:
 - Auth middleware protects all API routes (except /auth and /healthz)
@@ -142,7 +145,12 @@ All under `/api`:
 - `GET/POST /documents` - Document management
 - `POST /documents/:id/version` - Upload new version
 - `GET /documents/:id/versions` - Version history
-- `DELETE /documents/:id` - Delete document
+- `DELETE /documents/:id` - Soft delete (move to trash)
+- `GET /documents/trash` - Trashed documents with daysRemaining
+- `PUT /documents/:id/restore` - Restore from trash
+- `DELETE /documents/:id/permanent` - Permanent delete
+- `GET /departments` - List all departments
+- `GET /departments/:id` - Get department by ID
 - `GET/POST /tasks` - Task management (with seniority-based assignment validation)
 - `GET /tasks/stats` - Task statistics
 - `GET /tasks/eligible-users` - Eligible assignees with seniority tags

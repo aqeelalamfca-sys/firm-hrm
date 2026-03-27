@@ -19,9 +19,10 @@ async function getClientFinancials(clientId: number) {
 }
 
 router.get("/", async (req, res) => {
-  const { status } = req.query;
+  const { status, departmentId } = req.query;
   let clients = await db.select().from(clientsTable);
   if (status) clients = clients.filter(c => c.status === status);
+  if (departmentId) clients = clients.filter(c => c.departmentId === Number(departmentId));
 
   const result = await Promise.all(
     clients.map(async (c) => {
@@ -37,6 +38,7 @@ router.get("/", async (req, res) => {
         industry: c.industry,
         ntn: c.ntn,
         registrationNo: c.registrationNo,
+        departmentId: c.departmentId,
         status: c.status,
         ...financials,
         createdAt: c.createdAt,
@@ -72,7 +74,7 @@ router.get("/:id", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { name, contactPerson, email, phone, address, industry, ntn, registrationNo } = req.body;
+  const { name, contactPerson, email, phone, address, industry, ntn, registrationNo, departmentId } = req.body;
   if (!name || !contactPerson || !email) {
     return res.status(400).json({ error: "Name, contact person, and email are required" });
   }
@@ -88,6 +90,7 @@ router.post("/", async (req, res) => {
     industry: industry || null,
     ntn: ntn || null,
     registrationNo: registrationNo || null,
+    departmentId: departmentId || null,
   }).returning();
 
   res.status(201).json({
@@ -101,6 +104,7 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const updates: Record<string, any> = { updatedAt: new Date() };
+  if (req.body.departmentId !== undefined) updates.departmentId = req.body.departmentId || null;
   const fields = ["name", "contactPerson", "email", "phone", "address", "industry", "status", "ntn", "registrationNo"];
   for (const f of fields) {
     if (req.body[f] !== undefined) updates[f] = req.body[f];

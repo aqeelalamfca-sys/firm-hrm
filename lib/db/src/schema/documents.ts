@@ -1,4 +1,5 @@
-import { pgTable, serial, integer, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, pgEnum, boolean } from "drizzle-orm/pg-core";
+import { departmentsTable } from "./departments";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -21,13 +22,18 @@ export const documentsTable = pgTable("documents", {
   fileSize: integer("file_size").notNull(),
   mimeType: text("mime_type").notNull(),
   category: documentCategoryEnum("category").notNull().default("other"),
+  departmentId: integer("department_id").references(() => departmentsTable.id),
   clientId: integer("client_id"),
   engagementId: integer("engagement_id"),
+  taskId: integer("task_id"),
   description: text("description"),
   version: integer("version").notNull().default(1),
   parentDocumentId: integer("parent_document_id"),
   uploadedById: integer("uploaded_by_id").notNull(),
   filePath: text("file_path").notNull(),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
+  deletedById: integer("deleted_by_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

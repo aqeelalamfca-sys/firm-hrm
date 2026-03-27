@@ -19,6 +19,7 @@ function formatInvoice(inv: any, clientName: string) {
     clientId: inv.clientId,
     clientName,
     engagementId: inv.engagementId,
+    departmentId: inv.departmentId,
     serviceType: inv.serviceType,
     description: inv.description,
     amount: Number(inv.amount),
@@ -82,13 +83,14 @@ router.get("/aging", async (req, res) => {
 });
 
 router.get("/", async (req, res) => {
-  const { clientId, status, fromDate, toDate } = req.query;
+  const { clientId, status, fromDate, toDate, departmentId } = req.query;
   let invoices = await db.select().from(invoicesTable);
 
   if (clientId) invoices = invoices.filter(i => i.clientId === parseInt(clientId as string));
   if (status) invoices = invoices.filter(i => i.status === status);
   if (fromDate) invoices = invoices.filter(i => i.issueDate >= fromDate as string);
   if (toDate) invoices = invoices.filter(i => i.issueDate <= toDate as string);
+  if (departmentId) invoices = invoices.filter(i => i.departmentId === Number(departmentId));
 
   const result = await Promise.all(
     invoices.map(async (inv) => {
@@ -112,7 +114,7 @@ router.get("/:id", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { clientId, engagementId, serviceType, description, amount, tax, gstPercent, whtPercent, issueDate, dueDate, notes, isRecurring, recurringFrequency } = req.body;
+  const { clientId, engagementId, serviceType, description, amount, tax, gstPercent, whtPercent, issueDate, dueDate, notes, isRecurring, recurringFrequency, departmentId } = req.body;
   if (!clientId || !serviceType || !description || amount == null || !issueDate || !dueDate) {
     return res.status(400).json({ error: "Missing required fields" });
   }
@@ -130,6 +132,7 @@ router.post("/", async (req, res) => {
     invoiceNumber,
     clientId: parseInt(clientId),
     engagementId: engagementId ? parseInt(engagementId) : null,
+    departmentId: departmentId || null,
     serviceType,
     description,
     amount: baseAmount.toFixed(2),
