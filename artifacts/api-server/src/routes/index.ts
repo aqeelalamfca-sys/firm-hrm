@@ -18,12 +18,14 @@ import tasksRouter from "./tasks";
 import notificationsRouter from "./notifications";
 import departmentsRouter from "./departments";
 import applicationsRouter from "./applications";
+import meetingsRouter from "./meetings";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use("/auth", authRouter);
 router.use("/applications", applicationsRouter);
+router.use("/meetings", meetingsRouter);
 
 router.use(authMiddleware);
 

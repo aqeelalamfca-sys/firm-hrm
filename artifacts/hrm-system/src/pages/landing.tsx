@@ -12,7 +12,7 @@ import {
   GraduationCap, Clock, Layers, Lock, Search, PieChart, UserCheck, Cpu,
   Menu, X, Factory, Truck, Pickaxe, Clapperboard, Wallet, Utensils, Building,
   Hotel, Ship, Wrench, Newspaper, HandHeart, Fuel, Radio, Pill, BriefcaseBusiness,
-  Home, ShoppingCart, Monitor, Plane
+  Home, ShoppingCart, Monitor, Plane, Video
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -202,7 +202,12 @@ export default function Landing() {
               </button>
             ))}
           </nav>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Link href="/book-meeting">
+              <Button size="sm" variant="outline" className="h-9 text-[13px] font-semibold gap-1.5 hidden sm:flex">
+                <Video className="w-3.5 h-3.5" /> Book Meeting
+              </Button>
+            </Link>
             <Link href="/apply-training">
               <Button size="sm" variant="outline" className="h-9 text-[13px] font-semibold gap-1.5 hidden sm:flex">
                 <GraduationCap className="w-3.5 h-3.5" /> Apply for Training

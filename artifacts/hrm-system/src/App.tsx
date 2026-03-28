@@ -28,6 +28,8 @@ import Profile from "@/pages/profile";
 import TrainingApplication from "@/pages/training-application";
 import MCQTest from "@/pages/mcq-test";
 import Applications from "@/pages/applications";
+import BookMeeting from "@/pages/book-meeting";
+import ManageMeetings from "@/pages/manage-meetings";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -112,6 +114,7 @@ function Router() {
       <Route path="/landing" component={Landing} />
       <Route path="/apply-training" component={TrainingApplication} />
       <Route path="/mcq-test/:crn" component={MCQTest} />
+      <Route path="/book-meeting" component={BookMeeting} />
       <Route path="/login" component={Login} />
       <Route path="/employees"><ProtectedRoute component={Employees} /></Route>
       <Route path="/attendance"><ProtectedRoute component={Attendance} /></Route>
@@ -128,6 +131,7 @@ function Router() {
       <Route path="/credential-vault"><ProtectedRoute component={CredentialVault} /></Route>
       <Route path="/profile"><ProtectedRoute component={Profile} /></Route>
       <Route path="/applications"><ProtectedRoute component={Applications} /></Route>
+      <Route path="/manage-meetings"><ProtectedRoute component={ManageMeetings} /></Route>
       <Route path="/"><ProtectedRoute component={Dashboard} /></Route>
       <Route component={NotFound} />
     </Switch>

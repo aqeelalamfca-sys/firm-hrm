@@ -70,6 +70,7 @@ Tables:
 - `task_logs` - Immutable log of all task actions (create, update, reassign, complete)
 - `notifications` - In-app notifications with types (task_assigned, task_due, leave_approved, etc.)
 - `training_applications` - CA training applications with file uploads (CNIC/photo), academic records, skills assessment, status tracking (pending/shortlisted/rejected/selected)
+- `meetings` - Online meeting bookings with partners (public booking, admin management, status workflow: pending/confirmed/completed/cancelled)
 
 ## Roles
 
