@@ -1,0 +1,167 @@
+You are a senior DevOps engineer.
+
+OBJECTIVE:
+Deploy a NEW containerized project for domain ana-ca.com on an existing Hostinger VPS where auditwise project is already running.
+
+CRITICAL RULES:
+- DO NOT stop, edit, or interfere with existing auditwise containers
+- DO NOT use any of these ports:
+  80, 443, 5000, 3000, 5432
+- Use completely separate ports and container names
+- Maintain production-grade isolation
+
+--------------------------------------------------
+PORT ALLOCATION (STRICT)
+--------------------------------------------------
+Use only:
+- Backend: 5002
+- (Optional future frontend): 3001
+- Redis: internal only (no exposed port)
+
+--------------------------------------------------
+STEP 1: CREATE PROJECT DIRECTORY
+--------------------------------------------------
+mkdir -p ~/apps/ana-ca
+cd ~/apps/ana-ca
+
+--------------------------------------------------
+STEP 2: CREATE DOCKERFILE
+--------------------------------------------------
+cat > Dockerfile << 'EOF'
+FROM node:20-alpine
+WORKDIR /app
+COPY . .
+RUN npm install --production
+EXPOSE 5000
+CMD ["npm", "start"]
+EOF
+
+--------------------------------------------------
+STEP 3: CREATE DOCKER COMPOSE (STRICT ISOLATION)
+--------------------------------------------------
+cat > docker-compose.yml << 'EOF'
+version: '3.8'
+
+services:
+  ana-backend:
+    container_name: ana-backend
+    build: .
+    restart: always
+    ports:
+      - "5002:5000"
+    environment:
+      - NODE_ENV=production
+
+  ana-redis:
+    container_name: ana-redis
+    image: redis:alpine
+    restart: always
+EOF
+
+--------------------------------------------------
+STEP 4: BUILD & RUN
+--------------------------------------------------
+docker compose up -d --build
+
+--------------------------------------------------
+STEP 5: VERIFY
+--------------------------------------------------
+docker ps
+# Ensure:
+# ana-backend → 5002:5000
+# auditwise remains untouched
+
+--------------------------------------------------
+STEP 6: DNS CONFIG (GODADDY - USER ACTION)
+--------------------------------------------------
+Add:
+A Record → @ → VPS_IP
+A Record → www → VPS_IP
+
+--------------------------------------------------
+STEP 7: ADD DOMAIN ROUTING IN EXISTING NGINX
+--------------------------------------------------
+IMPORTANT:
+- Use existing auditwise-nginx container
+- DO NOT expose ports 80/443 again
+
+EXECUTE:
+
+docker exec -it auditwise-nginx sh -c "cat > /etc/nginx/conf.d/ana-ca.conf << 'EOF'
+server {
+    listen 80;
+    server_name ana-ca.com www.ana-ca.com;
+
+    location / {
+        proxy_pass http://172.17.0.1:5002;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF"
+
+--------------------------------------------------
+STEP 8: RELOAD NGINX (ZERO DOWNTIME)
+--------------------------------------------------
+docker exec auditwise-nginx nginx -s reload
+
+--------------------------------------------------
+STEP 9: SSL (LETSENCRYPT SAFE MODE)
+--------------------------------------------------
+apt update
+apt install certbot -y
+
+certbot certonly --standalone \
+  -d ana-ca.com -d www.ana-ca.com \
+  --non-interactive --agree-tos \
+  -m admin@ana-ca.com
+
+--------------------------------------------------
+STEP 10: ENABLE HTTPS IN NGINX
+--------------------------------------------------
+docker exec -it auditwise-nginx sh -c "cat > /etc/nginx/conf.d/ana-ca-ssl.conf << 'EOF'
+server {
+    listen 443 ssl;
+    server_name ana-ca.com www.ana-ca.com;
+
+    ssl_certificate /etc/letsencrypt/live/ana-ca.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/ana-ca.com/privkey.pem;
+
+    location / {
+        proxy_pass http://172.17.0.1:5002;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+    }
+}
+EOF"
+
+docker exec auditwise-nginx nginx -s reload
+
+--------------------------------------------------
+STEP 11: FINAL VALIDATION
+--------------------------------------------------
+curl http://ana-ca.com
+curl https://ana-ca.com
+
+--------------------------------------------------
+SUCCESS CONDITIONS
+--------------------------------------------------
+✔ ana-ca.com live
+✔ running on port 5002 internally
+✔ auditwise (5000 / 3000 / 5432) unaffected
+✔ nginx handling multi-domain routing
+✔ no port conflicts anywhere
+✔ production ready setup
+
+--------------------------------------------------
+OPTIONAL HARDENING
+--------------------------------------------------
+ufw allow 80
+ufw allow 443
+ufw enable
+systemctl enable docker
