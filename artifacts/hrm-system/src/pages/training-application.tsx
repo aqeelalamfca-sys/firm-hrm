@@ -172,7 +172,7 @@ export default function TrainingApplication() {
     if (!form.interBoard) newErrors.interBoard = "Board is required";
     if (!form.interYear) newErrors.interYear = "Year is required";
     if (!form.interMarks.trim()) newErrors.interMarks = "Marks/Grade is required";
-    if (!form.icapLevel) newErrors.icapLevel = "ICAP level is required";
+    if (!form.icapLevel) newErrors.icapLevel = "Registration basis is required";
     if (!form.preferredLocation) newErrors.preferredLocation = "Location is required";
     if (!form.preferredDept) newErrors.preferredDept = "Department is required";
     if (!form.availableStart) newErrors.availableStart = "Start date is required";
@@ -549,21 +549,12 @@ export default function TrainingApplication() {
             <div className="space-y-4">
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm">ICAP Level *</Label>
+                  <Label className="text-sm">Registration Based On *</Label>
                   <Select value={form.icapLevel} onValueChange={v => handleChange("icapLevel", v)}>
-                    <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select basis" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="not_registered">Not Yet Registered</SelectItem>
-                      <SelectItem value="caf_1">CAF-1 (Foundation)</SelectItem>
-                      <SelectItem value="caf_2">CAF-2</SelectItem>
-                      <SelectItem value="caf_3">CAF-3</SelectItem>
-                      <SelectItem value="caf_4">CAF-4</SelectItem>
-                      <SelectItem value="caf_5">CAF-5</SelectItem>
-                      <SelectItem value="caf_6">CAF-6</SelectItem>
-                      <SelectItem value="caf_7">CAF-7</SelectItem>
-                      <SelectItem value="caf_8">CAF-8</SelectItem>
-                      <SelectItem value="cfap">CFAP Level</SelectItem>
-                      <SelectItem value="msa">MSA Level</SelectItem>
+                      <SelectItem value="caf_qualified">CAF Qualified</SelectItem>
+                      <SelectItem value="graduation">Graduation</SelectItem>
                     </SelectContent>
                   </Select>
                   <FieldError field="icapLevel" />
