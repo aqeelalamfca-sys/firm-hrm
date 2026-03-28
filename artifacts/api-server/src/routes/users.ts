@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usersTable } from "@workspace/db";
+import { usersTable, departmentsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
 import { requireRoles, type AuthenticatedRequest } from "../middleware/auth";
@@ -119,6 +119,95 @@ router.post("/", requireRoles("super_admin", "partner"), async (req: Authenticat
   } catch (error) {
     console.error("Error creating user:", error);
     res.status(500).json({ error: "Failed to create user" });
+  }
+});
+
+router.post("/bulk-upload", requireRoles("super_admin", "partner", "hr_admin"), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { users: usersData } = req.body;
+    if (!Array.isArray(usersData) || usersData.length === 0) {
+      return res.status(400).json({ error: "No users provided" });
+    }
+    if (usersData.length > 200) {
+      return res.status(400).json({ error: "Maximum 200 users per upload" });
+    }
+
+    const validRoles = ["super_admin", "partner", "hr_admin", "finance_officer", "manager", "employee", "trainee"];
+    const departments = await db.select().from(departmentsTable);
+    const deptMap = new Map(departments.map(d => [d.name.toLowerCase(), d.id]));
+
+    const results: { row: number; name: string; status: "created" | "skipped"; reason?: string }[] = [];
+    let created = 0;
+
+    for (let i = 0; i < usersData.length; i++) {
+      const row = usersData[i];
+      const name = (row.name || "").trim();
+      const email = (row.email || "").trim().toLowerCase();
+      const password = (row.password || "").trim();
+      const role = (row.role || "employee").trim().toLowerCase().replace(/\s+/g, "_");
+      const phone = (row.phone || "").trim();
+      const mobile = (row.mobile || "").trim();
+      const cnic = (row.cnic || "").trim();
+      const deptName = (row.department || "").trim().toLowerCase();
+
+      if (!name || !email) {
+        results.push({ row: i + 2, name: name || `Row ${i + 2}`, status: "skipped", reason: "Name and email are required" });
+        continue;
+      }
+      if (!password) {
+        results.push({ row: i + 2, name, status: "skipped", reason: "Password is required" });
+        continue;
+      }
+      if (!validRoles.includes(role)) {
+        results.push({ row: i + 2, name, status: "skipped", reason: `Invalid role: ${row.role}` });
+        continue;
+      }
+
+      const existing = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, email));
+      if (existing.length > 0) {
+        results.push({ row: i + 2, name, status: "skipped", reason: "Email already exists" });
+        continue;
+      }
+
+      let departmentId: number | null = null;
+      if (deptName) {
+        const found = deptMap.get(deptName);
+        if (!found) {
+          results.push({ row: i + 2, name, status: "skipped", reason: `Invalid department: ${row.department}` });
+          continue;
+        }
+        departmentId = found;
+      }
+
+      await db.insert(usersTable).values({
+        email,
+        name,
+        passwordHash: hashPassword(password),
+        role: role as any,
+        phone: phone || null,
+        mobile: mobile || null,
+        cnic: cnic || null,
+        departmentId,
+      });
+
+      results.push({ row: i + 2, name, status: "created" });
+      created++;
+    }
+
+    await logActivity({
+      userId: req.user!.id,
+      userName: req.user!.name,
+      action: "create",
+      module: "users",
+      entityType: "user",
+      description: `Bulk uploaded ${created} users (${usersData.length - created} skipped)`,
+      ipAddress: req.ip,
+    });
+
+    res.json({ total: usersData.length, created, skipped: usersData.length - created, results });
+  } catch (error) {
+    console.error("Error bulk uploading users:", error);
+    res.status(500).json({ error: "Failed to bulk upload users" });
   }
 });
 

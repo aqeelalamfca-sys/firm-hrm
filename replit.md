@@ -2,240 +2,58 @@
 
 ## Overview
 
-Enterprise-grade HRM and Invoice Management System for Chartered Accountant firms. Manages employees/trainees, attendance, leave, payroll, clients, invoices, engagements, documents, and audit trails with full RBAC.
+This project is an enterprise-grade Human Resources Management (HRM) and Invoice Management System designed for Chartered Accountant firms. Its primary purpose is to streamline and manage various internal operations including employee and trainee administration, attendance tracking, leave management, payroll processing, client relationship management, invoicing, engagement tracking, document management, and comprehensive audit trails. The system incorporates a robust Role-Based Access Control (RBAC) system to ensure data security and appropriate access levels for different user types.
 
-## Stack
+The system aims to modernize the administrative and financial processes within CA firms, enabling greater efficiency, accuracy, and compliance. Key capabilities include automated payroll calculations with tax considerations, full invoice lifecycle management, secure client credential storage, and a dynamic task allocation system.
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **Frontend**: React + Vite + Tailwind CSS + shadcn/ui
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
-- **Charts**: Recharts
-- **Forms**: React Hook Form + Zod
-- **Animations**: Framer Motion
-- **Routing**: Wouter v3
+## User Preferences
 
-## Login Credentials (Demo Accounts)
+I prefer iterative development. Before making any major changes, please ask for my approval. Ensure detailed explanations for complex implementations. Do not make changes to files within the `artifacts-monorepo/artifacts/api-server/src/middleware/` folder unless specifically instructed. Do not make changes to files within `lib/api-zod` and `lib/api-client-react` as these are auto-generated.
 
-- **Admin** (Super Admin): admin@calfirm.com / admin123
-- **Partner**: partner@calfirm.com / partner123
-- **HR** (HR Admin): hr@calfirm.com / hr123
-- **Finance**: finance@calfirm.com / finance123
-- **Manager**: manager@calfirm.com / manager123
-- **Employee**: employee@calfirm.com / employee123
-- **Trainee**: trainee@calfirm.com / trainee123
+## System Architecture
 
-## Structure
+The project is structured as a monorepo using pnpm workspaces, consisting of a React-based frontend (`hrm-system`) and an Express.js backend (`api-server`). PostgreSQL is used as the primary database, managed by Drizzle ORM.
 
-```text
-artifacts-monorepo/
-├── artifacts/
-│   ├── api-server/         # Express API server
-│   └── hrm-system/         # React + Vite frontend (HRM & Invoice System)
-├── lib/
-│   ├── api-spec/           # OpenAPI spec + Orval codegen config
-│   ├── api-client-react/   # Generated React Query hooks
-│   ├── api-zod/            # Generated Zod schemas from OpenAPI
-│   └── db/                 # Drizzle ORM schema + DB connection
-├── scripts/                # Utility scripts
-├── pnpm-workspace.yaml
-├── tsconfig.base.json
-├── tsconfig.json
-└── package.json
-```
+**Frontend:**
+- Developed with React, Vite, Tailwind CSS, and shadcn/ui for a modern and responsive user interface.
+- Utilizes Recharts for data visualization, React Hook Form with Zod for form management and validation, and Framer Motion for animations.
+- Wouter v3 is used for client-side routing.
+- UI/UX features include a global header filter for departments, color-coded badges, and role-specific dashboard views. The design emphasizes clarity and efficiency for administrative tasks.
 
-## Database Schema
+**Backend:**
+- Built with Express 5, providing RESTful API endpoints.
+- Drizzle ORM interfaces with PostgreSQL, managing a comprehensive database schema that includes users, employees, attendance, leaves, payroll, clients, invoices, engagements, documents, tasks, and audit logs.
+- Features HMAC-SHA256 signed tokens for authentication and robust RBAC implemented via middleware on all API routes.
+- Security enhancements include Helmet security headers, AES-256-CBC encryption for sensitive client credentials, rate limiting, and structured logging with Pino.
+- Performance is optimized through N+1 query elimination strategies (e.g., batched queries, SQL-level filtering), extensive database indexing, and frontend memoization.
 
-Tables:
-- `users` - System users (auth, roles, phone, mobile, cnic, profilePicture, status)
-- `employees` - Employee/trainee master with auto-generated codes (EMP0001)
-- `attendance` - Daily attendance records (check-in/out, status, ipAddress)
-- `leaves` - Leave applications with approval workflow
-- `payroll` - Monthly payroll with attendance-based calculation (overtimeHours, overtimePay, taxAmount)
-- `clients` - Client master with auto-generated codes (CLT0001), NTN, registrationNo
-- `invoices` - Invoice lifecycle (Draft → Approved → Issued → Paid), WHT/GST amounts, recurring support
-- `activity_logs` - Complete audit trail of all system actions
-- `client_credentials` - Encrypted credential vault (FBR, SECP, PRA logins) using AES-256-CBC
-- `engagements` - Client engagement tracking (audit, tax, advisory) with lifecycle management
-- `engagement_assignments` - Team member assignments to engagements
-- `departments` - Department master (Audit, Tax, Corporate, Advisory, Others) with color coding
-- `documents` - Document management with version control, categorization, soft delete (isDeleted/deletedAt/deletedById), and task linking (taskId)
-- `tasks` - Tasks with client/engagement links, status tracking, assignment logs
-- `task_logs` - Immutable log of all task actions (create, update, reassign, complete)
-- `notifications` - In-app notifications with types (task_assigned, task_due, leave_approved, etc.)
-- `training_applications` - CA training applications with file uploads (CNIC/photo), academic records, skills assessment, status tracking (pending/shortlisted/rejected/selected)
-- `meetings` - Online meeting bookings with partners (public booking, admin management, status workflow: pending/confirmed/completed/cancelled)
+**Key Features & Implementations:**
+- **Authentication & RBAC:** Secure login with HMAC-signed tokens, granular role-based access control for all API routes and UI elements.
+- **Employee & Trainee Management:** Comprehensive CRUD operations for employees with auto-generated codes, detailed profiles, and tracking. Includes a 9-step CA training application process with file uploads, CRN generation, MCQ assessment, and smart interview scheduling.
+- **Attendance & Leave Management:** Daily attendance recording with IP capture, and an approval workflow for leave applications.
+- **Payroll System:** Monthly payroll generation with Pakistan income tax slab calculation and detailed payslips.
+- **Client & Invoice Management:** Client master with financial details, and a full invoice lifecycle (Draft, Approved, Issued, Paid) with WHT/GST tax calculations and aging reports.
+- **Engagement & Task Management:** Tracking client engagements through their lifecycle and a task scheduler with calendar/list/week views, priority levels, and dynamic, seniority-based task allocation.
+- **Document Management:** Version-controlled document storage with categories, soft delete (trash and restore functionality), and permanent deletion.
+- **Audit Trail:** Comprehensive logging of all system actions for accountability and compliance.
+- **Credential Vault:** Secure, encrypted storage for client portal credentials (e.g., FBR, SECP, PRA logins).
+- **Notifications:** In-app notification system with real-time updates for important events.
+- **Reports:** Generation of various reports for attendance, payroll, and invoices.
 
-## Roles
+## External Dependencies
 
-- `super_admin` - Full system access
-- `partner` - Partner-level access (similar to admin)
-- `hr_admin` - HR administration
-- `finance_officer` - Finance/billing access
-- `manager` - Department manager access
-- `employee` - Basic employee access
-- `trainee` - Limited trainee access
-
-## Features
-
-### Modules Built:
-1. **Authentication** - HMAC-signed token login, role-based access
-2. **RBAC** - Auth middleware on all API routes, role-based sidebar visibility, role-restricted pages
-3. **Employee Management** - Add/edit employees, auto employee codes, department/designation tracking
-4. **Attendance** - Mark attendance, check-in/out times, status tracking, IP address capture
-5. **Leave Management** - Apply leave, approval workflow, leave types
-6. **Payroll** - Generate monthly payroll, Pakistan income tax slab calculation, payslip dialog with full salary breakdown
-7. **Client Management** - Client master with NTN, registration number, financials tracking
-8. **Invoice Management** - Full lifecycle (Draft→Approved→Issued→Paid/Overdue), WHT/GST tax calculation, aging report
-9. **Engagements** - Client engagement tracking with lifecycle (planning→execution→review→completed)
-10. **Documents** - Document management with categories, version control (upload new versions, version history)
-11. **Audit Trail** - Complete activity logging with filtering by module/action, pagination
-12. **User Management** - Admin CRUD for system users with role assignment and status control
-13. **Dashboard** - Key metrics, role-specific views (Executive/Finance/HR), attendance trend, invoice summary, task overview
-14. **Reports** - Attendance, payroll, and invoice reports
-15. **Credential Vault** - Encrypted storage for client portal credentials (FBR, SECP, PRA)
-16. **Task Scheduler** - Task management with calendar/list/week views, delayed status detection, priority levels
-17. **User Profile** - Profile view/edit, change password, mobile/CNIC fields
-18. **Notifications** - In-app notification system with bell icon, unread count badge, mark-read/mark-all-read, auto-refresh every 30s
-19. **Dynamic Task Allocation** - Seniority-based assignment rules (Admin→all, Partner→subordinates, Manager→employees/trainees, Trainee→peers within 5 months), eligible-users API with seniority tags
-20. **Invoice PDF** - Professional invoice print/download with company header, tax breakdown, and print-to-PDF support
-21. **Department System** - 5 departments (Audit/Blue, Tax/Green, Corporate/Purple, Advisory/Orange, Others/Gray) with global header filter, color-coded badges across all pages, department field in all create/edit forms
-22. **Document Trash/Restore** - Soft delete (moves to trash), trash view with 30-day retention indicator, restore from trash, permanent delete
-23. **CA Training Application** - 9-step application form with file uploads (CNIC/photo), CRN generation (CRN-YYYY-XXXX), duplicate CNIC prevention
-24. **MCQ Assessment Test** - 10-question MCQ test (4 Accounting, 2 Audit, 2 Tax, 1 Excel, 1 General), 15-minute timer, auto-evaluation, pass/fail (≥8/10), single attempt enforcement
-25. **PDF Result Generation** - Auto-generated firm-branded PDF for passed candidates with application details, test score, and interview schedule
-26. **Smart Interview Scheduling** - 7 working days after test (excluding Sundays and Pakistan public holidays), 11:00 AM–12:00 PM slot
-
-### Security:
-- Auth middleware protects all API routes (except /auth and /healthz)
-- HMAC-SHA256 signed tokens with 24-hour expiry (replaces unsigned base64 tokens)
-- Helmet security headers (X-Content-Type-Options, HSTS, X-Frame-Options, etc.)
-- Role-based access control on sensitive routes
-- AES-256-CBC encryption for credential vault
-- Activity logging on all CRUD operations and login events
-- Role-based sidebar navigation (admin sees all, restricted roles see limited menu)
-- Rate limiting: 500 requests/15min for API, 20 requests/15min for auth endpoints
-- CORS restricted to ana-ca.com in production
-- Protected upload paths (applications/ requires auth)
-- API 404 handler for undefined endpoints
-- SPA cache strategy: immutable caching for fingerprinted assets, no-cache for index.html
-- Global error handler with structured logging via pino
-
-## API Routes
-
-All under `/api`:
-- `POST /auth/login` - Login
-- `GET /auth/me` - Current user
-- `GET/POST /employees` - Employee CRUD
-- `GET /employees/:id`, `PUT /employees/:id`
-- `GET/POST /attendance` - Attendance records
-- `GET /attendance/summary` - Monthly summary
-- `PUT /attendance/:id` - Correction
-- `GET/POST /leaves` - Leave applications
-- `PUT /leaves/:id` - Approve/reject
-- `GET/POST /payroll` - Payroll records + generate
-- `GET /payroll/:id` - Payslip
-- `GET/POST /clients` - Client CRUD (with NTN, registrationNo)
-- `GET/POST /invoices` - Invoice CRUD (with WHT/GST)
-- `PUT /invoices/:id/status` - Status update
-- `GET /invoices/aging` - Aging report
-- `GET /dashboard/stats` - Dashboard metrics
-- `GET /dashboard/attendance-trend` - Trend data
-- `GET /dashboard/invoice-summary` - Invoice analytics
-- `GET/POST /users` - User management (admin only)
-- `PUT /users/profile` - Update own profile
-- `PUT /users/change-password` - Change own password
-- `PUT /users/:id` - Update user (admin)
-- `GET /activity-logs` - Audit trail with filtering
-- `GET/POST /clients/:clientId/credentials` - Credential vault
-- `PUT/DELETE /clients/:clientId/credentials/:id` - Credential CRUD
-- `GET /clients/:clientId/credentials/:id/reveal` - Reveal credential (admin/partner)
-- `GET/POST /engagements` - Engagement management
-- `PUT /engagements/:id` - Update engagement
-- `GET/POST /documents` - Document management
-- `POST /documents/:id/version` - Upload new version
-- `GET /documents/:id/versions` - Version history
-- `DELETE /documents/:id` - Soft delete (move to trash)
-- `GET /documents/trash` - Trashed documents with daysRemaining
-- `PUT /documents/:id/restore` - Restore from trash
-- `DELETE /documents/:id/permanent` - Permanent delete
-- `GET /departments` - List all departments
-- `GET /departments/:id` - Get department by ID
-- `GET/POST /tasks` - Task management (with seniority-based assignment validation)
-- `GET /tasks/stats` - Task statistics
-- `GET /tasks/eligible-users` - Eligible assignees with seniority tags
-- `PUT /tasks/:id` - Update task
-- `GET /dashboard/role-stats` - Role-specific dashboard metrics
-- `GET /notifications` - User notifications (with unread count)
-- `PUT /notifications/:id/read` - Mark notification as read
-- `PUT /notifications/read-all` - Mark all notifications as read
-
-## Auth & Middleware
-
-- **Token**: HMAC-SHA256 signed token with 24h expiry (`payloadBase64url.signature`), stored in localStorage as `hrm_token`
-- **Password Hash**: SHA-256 + "hrm_salt_2024"
-- **Auth Middleware**: `artifacts/api-server/src/middleware/auth.ts` - applied globally in routes/index.ts
-- **Activity Logger**: `artifacts/api-server/src/middleware/activity-logger.ts` - logs actions to activity_logs table
-- **Encryption**: `artifacts/api-server/src/utils/encryption.ts` - AES-256-CBC for credential vault
-
-## Frontend Pages
-
-18 pages total:
-- `/landing` - Public landing page (firm overview, services, team, contact — accessible without authentication)
-- `/login` - Login page
-- `/` - Dashboard (role-based: Trainee=Light Blue tasks/attendance, Manager=Green staff/leave approvals, Partner/Admin=Deep Red executive overview with invoices/payroll/staff; all roles get Time In/Out card, leave apply, PKT time)
-- `/employees` - Employee management
-- `/attendance` - Attendance tracking (with IP capture)
-- `/leaves` - Leave management
-- `/payroll` - Payroll processing (with tax calculation and payslip dialog)
-- `/clients` - Client management (with NTN/Registration fields)
-- `/invoices` - Invoice management (with WHT/GST tax support)
-- `/reports` - Reports
-- `/engagements` - Engagement tracking
-- `/documents` - Document management (with version control)
-- `/audit-trail` - Audit trail (admin/partner/HR only)
-- `/user-management` - User management (admin/partner/HR only)
-- `/task-scheduler` - Task scheduler with calendar/list/week views
-- `/credential-vault` - Credential vault (admin/partner only)
-- `/profile` - User profile with edit and change password
-
-## TypeScript & Composite Projects
-
-Every package extends `tsconfig.base.json` which sets `composite: true`. Always typecheck from the root with `pnpm run typecheck`.
-
-`lib/api-zod/tsconfig.json` adds `"lib": ["es2022", "dom"]` so that DOM types (`File`, `Blob`) resolve correctly in the generated Zod schemas. Only `./generated/api` is re-exported from `lib/api-zod/src/index.ts` (the types folder is excluded to avoid duplicate-export conflicts).
-
-## Performance Optimizations Applied
-
-### API Route N+1 Eliminations
-- **employees.ts GET /**: All reporting managers fetched in a single `inArray` query; result joined in memory via Map.
-- **leaves.ts GET /**: SQL-level filtering with `eq`/`and` conditions; unique employee IDs and approver IDs collected, then fetched in two batched queries; joined in memory.
-- **invoices.ts GET /**: SQL-level filtering for clientId/status/departmentId; all clients fetched in single `inArray` batch query; joined via Map.
-- **documents.ts**: `batchEnrich()` replaces per-document `enrichDoc()` — all uploaders, clients, and deleters fetched in two bulk queries for the entire result set.
-- **dashboard.ts**: All JS-side filtering replaced with SQL `COUNT(*) FILTER (WHERE ...)` and `SUM(CASE WHEN ...)` aggregations; attendance trend uses `inArray` date filter instead of full-table scan.
-
-### Database Indexes Added
-- `activity_logs`: `user_id`, `module`, `created_at`
-- `attendance`: `employee_id`, `date`, composite `(employee_id, date)`
-- `leaves`: `employee_id`, `status`, composite `(employee_id, status)`
-- `notifications`: `user_id`, composite `(user_id, is_read)`, `created_at`
-- `payroll`: `employee_id`, composite `(year, month)`, composite `(employee_id, year)`
-
-### Frontend Memoization
-- `invoices.tsx`: `filteredInvoices` wrapped in `useMemo` (depends on `invoices`, `activeTab`, `selectedDepartmentId`).
-
-### TypeScript Strictness
-- `api-server/tsconfig.json`: `noImplicitReturns: false` — Express route handlers commonly use early `return res.json()` which TS flags as not all paths returning.
-
-## Development
-
-- `pnpm --filter @workspace/api-server run dev` - Start API server
-- `pnpm --filter @workspace/hrm-system run dev` - Start frontend
-- `pnpm --filter @workspace/db run push` - Push DB schema changes
-- `pnpm --filter @workspace/api-spec run codegen` - Regenerate API client
+- **Database:** PostgreSQL
+- **Frontend Framework:** React
+- **UI Component Library:** shadcn/ui
+- **Styling:** Tailwind CSS
+- **API Framework:** Express
+- **ORM:** Drizzle ORM
+- **Validation:** Zod
+- **API Codegen:** Orval (from OpenAPI spec)
+- **Charts:** Recharts
+- **Form Management:** React Hook Form
+- **Animations:** Framer Motion
+- **Routing:** Wouter
+- **Build Tool:** Vite, esbuild
+- **Logging:** Pino
+- **Encryption:** AES-256-CBC
