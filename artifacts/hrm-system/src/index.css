@@ -2,6 +2,20 @@
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
+button,
+a,
+[role="button"],
+[type="button"],
+[type="submit"],
+[type="reset"],
+input[type="checkbox"],
+input[type="radio"],
+select,
+label[for],
+.cursor-pointer {
+  cursor: pointer;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
