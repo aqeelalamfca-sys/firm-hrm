@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   Shield, FileText, Banknote, Users, BarChart3, Building2, Globe, ChevronRight,
-  CheckCircle2, ArrowRight, Star, Award, BookOpen, Calculator, Briefcase, Scale,
+  CheckCircle2, ArrowRight, Star, Award, BookOpen, Calculator, Briefcase,
   Landmark, TrendingUp, Eye, Target, Heart, Zap, Phone, Mail, MapPin,
   GraduationCap, Clock, Layers, Lock, Search, PieChart, UserCheck, Cpu,
   Menu, X, Factory, Truck, Pickaxe, Clapperboard, Wallet, Utensils, Building,
@@ -192,9 +192,7 @@ export default function Landing() {
       <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-background/95 backdrop-blur-md shadow-sm border-b border-border/30" : "bg-transparent"}`}>
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Scale className="w-4.5 h-4.5 text-primary" />
-            </div>
+            <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Alam & Aulakh" className="h-9 w-auto object-contain" />
             <span className="text-lg font-bold tracking-tight">Alam & Aulakh</span>
           </div>
           <nav className="hidden md:flex items-center gap-1">
@@ -884,9 +882,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Scale className="w-3.5 h-3.5 text-primary" />
-              </div>
+              <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Alam & Aulakh" className="h-7 w-auto object-contain" />
               <span className="text-sm font-bold">Alam & Aulakh</span>
               <span className="text-xs text-muted-foreground">Chartered Accountants</span>
             </div>
