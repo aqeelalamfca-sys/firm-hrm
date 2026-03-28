@@ -155,24 +155,50 @@ router.post("/", async (req, res) => {
 
 router.put("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
+  const existing = await db.select().from(invoicesTable).where(eq(invoicesTable.id, id));
+  if (!existing[0]) return res.status(404).json({ error: "Invoice not found" });
+  const e = existing[0];
+
+  if (!["draft", "approved"].includes(e.status)) {
+    return res.status(409).json({ error: "Only draft or approved invoices can be edited" });
+  }
+
   const updates: Record<string, any> = { updatedAt: new Date() };
-  const fields = ["serviceType", "description", "dueDate", "notes"];
+  const fields = ["serviceType", "description", "issueDate", "dueDate", "notes"];
   for (const f of fields) {
     if (req.body[f] !== undefined) updates[f] = req.body[f];
   }
-  if (req.body.amount !== undefined || req.body.tax !== undefined) {
-    const existing = await db.select().from(invoicesTable).where(eq(invoicesTable.id, id));
-    const e = existing[0];
-    const amount = req.body.amount !== undefined ? Number(req.body.amount) : Number(e?.amount);
-    const tax = req.body.tax !== undefined ? Number(req.body.tax) : Number(e?.tax);
-    updates.amount = amount.toFixed(2);
-    updates.tax = tax.toFixed(2);
-    updates.totalAmount = (amount + tax).toFixed(2);
+  if (req.body.clientId !== undefined) {
+    const cId = parseInt(req.body.clientId);
+    if (isNaN(cId)) return res.status(400).json({ error: "Invalid client ID" });
+    updates.clientId = cId;
+  }
+  if (req.body.engagementId !== undefined) updates.engagementId = req.body.engagementId ? parseInt(req.body.engagementId) : null;
+  if (req.body.departmentId !== undefined) updates.departmentId = req.body.departmentId || null;
+  if (req.body.isRecurring !== undefined) {
+    updates.isRecurring = req.body.isRecurring;
+    updates.recurringFrequency = req.body.isRecurring ? (req.body.recurringFrequency || "monthly") : null;
+  } else if (req.body.recurringFrequency !== undefined) {
+    updates.recurringFrequency = req.body.recurringFrequency;
+  }
+
+  if (req.body.amount !== undefined || req.body.gstPercent !== undefined || req.body.whtPercent !== undefined) {
+    const baseAmount = req.body.amount !== undefined ? Number(req.body.amount) : Number(e.amount);
+    if (isNaN(baseAmount) || baseAmount < 0) return res.status(400).json({ error: "Invalid amount" });
+    const gstRate = req.body.gstPercent !== undefined ? Number(req.body.gstPercent) : (Number(e.gstAmount) / Number(e.amount) * 100 || 0);
+    const whtRate = req.body.whtPercent !== undefined ? Number(req.body.whtPercent) : (Number(e.whtAmount) / Number(e.amount) * 100 || 0);
+    if (isNaN(gstRate) || gstRate < 0 || isNaN(whtRate) || whtRate < 0) return res.status(400).json({ error: "Invalid tax rate" });
+    const gstAmount = baseAmount * gstRate / 100;
+    const whtAmount = baseAmount * whtRate / 100;
+    const totalAmount = baseAmount + gstAmount - whtAmount;
+    updates.amount = baseAmount.toFixed(2);
+    updates.gstAmount = gstAmount.toFixed(2);
+    updates.whtAmount = whtAmount.toFixed(2);
+    updates.tax = gstAmount.toFixed(2);
+    updates.totalAmount = totalAmount.toFixed(2);
   }
 
   const [inv] = await db.update(invoicesTable).set(updates).where(eq(invoicesTable.id, id)).returning();
-  if (!inv) return res.status(404).json({ error: "Invoice not found" });
-
   const clients = await db.select().from(clientsTable).where(eq(clientsTable.id, inv.clientId));
   res.json(formatInvoice(inv, clients[0]?.name || "Unknown"));
 });

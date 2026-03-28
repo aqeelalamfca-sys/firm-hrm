@@ -13,12 +13,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
   Plus, FileText, CheckCircle, Send, AlertTriangle, ChevronRight,
-  Receipt, Eye, Download
+  Receipt, Eye, Download, Pencil, Save, X, Loader2
 } from "lucide-react";
 import { useDepartments } from "@/hooks/use-departments";
 import { DepartmentBadge } from "@/components/department-badge";
 import { DepartmentSelect } from "@/components/department-select";
 
+const SERVICE_TYPES = ["audit", "tax", "advisory", "accounting", "other"];
 const STATUS_FLOW: Record<string, string> = { draft: "approved", approved: "issued", issued: "paid" };
 const STATUS_LABELS: Record<string, string> = { draft: "Approve", approved: "Issue", issued: "Mark Paid" };
 const STATUS_ICONS: Record<string, any> = { draft: CheckCircle, approved: Send, issued: CheckCircle };
@@ -41,6 +42,9 @@ export default function Invoices() {
   const { selectedDepartmentId } = useDepartments();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [detailInvoice, setDetailInvoice] = useState<any>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState<any>({});
+  const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
   const [invoices, setInvoices] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -123,6 +127,61 @@ export default function Invoices() {
       const updated = await res.json();
       setInvoices(invoices.map((i: any) => i.id === id ? updated : i));
       toast({ title: "Invoice status updated" });
+    }
+  }
+
+  function startEdit(inv: any) {
+    const gstRate = inv.amount > 0 ? Math.round(inv.gstAmount / inv.amount * 100) : 0;
+    const whtRate = inv.amount > 0 ? Math.round(inv.whtAmount / inv.amount * 100) : 0;
+    setEditForm({
+      serviceType: inv.serviceType || "audit",
+      description: inv.description || "",
+      amount: inv.amount?.toString() || "",
+      gstPercent: gstRate.toString(),
+      whtPercent: whtRate.toString(),
+      issueDate: inv.issueDate || "",
+      dueDate: inv.dueDate || "",
+      notes: inv.notes || "",
+      isRecurring: inv.isRecurring || false,
+      recurringFrequency: inv.recurringFrequency || "monthly",
+      departmentId: inv.departmentId || "",
+    });
+    setEditMode(true);
+  }
+
+  async function handleEditSave() {
+    if (!detailInvoice) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/invoices/${detailInvoice.id}`, {
+        method: "PUT", headers,
+        body: JSON.stringify({
+          serviceType: editForm.serviceType,
+          description: editForm.description,
+          amount: editForm.amount,
+          gstPercent: editForm.gstPercent,
+          whtPercent: editForm.whtPercent,
+          issueDate: editForm.issueDate,
+          dueDate: editForm.dueDate,
+          notes: editForm.notes,
+          isRecurring: editForm.isRecurring,
+          recurringFrequency: editForm.recurringFrequency,
+          departmentId: editForm.departmentId,
+        }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setInvoices(invoices.map((i: any) => i.id === detailInvoice.id ? updated : i));
+        setDetailInvoice(updated);
+        setEditMode(false);
+        toast({ title: "Invoice updated successfully" });
+      } else {
+        toast({ title: "Failed to update invoice", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error updating invoice", variant: "destructive" });
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -518,9 +577,9 @@ export default function Invoices() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={!!detailInvoice} onOpenChange={(open) => { if (!open) setDetailInvoice(null); }}>
-        <DialogContent className="sm:max-w-[500px]">
-          {detailInvoice && (
+      <Dialog open={!!detailInvoice} onOpenChange={(open) => { if (!open) { setDetailInvoice(null); setEditMode(false); } }}>
+        <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
+          {detailInvoice && !editMode && (
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
@@ -530,15 +589,22 @@ export default function Invoices() {
                 <DialogDescription>Invoice details and breakdown</DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className={`uppercase text-[10px] font-semibold ${getStatusStyle(detailInvoice.status)}`}>
-                    {detailInvoice.status}
-                  </Badge>
-                  {detailInvoice.isRecurring && <Badge className="bg-purple-100 text-purple-700 text-[10px]">Recurring ({detailInvoice.recurringFrequency})</Badge>}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className={`uppercase text-[10px] font-semibold ${getStatusStyle(detailInvoice.status)}`}>
+                      {detailInvoice.status}
+                    </Badge>
+                    {detailInvoice.isRecurring && <Badge className="bg-purple-100 text-purple-700 text-[10px]">Recurring ({detailInvoice.recurringFrequency})</Badge>}
+                  </div>
+                  {(detailInvoice.status === "draft" || detailInvoice.status === "approved") && (
+                    <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => startEdit(detailInvoice)}>
+                      <Pencil className="w-3.5 h-3.5" /> Edit
+                    </Button>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div><span className="text-muted-foreground">Client:</span> <span className="font-medium">{detailInvoice.clientName}</span></div>
-                  <div><span className="text-muted-foreground">Service:</span> <span className="font-medium capitalize">{detailInvoice.serviceType}</span></div>
+                  <div><span className="text-muted-foreground">Service:</span> <span className="font-medium capitalize">{detailInvoice.serviceType?.replace("_", " ")}</span></div>
                   <div><span className="text-muted-foreground">Issue:</span> <span>{detailInvoice.issueDate}</span></div>
                   <div><span className="text-muted-foreground">Due:</span> <span>{detailInvoice.dueDate}</span></div>
                 </div>
@@ -558,6 +624,109 @@ export default function Invoices() {
                 <Button className="w-full gap-2 mt-2" variant="outline" onClick={() => handlePrintInvoice(detailInvoice)}>
                   <Download className="w-4 h-4" /> Download / Print Invoice
                 </Button>
+              </div>
+            </>
+          )}
+          {detailInvoice && editMode && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Pencil className="w-5 h-5 text-primary" />
+                  Edit Invoice #{detailInvoice.invoiceNumber}
+                </DialogTitle>
+                <DialogDescription>Modify invoice details below</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Service Type *</Label>
+                  <Select value={editForm.serviceType} onValueChange={(v) => setEditForm({ ...editForm, serviceType: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SERVICE_TYPES.map((st) => (
+                        <SelectItem key={st} value={st}>{st.replace("_", " ").replace(/\b\w/g, c => c.toUpperCase())}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Description *</Label>
+                  <Textarea value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} rows={2} />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-2">
+                    <Label>Amount (Rs.) *</Label>
+                    <Input type="number" value={editForm.amount} onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>GST %</Label>
+                    <Input type="number" value={editForm.gstPercent} onChange={(e) => setEditForm({ ...editForm, gstPercent: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>WHT %</Label>
+                    <Input type="number" value={editForm.whtPercent} onChange={(e) => setEditForm({ ...editForm, whtPercent: e.target.value })} />
+                  </div>
+                </div>
+                {editForm.amount && (
+                  <Card className="bg-muted/30">
+                    <CardContent className="p-3 space-y-1 text-sm">
+                      {(() => {
+                        const base = Number(editForm.amount) || 0;
+                        const gst = base * (Number(editForm.gstPercent) || 0) / 100;
+                        const wht = base * (Number(editForm.whtPercent) || 0) / 100;
+                        const net = base + gst - wht;
+                        return (
+                          <>
+                            <div className="flex justify-between"><span>Base</span><span>Rs. {base.toLocaleString("en-PK")}</span></div>
+                            {gst > 0 && <div className="flex justify-between text-green-700"><span>+ GST ({editForm.gstPercent}%)</span><span>Rs. {gst.toLocaleString("en-PK")}</span></div>}
+                            {wht > 0 && <div className="flex justify-between text-red-700"><span>- WHT ({editForm.whtPercent}%)</span><span>Rs. {wht.toLocaleString("en-PK")}</span></div>}
+                            <div className="flex justify-between font-bold pt-1 border-t"><span>Net Payable</span><span>Rs. {net.toLocaleString("en-PK", { minimumFractionDigits: 2 })}</span></div>
+                          </>
+                        );
+                      })()}
+                    </CardContent>
+                  </Card>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Issue Date *</Label>
+                    <Input type="date" value={editForm.issueDate} onChange={(e) => setEditForm({ ...editForm, issueDate: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Due Date *</Label>
+                    <Input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Notes</Label>
+                  <Textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} rows={2} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Department</Label>
+                  <DepartmentSelect value={editForm.departmentId} onValueChange={(v) => setEditForm({ ...editForm, departmentId: v === "none" ? "" : v })} showAll={false} />
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                  <Switch checked={editForm.isRecurring} onCheckedChange={(v) => setEditForm({ ...editForm, isRecurring: v })} />
+                  <Label className="cursor-pointer">Recurring Invoice</Label>
+                  {editForm.isRecurring && (
+                    <Select value={editForm.recurringFrequency} onValueChange={(v) => setEditForm({ ...editForm, recurringFrequency: v })}>
+                      <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="quarterly">Quarterly</SelectItem>
+                        <SelectItem value="yearly">Yearly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <Button variant="outline" className="flex-1 gap-1.5" onClick={() => setEditMode(false)}>
+                    <X className="w-3.5 h-3.5" /> Cancel
+                  </Button>
+                  <Button className="flex-1 gap-1.5" onClick={handleEditSave} disabled={saving || !editForm.amount || !editForm.description}>
+                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    {saving ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
               </div>
             </>
           )}
