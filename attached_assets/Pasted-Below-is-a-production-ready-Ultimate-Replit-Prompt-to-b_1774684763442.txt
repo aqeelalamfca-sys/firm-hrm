@@ -1,0 +1,185 @@
+Below is a production-ready “Ultimate Replit Prompt” to build the CA Training Application Form (Frontend + Backend) — fully structured, validated, secure, and integrated with your existing system.
+
+✅ ULTIMATE REPLIT PROMPT — CA TRAINING APPLICATION FORM (FULL STACK)
+
+Objective:
+Build a complete CA Training Application Module (Frontend + Backend + Database) that captures all required candidate information without CV upload, includes CNIC (front/back) + Photo upload, and is ready for HR screening and trainee onboarding.
+
+⚠️ Keep UI simple, clean, and user-friendly.
+⚠️ Ensure data integrity, validation, and secure file handling.
+
+🧩 PHASE 1 — DATABASE (PRISMA SCHEMA)
+
+Create model:
+
+model TrainingApplication {
+  id                String   @id @default(uuid())
+  fullName          String
+  fatherName        String
+  cnic              String
+  dateOfBirth       DateTime
+  gender            String
+  maritalStatus     String
+
+  mobile            String
+  alternateMobile   String?
+  email             String
+  currentAddress    String
+  permanentAddress  String
+
+  cnicFrontUrl      String
+  cnicBackUrl       String
+  photoUrl          String
+
+  matricBoard       String
+  matricYear        Int
+  matricMarks       String
+
+  interBoard        String
+  interYear         Int
+  interMarks        String
+
+  graduationDegree  String?
+  graduationUni     String?
+  graduationYear    Int?
+  graduationMarks   String?
+
+  icapRegNo         String?
+  icapLevel         String
+
+  preferredLocation String
+  preferredDept     String
+
+  availableStart    DateTime
+  isFullTime        Boolean
+  currentEngagement String?
+
+  accountingLevel   String
+  excelLevel        String
+  softwareSkills    String?
+  communication     String
+
+  experienceDetails String?
+
+  declaration       Boolean
+
+  status            String   @default("Pending")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+🗂️ PHASE 2 — FILE UPLOAD SYSTEM
+Requirements:
+Upload:
+CNIC Front
+CNIC Back
+Profile Picture
+Features:
+Store in:
+/uploads/applications/
+Save file URLs in DB
+Validate:
+File type (jpg, png, pdf)
+File size limit
+🔐 PHASE 3 — BACKEND API (NODE / EXPRESS)
+
+Create routes:
+
+1. Submit Application
+POST /api/applications
+Validate all fields
+Save data
+Upload files
+Return success
+2. Get All Applications (Admin)
+GET /api/applications
+3. Get Single Application
+GET /api/applications/:id
+4. Update Status
+PATCH /api/applications/:id/status
+
+Status:
+
+Pending
+Shortlisted
+Rejected
+Selected
+🎨 PHASE 4 — FRONTEND (REACT / NEXT.JS)
+Form Layout (Single Page, Section-wise)
+Sections:
+Personal Info
+Contact Details
+Uploads
+Academic Info
+Training Preferences
+Availability
+Skills
+Experience
+Declaration
+UI Requirements:
+Progress bar at top
+Section cards
+Clean spacing
+Minimal fields per row
+Upload UI:
+Drag & drop
+Preview image
+Replace option
+✅ PHASE 5 — VALIDATION (IMPORTANT)
+Frontend + Backend:
+CNIC format (xxxxx-xxxxxxx-x)
+Email validation
+Required fields check
+Mandatory uploads
+Declaration checkbox required
+🧠 PHASE 6 — NO CV POLICY
+DO NOT include CV upload field
+Ensure all required info is captured in form fields
+📊 PHASE 7 — ADMIN DASHBOARD
+
+Create simple page:
+
+Table View:
+Name
+CNIC
+Email
+Department
+Status
+Apply Date
+Actions:
+View full application
+Change status
+Download attachments
+🔍 PHASE 8 — SEARCH & FILTER
+Filter by:
+Status
+Department
+Date
+🔐 PHASE 9 — SECURITY
+Secure file access
+No public URLs
+Auth required for admin routes
+⚙️ PHASE 10 — PERFORMANCE
+Optimize uploads
+Prevent duplicate submissions
+Fast API response
+❗ CRITICAL INSTRUCTIONS
+DO NOT:
+Add CV upload
+Break existing system
+Store sensitive data insecurely
+MUST:
+Validate all inputs
+Ensure file security
+Keep UI simple
+✅ FINAL OUTPUT
+Fully working CA Training Application Module
+Secure uploads (CNIC + Photo)
+Clean UI form
+Admin screening panel
+No CV dependency
+Production-ready
+🔥 OPTIONAL (NEXT STEP)
+Online MCQ Test (50 questions, auto-evaluation)
+Auto shortlisting (70% criteria)
+Interview scheduling system
+Trainee onboarding integration
