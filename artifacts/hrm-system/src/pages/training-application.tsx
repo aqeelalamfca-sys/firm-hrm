@@ -377,6 +377,12 @@ export default function TrainingApplication() {
                   <FieldError field="maritalStatus" />
                 </div>
               </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm">ICAP Registration No.</Label>
+                  <Input value={form.icapRegNo} onChange={e => handleChange("icapRegNo", e.target.value)} placeholder="If registered" />
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -524,10 +530,6 @@ export default function TrainingApplication() {
             <p className="text-xs text-muted-foreground mb-6">Select your training preferences.</p>
             <div className="space-y-4">
               <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm">ICAP Registration No.</Label>
-                  <Input value={form.icapRegNo} onChange={e => handleChange("icapRegNo", e.target.value)} placeholder="If registered" />
-                </div>
                 <div>
                   <Label className="text-sm">ICAP Level *</Label>
                   <Select value={form.icapLevel} onValueChange={v => handleChange("icapLevel", v)}>
