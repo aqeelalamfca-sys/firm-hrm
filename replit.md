@@ -21,11 +21,15 @@ Enterprise-grade HRM and Invoice Management System for Chartered Accountant firm
 - **Animations**: Framer Motion
 - **Routing**: Wouter v3
 
-## Login Credentials
+## Login Credentials (Demo Accounts)
 
-- **Admin**: admin@calfirm.com / admin123
-- **HR**: hr@calfirm.com / hr123
+- **Admin** (Super Admin): admin@calfirm.com / admin123
+- **Partner**: partner@calfirm.com / partner123
+- **HR** (HR Admin): hr@calfirm.com / hr123
 - **Finance**: finance@calfirm.com / finance123
+- **Manager**: manager@calfirm.com / manager123
+- **Employee**: employee@calfirm.com / employee123
+- **Trainee**: trainee@calfirm.com / trainee123
 
 ## Structure
 
