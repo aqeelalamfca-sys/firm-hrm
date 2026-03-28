@@ -179,10 +179,6 @@ export default function TrainingApplication() {
     if (!form.fts) newErrors.fts = "FTS is required";
     if (!form.preferredLocation) newErrors.preferredLocation = "Location is required";
     if (!form.preferredDept) newErrors.preferredDept = "Department is required";
-    if (!form.availableStart) newErrors.availableStart = "Start date is required";
-    if (!form.accountingLevel) newErrors.accountingLevel = "Accounting level is required";
-    if (!form.excelLevel) newErrors.excelLevel = "Excel level is required";
-    if (!form.communication) newErrors.communication = "Communication level is required";
     if (!form.declaration) newErrors.declaration = "You must accept the declaration";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -630,12 +626,12 @@ export default function TrainingApplication() {
             <div className="space-y-4">
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm">Available Start Date *</Label>
+                  <Label className="text-sm">Available Start Date</Label>
                   <Input type="date" value={form.availableStart} onChange={e => handleChange("availableStart", e.target.value)} />
                   <FieldError field="availableStart" />
                 </div>
                 <div>
-                  <Label className="text-sm">Availability *</Label>
+                  <Label className="text-sm">Availability</Label>
                   <Select value={form.isFullTime} onValueChange={v => handleChange("isFullTime", v)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -663,7 +659,7 @@ export default function TrainingApplication() {
             <div className="space-y-4">
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm">Accounting Knowledge *</Label>
+                  <Label className="text-sm">Accounting Knowledge</Label>
                   <Select value={form.accountingLevel} onValueChange={v => handleChange("accountingLevel", v)}>
                     <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
                     <SelectContent>
@@ -676,7 +672,7 @@ export default function TrainingApplication() {
                   <FieldError field="accountingLevel" />
                 </div>
                 <div>
-                  <Label className="text-sm">Microsoft Excel *</Label>
+                  <Label className="text-sm">Microsoft Excel</Label>
                   <Select value={form.excelLevel} onValueChange={v => handleChange("excelLevel", v)}>
                     <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
                     <SelectContent>
@@ -690,7 +686,7 @@ export default function TrainingApplication() {
                 </div>
               </div>
               <div>
-                <Label className="text-sm">Communication Skills *</Label>
+                <Label className="text-sm">Communication Skills</Label>
                 <Select value={form.communication} onValueChange={v => handleChange("communication", v)}>
                   <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
                   <SelectContent>
