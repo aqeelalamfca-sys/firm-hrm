@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Scale, ArrowLeft, CheckCircle2, Upload, X, User, Phone, GraduationCap,
+  ArrowLeft, CheckCircle2, Upload, X, User, Phone, GraduationCap,
   MapPin, Briefcase, Wrench, FileText, AlertCircle, Loader2, Image as ImageIcon
 } from "lucide-react";
 
@@ -312,7 +312,7 @@ export default function TrainingApplication() {
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-border/40 shadow-sm">
         <div className="max-w-4xl mx-auto px-6 py-3 flex items-center justify-between">
           <Link href="/landing" className="flex items-center gap-2 text-foreground hover:text-primary transition-colors">
-            <Scale className="w-5 h-5 text-primary" />
+            <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Alam & Aulakh" className="h-8 w-auto object-contain" />
             <span className="font-bold text-sm">Alam & Aulakh</span>
           </Link>
           <h1 className="text-sm font-semibold text-foreground hidden sm:block">CA Training Application</h1>
@@ -325,6 +325,37 @@ export default function TrainingApplication() {
       </header>
 
       <div className="max-w-4xl mx-auto px-6 py-6 space-y-6">
+        <div className="bg-gradient-to-r from-primary/10 via-blue-50 to-indigo-50 border border-primary/20 rounded-xl p-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-primary" />
+                Training Entitlement & Availability
+              </h2>
+              <p className="text-xs text-muted-foreground mt-1">ICAP approved training positions at Alam & Aulakh Chartered Accountants</p>
+            </div>
+            <div className="flex gap-3">
+              <div className="bg-white rounded-lg border border-border/50 shadow-sm px-4 py-2.5 text-center min-w-[90px]">
+                <p className="text-2xl font-bold text-foreground">65</p>
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Total Entitlement</p>
+              </div>
+              <div className="bg-white rounded-lg border border-border/50 shadow-sm px-4 py-2.5 text-center min-w-[90px]">
+                <p className="text-2xl font-bold text-primary">10</p>
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Offering Now</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-4 mt-3">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <div className="w-2 h-2 rounded-full bg-blue-500" />
+              5 Male Positions
+            </div>
+            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <div className="w-2 h-2 rounded-full bg-pink-500" />
+              5 Female Positions
+            </div>
+          </div>
+        </div>
 
         <Card className="shadow-lg border-border/40">
           <CardContent className="p-6 sm:p-8">
