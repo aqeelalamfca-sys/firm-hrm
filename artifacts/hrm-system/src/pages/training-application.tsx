@@ -58,6 +58,9 @@ export default function TrainingApplication() {
     gender: "",
     maritalStatus: "",
     mobile: "",
+    mobileWhatsapp: false,
+    mobile2: "",
+    mobile2Whatsapp: false,
     emergencyMobile: "",
     emergencyName: "",
     emergencyRelation: "",
@@ -501,7 +504,19 @@ export default function TrainingApplication() {
                 <div>
                   <Label className="text-sm">Mobile Number *</Label>
                   <Input value={form.mobile} onChange={e => handleChange("mobile", e.target.value)} placeholder="03xx-xxxxxxx" />
+                  <label className="flex items-center gap-2 mt-1.5 cursor-pointer">
+                    <input type="checkbox" checked={form.mobileWhatsapp as unknown as boolean} onChange={e => handleChange("mobileWhatsapp", e.target.checked)} className="rounded border-gray-300 accent-primary w-4 h-4" />
+                    <span className="text-xs text-muted-foreground">Available on WhatsApp</span>
+                  </label>
                   <FieldError field="mobile" />
+                </div>
+                <div>
+                  <Label className="text-sm">Mobile Number 2</Label>
+                  <Input value={form.mobile2} onChange={e => handleChange("mobile2", e.target.value)} placeholder="Optional" />
+                  <label className="flex items-center gap-2 mt-1.5 cursor-pointer">
+                    <input type="checkbox" checked={form.mobile2Whatsapp as unknown as boolean} onChange={e => handleChange("mobile2Whatsapp", e.target.checked)} className="rounded border-gray-300 accent-primary w-4 h-4" />
+                    <span className="text-xs text-muted-foreground">Available on WhatsApp</span>
+                  </label>
                 </div>
               </div>
               <div className="mt-4 p-4 bg-muted/30 rounded-lg border border-border/50">
