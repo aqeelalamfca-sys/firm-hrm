@@ -204,12 +204,15 @@ export default function Landing() {
           </nav>
           <div className="flex items-center gap-2">
             <Link href="/book-meeting">
-              <Button size="sm" variant="outline" className="h-9 text-[13px] font-semibold gap-1.5 hidden sm:flex">
-                <Video className="w-3.5 h-3.5" /> Book Meeting
-              </Button>
+              <div className="relative hidden sm:block">
+                <span className="absolute inset-0 rounded-lg animate-ping-slow bg-blue-400/40 pointer-events-none" />
+                <Button size="sm" variant="outline" className="h-9 text-[13px] font-semibold gap-1.5 relative border-blue-400 text-blue-600 hover:bg-blue-50 hover:border-blue-500 shadow-[0_0_10px_2px_rgba(59,130,246,0.25)] animate-glow-blue">
+                  <Video className="w-3.5 h-3.5" /> Book Meeting
+                </Button>
+              </div>
             </Link>
             <Link href="/apply-training">
-              <Button size="sm" variant="outline" className="h-9 text-[13px] font-semibold gap-1.5 hidden sm:flex">
+              <Button size="sm" variant="outline" className="h-9 text-[13px] font-semibold gap-1.5 hidden sm:flex border-emerald-400 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-500 animate-shimmer-green relative overflow-hidden">
                 <GraduationCap className="w-3.5 h-3.5" /> Apply for Training
               </Button>
             </Link>
