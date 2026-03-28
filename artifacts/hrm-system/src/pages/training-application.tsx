@@ -74,6 +74,8 @@ export default function TrainingApplication() {
     graduationMarks: "",
     icapRegNo: "",
     icapLevel: "",
+    trainingPeriod: "",
+    fts: "",
     preferredLocation: "",
     preferredDept: "",
     availableStart: "",
@@ -173,6 +175,8 @@ export default function TrainingApplication() {
     if (!form.interYear) newErrors.interYear = "Year is required";
     if (!form.interMarks.trim()) newErrors.interMarks = "Marks/Grade is required";
     if (!form.icapLevel) newErrors.icapLevel = "Registration basis is required";
+    if (!form.trainingPeriod) newErrors.trainingPeriod = "Training period is required";
+    if (!form.fts) newErrors.fts = "FTS is required";
     if (!form.preferredLocation) newErrors.preferredLocation = "Location is required";
     if (!form.preferredDept) newErrors.preferredDept = "Department is required";
     if (!form.availableStart) newErrors.availableStart = "Start date is required";
@@ -547,7 +551,7 @@ export default function TrainingApplication() {
             </h2>
             <p className="text-xs text-muted-foreground mb-6">Select your training preferences.</p>
             <div className="space-y-4">
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid sm:grid-cols-3 gap-4">
                 <div>
                   <Label className="text-sm">Registration Based On *</Label>
                   <Select value={form.icapLevel} onValueChange={v => handleChange("icapLevel", v)}>
@@ -558,6 +562,30 @@ export default function TrainingApplication() {
                     </SelectContent>
                   </Select>
                   <FieldError field="icapLevel" />
+                </div>
+                <div>
+                  <Label className="text-sm">Preferred Training Period *</Label>
+                  <Select value={form.trainingPeriod} onValueChange={v => handleChange("trainingPeriod", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select period" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2.5">2.5 Years</SelectItem>
+                      <SelectItem value="3.5">3.5 Years</SelectItem>
+                      <SelectItem value="4">4 Years</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FieldError field="trainingPeriod" />
+                </div>
+                <div>
+                  <Label className="text-sm">FTS *</Label>
+                  <Select value={form.fts} onValueChange={v => handleChange("fts", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select FTS" /></SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 71 }, (_, i) => i + 30).map(n => (
+                        <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldError field="fts" />
                 </div>
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
