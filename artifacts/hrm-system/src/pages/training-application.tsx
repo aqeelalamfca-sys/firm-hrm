@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/select";
 import {
   ArrowLeft, CheckCircle2, Upload, X, User, Phone, GraduationCap,
-  MapPin, Briefcase, Wrench, FileText, AlertCircle, Loader2, Image as ImageIcon
+  MapPin, Briefcase, Wrench, FileText, AlertCircle, Loader2, Image as ImageIcon,
+  Users, Shield, Calculator, Building2, TrendingUp, BookOpen, Lock, Award, Globe
 } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
@@ -355,6 +356,109 @@ export default function TrainingApplication() {
               5 Female Positions
             </div>
           </div>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-4">
+          <Card className="shadow-sm border-border/40">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <Users className="w-4 h-4 text-blue-600" />
+                </div>
+                <h3 className="font-bold text-sm">Our Partners</h3>
+              </div>
+              <div className="space-y-2.5">
+                {[
+                  { name: "Mr. Aqeel Alam", title: "FCA", role: "Managing Partner", focus: "Audit, Tax & International Advisory", initials: "AA" },
+                  { name: "Mr. Bilal Aulakh", title: "FCA", role: "Partner", focus: "Tax & Corporate Services", initials: "BA" },
+                  { name: "Mr. M. Idrees Khattak", title: "FCA", role: "Partner", focus: "Audit & Advisory (ERP/SAP)", initials: "IK" },
+                  { name: "Ms. Manahil Ahmad", title: "ACA, FMVA", role: "Partner", focus: "International Advisory & Valuation", initials: "MA" },
+                  { name: "Mr. Shan Ibrahim", title: "FCA", role: "Partner", focus: "Audit, Tax & Corporate Planning", initials: "SI" },
+                  { name: "Mr. Anwaar Haider", title: "ACA", role: "Partner", focus: "Audit, IFRS & Forensic Accounting", initials: "AH" },
+                ].map((p) => (
+                  <div key={p.initials} className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary shrink-0">
+                      {p.initials}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold truncate">{p.name} <span className="text-muted-foreground font-normal">({p.title})</span></p>
+                      <p className="text-[10px] text-muted-foreground truncate">{p.focus}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border-border/40">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                  <Briefcase className="w-4 h-4 text-emerald-600" />
+                </div>
+                <h3 className="font-bold text-sm">Our Services</h3>
+              </div>
+              <div className="space-y-2">
+                {[
+                  { title: "Audit & Assurance", icon: Shield, color: "text-blue-600 bg-blue-50" },
+                  { title: "Taxation Services", icon: Calculator, color: "text-emerald-600 bg-emerald-50" },
+                  { title: "Corporate & Secretarial", icon: Building2, color: "text-violet-600 bg-violet-50" },
+                  { title: "Business Advisory", icon: TrendingUp, color: "text-amber-600 bg-amber-50" },
+                  { title: "Accounting & IFRS", icon: BookOpen, color: "text-rose-600 bg-rose-50" },
+                  { title: "Risk & HR Advisory", icon: Lock, color: "text-sky-600 bg-sky-50" },
+                ].map(({ title, icon: Icon, color }) => (
+                  <div key={title} className="flex items-center gap-2.5">
+                    <div className={`w-7 h-7 rounded-lg ${color} flex items-center justify-center shrink-0`}>
+                      <Icon className="w-3.5 h-3.5" />
+                    </div>
+                    <p className="text-xs font-medium">{title}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 pt-3 border-t border-border/40">
+                <div className="flex items-center gap-1.5">
+                  <Award className="w-3.5 h-3.5 text-primary" />
+                  <p className="text-[10px] text-muted-foreground">ICAP & AOB Registered Firm</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border-border/40">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                  <Globe className="w-4 h-4 text-violet-600" />
+                </div>
+                <h3 className="font-bold text-sm">Clients & Industries</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="bg-blue-50 rounded-lg p-2.5 text-center">
+                  <p className="text-lg font-bold text-blue-700">1295+</p>
+                  <p className="text-[10px] text-muted-foreground">Total Clients</p>
+                </div>
+                <div className="bg-emerald-50 rounded-lg p-2.5 text-center">
+                  <p className="text-lg font-bold text-emerald-700">25+</p>
+                  <p className="text-[10px] text-muted-foreground">Industry Sectors</p>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Key Sectors</p>
+                {["Financial Services", "Technology & Software", "Manufacturing", "Oil & Gas", "Real Estate", "Pharmaceuticals", "Government & PSU", "Telecommunications"].map((s) => (
+                  <div key={s} className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+                    <p className="text-xs text-muted-foreground">{s}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 pt-3 border-t border-border/40">
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-primary" />
+                  <p className="text-[10px] text-muted-foreground">Offices in Lahore & Islamabad</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <Card className="shadow-lg border-border/40">
