@@ -1,0 +1,116 @@
+You are a senior DevOps engineer.
+
+OBJECTIVE:
+Deploy a NEW, completely separate Docker-based project on an already running Hostinger VPS (Ubuntu 24.04) where another project (auditwise) is already live using Docker + Nginx.
+
+IMPORTANT RULES:
+- DO NOT modify, stop, rename, or interfere with any existing containers (auditwise-backend, auditwise-nginx, etc.)
+- New project must run independently with separate container names, ports, and Nginx config
+- Ensure zero downtime for existing project
+- Follow production-grade deployment
+
+PROJECT DETAILS:
+- New Domain: ana-ca.com
+- Domain DNS is managed on GoDaddy
+- VPS already has Docker, Docker Compose, and Nginx container running
+- Existing ports in use:
+  - 80, 443 → already handled by existing nginx container
+  - 5000 → used by auditwise backend
+- You MUST avoid port conflicts
+
+STEP-BY-STEP IMPLEMENTATION:
+
+1. CREATE NEW PROJECT DIRECTORY
+mkdir -p ~/ana-ca-app
+cd ~/ana-ca-app
+
+2. CREATE DOCKER COMPOSE FILE (ISOLATED PROJECT)
+- Use unique container names:
+  - ana-backend
+  - ana-db (if needed)
+  - ana-redis (if needed)
+- Backend should run on internal port 5000 but map externally to 5001
+
+Example docker-compose.yml:
+--------------------------------
+version: '3.8'
+
+services:
+  ana-backend:
+    container_name: ana-backend
+    build: .
+    ports:
+      - "5001:5000"
+    restart: always
+    environment:
+      - NODE_ENV=production
+
+  ana-redis:
+    container_name: ana-redis
+    image: redis:alpine
+    restart: always
+--------------------------------
+
+3. BUILD & RUN NEW PROJECT
+docker compose up -d --build
+
+4. VERIFY RUNNING
+docker ps
+Ensure ana-backend is running on port 5001
+
+5. CONFIGURE DOMAIN (IMPORTANT)
+User must update GoDaddy DNS:
+- A Record → ana-ca.com → VPS_PUBLIC_IP
+- A Record → www.ana-ca.com → VPS_PUBLIC_IP
+
+6. UPDATE EXISTING NGINX (REVERSE PROXY)
+DO NOT create a new nginx container.
+Instead:
+- Access existing nginx container OR host nginx config
+- Add new server block for ana-ca.com
+
+Nginx config:
+--------------------------------
+server {
+    listen 80;
+    server_name ana-ca.com www.ana-ca.com;
+
+    location / {
+        proxy_pass http://localhost:5001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+--------------------------------
+
+7. RELOAD NGINX (NO DOWNTIME)
+docker exec -it auditwise-nginx nginx -s reload
+OR
+sudo systemctl reload nginx
+
+8. INSTALL SSL (LETSENCRYPT)
+sudo apt install certbot python3-certbot-nginx -y
+sudo certbot --nginx -d ana-ca.com -d www.ana-ca.com --non-interactive --agree-tos -m admin@ana-ca.com
+
+9. FINAL TEST
+- Open: http://ana-ca.com
+- Then: https://ana-ca.com
+- Ensure SSL working and app loading
+
+10. SAFETY CHECKS
+- Existing auditwise project must remain accessible
+- No port conflicts
+- Containers are isolated
+- Nginx routes correctly based on domain
+
+DELIVERABLE:
+- Fully live production deployment at https://ana-ca.com
+- Existing system unaffected
+- Clean, isolated architecture
+
+BONUS:
+- Add auto-restart policy
+- Add healthcheck if possible
