@@ -159,6 +159,8 @@ const TEAM = [
   },
 ];
 
+const PARTNERS = TEAM.filter(t => t.role.includes("Partner"));
+
 const MILESTONES = [
   { year: "2016", title: "Foundation", desc: "Firm established as M/s. Aqeel Alam & Co. in Lahore" },
   { year: "2019", title: "AOB Registration", desc: "Registered with Audit Oversight Board (AOB)" },

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { leavesTable, employeesTable, usersTable } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { createNotification } from "./notifications";
 
 const router = Router();
@@ -10,9 +10,13 @@ router.get("/", async (req, res) => {
   try {
     const { employeeId, status } = req.query;
 
-    let records = await db.select().from(leavesTable);
-    if (employeeId) records = records.filter(r => r.employeeId === parseInt(employeeId as string));
-    if (status) records = records.filter(r => r.status === status);
+    const conditions: any[] = [];
+    if (employeeId) conditions.push(eq(leavesTable.employeeId, parseInt(employeeId as string)));
+    if (status) conditions.push(eq(leavesTable.status, status as any));
+
+    const records = conditions.length > 0
+      ? await db.select().from(leavesTable).where(and(...conditions))
+      : await db.select().from(leavesTable);
 
     if (records.length === 0) return res.json([]);
 
