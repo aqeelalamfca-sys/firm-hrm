@@ -267,6 +267,20 @@ router.post("/public/submit", uploadFields, async (req, res) => {
   }
 });
 
+router.get("/public/check-icap/:regNo", async (req, res) => {
+  try {
+    const regNo = req.params.regNo as string;
+    const [existing] = await db
+      .select({ id: trainingApplicationsTable.id })
+      .from(trainingApplicationsTable)
+      .where(eq(trainingApplicationsTable.icapRegNo, regNo));
+    res.json({ exists: !!existing });
+  } catch (error) {
+    console.error("Error checking ICAP reg:", error);
+    res.json({ exists: false });
+  }
+});
+
 router.get("/public/lookup/:crn", async (req, res) => {
   try {
     const [application] = await db

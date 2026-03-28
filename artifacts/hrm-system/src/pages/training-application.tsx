@@ -157,6 +157,7 @@ export default function TrainingApplication() {
     if (!form.dateOfBirth) newErrors.dateOfBirth = "Date of birth is required";
     if (!form.gender) newErrors.gender = "Gender is required";
     if (!form.maritalStatus) newErrors.maritalStatus = "Marital status is required";
+    if (!form.icapRegNo.trim()) newErrors.icapRegNo = "ICAP Registration No. is required";
     if (!form.mobile.trim()) newErrors.mobile = "Mobile number is required";
     if (!form.email.trim()) newErrors.email = "Email is required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) newErrors.email = "Invalid email";
@@ -325,6 +326,29 @@ export default function TrainingApplication() {
             <div className="space-y-4">
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
+                  <Label className="text-sm">ICAP Registration No. *</Label>
+                  <Input
+                    value={form.icapRegNo}
+                    onChange={e => handleChange("icapRegNo", e.target.value)}
+                    onBlur={async () => {
+                      if (form.icapRegNo.trim()) {
+                        try {
+                          const res = await fetch(`${API_BASE}/applications/public/check-icap/${encodeURIComponent(form.icapRegNo.trim())}`);
+                          const data = await res.json();
+                          if (data.exists) {
+                            toast({ title: "Already Applied", description: "You have already applied with this ICAP Registration No.", variant: "destructive" });
+                            setErrors(prev => ({ ...prev, icapRegNo: "You have already applied with this ICAP Registration No." }));
+                          }
+                        } catch {}
+                      }
+                    }}
+                    placeholder="Enter your ICAP Registration No."
+                  />
+                  <FieldError field="icapRegNo" />
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
                   <Label className="text-sm">Full Name *</Label>
                   <Input value={form.fullName} onChange={e => handleChange("fullName", e.target.value)} placeholder="e.g. Muhammad Ahmad" />
                   <FieldError field="fullName" />
@@ -375,12 +399,6 @@ export default function TrainingApplication() {
                     </SelectContent>
                   </Select>
                   <FieldError field="maritalStatus" />
-                </div>
-              </div>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm">ICAP Registration No.</Label>
-                  <Input value={form.icapRegNo} onChange={e => handleChange("icapRegNo", e.target.value)} placeholder="If registered" />
                 </div>
               </div>
             </div>
