@@ -220,7 +220,7 @@ export default function Landing() {
             </Link>
             <Link href="/login">
               <Button size="sm" className="h-9 text-[13px] font-semibold shadow-sm gap-1.5">
-                Sign In <ArrowRight className="w-3.5 h-3.5" />
+                Staff Sign In <ArrowRight className="w-3.5 h-3.5" />
               </Button>
             </Link>
             <button className="md:hidden p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
