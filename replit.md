@@ -85,7 +85,7 @@ Tables:
 ## Features
 
 ### Modules Built:
-1. **Authentication** - JWT-based login, role-based access
+1. **Authentication** - HMAC-signed token login, role-based access
 2. **RBAC** - Auth middleware on all API routes, role-based sidebar visibility, role-restricted pages
 3. **Employee Management** - Add/edit employees, auto employee codes, department/designation tracking
 4. **Attendance** - Mark attendance, check-in/out times, status tracking, IP address capture
@@ -114,11 +114,17 @@ Tables:
 
 ### Security:
 - Auth middleware protects all API routes (except /auth and /healthz)
+- HMAC-SHA256 signed tokens with 24-hour expiry (replaces unsigned base64 tokens)
+- Helmet security headers (X-Content-Type-Options, HSTS, X-Frame-Options, etc.)
 - Role-based access control on sensitive routes
 - AES-256-CBC encryption for credential vault
 - Activity logging on all CRUD operations and login events
 - Role-based sidebar navigation (admin sees all, restricted roles see limited menu)
 - Rate limiting: 500 requests/15min for API, 20 requests/15min for auth endpoints
+- CORS restricted to ana-ca.com in production
+- Protected upload paths (applications/ requires auth)
+- API 404 handler for undefined endpoints
+- SPA cache strategy: immutable caching for fingerprinted assets, no-cache for index.html
 - Global error handler with structured logging via pino
 
 ## API Routes
@@ -172,7 +178,7 @@ All under `/api`:
 
 ## Auth & Middleware
 
-- **JWT Token**: Base64-encoded `{userId, ts}`, stored in localStorage as `hrm_token`
+- **Token**: HMAC-SHA256 signed token with 24h expiry (`payloadBase64url.signature`), stored in localStorage as `hrm_token`
 - **Password Hash**: SHA-256 + "hrm_salt_2024"
 - **Auth Middleware**: `artifacts/api-server/src/middleware/auth.ts` - applied globally in routes/index.ts
 - **Activity Logger**: `artifacts/api-server/src/middleware/activity-logger.ts` - logs actions to activity_logs table

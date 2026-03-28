@@ -7,12 +7,33 @@ import { logActivity } from "../middleware/activity-logger";
 
 const router = Router();
 
+const TOKEN_SECRET = process.env.TOKEN_SECRET || crypto.randomBytes(32).toString("hex");
+const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000;
+
 function hashPassword(password: string): string {
   return crypto.createHash("sha256").update(password + "hrm_salt_2024").digest("hex");
 }
 
 function generateToken(userId: number): string {
-  return Buffer.from(JSON.stringify({ userId, ts: Date.now() })).toString("base64");
+  const payload = JSON.stringify({ userId, ts: Date.now(), exp: Date.now() + TOKEN_EXPIRY_MS });
+  const payloadB64 = Buffer.from(payload).toString("base64url");
+  const signature = crypto.createHmac("sha256", TOKEN_SECRET).update(payloadB64).digest("base64url");
+  return `${payloadB64}.${signature}`;
+}
+
+export function verifyToken(token: string): { userId: number; ts: number; exp: number } | null {
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [payloadB64, signature] = parts;
+  const expectedSig = crypto.createHmac("sha256", TOKEN_SECRET).update(payloadB64).digest("base64url");
+  if (signature !== expectedSig) return null;
+  try {
+    const decoded = JSON.parse(Buffer.from(payloadB64, "base64url").toString());
+    if (decoded.exp && decoded.exp < Date.now()) return null;
+    return decoded;
+  } catch {
+    return null;
+  }
 }
 
 router.post("/login", async (req, res) => {
@@ -59,7 +80,9 @@ router.get("/me", async (req, res) => {
 
   try {
     const token = authHeader.slice(7);
-    const decoded = JSON.parse(Buffer.from(token, "base64").toString());
+    const decoded = verifyToken(token);
+    if (!decoded) return res.status(401).json({ error: "Invalid or expired token" });
+
     const users = await db.select().from(usersTable).where(eq(usersTable.id, decoded.userId));
     const user = users[0];
     if (!user) return res.status(401).json({ error: "User not found" });

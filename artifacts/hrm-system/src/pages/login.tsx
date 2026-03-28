@@ -52,13 +52,14 @@ export default function Login() {
         <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }} />
         <div className="relative z-10 p-16 max-w-lg">
           <div className="flex items-center gap-3 mb-10">
-            <div className="w-11 h-11 rounded-xl shadow-lg bg-primary/20 flex items-center justify-center">
-              <Scale className="w-6 h-6 text-primary-foreground" />
+            <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Alam & Aulakh" className="h-12" />
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-sidebar-foreground">Alam & Aulakh</h1>
+              <p className="text-xs text-sidebar-foreground/50 font-medium">Chartered Accountants</p>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-sidebar-foreground">Vertex HR</h1>
           </div>
           <p className="text-lg leading-relaxed text-sidebar-foreground/65 font-light">
-            Enterprise resource planning and intelligent invoicing designed specifically for modern CA and professional services firms.
+            Enterprise HRM and invoicing platform designed specifically for Alam & Aulakh Chartered Accountants.
           </p>
         </div>
       </div>
@@ -69,9 +70,7 @@ export default function Login() {
         <div className="w-full max-w-[460px] space-y-5">
           <Card className="border-border/40 bg-card shadow-lg">
             <CardHeader className="space-y-2 text-center pt-8 pb-2">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-1 bg-primary/[0.08]">
-                <Scale className="w-7 h-7 text-primary" />
-              </div>
+              <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Alam & Aulakh" className="h-14 mx-auto mb-1" />
               <CardTitle className="text-2xl font-bold tracking-tight">Welcome back</CardTitle>
               <CardDescription className="text-base text-muted-foreground">Sign in to your account to continue</CardDescription>
             </CardHeader>
@@ -86,6 +85,7 @@ export default function Login() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@firm.com"
                     required
+                    autoComplete="email"
                     className="h-11 bg-background/60 border-border/60 focus:border-primary/40 focus:bg-background transition-all"
                   />
                 </div>
@@ -101,6 +101,7 @@ export default function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
+                    autoComplete="current-password"
                     className="h-11 bg-background/60 border-border/60 focus:border-primary/40 focus:bg-background transition-all"
                   />
                 </div>

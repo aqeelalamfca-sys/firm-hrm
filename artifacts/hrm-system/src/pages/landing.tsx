@@ -888,7 +888,7 @@ export default function Landing() {
               <span className="text-xs text-muted-foreground">Chartered Accountants</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Vertex HR — Enterprise resource planning for CA & professional services firms.
+              Alam & Aulakh — Enterprise HRM & invoicing for chartered accountants.
             </p>
           </div>
         </div>

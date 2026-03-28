@@ -244,7 +244,7 @@ export default function Invoices() {
 </style></head>
 <body>
   <div class="header">
-    <div><div class="company">Vertex & Associates</div><div class="company-sub">Chartered Accountants</div></div>
+    <div><div class="company">Alam & Aulakh</div><div class="company-sub">Chartered Accountants</div></div>
     <div class="invoice-title"><h1>INVOICE</h1><p>#${safeInvNum}</p></div>
   </div>
   <div class="meta">
@@ -272,7 +272,7 @@ export default function Invoices() {
     ${inv.paidAmount > 0 ? `<div class="total-row green"><span>Paid</span><span>Rs. ${Number(inv.paidAmount).toLocaleString("en-PK", { minimumFractionDigits: 2 })}</span></div>` : ""}
   </div></div>
   ${safeNotes ? `<div class="notes"><strong>Notes:</strong> ${safeNotes}</div>` : ""}
-  <div class="footer">This is a computer-generated invoice. | Vertex & Associates, Chartered Accountants</div>
+  <div class="footer">This is a computer-generated invoice. | Alam & Aulakh, Chartered Accountants</div>
   <div class="no-print" style="text-align:center;margin-top:20px"><button onclick="window.print()" style="padding:10px 30px;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px">Print / Save as PDF</button></div>
 </body></html>`;
     printWindow.document.write(html);

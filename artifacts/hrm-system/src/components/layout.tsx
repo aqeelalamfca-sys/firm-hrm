@@ -160,7 +160,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="md:hidden flex items-center justify-between p-4 bg-sidebar text-sidebar-foreground">
         <div className="flex items-center gap-2.5 font-bold text-lg tracking-tight">
           <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-7 h-7 rounded-lg" />
-          Vertex HR
+          Alam & Aulakh
         </div>
         <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-white hover:bg-sidebar-accent">
           <Menu className="w-5 h-5" />
@@ -174,7 +174,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       >
         <div className="px-5 py-5 flex items-center gap-2.5 font-bold text-lg tracking-tight border-b border-sidebar-border/60">
           <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-8 h-8 rounded-lg" />
-          <span className="text-white">Vertex HR</span>
+          <span className="text-white">Alam & Aulakh</span>
         </div>
         
         <div className="px-3 py-3 flex-1 overflow-y-auto scrollbar-thin space-y-0.5">

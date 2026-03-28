@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -10,27 +10,28 @@ import { Layout } from "@/components/layout";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
 import Login from "@/pages/login";
-import Dashboard from "@/pages/dashboard";
-import Employees from "@/pages/employees";
-import Attendance from "@/pages/attendance";
-import Leaves from "@/pages/leaves";
-import Payroll from "@/pages/payroll";
-import Clients from "@/pages/clients";
-import Invoices from "@/pages/invoices";
-import Reports from "@/pages/reports";
-import Engagements from "@/pages/engagements";
-import Documents from "@/pages/documents";
-import AuditTrail from "@/pages/audit-trail";
-import UserManagement from "@/pages/user-management";
-import TaskScheduler from "@/pages/task-scheduler";
-import CredentialVault from "@/pages/credential-vault";
-import Profile from "@/pages/profile";
-import TrainingApplication from "@/pages/training-application";
-import MCQTest from "@/pages/mcq-test";
-import Applications from "@/pages/applications";
-import BookMeeting from "@/pages/book-meeting";
-import ManageMeetings from "@/pages/manage-meetings";
-import Settings from "@/pages/settings";
+
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const Employees = lazy(() => import("@/pages/employees"));
+const Attendance = lazy(() => import("@/pages/attendance"));
+const Leaves = lazy(() => import("@/pages/leaves"));
+const Payroll = lazy(() => import("@/pages/payroll"));
+const Clients = lazy(() => import("@/pages/clients"));
+const Invoices = lazy(() => import("@/pages/invoices"));
+const Reports = lazy(() => import("@/pages/reports"));
+const Engagements = lazy(() => import("@/pages/engagements"));
+const Documents = lazy(() => import("@/pages/documents"));
+const AuditTrail = lazy(() => import("@/pages/audit-trail"));
+const UserManagement = lazy(() => import("@/pages/user-management"));
+const TaskScheduler = lazy(() => import("@/pages/task-scheduler"));
+const CredentialVault = lazy(() => import("@/pages/credential-vault"));
+const Profile = lazy(() => import("@/pages/profile"));
+const TrainingApplication = lazy(() => import("@/pages/training-application"));
+const MCQTest = lazy(() => import("@/pages/mcq-test"));
+const Applications = lazy(() => import("@/pages/applications"));
+const BookMeeting = lazy(() => import("@/pages/book-meeting"));
+const ManageMeetings = lazy(() => import("@/pages/manage-meetings"));
+const Settings = lazy(() => import("@/pages/settings"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,6 +41,17 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+function PageLoader() {
+  return (
+    <div className="h-screen w-screen flex items-center justify-center bg-background">
+      <div className="text-center">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+        <p className="text-muted-foreground text-sm">Loading...</p>
+      </div>
+    </div>
+  );
+}
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -90,14 +102,7 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   }, [isLoading, user, navigate]);
 
   if (isLoading) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-muted-foreground text-sm">Loading...</p>
-        </div>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!user) return null;
@@ -111,32 +116,34 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/landing" component={Landing} />
-      <Route path="/apply-training" component={TrainingApplication} />
-      <Route path="/mcq-test/:crn" component={MCQTest} />
-      <Route path="/book-meeting" component={BookMeeting} />
-      <Route path="/login" component={Login} />
-      <Route path="/employees"><ProtectedRoute component={Employees} /></Route>
-      <Route path="/attendance"><ProtectedRoute component={Attendance} /></Route>
-      <Route path="/leaves"><ProtectedRoute component={Leaves} /></Route>
-      <Route path="/payroll"><ProtectedRoute component={Payroll} /></Route>
-      <Route path="/clients"><ProtectedRoute component={Clients} /></Route>
-      <Route path="/invoices"><ProtectedRoute component={Invoices} /></Route>
-      <Route path="/reports"><ProtectedRoute component={Reports} /></Route>
-      <Route path="/engagements"><ProtectedRoute component={Engagements} /></Route>
-      <Route path="/documents"><ProtectedRoute component={Documents} /></Route>
-      <Route path="/audit-trail"><ProtectedRoute component={AuditTrail} /></Route>
-      <Route path="/user-management"><ProtectedRoute component={UserManagement} /></Route>
-      <Route path="/task-scheduler"><ProtectedRoute component={TaskScheduler} /></Route>
-      <Route path="/credential-vault"><ProtectedRoute component={CredentialVault} /></Route>
-      <Route path="/profile"><ProtectedRoute component={Profile} /></Route>
-      <Route path="/applications"><ProtectedRoute component={Applications} /></Route>
-      <Route path="/manage-meetings"><ProtectedRoute component={ManageMeetings} /></Route>
-      <Route path="/settings"><ProtectedRoute component={Settings} /></Route>
-      <Route path="/"><ProtectedRoute component={Dashboard} /></Route>
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        <Route path="/landing" component={Landing} />
+        <Route path="/apply-training" component={TrainingApplication} />
+        <Route path="/mcq-test/:crn" component={MCQTest} />
+        <Route path="/book-meeting" component={BookMeeting} />
+        <Route path="/login" component={Login} />
+        <Route path="/employees"><ProtectedRoute component={Employees} /></Route>
+        <Route path="/attendance"><ProtectedRoute component={Attendance} /></Route>
+        <Route path="/leaves"><ProtectedRoute component={Leaves} /></Route>
+        <Route path="/payroll"><ProtectedRoute component={Payroll} /></Route>
+        <Route path="/clients"><ProtectedRoute component={Clients} /></Route>
+        <Route path="/invoices"><ProtectedRoute component={Invoices} /></Route>
+        <Route path="/reports"><ProtectedRoute component={Reports} /></Route>
+        <Route path="/engagements"><ProtectedRoute component={Engagements} /></Route>
+        <Route path="/documents"><ProtectedRoute component={Documents} /></Route>
+        <Route path="/audit-trail"><ProtectedRoute component={AuditTrail} /></Route>
+        <Route path="/user-management"><ProtectedRoute component={UserManagement} /></Route>
+        <Route path="/task-scheduler"><ProtectedRoute component={TaskScheduler} /></Route>
+        <Route path="/credential-vault"><ProtectedRoute component={CredentialVault} /></Route>
+        <Route path="/profile"><ProtectedRoute component={Profile} /></Route>
+        <Route path="/applications"><ProtectedRoute component={Applications} /></Route>
+        <Route path="/manage-meetings"><ProtectedRoute component={ManageMeetings} /></Route>
+        <Route path="/settings"><ProtectedRoute component={Settings} /></Route>
+        <Route path="/"><ProtectedRoute component={Dashboard} /></Route>
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 

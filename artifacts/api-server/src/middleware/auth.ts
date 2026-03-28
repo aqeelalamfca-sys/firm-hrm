@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { verifyToken } from "../routes/auth";
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -25,7 +26,8 @@ export function authMiddleware(
 
   try {
     const token = authHeader.slice(7);
-    const decoded = JSON.parse(Buffer.from(token, "base64").toString());
+    const decoded = verifyToken(token);
+    if (!decoded) return res.status(401).json({ error: "Invalid or expired token" });
 
     db.select()
       .from(usersTable)

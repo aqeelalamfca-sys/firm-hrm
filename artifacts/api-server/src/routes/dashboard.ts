@@ -17,8 +17,8 @@ router.get("/role-stats", async (req: AuthenticatedRequest, res) => {
       }).from(invoicesTable);
 
       const [engagementStats] = await db.select({
-        active: sql<number>`COUNT(*) FILTER (WHERE status IN ('execution','planning'))`,
-        completed: sql<number>`COUNT(*) FILTER (WHERE status = 'completed')`,
+        active: sql<number>`COUNT(*) FILTER (WHERE engagement_status IN ('execution','planning'))`,
+        completed: sql<number>`COUNT(*) FILTER (WHERE engagement_status = 'completed')`,
       }).from(engagementsTable);
 
       const [clientStats] = await db.select({
