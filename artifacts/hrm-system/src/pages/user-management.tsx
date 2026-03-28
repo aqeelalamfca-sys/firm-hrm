@@ -111,7 +111,7 @@ export default function UserManagement() {
           </h1>
           <p className="text-muted-foreground mt-1">Manage system users, roles, and access</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setEditUser(null); setForm({ name: "", email: "", password: "", role: "employee", phone: "", mobile: "", cnic: "" }); } }}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setEditUser(null); setForm({ name: "", email: "", password: "", role: "employee", phone: "", mobile: "", cnic: "", departmentId: "" }); } }}>
           <DialogTrigger asChild>
             <Button className="gap-2 shadow-lg shadow-primary/25"><Plus className="w-4 h-4" /> Add User</Button>
           </DialogTrigger>

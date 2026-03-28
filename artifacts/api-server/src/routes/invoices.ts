@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { invoicesTable, clientsTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -84,22 +84,26 @@ router.get("/aging", async (req, res) => {
 
 router.get("/", async (req, res) => {
   const { clientId, status, fromDate, toDate, departmentId } = req.query;
-  let invoices = await db.select().from(invoicesTable);
 
-  if (clientId) invoices = invoices.filter(i => i.clientId === parseInt(clientId as string));
-  if (status) invoices = invoices.filter(i => i.status === status);
-  if (fromDate) invoices = invoices.filter(i => i.issueDate >= fromDate as string);
-  if (toDate) invoices = invoices.filter(i => i.issueDate <= toDate as string);
-  if (departmentId) invoices = invoices.filter(i => i.departmentId === Number(departmentId));
+  const conditions: any[] = [];
+  if (clientId) conditions.push(eq(invoicesTable.clientId, parseInt(clientId as string)));
+  if (status) conditions.push(eq(invoicesTable.status, status as any));
+  if (departmentId) conditions.push(eq(invoicesTable.departmentId, Number(departmentId)));
 
-  const result = await Promise.all(
-    invoices.map(async (inv) => {
-      const clients = await db.select().from(clientsTable).where(eq(clientsTable.id, inv.clientId));
-      const client = clients[0];
-      return formatInvoice(inv, client?.name || "Unknown");
-    })
-  );
+  let invoices = conditions.length > 0
+    ? await db.select().from(invoicesTable).where(and(...conditions))
+    : await db.select().from(invoicesTable);
 
+  if (fromDate) invoices = invoices.filter(i => new Date(i.issueDate) >= new Date(fromDate as string));
+  if (toDate) invoices = invoices.filter(i => new Date(i.issueDate) <= new Date(toDate as string));
+
+  if (invoices.length === 0) return res.json([]);
+
+  const clientIds = [...new Set(invoices.map(i => i.clientId))];
+  const clients = await db.select().from(clientsTable).where(inArray(clientsTable.id, clientIds));
+  const clientMap = new Map(clients.map(c => [c.id, c.name]));
+
+  const result = invoices.map(inv => formatInvoice(inv, clientMap.get(inv.clientId) || "Unknown"));
   res.json(result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
 });
 

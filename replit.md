@@ -209,7 +209,8 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. Always 
 
 ### API Route N+1 Eliminations
 - **employees.ts GET /**: All reporting managers fetched in a single `inArray` query; result joined in memory via Map.
-- **leaves.ts GET /**: Unique employee IDs and approver IDs collected, then fetched in two batched queries; joined in memory.
+- **leaves.ts GET /**: SQL-level filtering with `eq`/`and` conditions; unique employee IDs and approver IDs collected, then fetched in two batched queries; joined in memory.
+- **invoices.ts GET /**: SQL-level filtering for clientId/status/departmentId; all clients fetched in single `inArray` batch query; joined via Map.
 - **documents.ts**: `batchEnrich()` replaces per-document `enrichDoc()` — all uploaders, clients, and deleters fetched in two bulk queries for the entire result set.
 - **dashboard.ts**: All JS-side filtering replaced with SQL `COUNT(*) FILTER (WHERE ...)` and `SUM(CASE WHEN ...)` aggregations; attendance trend uses `inArray` date filter instead of full-table scan.
 
@@ -222,6 +223,9 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. Always 
 
 ### Frontend Memoization
 - `invoices.tsx`: `filteredInvoices` wrapped in `useMemo` (depends on `invoices`, `activeTab`, `selectedDepartmentId`).
+
+### TypeScript Strictness
+- `api-server/tsconfig.json`: `noImplicitReturns: false` — Express route handlers commonly use early `return res.json()` which TS flags as not all paths returning.
 
 ## Development
 

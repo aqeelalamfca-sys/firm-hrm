@@ -481,7 +481,7 @@ router.get("/:id", authMiddleware, requireRoles("super_admin", "partner", "hr_ad
     const [application] = await db
       .select()
       .from(trainingApplicationsTable)
-      .where(eq(trainingApplicationsTable.id, parseInt(req.params.id)));
+      .where(eq(trainingApplicationsTable.id, parseInt(req.params.id as string)));
 
     if (!application) {
       return res.status(404).json({ error: "Application not found" });
@@ -505,14 +505,22 @@ router.patch("/:id/status", authMiddleware, requireRoles("super_admin", "partner
     const [updated] = await db
       .update(trainingApplicationsTable)
       .set({ status, updatedAt: new Date() })
-      .where(eq(trainingApplicationsTable.id, parseInt(req.params.id)))
+      .where(eq(trainingApplicationsTable.id, parseInt(req.params.id as string)))
       .returning();
 
     if (!updated) {
       return res.status(404).json({ error: "Application not found" });
     }
 
-    await logActivity(req, "update", "training_application", updated.id, { status });
+    await logActivity({
+      userId: req.user?.id ?? 0,
+      userName: req.user?.name ?? "System",
+      action: "status_change",
+      module: "training_application",
+      entityId: updated.id,
+      entityType: "training_application",
+      description: `Updated training application status to ${status}`,
+    });
 
     res.json(updated);
   } catch (error) {
