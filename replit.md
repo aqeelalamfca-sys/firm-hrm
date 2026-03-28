@@ -203,6 +203,26 @@ All under `/api`:
 
 Every package extends `tsconfig.base.json` which sets `composite: true`. Always typecheck from the root with `pnpm run typecheck`.
 
+`lib/api-zod/tsconfig.json` adds `"lib": ["es2022", "dom"]` so that DOM types (`File`, `Blob`) resolve correctly in the generated Zod schemas. Only `./generated/api` is re-exported from `lib/api-zod/src/index.ts` (the types folder is excluded to avoid duplicate-export conflicts).
+
+## Performance Optimizations Applied
+
+### API Route N+1 Eliminations
+- **employees.ts GET /**: All reporting managers fetched in a single `inArray` query; result joined in memory via Map.
+- **leaves.ts GET /**: Unique employee IDs and approver IDs collected, then fetched in two batched queries; joined in memory.
+- **documents.ts**: `batchEnrich()` replaces per-document `enrichDoc()` — all uploaders, clients, and deleters fetched in two bulk queries for the entire result set.
+- **dashboard.ts**: All JS-side filtering replaced with SQL `COUNT(*) FILTER (WHERE ...)` and `SUM(CASE WHEN ...)` aggregations; attendance trend uses `inArray` date filter instead of full-table scan.
+
+### Database Indexes Added
+- `activity_logs`: `user_id`, `module`, `created_at`
+- `attendance`: `employee_id`, `date`, composite `(employee_id, date)`
+- `leaves`: `employee_id`, `status`, composite `(employee_id, status)`
+- `notifications`: `user_id`, composite `(user_id, is_read)`, `created_at`
+- `payroll`: `employee_id`, composite `(year, month)`, composite `(employee_id, year)`
+
+### Frontend Memoization
+- `invoices.tsx`: `filteredInvoices` wrapped in `useMemo` (depends on `invoices`, `activeTab`, `selectedDepartmentId`).
+
 ## Development
 
 - `pnpm --filter @workspace/api-server run dev` - Start API server

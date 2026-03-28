@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, decimal, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, decimal, text, timestamp, pgEnum, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -28,7 +28,11 @@ export const payrollTable = pgTable("payroll", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("payroll_employee_id_idx").on(t.employeeId),
+  index("payroll_year_month_idx").on(t.year, t.month),
+  index("payroll_employee_year_idx").on(t.employeeId, t.year),
+]);
 
 export const insertPayrollSchema = createInsertSchema(payrollTable).omit({
   id: true,

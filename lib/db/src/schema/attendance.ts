@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, pgEnum, date, decimal } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, pgEnum, date, decimal, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -22,7 +22,11 @@ export const attendanceTable = pgTable("attendance", {
   ipAddress: text("ip_address"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("attendance_employee_id_idx").on(t.employeeId),
+  index("attendance_date_idx").on(t.date),
+  index("attendance_employee_date_idx").on(t.employeeId, t.date),
+]);
 
 export const insertAttendanceSchema = createInsertSchema(attendanceTable).omit({
   id: true,

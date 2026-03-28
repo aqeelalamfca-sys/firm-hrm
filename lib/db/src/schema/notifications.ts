@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, boolean, pgEnum, index } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 
 export const notificationTypeEnum = pgEnum("notification_type", [
@@ -23,4 +23,8 @@ export const notificationsTable = pgTable("notifications", {
   relatedEntityType: text("related_entity_type"),
   relatedEntityId: integer("related_entity_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("notifications_user_id_idx").on(t.userId),
+  index("notifications_user_is_read_idx").on(t.userId, t.isRead),
+  index("notifications_created_at_idx").on(t.createdAt),
+]);

@@ -279,9 +279,10 @@ export default function Invoices() {
     printWindow.document.close();
   }
 
-  const filteredInvoices = invoices
+  const filteredInvoices = useMemo(() => invoices
     .filter((i: any) => activeTab === "all" || i.status === activeTab)
-    .filter((i: any) => !selectedDepartmentId || i.departmentId === selectedDepartmentId);
+    .filter((i: any) => !selectedDepartmentId || i.departmentId === selectedDepartmentId),
+  [invoices, activeTab, selectedDepartmentId]);
 
   const summary = useMemo(() => ({
     total: invoices.length,

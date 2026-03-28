@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, pgEnum, index } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 
 export const activityActionEnum = pgEnum("activity_action", [
@@ -28,6 +28,10 @@ export const activityLogsTable = pgTable("activity_logs", {
   newValues: text("new_values"),
   ipAddress: text("ip_address"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("activity_logs_user_id_idx").on(t.userId),
+  index("activity_logs_module_idx").on(t.module),
+  index("activity_logs_created_at_idx").on(t.createdAt),
+]);
 
 export type ActivityLog = typeof activityLogsTable.$inferSelect;

@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, pgEnum, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, pgEnum, date, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -31,7 +31,11 @@ export const leavesTable = pgTable("leaves", {
   approvalNotes: text("approval_notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("leaves_employee_id_idx").on(t.employeeId),
+  index("leaves_status_idx").on(t.status),
+  index("leaves_employee_status_idx").on(t.employeeId, t.status),
+]);
 
 export const insertLeaveSchema = createInsertSchema(leavesTable).omit({
   id: true,

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { documentsTable, clientsTable, usersTable } from "@workspace/db";
-import { eq, desc, and, sql, isNull } from "drizzle-orm";
+import { eq, desc, and, sql, inArray } from "drizzle-orm";
 import { type AuthenticatedRequest } from "../middleware/auth";
 import { logActivity } from "../middleware/activity-logger";
 import path from "path";
@@ -16,20 +16,27 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 
 const TRASH_RETENTION_DAYS = 30;
 
-async function enrichDoc(doc: any) {
-  const uploader = (await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, doc.uploadedById)))[0];
-  let clientName = null;
-  if (doc.clientId) {
-    const client = (await db.select({ name: clientsTable.name }).from(clientsTable).where(eq(clientsTable.id, doc.clientId)))[0];
-    clientName = client?.name || null;
-  }
-  let deletedByName = null;
-  if (doc.deletedById) {
-    const deleter = (await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, doc.deletedById)))[0];
-    deletedByName = deleter?.name || null;
-  }
+async function batchEnrich(docs: any[]) {
+  if (docs.length === 0) return [];
 
-  return {
+  const uploaderIds = [...new Set(docs.map(d => d.uploadedById).filter(Boolean))] as number[];
+  const clientIds = [...new Set(docs.map(d => d.clientId).filter(Boolean))] as number[];
+  const deleterIds = [...new Set(docs.map(d => d.deletedById).filter(Boolean))] as number[];
+  const allUserIds = [...new Set([...uploaderIds, ...deleterIds])];
+
+  const [users, clients] = await Promise.all([
+    allUserIds.length > 0
+      ? db.select({ id: usersTable.id, name: usersTable.name }).from(usersTable).where(inArray(usersTable.id, allUserIds))
+      : Promise.resolve([]),
+    clientIds.length > 0
+      ? db.select({ id: clientsTable.id, name: clientsTable.name }).from(clientsTable).where(inArray(clientsTable.id, clientIds))
+      : Promise.resolve([]),
+  ]);
+
+  const userMap = new Map(users.map(u => [u.id, u.name]));
+  const clientMap = new Map(clients.map(c => [c.id, c.name]));
+
+  return docs.map(doc => ({
     id: doc.id,
     fileName: doc.fileName,
     originalName: doc.originalName,
@@ -38,19 +45,19 @@ async function enrichDoc(doc: any) {
     category: doc.category,
     departmentId: doc.departmentId,
     clientId: doc.clientId,
-    clientName,
+    clientName: doc.clientId ? (clientMap.get(doc.clientId) ?? null) : null,
     engagementId: doc.engagementId,
     taskId: doc.taskId,
     description: doc.description,
     version: doc.version,
     uploadedById: doc.uploadedById,
-    uploadedByName: uploader?.name || "Unknown",
+    uploadedByName: userMap.get(doc.uploadedById) ?? "Unknown",
     isDeleted: doc.isDeleted,
     deletedAt: doc.deletedAt,
     deletedById: doc.deletedById,
-    deletedByName,
+    deletedByName: doc.deletedById ? (userMap.get(doc.deletedById) ?? null) : null,
     createdAt: doc.createdAt,
-  };
+  }));
 }
 
 router.get("/", async (req: AuthenticatedRequest, res) => {
@@ -63,14 +70,11 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
     if (departmentId) conditions.push(eq(documentsTable.departmentId, Number(departmentId as string)));
     if (taskId) conditions.push(eq(documentsTable.taskId, Number(taskId as string)));
 
-    const whereClause = and(...conditions);
-
     const docs = await db.select().from(documentsTable)
-      .where(whereClause)
+      .where(and(...conditions))
       .orderBy(desc(documentsTable.createdAt));
 
-    const enriched = await Promise.all(docs.map(enrichDoc));
-    res.json(enriched);
+    res.json(await batchEnrich(docs));
   } catch (error) {
     console.error("Error fetching documents:", error);
     res.status(500).json({ error: "Failed to fetch documents" });
@@ -83,15 +87,15 @@ router.get("/trash", async (req: AuthenticatedRequest, res) => {
       .where(eq(documentsTable.isDeleted, true))
       .orderBy(desc(documentsTable.deletedAt));
 
-    const enriched = await Promise.all(docs.map(async (doc) => {
-      const enrichedDoc = await enrichDoc(doc);
-      const deletedAt = doc.deletedAt ? new Date(doc.deletedAt) : new Date();
+    const enriched = await batchEnrich(docs);
+    const result = enriched.map((doc, i) => {
+      const deletedAt = docs[i].deletedAt ? new Date(docs[i].deletedAt) : new Date();
       const expiresAt = new Date(deletedAt.getTime() + TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000);
       const daysRemaining = Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-      return { ...enrichedDoc, expiresAt, daysRemaining };
-    }));
+      return { ...doc, expiresAt, daysRemaining };
+    });
 
-    res.json(enriched);
+    res.json(result);
   } catch (error) {
     console.error("Error fetching trash:", error);
     res.status(500).json({ error: "Failed to fetch trash" });
@@ -101,7 +105,7 @@ router.get("/trash", async (req: AuthenticatedRequest, res) => {
 router.put("/:id/restore", async (req: AuthenticatedRequest, res) => {
   try {
     const id = Number(req.params.id);
-    const doc = (await db.select().from(documentsTable).where(eq(documentsTable.id, id)))[0];
+    const [doc] = await db.select().from(documentsTable).where(eq(documentsTable.id, id));
     if (!doc) return res.status(404).json({ error: "Document not found" });
     if (!doc.isDeleted) return res.status(400).json({ error: "Document is not in trash" });
 
@@ -123,9 +127,10 @@ router.put("/:id/restore", async (req: AuthenticatedRequest, res) => {
       ipAddress: req.ip,
     });
 
-    const enriched = await enrichDoc(restored);
+    const [enriched] = await batchEnrich([restored]);
     res.json(enriched);
   } catch (error) {
+    console.error("Error restoring document:", error);
     res.status(500).json({ error: "Failed to restore document" });
   }
 });
@@ -160,7 +165,7 @@ router.post("/", async (req: AuthenticatedRequest, res) => {
       ipAddress: req.ip,
     });
 
-    const enriched = await enrichDoc(doc);
+    const [enriched] = await batchEnrich([doc]);
     res.status(201).json(enriched);
   } catch (error) {
     console.error("Error uploading document:", error);
@@ -171,7 +176,7 @@ router.post("/", async (req: AuthenticatedRequest, res) => {
 router.post("/:id/version", async (req: AuthenticatedRequest, res) => {
   try {
     const parentId = Number(req.params.id);
-    const parent = (await db.select().from(documentsTable).where(eq(documentsTable.id, parentId)))[0];
+    const [parent] = await db.select().from(documentsTable).where(eq(documentsTable.id, parentId));
     if (!parent) return res.status(404).json({ error: "Parent document not found" });
 
     const siblings = await db.select().from(documentsTable)
@@ -208,7 +213,7 @@ router.post("/:id/version", async (req: AuthenticatedRequest, res) => {
       ipAddress: req.ip,
     });
 
-    const enriched = await enrichDoc(doc);
+    const [enriched] = await batchEnrich([doc]);
     res.status(201).json(enriched);
   } catch (error) {
     console.error("Error uploading new version:", error);
@@ -219,7 +224,7 @@ router.post("/:id/version", async (req: AuthenticatedRequest, res) => {
 router.get("/:id/versions", async (req: AuthenticatedRequest, res) => {
   try {
     const parentId = Number(req.params.id);
-    const parent = (await db.select().from(documentsTable).where(eq(documentsTable.id, parentId)))[0];
+    const [parent] = await db.select().from(documentsTable).where(eq(documentsTable.id, parentId));
     if (!parent) return res.status(404).json({ error: "Document not found" });
 
     const versions = await db.select().from(documentsTable)
@@ -227,21 +232,24 @@ router.get("/:id/versions", async (req: AuthenticatedRequest, res) => {
       .orderBy(desc(documentsTable.createdAt));
 
     const allVersions = [parent, ...versions];
-    const enriched = await Promise.all(allVersions.map(async (doc) => {
-      const uploader = (await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, doc.uploadedById)))[0];
-      return {
-        id: doc.id,
-        fileName: doc.fileName,
-        originalName: doc.originalName,
-        fileSize: doc.fileSize,
-        version: doc.version,
-        uploadedByName: uploader?.name || "Unknown",
-        createdAt: doc.createdAt,
-      };
+    const uploaderIds = [...new Set(allVersions.map(d => d.uploadedById))];
+    const uploaders = await db.select({ id: usersTable.id, name: usersTable.name })
+      .from(usersTable).where(inArray(usersTable.id, uploaderIds));
+    const uploaderMap = new Map(uploaders.map(u => [u.id, u.name]));
+
+    const enriched = allVersions.map(doc => ({
+      id: doc.id,
+      fileName: doc.fileName,
+      originalName: doc.originalName,
+      fileSize: doc.fileSize,
+      version: doc.version,
+      uploadedByName: uploaderMap.get(doc.uploadedById) ?? "Unknown",
+      createdAt: doc.createdAt,
     }));
 
     res.json(enriched.sort((a, b) => (b.version || 1) - (a.version || 1)));
   } catch (error) {
+    console.error("Error fetching versions:", error);
     res.status(500).json({ error: "Failed to fetch versions" });
   }
 });
@@ -249,12 +257,13 @@ router.get("/:id/versions", async (req: AuthenticatedRequest, res) => {
 router.get("/:id", async (req: AuthenticatedRequest, res) => {
   try {
     const id = Number(req.params.id);
-    const doc = (await db.select().from(documentsTable).where(eq(documentsTable.id, id)))[0];
+    const [doc] = await db.select().from(documentsTable).where(eq(documentsTable.id, id));
     if (!doc) return res.status(404).json({ error: "Document not found" });
 
-    const enriched = await enrichDoc(doc);
+    const [enriched] = await batchEnrich([doc]);
     res.json(enriched);
   } catch (error) {
+    console.error("Error fetching document:", error);
     res.status(500).json({ error: "Failed to fetch document" });
   }
 });
@@ -262,7 +271,7 @@ router.get("/:id", async (req: AuthenticatedRequest, res) => {
 router.delete("/:id", async (req: AuthenticatedRequest, res) => {
   try {
     const id = Number(req.params.id);
-    const doc = (await db.select().from(documentsTable).where(eq(documentsTable.id, id)))[0];
+    const [doc] = await db.select().from(documentsTable).where(eq(documentsTable.id, id));
     if (!doc) return res.status(404).json({ error: "Document not found" });
 
     await db.update(documentsTable).set({
@@ -285,6 +294,7 @@ router.delete("/:id", async (req: AuthenticatedRequest, res) => {
 
     res.json({ message: "Document moved to trash" });
   } catch (error) {
+    console.error("Error deleting document:", error);
     res.status(500).json({ error: "Failed to delete document" });
   }
 });
@@ -292,7 +302,7 @@ router.delete("/:id", async (req: AuthenticatedRequest, res) => {
 router.delete("/:id/permanent", async (req: AuthenticatedRequest, res) => {
   try {
     const id = Number(req.params.id);
-    const doc = (await db.select().from(documentsTable).where(eq(documentsTable.id, id)))[0];
+    const [doc] = await db.select().from(documentsTable).where(eq(documentsTable.id, id));
     if (!doc) return res.status(404).json({ error: "Document not found" });
 
     await db.delete(documentsTable).where(eq(documentsTable.id, id));
@@ -310,6 +320,7 @@ router.delete("/:id/permanent", async (req: AuthenticatedRequest, res) => {
 
     res.json({ message: "Document permanently deleted" });
   } catch (error) {
+    console.error("Error permanently deleting document:", error);
     res.status(500).json({ error: "Failed to permanently delete document" });
   }
 });
