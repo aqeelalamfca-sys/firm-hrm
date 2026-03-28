@@ -4,12 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   Shield, FileText, Banknote, Users, BarChart3, Building2, Globe, ChevronRight,
   CheckCircle2, ArrowRight, Star, Award, BookOpen, Calculator, Briefcase, Scale,
   Landmark, TrendingUp, Eye, Target, Heart, Zap, Phone, Mail, MapPin,
   GraduationCap, Clock, Layers, Lock, Search, PieChart, UserCheck, Cpu,
-  Menu, X
+  Menu, X, Factory, Truck, Pickaxe, Clapperboard, Wallet, Utensils, Building,
+  Hotel, Ship, Wrench, Newspaper, HandHeart, Fuel, Radio, Pill, BriefcaseBusiness,
+  Home, ShoppingCart, Monitor, Plane
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -73,12 +76,30 @@ const SERVICES = [
   },
 ];
 
-const INDUSTRIES = [
-  "Automotive", "Chemical", "Computer Software", "Construction", "Development", "Energy & Mining",
-  "Entertainment", "Financial Services", "Food & Beverage", "Government", "Hospitality", "Import & Export",
-  "Manufacturing", "Media & Communication", "NGOs/NPOs/Trusts", "Oil & Gas", "Telecommunications",
-  "Pharmaceuticals", "Professional Services", "Real Estate", "Retail & Wholesale", "Technology",
-  "Travel & Hajj Services",
+const INDUSTRIES: { name: string; icon: any; color: string; desc: string; services: string[]; clients: string }[] = [
+  { name: "Automotive", icon: Truck, color: "bg-blue-500/10 text-blue-600 border-blue-200", desc: "Comprehensive audit, tax advisory, and compliance services for automotive manufacturers, dealers, and parts suppliers across Pakistan's growing automobile sector.", services: ["Statutory & cost audits", "Sales tax compliance for vehicle sales", "Transfer pricing advisory", "Import duty optimization", "FBR compliance for CKD/SKD units"], clients: "50+" },
+  { name: "Chemical", icon: Factory, color: "bg-emerald-500/10 text-emerald-600 border-emerald-200", desc: "Specialized services for chemical and petrochemical companies including regulatory compliance, environmental reporting, and tax planning for complex manufacturing operations.", services: ["Environmental compliance audits", "Cost accounting & process costing", "R&D tax incentive advisory", "Customs & excise advisory", "SECP regulatory compliance"], clients: "35+" },
+  { name: "Computer Software", icon: Monitor, color: "bg-violet-500/10 text-violet-600 border-violet-200", desc: "Tailored services for software development houses, IT services companies, and technology startups — from incorporation and tax-exempt registration to international expansion advisory.", services: ["IT/ITeS tax exemption advisory", "Software export documentation", "PSEB registration support", "International corporate structuring", "Revenue recognition under IFRS 15"], clients: "60+" },
+  { name: "Construction", icon: Building, color: "bg-amber-500/10 text-amber-600 border-amber-200", desc: "Full-service financial advisory for construction and real estate development firms including project accounting, contract auditing, and builder/developer tax compliance.", services: ["Project-based accounting", "Construction contract audit (IFRS 15)", "WHT compliance for contractors", "FBR builder/developer schemes", "Joint venture structuring"], clients: "45+" },
+  { name: "Development", icon: Globe, color: "bg-sky-500/10 text-sky-600 border-sky-200", desc: "Expert services for development sector organizations including donor-funded projects, USAID, DFID, ADB, and World Bank compliance audits and financial management.", services: ["Donor compliance audits", "PEFA assessments", "Grant management advisory", "Public expenditure tracking", "Fiduciary risk assessments"], clients: "40+" },
+  { name: "Energy & Mining", icon: Pickaxe, color: "bg-orange-500/10 text-orange-600 border-orange-200", desc: "Specialized audit and tax advisory for energy generation, power distribution, mining, and mineral extraction companies operating under complex regulatory frameworks.", services: ["Power sector regulatory audit", "Mining royalty compliance", "NEPRA tariff advisory", "Capital expenditure audits", "Environmental liability reporting"], clients: "30+" },
+  { name: "Entertainment", icon: Clapperboard, color: "bg-pink-500/10 text-pink-600 border-pink-200", desc: "Financial and tax advisory for entertainment companies, media houses, event management firms, and digital content creators navigating Pakistan's evolving media landscape.", services: ["Revenue recognition for media", "WHT on artist payments", "Intellectual property valuation", "Production cost auditing", "Digital content tax advisory"], clients: "20+" },
+  { name: "Financial Services", icon: Wallet, color: "bg-indigo-500/10 text-indigo-600 border-indigo-200", desc: "Deep expertise in banking, insurance, microfinance, and fintech sectors with specialized knowledge of SBP regulations, SECP requirements, and IFRS 9 implementation.", services: ["SBP regulatory compliance", "IFRS 9 implementation", "Anti-money laundering audits", "Insurance regulatory audits", "Microfinance institution audits"], clients: "75+" },
+  { name: "Food & Beverage", icon: Utensils, color: "bg-red-500/10 text-red-600 border-red-200", desc: "Complete financial services for food manufacturing, processing, restaurant chains, and FMCG companies including inventory management, costing, and regulatory compliance.", services: ["FMCG inventory audits", "Food safety compliance advisory", "Cost of goods sold optimization", "Sales tax on FMCGs", "Franchise structuring advisory"], clients: "55+" },
+  { name: "Government", icon: Landmark, color: "bg-slate-500/10 text-slate-600 border-slate-200", desc: "Extensive experience with federal and provincial government agencies, public sector undertakings, and autonomous bodies requiring compliance with government financial rules.", services: ["Government audit (AGP standards)", "PSU financial management", "Public procurement audits", "PSDP project reviews", "Performance audits"], clients: "150+" },
+  { name: "Hospitality", icon: Hotel, color: "bg-teal-500/10 text-teal-600 border-teal-200", desc: "Specialized advisory for hotels, resorts, restaurants, and tourism operators covering revenue management, tourism tax compliance, and international hospitality accounting standards.", services: ["Hotel revenue audits", "Tourism tax compliance", "USALI accounting standards", "F&B cost control audits", "Franchise fee structuring"], clients: "25+" },
+  { name: "Import & Export", icon: Ship, color: "bg-cyan-500/10 text-cyan-600 border-cyan-200", desc: "End-to-end services for trading companies including customs advisory, WeBOC registration, Letters of Credit documentation, and trade compliance with SBP regulations.", services: ["WeBOC compliance", "Customs duty optimization", "LC documentation advisory", "SBP trade regulations", "Export rebate claims"], clients: "65+" },
+  { name: "Manufacturing", icon: Wrench, color: "bg-gray-500/10 text-gray-600 border-gray-200", desc: "Comprehensive services for manufacturing enterprises including cost auditing, inventory management, capacity utilization studies, and industrial tax incentive advisory.", services: ["Cost & management audits", "Manufacturing process review", "Industrial tax incentives", "Fixed asset management", "Standard costing systems"], clients: "80+" },
+  { name: "Media & Communication", icon: Newspaper, color: "bg-purple-500/10 text-purple-600 border-purple-200", desc: "Financial advisory and audit services for print media, broadcast companies, digital media platforms, advertising agencies, and telecommunications content providers.", services: ["Media revenue audits", "Advertisement tax compliance", "PEMRA regulatory advisory", "Digital media taxation", "Content licensing audits"], clients: "30+" },
+  { name: "NGOs/NPOs/Trusts", icon: HandHeart, color: "bg-rose-500/10 text-rose-600 border-rose-200", desc: "Specialized audit and compliance services for non-profit organizations, charitable trusts, and societies including PCP certification support and donor compliance audits.", services: ["NPO/NGO statutory audits", "PCP certification support", "Donor fund compliance", "EAD reporting requirements", "Trust registration & advisory"], clients: "45+" },
+  { name: "Oil & Gas", icon: Fuel, color: "bg-yellow-500/10 text-yellow-600 border-yellow-200", desc: "Expert advisory for upstream, midstream, and downstream oil & gas companies navigating complex regulatory frameworks, production sharing contracts, and OGRA compliance.", services: ["Production sharing audits", "OGRA compliance advisory", "Petroleum levy compliance", "Exploration cost accounting", "JV partner audits"], clients: "20+" },
+  { name: "Telecommunications", icon: Radio, color: "bg-blue-500/10 text-blue-600 border-blue-200", desc: "Advisory services for telecom operators, tower companies, and internet service providers including PTA regulatory compliance, spectrum licensing, and IFRS 15 revenue recognition.", services: ["PTA regulatory compliance", "Spectrum fee advisory", "IFRS 15 for telecom", "Tower sharing arrangements", "USF fund compliance"], clients: "15+" },
+  { name: "Pharmaceuticals", icon: Pill, color: "bg-green-500/10 text-green-600 border-green-200", desc: "Specialized services for pharmaceutical manufacturers, distributors, and healthcare companies including DRAP compliance, clinical trial accounting, and drug pricing advisory.", services: ["DRAP compliance audits", "Drug pricing compliance", "Clinical trial accounting", "Healthcare revenue audits", "Transfer pricing for pharma"], clients: "40+" },
+  { name: "Professional Services", icon: BriefcaseBusiness, color: "bg-indigo-500/10 text-indigo-600 border-indigo-200", desc: "Advisory and audit services for law firms, consulting companies, architectural firms, and other professional services organizations with partnership and LLP structuring expertise.", services: ["Partnership accounting", "LLP structuring advisory", "Professional income taxation", "Revenue recognition advisory", "Partner compensation planning"], clients: "35+" },
+  { name: "Real Estate", icon: Home, color: "bg-amber-500/10 text-amber-600 border-amber-200", desc: "Complete financial services for real estate developers, property management companies, and housing authorities including FBR builder schemes, capital gains tax, and REIT advisory.", services: ["FBR builder/developer schemes", "Capital gains tax advisory", "Property valuation", "REIT structuring advisory", "Rental income compliance"], clients: "70+" },
+  { name: "Retail & Wholesale", icon: ShoppingCart, color: "bg-emerald-500/10 text-emerald-600 border-emerald-200", desc: "Financial advisory for retail chains, wholesale distributors, and e-commerce businesses covering POS integration, sales tax compliance, and inventory management systems.", services: ["POS/FBR integration", "Sales tax tier compliance", "Inventory management audits", "E-commerce taxation", "Franchise structuring"], clients: "55+" },
+  { name: "Technology", icon: Cpu, color: "bg-violet-500/10 text-violet-600 border-violet-200", desc: "Cutting-edge services for technology companies, SaaS providers, and digital platforms including IT/ITeS tax exemptions, international structuring, and startup accounting.", services: ["IT/ITeS tax exemptions", "SaaS revenue recognition", "Startup valuation", "Tech company incorporation", "International expansion advisory"], clients: "50+" },
+  { name: "Travel & Hajj Services", icon: Plane, color: "bg-sky-500/10 text-sky-600 border-sky-200", desc: "Specialized services for travel agencies, Hajj/Umrah operators, and tourism companies covering IATA compliance, advance tax on travel agents, and pilgrimage fund accounting.", services: ["IATA compliance advisory", "Hajj/Umrah fund audits", "Travel agent advance tax", "Tour operator licensing", "Foreign exchange compliance"], clients: "25+" },
 ];
 
 const TEAM = [
@@ -101,6 +122,7 @@ export default function Landing() {
   const [activeTab, setActiveTab] = useState("about");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [selectedIndustry, setSelectedIndustry] = useState<typeof INDUSTRIES[0] | null>(null);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -446,13 +468,65 @@ export default function Landing() {
               Comprehensive coverage across diverse industries nationwide with deep domain expertise.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2 justify-center max-w-4xl mx-auto">
-            {INDUSTRIES.map(industry => (
-              <span key={industry} className="px-3.5 py-2 rounded-full text-xs font-medium bg-muted/60 text-foreground/70 border border-border/40 hover:bg-primary/5 hover:text-primary hover:border-primary/20 transition-colors cursor-default">
-                {industry}
-              </span>
-            ))}
+          <div className="flex flex-wrap gap-2.5 justify-center max-w-4xl mx-auto">
+            {INDUSTRIES.map(ind => {
+              const Icon = ind.icon;
+              return (
+                <button
+                  key={ind.name}
+                  onClick={() => setSelectedIndustry(ind)}
+                  className="group flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-medium bg-muted/60 text-foreground/70 border border-border/40 hover:bg-primary/5 hover:text-primary hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer"
+                >
+                  <Icon className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+                  {ind.name}
+                </button>
+              );
+            })}
           </div>
+
+          <Dialog open={!!selectedIndustry} onOpenChange={(open) => !open && setSelectedIndustry(null)}>
+            <DialogContent className="max-w-lg">
+              {selectedIndustry && (() => {
+                const Icon = selectedIndustry.icon;
+                return (
+                  <>
+                    <DialogHeader>
+                      <div className="flex items-center gap-3 mb-1">
+                        <div className={`w-11 h-11 rounded-xl ${selectedIndustry.color} flex items-center justify-center border`}>
+                          <Icon className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <DialogTitle className="text-lg">{selectedIndustry.name}</DialogTitle>
+                          <p className="text-xs text-muted-foreground font-medium">{selectedIndustry.clients} Clients Served</p>
+                        </div>
+                      </div>
+                    </DialogHeader>
+                    <DialogDescription className="text-sm text-foreground/70 leading-relaxed mt-1">
+                      {selectedIndustry.desc}
+                    </DialogDescription>
+                    <div className="mt-4">
+                      <h4 className="text-xs font-semibold text-foreground/80 uppercase tracking-wider mb-3">Key Services</h4>
+                      <div className="space-y-2">
+                        {selectedIndustry.services.map(svc => (
+                          <div key={svc} className="flex items-start gap-2.5 text-sm">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                            <span className="text-foreground/80">{svc}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="mt-5 pt-4 border-t border-border/40">
+                      <Link href="/login">
+                        <Button size="sm" className="w-full gap-2">
+                          Get Expert Advisory <ArrowRight className="w-4 h-4" />
+                        </Button>
+                      </Link>
+                    </div>
+                  </>
+                );
+              })()}
+            </DialogContent>
+          </Dialog>
         </div>
       </section>
 

@@ -1,0 +1,172 @@
+Below is a complete, production-grade “Ultimate Replit Prompt” to build the MCQ Test Module + Auto Evaluation + Pass/Fail Workflow + PDF Generation + CRN Control, fully integrated with your CA Training Application system.
+
+✅ ULTIMATE REPLIT PROMPT — MCQ TEST MODULE + RESULT + PDF + CRN CONTROL
+
+Objective:
+Extend the existing CA Training Application system to include:
+
+10 MCQ test (easy/average level)
+Auto evaluation
+Pass rule (≥ 8 correct answers)
+Smart scheduling (7 working days, excluding public holidays)
+PDF generation (only if passed)
+Fail message (no PDF)
+Unique CRN (one-time application per CNIC)
+
+⚠️ Keep UI simple, clean, and user-friendly.
+
+🧩 PHASE 1 — DATABASE UPDATE (PRISMA)
+Extend TrainingApplication:
+model TrainingApplication {
+  id                String   @id @default(uuid())
+  crn               String   @unique
+  cnic              String   @unique
+
+  // Existing fields...
+
+  testScore         Int?
+  testTotal         Int? @default(10)
+  testStatus        String? // Passed / Failed
+  testDate          DateTime?
+  interviewDate     DateTime?
+
+  pdfUrl            String?
+
+  createdAt         DateTime @default(now())
+}
+🔐 PHASE 2 — CRN (UNIQUE, ONE-TIME APPLICATION)
+Logic:
+On submission:
+Check CNIC
+If exists → block:
+
+👉 “You have already applied. Re-application is not allowed.”
+
+CRN Format:
+CRN-YYYY-XXXX
+
+Example:
+CRN-2026-0001
+
+📝 PHASE 3 — MCQ TEST (10 QUESTIONS)
+Structure:
+10 questions
+4 options each
+Single correct answer
+Sample Questions (Hardcoded initially):
+[
+  {
+    "question": "What does IFRS stand for?",
+    "options": ["International Financial Reporting Standards", "Internal Financial Reporting System", "International Finance Rules System", "None"],
+    "answer": 0
+  },
+  {
+    "question": "Which statement shows financial position?",
+    "options": ["Income Statement", "Balance Sheet", "Cash Flow", "Equity"],
+    "answer": 1
+  }
+]
+
+👉 Add 10 total (easy + average level)
+
+🎨 PHASE 4 — TEST UI
+Features:
+One question per screen OR list view
+Timer (optional: 10–15 mins)
+Radio button selection
+Submit button
+⚙️ PHASE 5 — AUTO EVALUATION
+Logic:
+score = correctAnswersCount
+
+IF score >= 8:
+   status = "Passed"
+ELSE:
+   status = "Failed"
+📅 PHASE 6 — INTERVIEW DATE (SMART SCHEDULING)
+Rule:
+Interview = 7 working days after test
+Time:
+👉 Between 11:00 AM – 12:00 PM
+Exclude:
+Sundays
+Public holidays (create configurable list)
+Logic:
+function addWorkingDays(startDate, days, holidays) {
+  // skip Sundays + holidays
+}
+📄 PHASE 7 — PDF GENERATION (ONLY IF PASSED)
+Generate PDF:
+
+Include:
+
+CRN
+Full Application Form
+Test Score
+Status = PASSED
+Interview Date & Time
+Auto Trigger:
+After passing → auto-generate + auto-download
+❌ PHASE 8 — FAIL WORKFLOW
+If Failed:
+Show message:
+
+👉
+“Thank you for appearing in the test.
+We appreciate your effort.
+Unfortunately, you did not meet the qualifying criteria this time.
+We encourage you to continue learning and wish you success ahead.”
+
+DO NOT generate PDF
+📎 PHASE 9 — PDF FORMAT (PROFESSIONAL)
+Sections:
+Candidate Info
+Academic Info
+Skills
+Test Result
+Interview Schedule
+🔔 PHASE 10 — UI RESPONSE
+If Passed:
+Show:
+“Congratulations! You have passed the test.”
+Interview date/time
+Auto download PDF
+If Failed:
+Show only message
+No download option
+🔐 PHASE 11 — SECURITY
+Prevent test retake
+One attempt only
+Lock after submission
+⚙️ PHASE 12 — ADMIN VIEW
+
+Add:
+
+Test score column
+Status (Passed/Failed)
+PDF download
+📊 PHASE 13 — VALIDATIONS
+Must complete form before test
+Must attempt all questions
+No re-submission
+❗ CRITICAL INSTRUCTIONS
+DO NOT:
+Allow multiple attempts
+Generate PDF for failed candidates
+Allow duplicate CNIC
+MUST:
+Ensure fairness
+Ensure data integrity
+Keep UI simple
+✅ FINAL OUTPUT
+Fully working MCQ test module
+Auto evaluation
+Smart interview scheduling
+PDF generation (pass only)
+Fail message system
+CRN-based one-time application
+🔥 OPTIONAL (NEXT STEP)
+Question bank (random 50 MCQs)
+Time tracking
+Anti-cheating controls
+Email notification (result + interview)
