@@ -272,6 +272,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
               )}
             </Button>
 
+            <Link href="/profile">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full p-0 overflow-hidden border border-border/50 hover:border-primary/50 transition-colors"
+              >
+                <div className="w-full h-full rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
+                  {user.name.charAt(0)}
+                </div>
+              </Button>
+            </Link>
+
             {notifOpen && (
               <div className="absolute right-0 top-12 w-[360px] bg-card border border-border/70 rounded-xl shadow-xl z-50 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50">
