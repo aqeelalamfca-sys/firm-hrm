@@ -30,6 +30,7 @@ import MCQTest from "@/pages/mcq-test";
 import Applications from "@/pages/applications";
 import BookMeeting from "@/pages/book-meeting";
 import ManageMeetings from "@/pages/manage-meetings";
+import Settings from "@/pages/settings";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -132,6 +133,7 @@ function Router() {
       <Route path="/profile"><ProtectedRoute component={Profile} /></Route>
       <Route path="/applications"><ProtectedRoute component={Applications} /></Route>
       <Route path="/manage-meetings"><ProtectedRoute component={ManageMeetings} /></Route>
+      <Route path="/settings"><ProtectedRoute component={Settings} /></Route>
       <Route path="/"><ProtectedRoute component={Dashboard} /></Route>
       <Route component={NotFound} />
     </Switch>
