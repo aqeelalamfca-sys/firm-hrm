@@ -103,12 +103,60 @@ const INDUSTRIES: { name: string; icon: any; color: string; desc: string; servic
 ];
 
 const TEAM = [
-  { name: "Mr. Aqeel Alam", title: "FCA", role: "Managing Partner", focus: "Audit, Tax & International Advisory", exp: "15 years", bg: "KPMG", initials: "AA" },
-  { name: "Mr. Bilal Aulakh", title: "FCA", role: "Partner", focus: "Tax & Corporate Services", exp: "14 years", bg: "KPMG", initials: "BA" },
-  { name: "Mr. M. Idrees Khattak", title: "FCA", role: "Partner", focus: "Audit & Advisory (ERP/SAP)", exp: "13 years", bg: "Baker Tilly", initials: "IK" },
-  { name: "Ms. Manahil Ahmad", title: "ACA, FMVA", role: "Partner", focus: "International Advisory & Valuation", exp: "10+ years", bg: "Baker Tilly / KPMG", initials: "MA" },
-  { name: "Mr. Shan Ibrahim", title: "FCA", role: "Partner", focus: "Audit, Tax & Corporate Planning", exp: "10 years", bg: "RSM International", initials: "SI" },
-  { name: "Mr. Anwaar Haider", title: "ACA", role: "Partner", focus: "Audit, IFRS & Forensic Accounting", exp: "7 years", bg: "KPMG", initials: "AH" },
+  {
+    name: "Mr. Aqeel Alam", title: "FCA", role: "Managing Partner", focus: "Audit, Tax & International Advisory", exp: "15 years", bg: "KPMG", initials: "AA",
+    bio: "Mr. Aqeel Alam is the founding and Managing Partner of Aqeel Alam & Company, Chartered Accountants, and leads the firm's strategic vision. A Fellow Chartered Accountant (FCA) from ICAP, he brings over 15 years of hands-on experience in audit, taxation, and international financial advisory. Prior to establishing the firm, he served at KPMG where he led engagement teams for major listed companies and multinational corporations.",
+    qualifications: ["Fellow Chartered Accountant (FCA) — ICAP", "Member, Institute of Chartered Accountants of Pakistan", "Registered with Audit Oversight Board (AOB)", "ICAP Approved Training Partner"],
+    expertise: ["Statutory & Group Audits (ISA/IFRS)", "Corporate Tax Planning & FBR Compliance", "International Financial Advisory", "Business Valuation & Due Diligence", "Company Incorporation & Cross-Border Structuring", "Managing Partner responsibilities including firm strategy and governance"],
+    industries: ["Financial Services", "Manufacturing", "Government", "Oil & Gas", "Technology"],
+    email: "aqeel@aqeelalam.com",
+    location: "Lahore",
+  },
+  {
+    name: "Mr. Bilal Aulakh", title: "FCA", role: "Partner", focus: "Tax & Corporate Services", exp: "14 years", bg: "KPMG", initials: "BA",
+    bio: "Mr. Bilal Aulakh is a Fellow Chartered Accountant (FCA) and Partner at Alam & Aulakh, heading the Tax & Corporate Services division. With 14 years of professional experience including significant tenure at KPMG, he specializes in corporate tax planning, FBR compliance, sales tax advisory, and corporate structuring for businesses of all sizes across Pakistan.",
+    qualifications: ["Fellow Chartered Accountant (FCA) — ICAP", "Member, Institute of Chartered Accountants of Pakistan", "Certified Tax Practitioner"],
+    expertise: ["Corporate Income Tax Planning", "Sales Tax & Federal Excise Advisory", "FBR Compliance & Tax Litigation", "Corporate Restructuring & Mergers", "Transfer Pricing Advisory", "Withholding Tax Compliance"],
+    industries: ["Retail & Wholesale", "Import & Export", "Real Estate", "Construction", "Food & Beverage"],
+    email: "bilal@aqeelalam.com",
+    location: "Lahore",
+  },
+  {
+    name: "Mr. M. Idrees Khattak", title: "FCA", role: "Partner", focus: "Audit & Advisory (ERP/SAP)", exp: "13 years", bg: "Baker Tilly", initials: "IK",
+    bio: "Mr. M. Idrees Khattak is a Fellow Chartered Accountant (FCA) and Partner specializing in audit and advisory services with deep expertise in ERP/SAP implementations. With 13 years of experience, including tenure at Baker Tilly International, he brings a unique combination of technical audit skills and technology-driven advisory, helping clients optimize their financial systems and internal controls.",
+    qualifications: ["Fellow Chartered Accountant (FCA) — ICAP", "SAP Certified Financial Consultant", "Member, Institute of Chartered Accountants of Pakistan"],
+    expertise: ["Statutory & Internal Audits", "ERP/SAP Implementation Advisory", "Internal Controls & SOPs Development", "Risk-Based Audit Methodology", "IFRS Implementation & Transition", "IT Audit & System Reviews"],
+    industries: ["Manufacturing", "Energy & Mining", "Telecommunications", "Pharmaceuticals", "Computer Software"],
+    email: "idrees@aqeelalam.com",
+    location: "Islamabad",
+  },
+  {
+    name: "Ms. Manahil Ahmad", title: "ACA, FMVA", role: "Partner", focus: "International Advisory & Valuation", exp: "10+ years", bg: "Baker Tilly / KPMG", initials: "MA",
+    bio: "Ms. Manahil Ahmad is an Associate Chartered Accountant (ACA) and Financial Modelling & Valuation Analyst (FMVA), serving as Partner heading the International Advisory & Valuation practice. With over 10 years of experience at both Baker Tilly and KPMG, she specializes in cross-border corporate structuring, business valuations, financial modelling, and international IFRS advisory for clients expanding globally.",
+    qualifications: ["Associate Chartered Accountant (ACA) — ICAP", "Financial Modelling & Valuation Analyst (FMVA) — CFI", "Member, Institute of Chartered Accountants of Pakistan"],
+    expertise: ["Business Valuation & Financial Modelling", "Cross-Border Corporate Structuring", "International IFRS Advisory", "Mergers, Acquisitions & Due Diligence", "Foreign Investment Advisory", "Transfer Pricing Documentation"],
+    industries: ["Financial Services", "Technology", "Professional Services", "Development", "Hospitality"],
+    email: "manahil@aqeelalam.com",
+    location: "Lahore",
+  },
+  {
+    name: "Mr. Shan Ibrahim", title: "FCA", role: "Partner", focus: "Audit, Tax & Corporate Planning", exp: "10 years", bg: "RSM International", initials: "SI",
+    bio: "Mr. Shan Ibrahim is a Fellow Chartered Accountant (FCA) and Partner with 10 years of experience, including significant tenure at RSM International. He leads engagement teams for audit, tax advisory, and corporate planning assignments, with particular expertise in handling complex group audits, multi-jurisdictional tax planning, and corporate governance advisory for listed and private companies.",
+    qualifications: ["Fellow Chartered Accountant (FCA) — ICAP", "Member, Institute of Chartered Accountants of Pakistan", "Corporate Governance Certified"],
+    expertise: ["Group & Consolidated Audits", "Multi-Jurisdictional Tax Planning", "Corporate Governance Advisory", "Companies Act Compliance", "Board & Committee Advisory", "Regulatory & SECP Compliance"],
+    industries: ["Government", "NGOs/NPOs/Trusts", "Chemical", "Automotive", "Media & Communication"],
+    email: "shan@aqeelalam.com",
+    location: "Islamabad",
+  },
+  {
+    name: "Mr. Anwaar Haider", title: "ACA", role: "Partner", focus: "Audit, IFRS & Forensic Accounting", exp: "7 years", bg: "KPMG", initials: "AH",
+    bio: "Mr. Anwaar Haider is an Associate Chartered Accountant (ACA) and Partner specializing in audit, IFRS advisory, and forensic accounting. With 7 years of experience including service at KPMG, he brings sharp analytical skills and deep knowledge of international financial reporting standards. He leads the firm's forensic accounting practice, conducting financial investigations and fraud risk assessments for corporate clients.",
+    qualifications: ["Associate Chartered Accountant (ACA) — ICAP", "Member, Institute of Chartered Accountants of Pakistan", "Certified Forensic Accountant"],
+    expertise: ["IFRS Implementation & Advisory", "Forensic Accounting & Investigations", "Fraud Risk Assessment", "Anti-Money Laundering Compliance", "Special Purpose Audits", "Revenue Recognition (IFRS 15/16)"],
+    industries: ["Financial Services", "Oil & Gas", "Entertainment", "Travel & Hajj Services", "Real Estate"],
+    email: "anwaar@aqeelalam.com",
+    location: "Lahore",
+  },
 ];
 
 const MILESTONES = [
@@ -123,6 +171,7 @@ export default function Landing() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [selectedIndustry, setSelectedIndustry] = useState<typeof INDUSTRIES[0] | null>(null);
+  const [selectedPartner, setSelectedPartner] = useState<typeof TEAM[0] | null>(null);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -544,27 +593,119 @@ export default function Landing() {
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {TEAM.map((member) => (
-              <Card key={member.name} className="border-border/40 shadow-xs hover:shadow-md transition-shadow">
+              <Card
+                key={member.name}
+                className="border-border/40 shadow-xs hover:shadow-md hover:border-primary/20 transition-all cursor-pointer group"
+                onClick={() => setSelectedPartner(member)}
+              >
                 <CardContent className="p-6">
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-lg font-bold shrink-0">
+                    <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-lg font-bold shrink-0 group-hover:bg-primary/15 transition-colors">
                       {member.initials}
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold">{member.name}</h4>
+                      <h4 className="text-sm font-bold group-hover:text-primary transition-colors">{member.name}</h4>
                       <p className="text-[11px] text-primary font-semibold">{member.title}</p>
                       <p className="text-xs text-muted-foreground">{member.role}</p>
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground mb-3">{member.focus}</p>
-                  <div className="flex items-center gap-3 text-[11px]">
-                    <span className="px-2 py-1 rounded-md bg-muted/60 text-muted-foreground font-medium">{member.exp}</span>
-                    <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 font-medium">{member.bg}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 text-[11px]">
+                      <span className="px-2 py-1 rounded-md bg-muted/60 text-muted-foreground font-medium">{member.exp}</span>
+                      <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 font-medium">{member.bg}</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground/50 group-hover:text-primary/60 transition-colors">View Profile →</span>
                   </div>
                 </CardContent>
               </Card>
             ))}
           </div>
+
+          <Dialog open={!!selectedPartner} onOpenChange={(open) => !open && setSelectedPartner(null)}>
+            <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
+              {selectedPartner && (
+                <>
+                  <DialogHeader>
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-xl font-bold shrink-0">
+                        {selectedPartner.initials}
+                      </div>
+                      <div>
+                        <DialogTitle className="text-lg">{selectedPartner.name}</DialogTitle>
+                        <p className="text-sm text-primary font-semibold">{selectedPartner.title}</p>
+                        <p className="text-xs text-muted-foreground">{selectedPartner.role}</p>
+                      </div>
+                    </div>
+                  </DialogHeader>
+
+                  <div className="flex flex-wrap items-center gap-3 mt-3 text-xs">
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 text-muted-foreground font-medium">
+                      <Clock className="w-3 h-3" /> {selectedPartner.exp}
+                    </span>
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium">
+                      <Briefcase className="w-3 h-3" /> {selectedPartner.bg}
+                    </span>
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-medium">
+                      <MapPin className="w-3 h-3" /> {selectedPartner.location}
+                    </span>
+                  </div>
+
+                  <DialogDescription className="text-sm text-foreground/70 leading-relaxed mt-4">
+                    {selectedPartner.bio}
+                  </DialogDescription>
+
+                  <div className="mt-5">
+                    <h4 className="text-xs font-semibold text-foreground/80 uppercase tracking-wider mb-3">Qualifications</h4>
+                    <div className="space-y-2">
+                      {selectedPartner.qualifications.map(q => (
+                        <div key={q} className="flex items-start gap-2.5 text-sm">
+                          <GraduationCap className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                          <span className="text-foreground/80">{q}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <h4 className="text-xs font-semibold text-foreground/80 uppercase tracking-wider mb-3">Areas of Expertise</h4>
+                    <div className="space-y-2">
+                      {selectedPartner.expertise.map(e => (
+                        <div key={e} className="flex items-start gap-2.5 text-sm">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                          <span className="text-foreground/80">{e}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <h4 className="text-xs font-semibold text-foreground/80 uppercase tracking-wider mb-3">Industry Focus</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedPartner.industries.map(ind => (
+                        <span key={ind} className="px-2.5 py-1 rounded-full text-xs font-medium bg-primary/5 text-primary border border-primary/10">
+                          {ind}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-5 pt-4 border-t border-border/40 flex items-center gap-3">
+                    <a href={`mailto:${selectedPartner.email}`} className="flex-1">
+                      <Button size="sm" className="w-full gap-2">
+                        <Mail className="w-4 h-4" /> Contact {selectedPartner.name.split(" ")[1]}
+                      </Button>
+                    </a>
+                    <a href="tel:0321-111-2041">
+                      <Button size="sm" variant="outline" className="gap-2">
+                        <Phone className="w-4 h-4" /> Call
+                      </Button>
+                    </a>
+                  </div>
+                </>
+              )}
+            </DialogContent>
+          </Dialog>
 
           <div className="mt-8 grid sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
             <div className="text-center p-4 rounded-xl bg-card border border-border/40">

@@ -1,0 +1,195 @@
+Below is a complete, production-grade bundle for your system:
+
+✔ Firm-branded PDF template
+✔ 1000+ MCQ bank structure (with starter dataset + scalable loader)
+✔ Email automation (selection / rejection)
+
+Firm: Alam & Aulakh (Chartered Accountants) — Lahore | Islamabad
+
+✅ 1. FIRM-BRANDED PDF TEMPLATE (FOR PASSED CANDIDATES)
+🔧 REPLIT PROMPT — PDF GENERATION (REPORTLAB)
+
+Objective:
+Generate a professional PDF after passing the test, including full application + result + interview schedule.
+
+📄 PDF CONTENT STRUCTURE
+
+Header:
+
+Firm Name: Alam & Aulakh (Chartered Accountants)
+Offices: Lahore | Islamabad
+Title: CA Training Application & Test Result
+Sections:
+Candidate Information
+Academic Details
+Skills & Experience
+Test Result
+Interview Schedule
+🧾 REPLIT PROMPT
+Build PDF generation using reportlab.platypus.
+
+Design:
+- Header with firm name: Alam & Aulakh (Chartered Accountants)
+- Subtext: Lahore | Islamabad
+- Add horizontal line separator
+
+Sections:
+1. Candidate Info (Table)
+2. Academic Info (Table)
+3. Skills (Paragraph)
+4. Test Result:
+   - Score: X/10
+   - Status: PASSED (Green text)
+5. Interview Schedule:
+   - Date
+   - Time (11:00 AM – 12:00 PM)
+   - Location: Lahore / Islamabad (based on preference)
+
+Footer:
+"This is a system-generated document and does not require signature."
+
+Style:
+- Clean spacing
+- Bold headings
+- Table grid lines
+- Professional layout
+
+Auto-generate PDF after passing and save to /uploads/pdfs/
+Return download link and trigger auto-download.
+✅ 2. FULL MCQ BANK (1000+ QUESTIONS STRUCTURE)
+🔧 DESIGN APPROACH (SCALABLE)
+
+Instead of hardcoding, create MCQ Bank Table
+
+📦 DATABASE MODEL
+model MCQQuestion {
+  id          String @id @default(uuid())
+  question    String
+  optionA     String
+  optionB     String
+  optionC     String
+  optionD     String
+  correct     String
+  category    String // Audit, Tax, Accounting, Excel, General
+  difficulty  String // Easy, Medium, Hard
+}
+🎯 REPLIT PROMPT — MCQ SYSTEM
+Create MCQ bank system:
+
+- Store 1000+ questions in database
+- Categories:
+  - Audit
+  - Accounting
+  - Tax
+  - Corporate
+  - Excel
+  - General Knowledge
+
+- Difficulty:
+  - Easy
+  - Medium
+
+Test Generation:
+- Randomly select 10 questions:
+  - 4 Accounting
+  - 2 Audit
+  - 2 Tax
+  - 1 Excel
+  - 1 General
+
+- Shuffle questions and options
+
+- Ensure no repetition
+
+- Store selected question IDs for evaluation
+📘 SAMPLE QUESTIONS (STARTER SET)
+
+You can seed initial dataset like:
+
+[
+  {
+    "question": "What is the accounting equation?",
+    "optionA": "Assets = Liabilities + Equity",
+    "optionB": "Assets = Income - Expenses",
+    "optionC": "Equity = Assets - Revenue",
+    "optionD": "None",
+    "correct": "A",
+    "category": "Accounting",
+    "difficulty": "Easy"
+  },
+  {
+    "question": "What is audit evidence?",
+    "optionA": "Proof of income",
+    "optionB": "Information used by auditor",
+    "optionC": "Financial statements",
+    "optionD": "None",
+    "correct": "B",
+    "category": "Audit",
+    "difficulty": "Easy"
+  }
+]
+
+👉 Extend to 1000+ via CSV import or script
+
+✅ 3. EMAIL AUTOMATION SYSTEM
+🔧 REPLIT PROMPT — EMAIL MODULE
+
+Use:
+
+Nodemailer (backend)
+SMTP (Gmail / domain email)
+📧 1. PASS EMAIL (SELECTION)
+Subject: CA Training Test Result – Alam & Aulakh
+
+Body:
+
+Dear [Candidate Name],
+
+We are pleased to inform you that you have successfully passed the assessment test conducted by Alam & Aulakh (Chartered Accountants).
+
+Your interview has been scheduled as follows:
+
+Date: [Interview Date]  
+Time: Between 11:00 AM – 12:00 PM  
+Location: [Lahore / Islamabad Office]
+
+Please ensure your availability within the given time window.
+
+We look forward to meeting you.
+
+Best regards,  
+Alam & Aulakh (Chartered Accountants)
+Lahore | Islamabad
+📧 2. FAIL EMAIL (REJECTION)
+Subject: CA Training Application – Test Result
+
+Body:
+
+Dear [Candidate Name],
+
+Thank you for appearing in the assessment test conducted by Alam & Aulakh (Chartered Accountants).
+
+We appreciate your effort and interest in joining our firm. However, you did not meet the qualifying criteria on this occasion.
+
+We encourage you to continue your professional development and wish you success in your future endeavors.
+
+Best regards,  
+Alam & Aulakh (Chartered Accountants)
+⚙️ EMAIL LOGIC
+IF testStatus == "Passed":
+   send PASS email
+   attach PDF
+
+ELSE:
+   send FAIL email
+   no attachment
+🔐 ADDITIONAL CONTROLS (IMPORTANT)
+Email sent only once
+Log email status in DB
+Retry if failed
+✅ FINAL OUTPUT
+
+✔ Firm-branded professional PDF
+✔ Scalable MCQ bank (1000+ ready structure)
+✔ Automated email system (pass/fail)
+✔ Fully integrated with application + test module
