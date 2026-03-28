@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,23 +14,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Scale, ArrowLeft, ArrowRight, CheckCircle2, Upload, X, User, Phone, GraduationCap,
+  Scale, ArrowLeft, CheckCircle2, Upload, X, User, Phone, GraduationCap,
   MapPin, Briefcase, Wrench, FileText, AlertCircle, Loader2, Image as ImageIcon
 } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
-
-const SECTIONS = [
-  { id: "personal", label: "Personal Info", icon: User },
-  { id: "contact", label: "Contact", icon: Phone },
-  { id: "uploads", label: "Uploads", icon: Upload },
-  { id: "academic", label: "Academic", icon: GraduationCap },
-  { id: "training", label: "Training Preferences", icon: MapPin },
-  { id: "availability", label: "Availability", icon: Briefcase },
-  { id: "skills", label: "Skills", icon: Wrench },
-  { id: "experience", label: "Experience", icon: FileText },
-  { id: "declaration", label: "Declaration", icon: CheckCircle2 },
-];
 
 const BOARDS = [
   "Federal Board (FBISE)",
@@ -58,10 +46,8 @@ const BOARDS = [
 
 export default function TrainingApplication() {
   const { toast } = useToast();
-  const [currentSection, setCurrentSection] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [applicationId, setApplicationId] = useState<number | null>(null);
   const [applicationCrn, setApplicationCrn] = useState<string | null>(null);
 
   const [form, setForm] = useState({
@@ -162,75 +148,48 @@ export default function TrainingApplication() {
     return `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12)}`;
   };
 
-  const validateSection = (sectionIndex: number): boolean => {
+  const validateAll = (): boolean => {
     const newErrors: Record<string, string> = {};
-
-    switch (sectionIndex) {
-      case 0:
-        if (!form.fullName.trim()) newErrors.fullName = "Full name is required";
-        if (!form.fatherName.trim()) newErrors.fatherName = "Father's name is required";
-        if (!form.cnic.trim()) newErrors.cnic = "CNIC is required";
-        else if (!/^\d{5}-\d{7}-\d$/.test(form.cnic)) newErrors.cnic = "Format: xxxxx-xxxxxxx-x";
-        if (!form.dateOfBirth) newErrors.dateOfBirth = "Date of birth is required";
-        if (!form.gender) newErrors.gender = "Gender is required";
-        if (!form.maritalStatus) newErrors.maritalStatus = "Marital status is required";
-        break;
-      case 1:
-        if (!form.mobile.trim()) newErrors.mobile = "Mobile number is required";
-        if (!form.email.trim()) newErrors.email = "Email is required";
-        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) newErrors.email = "Invalid email";
-        if (!form.currentAddress.trim()) newErrors.currentAddress = "Current address is required";
-        if (!form.permanentAddress.trim()) newErrors.permanentAddress = "Permanent address is required";
-        break;
-      case 2:
-        if (!files.cnicFront) newErrors.cnicFront = "CNIC front image is required";
-        if (!files.cnicBack) newErrors.cnicBack = "CNIC back image is required";
-        if (!files.photo) newErrors.photo = "Photo is required";
-        break;
-      case 3:
-        if (!form.matricBoard) newErrors.matricBoard = "Board is required";
-        if (!form.matricYear) newErrors.matricYear = "Year is required";
-        if (!form.matricMarks.trim()) newErrors.matricMarks = "Marks/Grade is required";
-        if (!form.interBoard) newErrors.interBoard = "Board is required";
-        if (!form.interYear) newErrors.interYear = "Year is required";
-        if (!form.interMarks.trim()) newErrors.interMarks = "Marks/Grade is required";
-        break;
-      case 4:
-        if (!form.icapLevel) newErrors.icapLevel = "ICAP level is required";
-        if (!form.preferredLocation) newErrors.preferredLocation = "Location is required";
-        if (!form.preferredDept) newErrors.preferredDept = "Department is required";
-        break;
-      case 5:
-        if (!form.availableStart) newErrors.availableStart = "Start date is required";
-        break;
-      case 6:
-        if (!form.accountingLevel) newErrors.accountingLevel = "Accounting level is required";
-        if (!form.excelLevel) newErrors.excelLevel = "Excel level is required";
-        if (!form.communication) newErrors.communication = "Communication level is required";
-        break;
-      case 8:
-        if (!form.declaration) newErrors.declaration = "You must accept the declaration";
-        break;
-    }
-
+    if (!form.fullName.trim()) newErrors.fullName = "Full name is required";
+    if (!form.fatherName.trim()) newErrors.fatherName = "Father's name is required";
+    if (!form.cnic.trim()) newErrors.cnic = "CNIC is required";
+    else if (!/^\d{5}-\d{7}-\d$/.test(form.cnic)) newErrors.cnic = "Format: xxxxx-xxxxxxx-x";
+    if (!form.dateOfBirth) newErrors.dateOfBirth = "Date of birth is required";
+    if (!form.gender) newErrors.gender = "Gender is required";
+    if (!form.maritalStatus) newErrors.maritalStatus = "Marital status is required";
+    if (!form.mobile.trim()) newErrors.mobile = "Mobile number is required";
+    if (!form.email.trim()) newErrors.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) newErrors.email = "Invalid email";
+    if (!form.currentAddress.trim()) newErrors.currentAddress = "Current address is required";
+    if (!form.permanentAddress.trim()) newErrors.permanentAddress = "Permanent address is required";
+    if (!files.cnicFront) newErrors.cnicFront = "CNIC front image is required";
+    if (!files.cnicBack) newErrors.cnicBack = "CNIC back image is required";
+    if (!files.photo) newErrors.photo = "Photo is required";
+    if (!form.matricBoard) newErrors.matricBoard = "Board is required";
+    if (!form.matricYear) newErrors.matricYear = "Year is required";
+    if (!form.matricMarks.trim()) newErrors.matricMarks = "Marks/Grade is required";
+    if (!form.interBoard) newErrors.interBoard = "Board is required";
+    if (!form.interYear) newErrors.interYear = "Year is required";
+    if (!form.interMarks.trim()) newErrors.interMarks = "Marks/Grade is required";
+    if (!form.icapLevel) newErrors.icapLevel = "ICAP level is required";
+    if (!form.preferredLocation) newErrors.preferredLocation = "Location is required";
+    if (!form.preferredDept) newErrors.preferredDept = "Department is required";
+    if (!form.availableStart) newErrors.availableStart = "Start date is required";
+    if (!form.accountingLevel) newErrors.accountingLevel = "Accounting level is required";
+    if (!form.excelLevel) newErrors.excelLevel = "Excel level is required";
+    if (!form.communication) newErrors.communication = "Communication level is required";
+    if (!form.declaration) newErrors.declaration = "You must accept the declaration";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleNext = () => {
-    if (validateSection(currentSection)) {
-      setCurrentSection(prev => Math.min(prev + 1, SECTIONS.length - 1));
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
-
-  const handlePrev = () => {
-    setCurrentSection(prev => Math.max(prev - 1, 0));
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   const handleSubmit = async () => {
-    if (!validateSection(currentSection)) return;
+    if (!validateAll()) {
+      const firstErr = document.querySelector("[data-field-error]");
+      if (firstErr) firstErr.scrollIntoView({ behavior: "smooth", block: "center" });
+      toast({ title: "Please fix the errors", description: "Some required fields are missing or invalid.", variant: "destructive" });
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -253,7 +212,6 @@ export default function TrainingApplication() {
       }
 
       setSubmitted(true);
-      setApplicationId(data.id);
       setApplicationCrn(data.crn);
       toast({ title: "Application Submitted!", description: "Your training application has been received successfully." });
     } catch (error: any) {
@@ -299,12 +257,12 @@ export default function TrainingApplication() {
           />
         </label>
       )}
-      {errors[field] && <p className="text-destructive text-xs mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors[field]}</p>}
+      {errors[field] && <p data-field-error className="text-destructive text-xs mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors[field]}</p>}
     </div>
   );
 
   const FieldError = ({ field }: { field: string }) =>
-    errors[field] ? <p className="text-destructive text-xs mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors[field]}</p> : null;
+    errors[field] ? <p data-field-error className="text-destructive text-xs mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors[field]}</p> : null;
 
   if (submitted) {
     return (
@@ -338,8 +296,6 @@ export default function TrainingApplication() {
     );
   }
 
-  const progress = ((currentSection + 1) / SECTIONS.length) * 100;
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50/80 via-background to-indigo-50/50">
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-border/40 shadow-sm">
@@ -357,433 +313,426 @@ export default function TrainingApplication() {
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-6 py-6">
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-muted-foreground">
-              Step {currentSection + 1} of {SECTIONS.length}
-            </span>
-            <span className="text-xs font-semibold text-primary">{Math.round(progress)}%</span>
-          </div>
-          <div className="w-full bg-muted/60 rounded-full h-2 overflow-hidden">
-            <div
-              className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <div className="flex gap-1 mt-3 overflow-x-auto pb-1">
-            {SECTIONS.map((s, i) => {
-              const Icon = s.icon;
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => { if (i < currentSection) setCurrentSection(i); }}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-colors ${
-                    i === currentSection
-                      ? "bg-primary text-primary-foreground"
-                      : i < currentSection
-                        ? "bg-emerald-100 text-emerald-700 cursor-pointer hover:bg-emerald-200"
-                        : "bg-muted/60 text-muted-foreground"
-                  }`}
-                >
-                  {i < currentSection ? <CheckCircle2 className="w-3 h-3" /> : <Icon className="w-3 h-3" />}
-                  <span className="hidden sm:inline">{s.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      <div className="max-w-4xl mx-auto px-6 py-6 space-y-6">
 
         <Card className="shadow-lg border-border/40">
           <CardContent className="p-6 sm:p-8">
             <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
-              {(() => { const Icon = SECTIONS[currentSection].icon; return <Icon className="w-5 h-5 text-primary" />; })()}
-              {SECTIONS[currentSection].label}
+              <User className="w-5 h-5 text-primary" />
+              Personal Info
             </h2>
-            <p className="text-xs text-muted-foreground mb-6">
-              {currentSection === 0 && "Please provide your personal information."}
-              {currentSection === 1 && "How can we reach you?"}
-              {currentSection === 2 && "Upload your CNIC (front & back) and a recent photograph."}
-              {currentSection === 3 && "Enter your academic qualifications."}
-              {currentSection === 4 && "Select your training preferences."}
-              {currentSection === 5 && "When can you start and your availability."}
-              {currentSection === 6 && "Rate your technical and soft skills."}
-              {currentSection === 7 && "Share any relevant work experience (optional)."}
-              {currentSection === 8 && "Review and submit your application."}
-            </p>
-
-            {currentSection === 0 && (
-              <div className="space-y-4">
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm">Full Name *</Label>
-                    <Input value={form.fullName} onChange={e => handleChange("fullName", e.target.value)} placeholder="e.g. Muhammad Ahmad" />
-                    <FieldError field="fullName" />
-                  </div>
-                  <div>
-                    <Label className="text-sm">Father's Name *</Label>
-                    <Input value={form.fatherName} onChange={e => handleChange("fatherName", e.target.value)} placeholder="e.g. Muhammad Ali" />
-                    <FieldError field="fatherName" />
-                  </div>
+            <p className="text-xs text-muted-foreground mb-6">Please provide your personal information.</p>
+            <div className="space-y-4">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm">Full Name *</Label>
+                  <Input value={form.fullName} onChange={e => handleChange("fullName", e.target.value)} placeholder="e.g. Muhammad Ahmad" />
+                  <FieldError field="fullName" />
                 </div>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm">CNIC Number *</Label>
-                    <Input
-                      value={form.cnic}
-                      onChange={e => handleChange("cnic", formatCNIC(e.target.value))}
-                      placeholder="xxxxx-xxxxxxx-x"
-                      maxLength={15}
-                    />
-                    <FieldError field="cnic" />
-                  </div>
-                  <div>
-                    <Label className="text-sm">Date of Birth *</Label>
-                    <Input type="date" value={form.dateOfBirth} onChange={e => handleChange("dateOfBirth", e.target.value)} />
-                    <FieldError field="dateOfBirth" />
-                  </div>
-                </div>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm">Gender *</Label>
-                    <Select value={form.gender} onValueChange={v => handleChange("gender", v)}>
-                      <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="male">Male</SelectItem>
-                        <SelectItem value="female">Female</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FieldError field="gender" />
-                  </div>
-                  <div>
-                    <Label className="text-sm">Marital Status *</Label>
-                    <Select value={form.maritalStatus} onValueChange={v => handleChange("maritalStatus", v)}>
-                      <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="single">Single</SelectItem>
-                        <SelectItem value="married">Married</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FieldError field="maritalStatus" />
-                  </div>
+                <div>
+                  <Label className="text-sm">Father's Name *</Label>
+                  <Input value={form.fatherName} onChange={e => handleChange("fatherName", e.target.value)} placeholder="e.g. Muhammad Ali" />
+                  <FieldError field="fatherName" />
                 </div>
               </div>
-            )}
-
-            {currentSection === 1 && (
-              <div className="space-y-4">
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm">Mobile Number *</Label>
-                    <Input value={form.mobile} onChange={e => handleChange("mobile", e.target.value)} placeholder="03xx-xxxxxxx" />
-                    <FieldError field="mobile" />
-                  </div>
-                  <div>
-                    <Label className="text-sm">Alternate Mobile</Label>
-                    <Input value={form.alternateMobile} onChange={e => handleChange("alternateMobile", e.target.value)} placeholder="Optional" />
-                  </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm">CNIC Number *</Label>
+                  <Input
+                    value={form.cnic}
+                    onChange={e => handleChange("cnic", formatCNIC(e.target.value))}
+                    placeholder="xxxxx-xxxxxxx-x"
+                    maxLength={15}
+                  />
+                  <FieldError field="cnic" />
                 </div>
                 <div>
-                  <Label className="text-sm">Email Address *</Label>
-                  <Input type="email" value={form.email} onChange={e => handleChange("email", e.target.value)} placeholder="you@example.com" />
-                  <FieldError field="email" />
-                </div>
-                <div>
-                  <Label className="text-sm">Current Address *</Label>
-                  <Textarea value={form.currentAddress} onChange={e => handleChange("currentAddress", e.target.value)} placeholder="Full current address" rows={2} />
-                  <FieldError field="currentAddress" />
-                </div>
-                <div>
-                  <Label className="text-sm">Permanent Address *</Label>
-                  <Textarea value={form.permanentAddress} onChange={e => handleChange("permanentAddress", e.target.value)} placeholder="Full permanent address" rows={2} />
-                  <FieldError field="permanentAddress" />
+                  <Label className="text-sm">Date of Birth *</Label>
+                  <Input type="date" value={form.dateOfBirth} onChange={e => handleChange("dateOfBirth", e.target.value)} />
+                  <FieldError field="dateOfBirth" />
                 </div>
               </div>
-            )}
-
-            {currentSection === 2 && (
-              <div className="grid sm:grid-cols-3 gap-5">
-                <FileUploadBox field="cnicFront" label="CNIC Front" />
-                <FileUploadBox field="cnicBack" label="CNIC Back" />
-                <FileUploadBox field="photo" label="Recent Photograph" />
-              </div>
-            )}
-
-            {currentSection === 3 && (
-              <div className="space-y-6">
+              <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <h3 className="text-sm font-semibold mb-3 text-primary">Matriculation / O-Level</h3>
-                  <div className="grid sm:grid-cols-3 gap-4">
-                    <div>
-                      <Label className="text-sm">Board *</Label>
-                      <Select value={form.matricBoard} onValueChange={v => handleChange("matricBoard", v)}>
-                        <SelectTrigger><SelectValue placeholder="Select board" /></SelectTrigger>
-                        <SelectContent>{BOARDS.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
-                      </Select>
-                      <FieldError field="matricBoard" />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Year *</Label>
-                      <Input type="number" value={form.matricYear} onChange={e => handleChange("matricYear", e.target.value)} placeholder="e.g. 2018" />
-                      <FieldError field="matricYear" />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Marks/Grade *</Label>
-                      <Input value={form.matricMarks} onChange={e => handleChange("matricMarks", e.target.value)} placeholder="e.g. 950/1100 or A+" />
-                      <FieldError field="matricMarks" />
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold mb-3 text-primary">Intermediate / A-Level</h3>
-                  <div className="grid sm:grid-cols-3 gap-4">
-                    <div>
-                      <Label className="text-sm">Board *</Label>
-                      <Select value={form.interBoard} onValueChange={v => handleChange("interBoard", v)}>
-                        <SelectTrigger><SelectValue placeholder="Select board" /></SelectTrigger>
-                        <SelectContent>{BOARDS.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
-                      </Select>
-                      <FieldError field="interBoard" />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Year *</Label>
-                      <Input type="number" value={form.interYear} onChange={e => handleChange("interYear", e.target.value)} placeholder="e.g. 2020" />
-                      <FieldError field="interYear" />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Marks/Grade *</Label>
-                      <Input value={form.interMarks} onChange={e => handleChange("interMarks", e.target.value)} placeholder="e.g. 900/1100 or A" />
-                      <FieldError field="interMarks" />
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold mb-3 text-primary">Graduation (if applicable)</h3>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm">Degree</Label>
-                      <Input value={form.graduationDegree} onChange={e => handleChange("graduationDegree", e.target.value)} placeholder="e.g. B.Com, BBA, BS" />
-                    </div>
-                    <div>
-                      <Label className="text-sm">University</Label>
-                      <Input value={form.graduationUni} onChange={e => handleChange("graduationUni", e.target.value)} placeholder="e.g. Punjab University" />
-                    </div>
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-4 mt-4">
-                    <div>
-                      <Label className="text-sm">Year</Label>
-                      <Input type="number" value={form.graduationYear} onChange={e => handleChange("graduationYear", e.target.value)} placeholder="e.g. 2023" />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Marks/CGPA</Label>
-                      <Input value={form.graduationMarks} onChange={e => handleChange("graduationMarks", e.target.value)} placeholder="e.g. 3.5/4.0 or 65%" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {currentSection === 4 && (
-              <div className="space-y-4">
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm">ICAP Registration No.</Label>
-                    <Input value={form.icapRegNo} onChange={e => handleChange("icapRegNo", e.target.value)} placeholder="If registered" />
-                  </div>
-                  <div>
-                    <Label className="text-sm">ICAP Level *</Label>
-                    <Select value={form.icapLevel} onValueChange={v => handleChange("icapLevel", v)}>
-                      <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="not_registered">Not Yet Registered</SelectItem>
-                        <SelectItem value="caf_1">CAF-1 (Foundation)</SelectItem>
-                        <SelectItem value="caf_2">CAF-2</SelectItem>
-                        <SelectItem value="caf_3">CAF-3</SelectItem>
-                        <SelectItem value="caf_4">CAF-4</SelectItem>
-                        <SelectItem value="caf_5">CAF-5</SelectItem>
-                        <SelectItem value="caf_6">CAF-6</SelectItem>
-                        <SelectItem value="caf_7">CAF-7</SelectItem>
-                        <SelectItem value="caf_8">CAF-8</SelectItem>
-                        <SelectItem value="cfap">CFAP Level</SelectItem>
-                        <SelectItem value="msa">MSA Level</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FieldError field="icapLevel" />
-                  </div>
-                </div>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm">Preferred Location *</Label>
-                    <Select value={form.preferredLocation} onValueChange={v => handleChange("preferredLocation", v)}>
-                      <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="lahore">Lahore Office</SelectItem>
-                        <SelectItem value="islamabad">Islamabad Office</SelectItem>
-                        <SelectItem value="any">Either Location</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FieldError field="preferredLocation" />
-                  </div>
-                  <div>
-                    <Label className="text-sm">Preferred Department *</Label>
-                    <Select value={form.preferredDept} onValueChange={v => handleChange("preferredDept", v)}>
-                      <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="audit">Audit & Assurance</SelectItem>
-                        <SelectItem value="tax">Tax Advisory</SelectItem>
-                        <SelectItem value="corporate">Corporate Services</SelectItem>
-                        <SelectItem value="advisory">Advisory & Consulting</SelectItem>
-                        <SelectItem value="any">No Preference</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FieldError field="preferredDept" />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {currentSection === 5 && (
-              <div className="space-y-4">
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm">Available Start Date *</Label>
-                    <Input type="date" value={form.availableStart} onChange={e => handleChange("availableStart", e.target.value)} />
-                    <FieldError field="availableStart" />
-                  </div>
-                  <div>
-                    <Label className="text-sm">Availability *</Label>
-                    <Select value={form.isFullTime} onValueChange={v => handleChange("isFullTime", v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="true">Full-Time</SelectItem>
-                        <SelectItem value="false">Part-Time</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm">Current Engagement (if any)</Label>
-                  <Textarea value={form.currentEngagement} onChange={e => handleChange("currentEngagement", e.target.value)} placeholder="Describe any current work, studies, or commitments" rows={3} />
-                </div>
-              </div>
-            )}
-
-            {currentSection === 6 && (
-              <div className="space-y-4">
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm">Accounting Knowledge *</Label>
-                    <Select value={form.accountingLevel} onValueChange={v => handleChange("accountingLevel", v)}>
-                      <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="beginner">Beginner</SelectItem>
-                        <SelectItem value="intermediate">Intermediate</SelectItem>
-                        <SelectItem value="advanced">Advanced</SelectItem>
-                        <SelectItem value="expert">Expert</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FieldError field="accountingLevel" />
-                  </div>
-                  <div>
-                    <Label className="text-sm">Microsoft Excel *</Label>
-                    <Select value={form.excelLevel} onValueChange={v => handleChange("excelLevel", v)}>
-                      <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="beginner">Beginner</SelectItem>
-                        <SelectItem value="intermediate">Intermediate</SelectItem>
-                        <SelectItem value="advanced">Advanced</SelectItem>
-                        <SelectItem value="expert">Expert</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FieldError field="excelLevel" />
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm">Communication Skills *</Label>
-                  <Select value={form.communication} onValueChange={v => handleChange("communication", v)}>
-                    <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
+                  <Label className="text-sm">Gender *</Label>
+                  <Select value={form.gender} onValueChange={v => handleChange("gender", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="basic">Basic</SelectItem>
-                      <SelectItem value="good">Good</SelectItem>
-                      <SelectItem value="excellent">Excellent</SelectItem>
-                      <SelectItem value="professional">Professional</SelectItem>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
-                  <FieldError field="communication" />
+                  <FieldError field="gender" />
                 </div>
                 <div>
-                  <Label className="text-sm">Other Software Skills</Label>
-                  <Input value={form.softwareSkills} onChange={e => handleChange("softwareSkills", e.target.value)} placeholder="e.g. SAP, QuickBooks, Tally, Word, PowerPoint" />
+                  <Label className="text-sm">Marital Status *</Label>
+                  <Select value={form.maritalStatus} onValueChange={v => handleChange("maritalStatus", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="single">Single</SelectItem>
+                      <SelectItem value="married">Married</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FieldError field="maritalStatus" />
                 </div>
               </div>
-            )}
+            </div>
+          </CardContent>
+        </Card>
 
-            {currentSection === 7 && (
-              <div className="space-y-4">
+        <Card className="shadow-lg border-border/40">
+          <CardContent className="p-6 sm:p-8">
+            <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
+              <Phone className="w-5 h-5 text-primary" />
+              Contact Information
+            </h2>
+            <p className="text-xs text-muted-foreground mb-6">How can we reach you?</p>
+            <div className="space-y-4">
+              <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm">Work Experience Details</Label>
-                  <Textarea
-                    value={form.experienceDetails}
-                    onChange={e => handleChange("experienceDetails", e.target.value)}
-                    placeholder="Describe any relevant work experience, internships, or volunteer work. Include company name, role, duration, and key responsibilities. Leave blank if no experience."
-                    rows={6}
-                  />
+                  <Label className="text-sm">Mobile Number *</Label>
+                  <Input value={form.mobile} onChange={e => handleChange("mobile", e.target.value)} placeholder="03xx-xxxxxxx" />
+                  <FieldError field="mobile" />
                 </div>
-                <p className="text-xs text-muted-foreground bg-blue-50 text-blue-700 rounded-lg p-3">
-                  This section is optional. Fresh graduates with no experience are welcome to apply.
+                <div>
+                  <Label className="text-sm">Alternate Mobile</Label>
+                  <Input value={form.alternateMobile} onChange={e => handleChange("alternateMobile", e.target.value)} placeholder="Optional" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm">Email Address *</Label>
+                <Input type="email" value={form.email} onChange={e => handleChange("email", e.target.value)} placeholder="you@example.com" />
+                <FieldError field="email" />
+              </div>
+              <div>
+                <Label className="text-sm">Current Address *</Label>
+                <Textarea value={form.currentAddress} onChange={e => handleChange("currentAddress", e.target.value)} placeholder="Full current address" rows={2} />
+                <FieldError field="currentAddress" />
+              </div>
+              <div>
+                <Label className="text-sm">Permanent Address *</Label>
+                <Textarea value={form.permanentAddress} onChange={e => handleChange("permanentAddress", e.target.value)} placeholder="Full permanent address" rows={2} />
+                <FieldError field="permanentAddress" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg border-border/40">
+          <CardContent className="p-6 sm:p-8">
+            <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
+              <Upload className="w-5 h-5 text-primary" />
+              Document Uploads
+            </h2>
+            <p className="text-xs text-muted-foreground mb-6">Upload your CNIC (front & back) and a recent photograph.</p>
+            <div className="grid sm:grid-cols-3 gap-5">
+              <FileUploadBox field="cnicFront" label="CNIC Front" />
+              <FileUploadBox field="cnicBack" label="CNIC Back" />
+              <FileUploadBox field="photo" label="Recent Photograph" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg border-border/40">
+          <CardContent className="p-6 sm:p-8">
+            <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
+              <GraduationCap className="w-5 h-5 text-primary" />
+              Academic Qualifications
+            </h2>
+            <p className="text-xs text-muted-foreground mb-6">Enter your academic qualifications.</p>
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold mb-3 text-primary">Matriculation / O-Level</h3>
+                <div className="grid sm:grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-sm">Board *</Label>
+                    <Select value={form.matricBoard} onValueChange={v => handleChange("matricBoard", v)}>
+                      <SelectTrigger><SelectValue placeholder="Select board" /></SelectTrigger>
+                      <SelectContent>{BOARDS.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <FieldError field="matricBoard" />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Year *</Label>
+                    <Input type="number" value={form.matricYear} onChange={e => handleChange("matricYear", e.target.value)} placeholder="e.g. 2018" />
+                    <FieldError field="matricYear" />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Marks/Grade *</Label>
+                    <Input value={form.matricMarks} onChange={e => handleChange("matricMarks", e.target.value)} placeholder="e.g. 950/1100 or A+" />
+                    <FieldError field="matricMarks" />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold mb-3 text-primary">Intermediate / A-Level</h3>
+                <div className="grid sm:grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-sm">Board *</Label>
+                    <Select value={form.interBoard} onValueChange={v => handleChange("interBoard", v)}>
+                      <SelectTrigger><SelectValue placeholder="Select board" /></SelectTrigger>
+                      <SelectContent>{BOARDS.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <FieldError field="interBoard" />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Year *</Label>
+                    <Input type="number" value={form.interYear} onChange={e => handleChange("interYear", e.target.value)} placeholder="e.g. 2020" />
+                    <FieldError field="interYear" />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Marks/Grade *</Label>
+                    <Input value={form.interMarks} onChange={e => handleChange("interMarks", e.target.value)} placeholder="e.g. 900/1100 or A" />
+                    <FieldError field="interMarks" />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold mb-3 text-primary">Graduation (if applicable)</h3>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm">Degree</Label>
+                    <Input value={form.graduationDegree} onChange={e => handleChange("graduationDegree", e.target.value)} placeholder="e.g. B.Com, BBA, BS" />
+                  </div>
+                  <div>
+                    <Label className="text-sm">University</Label>
+                    <Input value={form.graduationUni} onChange={e => handleChange("graduationUni", e.target.value)} placeholder="e.g. Punjab University" />
+                  </div>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <Label className="text-sm">Year</Label>
+                    <Input type="number" value={form.graduationYear} onChange={e => handleChange("graduationYear", e.target.value)} placeholder="e.g. 2023" />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Marks/CGPA</Label>
+                    <Input value={form.graduationMarks} onChange={e => handleChange("graduationMarks", e.target.value)} placeholder="e.g. 3.5/4.0 or 65%" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg border-border/40">
+          <CardContent className="p-6 sm:p-8">
+            <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-primary" />
+              Training Preferences
+            </h2>
+            <p className="text-xs text-muted-foreground mb-6">Select your training preferences.</p>
+            <div className="space-y-4">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm">ICAP Registration No.</Label>
+                  <Input value={form.icapRegNo} onChange={e => handleChange("icapRegNo", e.target.value)} placeholder="If registered" />
+                </div>
+                <div>
+                  <Label className="text-sm">ICAP Level *</Label>
+                  <Select value={form.icapLevel} onValueChange={v => handleChange("icapLevel", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="not_registered">Not Yet Registered</SelectItem>
+                      <SelectItem value="caf_1">CAF-1 (Foundation)</SelectItem>
+                      <SelectItem value="caf_2">CAF-2</SelectItem>
+                      <SelectItem value="caf_3">CAF-3</SelectItem>
+                      <SelectItem value="caf_4">CAF-4</SelectItem>
+                      <SelectItem value="caf_5">CAF-5</SelectItem>
+                      <SelectItem value="caf_6">CAF-6</SelectItem>
+                      <SelectItem value="caf_7">CAF-7</SelectItem>
+                      <SelectItem value="caf_8">CAF-8</SelectItem>
+                      <SelectItem value="cfap">CFAP Level</SelectItem>
+                      <SelectItem value="msa">MSA Level</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FieldError field="icapLevel" />
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm">Preferred Location *</Label>
+                  <Select value={form.preferredLocation} onValueChange={v => handleChange("preferredLocation", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="lahore">Lahore Office</SelectItem>
+                      <SelectItem value="islamabad">Islamabad Office</SelectItem>
+                      <SelectItem value="any">Either Location</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FieldError field="preferredLocation" />
+                </div>
+                <div>
+                  <Label className="text-sm">Preferred Department *</Label>
+                  <Select value={form.preferredDept} onValueChange={v => handleChange("preferredDept", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="audit">Audit & Assurance</SelectItem>
+                      <SelectItem value="tax">Tax Advisory</SelectItem>
+                      <SelectItem value="corporate">Corporate Services</SelectItem>
+                      <SelectItem value="advisory">Advisory & Consulting</SelectItem>
+                      <SelectItem value="any">No Preference</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FieldError field="preferredDept" />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg border-border/40">
+          <CardContent className="p-6 sm:p-8">
+            <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
+              <Briefcase className="w-5 h-5 text-primary" />
+              Availability
+            </h2>
+            <p className="text-xs text-muted-foreground mb-6">When can you start and your availability.</p>
+            <div className="space-y-4">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm">Available Start Date *</Label>
+                  <Input type="date" value={form.availableStart} onChange={e => handleChange("availableStart", e.target.value)} />
+                  <FieldError field="availableStart" />
+                </div>
+                <div>
+                  <Label className="text-sm">Availability *</Label>
+                  <Select value={form.isFullTime} onValueChange={v => handleChange("isFullTime", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Full-Time</SelectItem>
+                      <SelectItem value="false">Part-Time</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm">Current Engagement (if any)</Label>
+                <Textarea value={form.currentEngagement} onChange={e => handleChange("currentEngagement", e.target.value)} placeholder="Describe any current work, studies, or commitments" rows={3} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg border-border/40">
+          <CardContent className="p-6 sm:p-8">
+            <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
+              <Wrench className="w-5 h-5 text-primary" />
+              Skills
+            </h2>
+            <p className="text-xs text-muted-foreground mb-6">Rate your technical and soft skills.</p>
+            <div className="space-y-4">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm">Accounting Knowledge *</Label>
+                  <Select value={form.accountingLevel} onValueChange={v => handleChange("accountingLevel", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="beginner">Beginner</SelectItem>
+                      <SelectItem value="intermediate">Intermediate</SelectItem>
+                      <SelectItem value="advanced">Advanced</SelectItem>
+                      <SelectItem value="expert">Expert</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FieldError field="accountingLevel" />
+                </div>
+                <div>
+                  <Label className="text-sm">Microsoft Excel *</Label>
+                  <Select value={form.excelLevel} onValueChange={v => handleChange("excelLevel", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="beginner">Beginner</SelectItem>
+                      <SelectItem value="intermediate">Intermediate</SelectItem>
+                      <SelectItem value="advanced">Advanced</SelectItem>
+                      <SelectItem value="expert">Expert</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FieldError field="excelLevel" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm">Communication Skills *</Label>
+                <Select value={form.communication} onValueChange={v => handleChange("communication", v)}>
+                  <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="basic">Basic</SelectItem>
+                    <SelectItem value="good">Good</SelectItem>
+                    <SelectItem value="excellent">Excellent</SelectItem>
+                    <SelectItem value="professional">Professional</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FieldError field="communication" />
+              </div>
+              <div>
+                <Label className="text-sm">Other Software Skills</Label>
+                <Input value={form.softwareSkills} onChange={e => handleChange("softwareSkills", e.target.value)} placeholder="e.g. SAP, QuickBooks, Tally, Word, PowerPoint" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg border-border/40">
+          <CardContent className="p-6 sm:p-8">
+            <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              Experience
+            </h2>
+            <p className="text-xs text-muted-foreground mb-6">Share any relevant work experience (optional).</p>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm">Work Experience Details</Label>
+                <Textarea
+                  value={form.experienceDetails}
+                  onChange={e => handleChange("experienceDetails", e.target.value)}
+                  placeholder="Describe any relevant work experience, internships, or volunteer work. Include company name, role, duration, and key responsibilities. Leave blank if no experience."
+                  rows={5}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground bg-blue-50 text-blue-700 rounded-lg p-3">
+                This section is optional. Fresh graduates with no experience are welcome to apply.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg border-border/40">
+          <CardContent className="p-6 sm:p-8">
+            <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-primary" />
+              Declaration
+            </h2>
+            <p className="text-xs text-muted-foreground mb-6">Review and submit your application.</p>
+            <div className="space-y-4">
+              <div className="bg-muted/30 rounded-xl p-5 border border-border/40 text-sm space-y-3">
+                <p className="font-semibold text-foreground">Declaration</p>
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  I hereby declare that all information provided in this application is true, complete, and correct to the best of my knowledge and belief. I understand that any false statement, omission, or misrepresentation may disqualify my application or result in termination of training.
+                </p>
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  I authorize Aqeel Alam & Company, Chartered Accountants, to verify any information provided herein and to contact the educational institutions and references listed.
+                </p>
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  I understand that submitting this application does not guarantee admission into the CA training program and that the firm reserves the right to accept or reject any application at its sole discretion.
                 </p>
               </div>
-            )}
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={form.declaration as boolean}
+                  onChange={e => handleChange("declaration", e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-border accent-primary"
+                />
+                <span className="text-sm text-foreground/80 group-hover:text-foreground transition-colors">
+                  I have read, understood, and agree to the above declaration. *
+                </span>
+              </label>
+              <FieldError field="declaration" />
 
-            {currentSection === 8 && (
-              <div className="space-y-4">
-                <div className="bg-muted/30 rounded-xl p-5 border border-border/40 text-sm space-y-3">
-                  <p className="font-semibold text-foreground">Declaration</p>
-                  <p className="text-muted-foreground text-xs leading-relaxed">
-                    I hereby declare that all information provided in this application is true, complete, and correct to the best of my knowledge and belief. I understand that any false statement, omission, or misrepresentation may disqualify my application or result in termination of training.
-                  </p>
-                  <p className="text-muted-foreground text-xs leading-relaxed">
-                    I authorize Aqeel Alam & Company, Chartered Accountants, to verify any information provided herein and to contact the educational institutions and references listed.
-                  </p>
-                  <p className="text-muted-foreground text-xs leading-relaxed">
-                    I understand that submitting this application does not guarantee admission into the CA training program and that the firm reserves the right to accept or reject any application at its sole discretion.
-                  </p>
-                </div>
-                <label className="flex items-start gap-3 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={form.declaration as boolean}
-                    onChange={e => handleChange("declaration", e.target.checked)}
-                    className="mt-0.5 w-4 h-4 rounded border-border accent-primary"
-                  />
-                  <span className="text-sm text-foreground/80 group-hover:text-foreground transition-colors">
-                    I have read, understood, and agree to the above declaration. *
-                  </span>
-                </label>
-                <FieldError field="declaration" />
-              </div>
-            )}
-
-            <div className="flex items-center justify-between mt-8 pt-6 border-t border-border/40">
-              <Button
-                variant="outline"
-                onClick={handlePrev}
-                disabled={currentSection === 0}
-                className="gap-1.5"
-              >
-                <ArrowLeft className="w-4 h-4" /> Previous
-              </Button>
-
-              {currentSection < SECTIONS.length - 1 ? (
-                <Button onClick={handleNext} className="gap-1.5">
-                  Next <ArrowRight className="w-4 h-4" />
-                </Button>
-              ) : (
+              <div className="pt-4 border-t border-border/40">
                 <Button
                   onClick={handleSubmit}
                   disabled={submitting || !form.declaration}
-                  className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                  className="w-full gap-1.5 bg-emerald-600 hover:bg-emerald-700 h-11 text-base"
                 >
                   {submitting ? (
                     <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</>
@@ -791,10 +740,11 @@ export default function TrainingApplication() {
                     <><CheckCircle2 className="w-4 h-4" /> Submit Application</>
                   )}
                 </Button>
-              )}
+              </div>
             </div>
           </CardContent>
         </Card>
+
       </div>
     </div>
   );
