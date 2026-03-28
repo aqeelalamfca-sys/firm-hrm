@@ -110,33 +110,42 @@ export default function Applications() {
     shortlisted: applications.filter((a: any) => a.status === "shortlisted").length,
     selected: applications.filter((a: any) => a.status === "selected").length,
     rejected: applications.filter((a: any) => a.status === "rejected").length,
+    passed: applications.filter((a: any) => a.testStatus === "Passed").length,
+    failed: applications.filter((a: any) => a.testStatus === "Failed").length,
   };
+
+  const STAT_CARDS = [
+    { key: "total", label: "Total", value: stats.total, color: "bg-slate-100 text-slate-700 border-slate-200", icon: Users },
+    { key: "passed", label: "Passed", value: stats.passed, color: "bg-emerald-100 text-emerald-700 border-emerald-200", icon: CheckCircle2 },
+    { key: "failed", label: "Failed", value: stats.failed, color: "bg-red-100 text-red-700 border-red-200", icon: XCircle },
+    { key: "pending", label: "Pending", value: stats.pending, color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: Clock },
+    { key: "selected", label: "Selected", value: stats.selected, color: "bg-blue-100 text-blue-700 border-blue-200", icon: UserCheck },
+  ];
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Training Applications</h1>
-          <p className="text-sm text-muted-foreground">Review and manage CA training applications</p>
+          <h1 className="text-2xl font-bold tracking-tight">Candidate Management</h1>
+          <p className="text-sm text-muted-foreground">Track applications, test results, and interview schedules</p>
         </div>
         <Badge variant="outline" className="text-xs font-semibold px-3 py-1.5">
-          <Users className="w-3.5 h-3.5 mr-1.5" /> {stats.total} Applications
+          <Users className="w-3.5 h-3.5 mr-1.5" /> {stats.total} Candidates
         </Badge>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {Object.entries(STATUS_CONFIG).map(([key, { label, color, icon: Icon }]) => (
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        {STAT_CARDS.map(({ key, label, value, color, icon: Icon }) => (
           <Card
             key={key}
-            className={`cursor-pointer border transition-all hover:shadow-sm ${statusFilter === key ? "ring-2 ring-primary" : ""}`}
-            onClick={() => setStatusFilter(statusFilter === key ? "all" : key)}
+            className="border transition-all hover:shadow-sm"
           >
             <CardContent className="p-4 flex items-center gap-3">
               <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${color}`}>
                 <Icon className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-lg font-bold">{(stats as any)[key]}</p>
+                <p className="text-lg font-bold">{value}</p>
                 <p className="text-[10px] text-muted-foreground font-medium">{label}</p>
               </div>
             </CardContent>
@@ -192,6 +201,7 @@ export default function Applications() {
                   <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground">Department</th>
                   <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground">Test</th>
                   <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground">Status</th>
+                  <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground">Interview</th>
                   <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground">Applied</th>
                   <th className="text-right px-4 py-3 font-semibold text-xs text-muted-foreground">Actions</th>
                 </tr>
@@ -222,6 +232,14 @@ export default function Applications() {
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${sc.color}`}>
                           <StatusIcon className="w-3 h-3" /> {sc.label}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        {app.interviewDate ? (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(app.interviewDate).toLocaleDateString("en-PK", { day: "numeric", month: "short" })}
+                          </span>
+                        ) : "—"}
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">
                         {new Date(app.createdAt).toLocaleDateString("en-PK", { day: "numeric", month: "short", year: "numeric" })}
