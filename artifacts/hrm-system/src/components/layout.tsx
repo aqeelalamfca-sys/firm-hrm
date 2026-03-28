@@ -54,7 +54,7 @@ const navItems: NavItem[] = [
   { href: "/documents", label: "Documents", icon: FolderOpen, section: "work" },
   { href: "/reports", label: "Reports", icon: BarChart3, section: "analytics", roles: ["super_admin", "partner", "hr_admin", "finance_officer", "manager"] },
   { href: "/applications", label: "Candidate Management", icon: GraduationCap, section: "admin", roles: ["super_admin", "partner", "hr_admin"] },
-  { href: "/manage-meetings", label: "Manage Meetings", icon: Video, section: "admin", roles: ["super_admin", "partner"] },
+  { href: "/manage-meetings", label: "Meeting Management", icon: Video, section: "admin", roles: ["super_admin", "partner"] },
   { href: "/audit-trail", label: "Audit Trail", icon: ScrollText, section: "admin", roles: ["super_admin", "partner", "hr_admin"] },
   { href: "/user-management", label: "User Management", icon: UserCog, section: "admin", roles: ["super_admin", "partner", "hr_admin"] },
 ];

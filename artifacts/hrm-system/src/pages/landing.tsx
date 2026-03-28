@@ -12,7 +12,7 @@ import {
   GraduationCap, Clock, Layers, Lock, Search, PieChart, UserCheck, Cpu,
   Menu, X, Factory, Truck, Pickaxe, Clapperboard, Wallet, Utensils, Building,
   Hotel, Ship, Wrench, Newspaper, HandHeart, Fuel, Radio, Pill, BriefcaseBusiness,
-  Home, ShoppingCart, Monitor, Plane, Video
+  Home, ShoppingCart, Monitor, Plane, Video, Calendar
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -240,29 +240,78 @@ export default function Landing() {
         <div className="absolute top-20 right-0 w-[500px] h-[500px] bg-primary/[0.04] rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-violet-500/[0.03] rounded-full blur-3xl" />
         <div className="relative max-w-7xl mx-auto px-6">
-          <div className="max-w-3xl">
-            <Badge className="mb-6 bg-primary/5 text-primary border-primary/20 text-xs font-semibold px-3 py-1">
-              ICAP Approved Training Organization
-            </Badge>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1] mb-6">
-              Leading Chartered
-              <br />
-              <span className="text-primary">Accountants Firm</span>
-            </h1>
-            <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mb-8">
-              Providing audit, tax, and financial & corporate advisory services with firm commitment.
-              Expert chartered accounting and international corporate services — your trusted partner
-              in Pakistan and beyond.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Link href="/login">
-                <Button size="lg" className="h-12 px-6 text-sm font-semibold shadow-md gap-2">
-                  Get Started <ArrowRight className="w-4 h-4" />
-                </Button>
-              </Link>
-              <button onClick={() => scrollTo("services")} className="h-12 px-6 text-sm font-semibold border border-border/60 rounded-lg bg-background hover:bg-muted/50 transition-colors inline-flex items-center gap-2">
-                Our Services <ChevronRight className="w-4 h-4" />
-              </button>
+          <div className="grid lg:grid-cols-[1fr_400px] gap-12 items-center">
+            <div>
+              <Badge className="mb-6 bg-primary/5 text-primary border-primary/20 text-xs font-semibold px-3 py-1">
+                ICAP Approved Training Organization
+              </Badge>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1] mb-6">
+                Leading Chartered
+                <br />
+                <span className="text-primary">Accountants Firm</span>
+              </h1>
+              <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mb-8">
+                Providing audit, tax, and financial & corporate advisory services with firm commitment.
+                Expert chartered accounting and international corporate services — your trusted partner
+                in Pakistan and beyond.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Link href="/login">
+                  <Button size="lg" className="h-12 px-6 text-sm font-semibold shadow-md gap-2">
+                    Get Started <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </Link>
+                <button onClick={() => scrollTo("services")} className="h-12 px-6 text-sm font-semibold border border-border/60 rounded-lg bg-background hover:bg-muted/50 transition-colors inline-flex items-center gap-2">
+                  Our Services <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Meeting Booking Card */}
+            <div className="hidden lg:block">
+              <Card className="shadow-xl border-border/50 overflow-hidden">
+                <div className="bg-primary px-6 py-5">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center">
+                      <Video className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-bold text-base leading-tight">Book a Partner Meeting</h3>
+                      <p className="text-white/70 text-xs">Online consultations available</p>
+                    </div>
+                  </div>
+                </div>
+                <CardContent className="p-5 space-y-4">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Schedule a one-on-one session with our experienced Chartered Accountants. Choose your preferred partner, date, and time.
+                  </p>
+                  <div className="space-y-2.5">
+                    {PARTNERS.slice(0, 4).map((p) => (
+                      <div key={p.name} className="flex items-center gap-3 p-2.5 rounded-xl border border-border/40 bg-muted/20 hover:bg-muted/40 transition-colors">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                          {p.name.split(" ").slice(-1)[0][0]}{p.name.split(" ").slice(-2, -1)[0]?.[0] || ""}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold truncate">{p.name}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{p.focus}</p>
+                        </div>
+                      </div>
+                    ))}
+                    <p className="text-[10px] text-muted-foreground text-center">+{PARTNERS.length - 4} more partners available</p>
+                  </div>
+                  <div className="pt-1 space-y-2">
+                    <Link href="/book-meeting">
+                      <Button className="w-full gap-2 shadow-sm">
+                        <Calendar className="w-4 h-4" /> Schedule a Meeting
+                      </Button>
+                    </Link>
+                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground justify-center">
+                      <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-emerald-500" /> Free consultation</span>
+                      <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-primary" /> 30–60 min sessions</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
 
