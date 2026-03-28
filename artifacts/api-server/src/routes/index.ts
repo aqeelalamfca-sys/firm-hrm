@@ -17,11 +17,13 @@ import documentsRouter from "./documents";
 import tasksRouter from "./tasks";
 import notificationsRouter from "./notifications";
 import departmentsRouter from "./departments";
+import applicationsRouter from "./applications";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use("/auth", authRouter);
+router.use("/applications", applicationsRouter);
 
 router.use(authMiddleware);
 

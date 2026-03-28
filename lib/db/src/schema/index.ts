@@ -12,3 +12,4 @@ export * from "./engagements";
 export * from "./documents";
 export * from "./tasks";
 export * from "./notifications";
+export * from "./training_applications";

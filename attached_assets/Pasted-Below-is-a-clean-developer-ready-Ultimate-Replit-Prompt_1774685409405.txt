@@ -1,0 +1,157 @@
+Below is a clean, developer-ready “Ultimate Replit Prompt” to add a new Admin Panel: Candidate Management into your existing sidebar (as shown), fully integrated with your CA Training + Test Module.
+
+✅ ULTIMATE REPLIT PROMPT — ADD “CANDIDATE MANAGEMENT” (ADMIN PANEL)
+
+Objective:
+Scan the current sidebar/navigation and add a new Admin Module: “Candidate Management” with full functionality for:
+
+Viewing applications
+Test results
+Status updates
+PDF access
+Interview tracking
+
+⚠️ Keep UI consistent with existing theme (dark sidebar, icons, spacing).
+⚠️ Do NOT disturb existing menu structure.
+
+🎯 PHASE 1 — SIDEBAR UPDATE (UI)
+Add new section under:
+
+👉 ADMINISTRATION
+
+ADMINISTRATION
+   Audit Trail
+   User Management
+   Candidate Management   ← NEW
+Icon:
+Use: user-check / users / file-user icon
+Route:
+/admin/candidates
+🧩 PHASE 2 — CANDIDATE MANAGEMENT MODULE
+
+Create new page:
+
+pages/admin/candidates.tsx
+📊 PHASE 3 — MAIN TABLE VIEW (CORE)
+Columns:
+CRN
+Name
+CNIC
+Email
+Department
+Test Score
+Status
+Interview Date
+Applied Date
+Status Values:
+Pending
+Passed
+Failed
+Shortlisted
+Selected
+UI:
+Clean table
+Sticky header
+Pagination
+🔍 PHASE 4 — FILTERS (TOP BAR)
+
+Add filters:
+
+Status
+Department
+Date Range
+Search (Name / CNIC / CRN)
+👁 PHASE 5 — VIEW DETAILS (MODAL / PAGE)
+
+On click → open full application:
+
+Show:
+Personal Info
+Academic Info
+Skills
+Uploaded Documents:
+CNIC Front
+CNIC Back
+Photo
+Test Result:
+Score
+Status
+Interview Details
+⚙️ PHASE 6 — ACTION BUTTONS
+
+Each row must include:
+
+Actions:
+👁 View
+✅ Mark Selected
+❌ Reject
+📄 Download PDF (only if passed)
+📄 PHASE 7 — PDF ACCESS
+Show PDF button only if:
+testStatus === "Passed"
+Download from:
+/pdfUrl
+🔄 PHASE 8 — STATUS UPDATE LOGIC
+Buttons:
+Mark Selected
+Reject
+Update DB:
+PATCH /api/applications/:id/status
+🔐 PHASE 9 — ACCESS CONTROL
+
+Only accessible by:
+
+Admin
+Partner
+
+NOT:
+
+Manager
+Trainee
+📊 PHASE 10 — DASHBOARD SUMMARY (TOP CARDS)
+
+Add summary cards:
+
+Total Applications
+Passed
+Failed
+Pending
+Selected
+📎 PHASE 11 — INTERVIEW TRACKING
+
+Display:
+
+Interview Date
+Time (11–12 window)
+
+Add option:
+
+“Reschedule” (optional)
+🔐 PHASE 12 — SECURITY
+Protect route with auth middleware
+No public access
+Secure file access
+⚙️ PHASE 13 — PERFORMANCE
+Lazy load data
+Pagination (10–20 rows)
+Indexed search (CNIC, CRN)
+🎨 UI RULES (STRICT)
+Match current sidebar style
+Use same font, colors, spacing
+Minimal design (no clutter)
+Card + table combination
+❗ CRITICAL INSTRUCTIONS
+DO NOT:
+Break sidebar layout
+Change existing modules
+Overcomplicate UI
+MUST:
+Keep it clean
+Fast
+Fully functional
+✅ FINAL OUTPUT
+New “Candidate Management” tab in Admin panel
+Full candidate tracking system
+Test + PDF + interview visibility
+Clean, professional UI
+Integrated with training module

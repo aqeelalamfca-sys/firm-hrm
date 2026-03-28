@@ -24,6 +24,7 @@ import {
   Check,
   CheckCheck,
   X,
+  GraduationCap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -51,6 +52,7 @@ const navItems: NavItem[] = [
   { href: "/engagements", label: "Engagements", icon: ClipboardList, section: "work" },
   { href: "/documents", label: "Documents", icon: FolderOpen, section: "work" },
   { href: "/reports", label: "Reports", icon: BarChart3, section: "analytics", roles: ["super_admin", "partner", "hr_admin", "finance_officer", "manager"] },
+  { href: "/applications", label: "Training Apps", icon: GraduationCap, section: "admin", roles: ["super_admin", "partner", "hr_admin"] },
   { href: "/audit-trail", label: "Audit Trail", icon: ScrollText, section: "admin", roles: ["super_admin", "partner", "hr_admin"] },
   { href: "/user-management", label: "User Management", icon: UserCog, section: "admin", roles: ["super_admin", "partner", "hr_admin"] },
 ];

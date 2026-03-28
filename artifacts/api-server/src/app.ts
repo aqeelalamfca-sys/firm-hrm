@@ -2,6 +2,7 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import cors from "cors";
 import pinoHttp from "pino-http";
 import rateLimit from "express-rate-limit";
+import path from "path";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -46,6 +47,8 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Too many login attempts, please try again later" },
 });
+
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 app.use("/api/auth", authLimiter);
 app.use("/api", apiLimiter);

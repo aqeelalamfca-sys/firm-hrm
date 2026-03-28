@@ -25,6 +25,8 @@ import UserManagement from "@/pages/user-management";
 import TaskScheduler from "@/pages/task-scheduler";
 import CredentialVault from "@/pages/credential-vault";
 import Profile from "@/pages/profile";
+import TrainingApplication from "@/pages/training-application";
+import Applications from "@/pages/applications";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -107,6 +109,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/landing" component={Landing} />
+      <Route path="/apply-training" component={TrainingApplication} />
       <Route path="/login" component={Login} />
       <Route path="/employees"><ProtectedRoute component={Employees} /></Route>
       <Route path="/attendance"><ProtectedRoute component={Attendance} /></Route>
@@ -122,6 +125,7 @@ function Router() {
       <Route path="/task-scheduler"><ProtectedRoute component={TaskScheduler} /></Route>
       <Route path="/credential-vault"><ProtectedRoute component={CredentialVault} /></Route>
       <Route path="/profile"><ProtectedRoute component={Profile} /></Route>
+      <Route path="/applications"><ProtectedRoute component={Applications} /></Route>
       <Route path="/"><ProtectedRoute component={Dashboard} /></Route>
       <Route component={NotFound} />
     </Switch>

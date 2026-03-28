@@ -203,6 +203,11 @@ export default function Landing() {
             ))}
           </nav>
           <div className="flex items-center gap-3">
+            <Link href="/apply-training">
+              <Button size="sm" variant="outline" className="h-9 text-[13px] font-semibold gap-1.5 hidden sm:flex">
+                <GraduationCap className="w-3.5 h-3.5" /> Apply for Training
+              </Button>
+            </Link>
             <Link href="/login">
               <Button size="sm" className="h-9 text-[13px] font-semibold shadow-sm gap-1.5">
                 Sign In <ArrowRight className="w-3.5 h-3.5" />
