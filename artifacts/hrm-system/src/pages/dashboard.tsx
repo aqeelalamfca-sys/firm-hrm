@@ -5,11 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   Users, FileText, Banknote, CalendarCheck, TrendingUp, TrendingDown,
   ArrowRight, Clock, AlertCircle, CheckCircle, ChevronRight, ListTodo, Calendar,
   LogIn, LogOut as LogOutIcon, Palmtree, ClipboardList, Shield, BarChart3, Receipt,
-  CheckCircle2, XCircle, Coffee
+  CheckCircle2, XCircle, Coffee, X
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
@@ -65,6 +66,8 @@ export default function Dashboard() {
   const [attendanceLoading, setAttendanceLoading] = React.useState(true);
   const [clockingIn, setClockingIn] = React.useState(false);
   const [pktTime, setPktTime] = React.useState(getPKTTime());
+  const [rejectDialog, setRejectDialog] = React.useState<{ open: boolean; leaveId: number | null; employeeName: string }>({ open: false, leaveId: null, employeeName: "" });
+  const [rejectReason, setRejectReason] = React.useState("");
 
   React.useEffect(() => {
     const timer = setInterval(() => setPktTime(getPKTTime()), 60000);
@@ -115,12 +118,14 @@ export default function Dashboard() {
     finally { setClockingIn(false); }
   }
 
-  async function handleLeaveAction(leaveId: number, status: "approved" | "rejected") {
+  async function handleLeaveAction(leaveId: number, status: "approved" | "rejected", approvalNotes?: string) {
     try {
+      const body: any = { status };
+      if (approvalNotes) body.approvalNotes = approvalNotes;
       await fetch(`/api/leaves/${leaveId}`, {
         method: "PUT",
         headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(body),
       });
       setPendingLeaves(prev => prev.filter(l => l.id !== leaveId));
       toast({ title: `Leave ${status}` });
@@ -409,7 +414,10 @@ export default function Dashboard() {
                     <Button size="sm" className="h-7 px-3 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleLeaveAction(leave.id, "approved")}>
                       Approve
                     </Button>
-                    <Button size="sm" variant="outline" className="h-7 px-3 text-[11px] border-red-200 text-red-600 hover:bg-red-50" onClick={() => handleLeaveAction(leave.id, "rejected")}>
+                    <Button size="sm" variant="outline" className="h-7 px-3 text-[11px] border-red-200 text-red-600 hover:bg-red-50" onClick={() => {
+                      setRejectDialog({ open: true, leaveId: leave.id, employeeName: leave.employeeName });
+                      setRejectReason("");
+                    }}>
                       Reject
                     </Button>
                   </div>
@@ -679,6 +687,49 @@ export default function Dashboard() {
           </CardHeader>
         </Card>
       )}
+
+      {/* Rejection Reason Dialog */}
+      <Dialog open={rejectDialog.open} onOpenChange={(open) => { if (!open) setRejectDialog({ open: false, leaveId: null, employeeName: "" }); }}>
+        <DialogContent className="border-border/60 sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl flex items-center gap-2 text-red-700">
+              <X className="w-5 h-5" /> Reject Leave
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Rejecting leave request from <span className="font-medium text-foreground">{rejectDialog.employeeName}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (!rejectReason.trim()) {
+              toast({ title: "Please provide a rejection reason", variant: "destructive" });
+              return;
+            }
+            if (rejectDialog.leaveId) {
+              handleLeaveAction(rejectDialog.leaveId, "rejected", rejectReason.trim());
+              setRejectDialog({ open: false, leaveId: null, employeeName: "" });
+            }
+          }} className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Reason for rejection *</label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                required
+                rows={3}
+                className="w-full rounded-lg border border-border/50 bg-muted/40 px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                placeholder="Provide a clear reason for rejecting this leave..."
+              />
+            </div>
+            <div className="pt-2 flex justify-end gap-3 border-t border-border/50">
+              <Button variant="ghost" type="button" onClick={() => setRejectDialog({ open: false, leaveId: null, employeeName: "" })}>Cancel</Button>
+              <Button type="submit" className="bg-red-600 hover:bg-red-700 text-white shadow-md">
+                Reject Leave
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

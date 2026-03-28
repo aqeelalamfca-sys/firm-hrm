@@ -5,12 +5,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Check, X, Clock, Palmtree, Plus, CalendarDays, Smile, Stethoscope } from "lucide-react";
+import { Check, X, Clock, Palmtree, Plus, CalendarDays, Smile, Stethoscope, MessageSquare, User } from "lucide-react";
 
 const LEAVE_ICONS: Record<string, any> = {
   annual: Smile,
@@ -36,6 +36,8 @@ export default function Leaves() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
+  const [rejectDialog, setRejectDialog] = useState<{ open: boolean; leaveId: number | null; employeeName: string }>({ open: false, leaveId: null, employeeName: "" });
+  const [rejectReason, setRejectReason] = useState("");
 
   const requestOpts = { request: { headers: { Authorization: `Bearer ${token}` } } };
   const { data: leaves = [], isLoading } = useGetLeaves({}, requestOpts);
@@ -234,6 +236,26 @@ export default function Leaves() {
                           </div>
                         </div>
 
+                        {/* Reviewer Info */}
+                        {leave.status !== 'pending' && (leave.approvedByName || leave.approvalNotes) && (
+                          <div className="mt-3 pt-3 border-t border-border/40">
+                            <div className="flex flex-wrap items-start gap-3">
+                              {leave.approvedByName && (
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <User className="w-3.5 h-3.5" />
+                                  <span>{leave.status === 'rejected' ? 'Rejected' : 'Approved'} by <span className="font-medium text-foreground/80">{leave.approvedByName}</span></span>
+                                </div>
+                              )}
+                              {leave.approvalNotes && (
+                                <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                                  <MessageSquare className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                                  <span className={leave.status === 'rejected' ? 'text-red-600' : 'text-foreground/70'}>{leave.approvalNotes}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Actions */}
                         {leave.status === 'pending' && (
                           <div className="flex items-center gap-2 sm:self-center shrink-0">
@@ -249,7 +271,10 @@ export default function Leaves() {
                               size="sm"
                               variant="outline"
                               className="border-red-200 text-red-600 hover:bg-red-50 gap-1.5 h-8"
-                              onClick={() => updateMutation.mutate({ id: leave.id, data: { status: 'rejected' } })}
+                              onClick={() => {
+                                setRejectDialog({ open: true, leaveId: leave.id, employeeName: leave.employeeName });
+                                setRejectReason("");
+                              }}
                               disabled={updateMutation.isPending}
                             >
                               <X className="w-3.5 h-3.5" /> Reject
@@ -265,6 +290,51 @@ export default function Leaves() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Rejection Reason Dialog */}
+      <Dialog open={rejectDialog.open} onOpenChange={(open) => { if (!open) setRejectDialog({ open: false, leaveId: null, employeeName: "" }); }}>
+        <DialogContent className="border-border/60 sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl flex items-center gap-2 text-red-700">
+              <X className="w-5 h-5" /> Reject Leave
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Rejecting leave request from <span className="font-medium text-foreground">{rejectDialog.employeeName}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (!rejectReason.trim()) {
+              toast({ title: "Please provide a rejection reason", variant: "destructive" });
+              return;
+            }
+            if (rejectDialog.leaveId) {
+              updateMutation.mutate(
+                { id: rejectDialog.leaveId, data: { status: 'rejected', approvalNotes: rejectReason.trim() } },
+                { onSuccess: () => setRejectDialog({ open: false, leaveId: null, employeeName: "" }) }
+              );
+            }
+          }} className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Reason for rejection *</label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                required
+                rows={3}
+                className="w-full rounded-lg border border-border/50 bg-muted/40 px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                placeholder="Provide a clear reason for rejecting this leave..."
+              />
+            </div>
+            <div className="pt-2 flex justify-end gap-3 border-t border-border/50">
+              <Button variant="ghost" type="button" onClick={() => setRejectDialog({ open: false, leaveId: null, employeeName: "" })}>Cancel</Button>
+              <Button type="submit" disabled={updateMutation.isPending} className="bg-red-600 hover:bg-red-700 text-white shadow-md">
+                {updateMutation.isPending ? "Rejecting..." : "Reject Leave"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

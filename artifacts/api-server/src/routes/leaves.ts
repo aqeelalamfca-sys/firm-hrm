@@ -18,8 +18,13 @@ router.get("/", async (req, res) => {
       const emp = emps[0];
       let approvedByName = null;
       if (r.approvedById) {
-        const approvers = await db.select().from(employeesTable).where(eq(employeesTable.id, r.approvedById));
-        if (approvers[0]) approvedByName = `${approvers[0].firstName} ${approvers[0].lastName}`;
+        const [reviewer] = await db.select().from(usersTable).where(eq(usersTable.id, r.approvedById));
+        if (reviewer) {
+          approvedByName = reviewer.name;
+        } else {
+          const approvers = await db.select().from(employeesTable).where(eq(employeesTable.id, r.approvedById));
+          if (approvers[0]) approvedByName = `${approvers[0].firstName} ${approvers[0].lastName}`;
+        }
       }
       return {
         id: r.id,
@@ -77,9 +82,16 @@ router.put("/:id", async (req, res) => {
   const { status, approvalNotes } = req.body;
   if (!status) return res.status(400).json({ error: "Status required" });
 
+  if (status === "rejected" && !approvalNotes) {
+    return res.status(400).json({ error: "Rejection reason is required" });
+  }
+
+  const reviewerUserId = (req as any).user?.id || null;
+
   const updates: Record<string, any> = {
     status,
     approvalNotes: approvalNotes || null,
+    approvedById: reviewerUserId,
     updatedAt: new Date(),
   };
 
@@ -89,14 +101,23 @@ router.put("/:id", async (req, res) => {
   const emps = await db.select().from(employeesTable).where(eq(employeesTable.id, record.employeeId));
   const emp = emps[0];
 
+  let approvedByName = null;
+  if (reviewerUserId) {
+    const [reviewer] = await db.select().from(usersTable).where(eq(usersTable.id, reviewerUserId));
+    if (reviewer) approvedByName = reviewer.name;
+  }
+
   if (emp && (status === "approved" || status === "rejected")) {
     const [linkedUser] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.employeeId, record.employeeId));
     if (linkedUser) {
+      const notificationMsg = status === "rejected"
+        ? `Your ${record.leaveType} leave from ${record.fromDate} to ${record.toDate} has been rejected. Reason: ${approvalNotes}`
+        : `Your ${record.leaveType} leave from ${record.fromDate} to ${record.toDate} has been approved${approvalNotes ? `. Note: ${approvalNotes}` : ""}`;
       await createNotification({
         userId: linkedUser.id,
         type: status === "approved" ? "leave_approved" : "leave_rejected",
         title: `Leave ${status === "approved" ? "Approved" : "Rejected"}`,
-        message: `Your ${record.leaveType} leave from ${record.fromDate} to ${record.toDate} has been ${status}`,
+        message: notificationMsg,
         relatedEntityType: "leave",
         relatedEntityId: record.id,
       });
@@ -106,7 +127,7 @@ router.put("/:id", async (req, res) => {
   res.json({
     ...record,
     employeeName: emp ? `${emp.firstName} ${emp.lastName}` : "Unknown",
-    approvedByName: null,
+    approvedByName,
   });
 });
 
