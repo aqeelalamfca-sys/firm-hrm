@@ -6,17 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
-import { Loader2, Shield, Briefcase, Users, Calculator, UserCog, UserCheck, GraduationCap, Scale, ArrowLeft } from "lucide-react";
-
-const DEMO_ACCOUNTS = [
-  { label: "Admin", email: "admin@calfirm.com", password: "admin123", icon: Shield, color: "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100", role: "Super Admin" },
-  { label: "Partner", email: "partner@calfirm.com", password: "partner123", icon: Briefcase, color: "bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100", role: "Partner" },
-  { label: "HR", email: "hr@calfirm.com", password: "hr123", icon: Users, color: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100", role: "HR Admin" },
-  { label: "Finance", email: "finance@calfirm.com", password: "finance123", icon: Calculator, color: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100", role: "Finance" },
-  { label: "Manager", email: "manager@calfirm.com", password: "manager123", icon: UserCog, color: "bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100", role: "Manager" },
-  { label: "Employee", email: "employee@calfirm.com", password: "employee123", icon: UserCheck, color: "bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100", role: "Employee" },
-  { label: "Trainee", email: "trainee@calfirm.com", password: "trainee123", icon: GraduationCap, color: "bg-sky-50 text-sky-600 border-sky-200 hover:bg-sky-100", role: "Trainee" },
-];
+import { Loader2, ArrowLeft } from "lucide-react";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -38,12 +28,6 @@ export default function Login() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDemoLogin = (demoEmail: string, demoPassword: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPassword);
-    setError("");
   };
 
   return (
@@ -113,43 +97,7 @@ export default function Login() {
             </CardContent>
           </Card>
 
-          <div className="space-y-2.5">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider text-center">Quick Demo Login</p>
-            <div className="grid grid-cols-4 gap-2">
-              {DEMO_ACCOUNTS.slice(0, 4).map((demo) => {
-                const Icon = demo.icon;
-                return (
-                  <button
-                    key={demo.email}
-                    type="button"
-                    onClick={() => handleDemoLogin(demo.email, demo.password)}
-                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all ${demo.color}`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="text-[11px] font-semibold leading-tight">{demo.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {DEMO_ACCOUNTS.slice(4).map((demo) => {
-                const Icon = demo.icon;
-                return (
-                  <button
-                    key={demo.email}
-                    type="button"
-                    onClick={() => handleDemoLogin(demo.email, demo.password)}
-                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all ${demo.color}`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="text-[11px] font-semibold leading-tight">{demo.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="text-center">
+          <div className="text-center mt-4">
             <Link href="/landing">
               <button className="text-xs text-muted-foreground hover:text-primary transition-colors font-medium inline-flex items-center gap-1.5">
                 <ArrowLeft className="w-3 h-3" />
