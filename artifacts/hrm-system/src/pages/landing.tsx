@@ -291,7 +291,7 @@ export default function Landing() {
                     Schedule a one-on-one session with our experienced Chartered Accountants. Choose your preferred partner, date, and time.
                   </p>
                   <div className="space-y-2.5">
-                    {PARTNERS.slice(0, 4).map((p) => (
+                    {PARTNERS.map((p) => (
                       <div key={p.name} className="flex items-center gap-3 p-2.5 rounded-xl border border-border/40 bg-muted/20 hover:bg-muted/40 transition-colors">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
                           {p.name.split(" ").slice(-1)[0][0]}{p.name.split(" ").slice(-2, -1)[0]?.[0] || ""}
@@ -302,7 +302,6 @@ export default function Landing() {
                         </div>
                       </div>
                     ))}
-                    <p className="text-[10px] text-muted-foreground text-center">+{PARTNERS.length - 4} more partners available</p>
                   </div>
                   <div className="pt-1 space-y-2">
                     <Link href="/book-meeting">
