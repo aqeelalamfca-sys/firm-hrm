@@ -1,0 +1,66 @@
+import { db, mcqQuestionsTable } from "@workspace/db";
+import { sql } from "drizzle-orm";
+
+const questions = [
+  { question: "What does IFRS stand for?", optionA: "International Financial Reporting Standards", optionB: "Internal Financial Reporting System", optionC: "International Finance Rules System", optionD: "Integrated Financial Record Standards", correct: "A", category: "Accounting", difficulty: "easy" },
+  { question: "What is the accounting equation?", optionA: "Assets = Liabilities + Equity", optionB: "Assets = Income - Expenses", optionC: "Equity = Assets - Revenue", optionD: "Liabilities = Assets + Equity", correct: "A", category: "Accounting", difficulty: "easy" },
+  { question: "Which statement shows financial position?", optionA: "Income Statement", optionB: "Balance Sheet", optionC: "Cash Flow Statement", optionD: "Notes to Accounts", correct: "B", category: "Accounting", difficulty: "easy" },
+  { question: "What is depreciation?", optionA: "Increase in asset value", optionB: "Allocation of asset cost over useful life", optionC: "Cash payment for assets", optionD: "Profit on sale of assets", correct: "B", category: "Accounting", difficulty: "easy" },
+  { question: "Which of the following is a current asset?", optionA: "Building", optionB: "Machinery", optionC: "Accounts Receivable", optionD: "Goodwill", correct: "C", category: "Accounting", difficulty: "easy" },
+  { question: "What is the double-entry system?", optionA: "Recording one entry for each transaction", optionB: "Every debit has a corresponding credit", optionC: "Recording only cash transactions", optionD: "Recording only credit transactions", correct: "B", category: "Accounting", difficulty: "easy" },
+  { question: "What does GAAP stand for?", optionA: "Generally Applied Accounting Policies", optionB: "General Accounting and Auditing Procedures", optionC: "Generally Accepted Accounting Principles", optionD: "Global Accounting Assessment Process", correct: "C", category: "Accounting", difficulty: "easy" },
+  { question: "Which account normally has a credit balance?", optionA: "Assets", optionB: "Expenses", optionC: "Revenue", optionD: "Drawings", correct: "C", category: "Accounting", difficulty: "easy" },
+  { question: "What is working capital?", optionA: "Total assets minus total liabilities", optionB: "Current assets minus current liabilities", optionC: "Fixed assets minus long-term liabilities", optionD: "Revenue minus expenses", correct: "B", category: "Accounting", difficulty: "easy" },
+  { question: "What is a trial balance?", optionA: "A financial statement", optionB: "A list of all account balances to verify equality of debits and credits", optionC: "A bank reconciliation", optionD: "A tax return", correct: "B", category: "Accounting", difficulty: "easy" },
+  { question: "What type of account is 'Prepaid Rent'?", optionA: "Liability", optionB: "Revenue", optionC: "Asset", optionD: "Expense", correct: "C", category: "Accounting", difficulty: "medium" },
+  { question: "Which financial statement reports revenues and expenses?", optionA: "Balance Sheet", optionB: "Income Statement", optionC: "Statement of Cash Flows", optionD: "Statement of Changes in Equity", correct: "B", category: "Accounting", difficulty: "easy" },
+  { question: "What is accrual accounting?", optionA: "Recording transactions when cash is received", optionB: "Recording transactions when they occur regardless of cash flow", optionC: "Recording only credit sales", optionD: "Recording only cash purchases", correct: "B", category: "Accounting", difficulty: "medium" },
+  { question: "What is the purpose of an audit?", optionA: "To prepare financial statements", optionB: "To provide assurance on financial statements", optionC: "To calculate taxes", optionD: "To manage company operations", correct: "B", category: "Audit", difficulty: "easy" },
+  { question: "What is audit evidence?", optionA: "Proof of income", optionB: "Information used by auditor to form opinion", optionC: "Financial statements only", optionD: "Management reports", correct: "B", category: "Audit", difficulty: "easy" },
+  { question: "What is an unqualified audit opinion?", optionA: "Financial statements have errors", optionB: "Auditor could not complete the audit", optionC: "Financial statements are fairly presented", optionD: "There are material misstatements", correct: "C", category: "Audit", difficulty: "easy" },
+  { question: "What is materiality in auditing?", optionA: "The type of materials used", optionB: "Significance of misstatement that could influence users' decisions", optionC: "Total value of assets", optionD: "Amount of audit fees", correct: "B", category: "Audit", difficulty: "medium" },
+  { question: "What is internal control?", optionA: "Employee handbook", optionB: "Process to ensure reliability of financial reporting and compliance", optionC: "Tax filing system", optionD: "Payroll management", correct: "B", category: "Audit", difficulty: "easy" },
+  { question: "What does ISA stand for in auditing?", optionA: "Internal Standards of Accounting", optionB: "International Standards on Auditing", optionC: "Integrated Systems for Audit", optionD: "International Society of Accountants", correct: "B", category: "Audit", difficulty: "easy" },
+  { question: "What is a going concern?", optionA: "A company that is closing down", optionB: "Assumption that entity will continue operations for foreseeable future", optionC: "A one-time audit", optionD: "A tax dispute", correct: "B", category: "Audit", difficulty: "medium" },
+  { question: "Who appoints external auditors of a company?", optionA: "Management", optionB: "Board of Directors", optionC: "Shareholders", optionD: "Government", correct: "C", category: "Audit", difficulty: "easy" },
+  { question: "What is sampling in auditing?", optionA: "Testing all transactions", optionB: "Selecting a portion of items for testing", optionC: "Reviewing only cash transactions", optionD: "Interviewing employees", correct: "B", category: "Audit", difficulty: "easy" },
+  { question: "What is the standard corporate tax rate in Pakistan (2025)?", optionA: "25%", optionB: "29%", optionC: "32%", optionD: "35%", correct: "B", category: "Tax", difficulty: "easy" },
+  { question: "What does NTN stand for?", optionA: "National Tax Number", optionB: "Net Taxable Nominee", optionC: "New Tax Notice", optionD: "National Treasury Note", correct: "A", category: "Tax", difficulty: "easy" },
+  { question: "What is GST in Pakistan?", optionA: "General Service Tax", optionB: "Goods and Sales Tax", optionC: "General Sales Tax", optionD: "Government Service Tax", correct: "C", category: "Tax", difficulty: "easy" },
+  { question: "What is the standard GST rate in Pakistan?", optionA: "15%", optionB: "17%", optionC: "18%", optionD: "20%", correct: "B", category: "Tax", difficulty: "easy" },
+  { question: "What is Withholding Tax (WHT)?", optionA: "Tax paid at year end", optionB: "Tax deducted at source", optionC: "Tax on property only", optionD: "Tax on imports only", correct: "B", category: "Tax", difficulty: "easy" },
+  { question: "Which authority administers income tax in Pakistan?", optionA: "State Bank of Pakistan", optionB: "Federal Board of Revenue (FBR)", optionC: "Securities and Exchange Commission", optionD: "Ministry of Commerce", correct: "B", category: "Tax", difficulty: "easy" },
+  { question: "What is a tax year in Pakistan?", optionA: "Calendar year", optionB: "July 1 to June 30", optionC: "April 1 to March 31", optionD: "January 1 to December 31", correct: "B", category: "Tax", difficulty: "easy" },
+  { question: "What is minimum tax under section 113 of Income Tax Ordinance?", optionA: "0.5% of turnover", optionB: "1% of turnover", optionC: "1.25% of turnover", optionD: "2% of turnover", correct: "C", category: "Tax", difficulty: "medium" },
+  { question: "What is the tax filing deadline for companies in Pakistan?", optionA: "30th June", optionB: "31st August", optionC: "30th September", optionD: "31st December", correct: "D", category: "Tax", difficulty: "medium" },
+  { question: "What does SECP stand for?", optionA: "Securities and Exchange Commission of Pakistan", optionB: "Standard Economic Control Panel", optionC: "Stock Exchange Central Portal", optionD: "Statutory Economic Compliance Program", correct: "A", category: "Corporate", difficulty: "easy" },
+  { question: "What is the Companies Act governing Pakistan?", optionA: "Companies Act 2013", optionB: "Companies Act 2017", optionC: "Companies Ordinance 1984", optionD: "Corporate Law 2020", correct: "B", category: "Corporate", difficulty: "easy" },
+  { question: "What is a private limited company?", optionA: "Company listed on stock exchange", optionB: "Company with limited number of shareholders, not publicly traded", optionC: "Government-owned entity", optionD: "Non-profit organization", correct: "B", category: "Corporate", difficulty: "easy" },
+  { question: "What is the minimum number of directors for a public company?", optionA: "2", optionB: "3", optionC: "5", optionD: "7", correct: "B", category: "Corporate", difficulty: "medium" },
+  { question: "What is an Annual General Meeting (AGM)?", optionA: "Monthly management meeting", optionB: "Yearly meeting of shareholders", optionC: "Board meeting", optionD: "Audit committee meeting", correct: "B", category: "Corporate", difficulty: "easy" },
+  { question: "What is the role of a company secretary?", optionA: "Managing day-to-day operations", optionB: "Ensuring compliance with corporate laws and governance", optionC: "Preparing financial statements", optionD: "Conducting audits", correct: "B", category: "Corporate", difficulty: "easy" },
+  { question: "What is a Memorandum of Association?", optionA: "Internal operating rules", optionB: "Document defining company's constitution and relationship with outside world", optionC: "Tax registration document", optionD: "Employee handbook", correct: "B", category: "Corporate", difficulty: "medium" },
+  { question: "What is the VLOOKUP function in Excel?", optionA: "Looks up a value vertically in a table", optionB: "Looks up a value horizontally", optionC: "Counts cells with values", optionD: "Sums a range of cells", correct: "A", category: "Excel", difficulty: "easy" },
+  { question: "Which Excel function is used to add numbers?", optionA: "COUNT", optionB: "SUM", optionC: "AVERAGE", optionD: "MAX", correct: "B", category: "Excel", difficulty: "easy" },
+  { question: "What does the IF function do in Excel?", optionA: "Adds numbers", optionB: "Returns one value if condition is true, another if false", optionC: "Counts blank cells", optionD: "Creates charts", correct: "B", category: "Excel", difficulty: "easy" },
+  { question: "What is a pivot table in Excel?", optionA: "A type of chart", optionB: "Tool for summarizing and analyzing large datasets", optionC: "A formula for calculations", optionD: "A type of cell formatting", correct: "B", category: "Excel", difficulty: "easy" },
+  { question: "Which shortcut saves a file in Excel?", optionA: "Ctrl+P", optionB: "Ctrl+S", optionC: "Ctrl+Z", optionD: "Ctrl+C", correct: "B", category: "Excel", difficulty: "easy" },
+  { question: "What does CONCATENATE do in Excel?", optionA: "Splits text", optionB: "Joins two or more text strings", optionC: "Counts characters", optionD: "Formats numbers", correct: "B", category: "Excel", difficulty: "easy" },
+  { question: "What does ICAP stand for?", optionA: "Institute of Corporate Accountants of Pakistan", optionB: "Institute of Chartered Accountants of Pakistan", optionC: "International Council of Accounting Professionals", optionD: "Institute of Cost and Audit Practitioners", correct: "B", category: "General", difficulty: "easy" },
+  { question: "What is the currency of Pakistan?", optionA: "Rupee", optionB: "Dollar", optionC: "Dirham", optionD: "Taka", correct: "A", category: "General", difficulty: "easy" },
+  { question: "Who is the regulatory body for chartered accountants in Pakistan?", optionA: "FBR", optionB: "SECP", optionC: "ICAP", optionD: "SBP", correct: "C", category: "General", difficulty: "easy" },
+  { question: "What is professional ethics in accounting?", optionA: "Tax planning strategies", optionB: "Moral principles governing professional conduct", optionC: "Audit procedures", optionD: "Financial reporting standards", correct: "B", category: "General", difficulty: "easy" },
+  { question: "What qualification is required to become a Chartered Accountant in Pakistan?", optionA: "MBA", optionB: "CA qualification from ICAP", optionC: "ACCA", optionD: "CPA", correct: "B", category: "General", difficulty: "easy" },
+  { question: "What is the full form of FCA?", optionA: "Federal Chartered Authority", optionB: "Fellow Chartered Accountant", optionC: "Financial Compliance Analyst", optionD: "Fiscal Control Advisor", correct: "B", category: "General", difficulty: "easy" },
+];
+
+export async function seedMCQQuestions() {
+  const existing = await db.select({ count: sql<number>`count(*)` }).from(mcqQuestionsTable);
+  if (Number(existing[0].count) > 0) {
+    console.log(`MCQ bank already has ${existing[0].count} questions, skipping seed`);
+    return;
+  }
+
+  await db.insert(mcqQuestionsTable).values(questions);
+  console.log(`Seeded ${questions.length} MCQ questions`);
+}

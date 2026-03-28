@@ -106,6 +106,10 @@ Tables:
 20. **Invoice PDF** - Professional invoice print/download with company header, tax breakdown, and print-to-PDF support
 21. **Department System** - 5 departments (Audit/Blue, Tax/Green, Corporate/Purple, Advisory/Orange, Others/Gray) with global header filter, color-coded badges across all pages, department field in all create/edit forms
 22. **Document Trash/Restore** - Soft delete (moves to trash), trash view with 30-day retention indicator, restore from trash, permanent delete
+23. **CA Training Application** - 9-step application form with file uploads (CNIC/photo), CRN generation (CRN-YYYY-XXXX), duplicate CNIC prevention
+24. **MCQ Assessment Test** - 10-question MCQ test (4 Accounting, 2 Audit, 2 Tax, 1 Excel, 1 General), 15-minute timer, auto-evaluation, pass/fail (≥8/10), single attempt enforcement
+25. **PDF Result Generation** - Auto-generated firm-branded PDF for passed candidates with application details, test score, and interview schedule
+26. **Smart Interview Scheduling** - 7 working days after test (excluding Sundays and Pakistan public holidays), 11:00 AM–12:00 PM slot
 
 ### Security:
 - Auth middleware protects all API routes (except /auth and /healthz)

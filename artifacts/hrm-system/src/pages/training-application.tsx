@@ -62,6 +62,7 @@ export default function TrainingApplication() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [applicationId, setApplicationId] = useState<number | null>(null);
+  const [applicationCrn, setApplicationCrn] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     fullName: "",
@@ -253,6 +254,7 @@ export default function TrainingApplication() {
 
       setSubmitted(true);
       setApplicationId(data.id);
+      setApplicationCrn(data.crn);
       toast({ title: "Application Submitted!", description: "Your training application has been received successfully." });
     } catch (error: any) {
       toast({ title: "Submission Failed", description: error.message, variant: "destructive" });
@@ -314,15 +316,21 @@ export default function TrainingApplication() {
             </div>
             <h2 className="text-xl font-bold mb-2">Application Submitted!</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Your CA training application has been received successfully. Our HR team will review your application and contact you shortly.
+              Your application has been received. Please proceed to the Assessment Test to complete your application process.
             </p>
-            {applicationId && (
+            {applicationCrn && (
               <p className="text-xs text-muted-foreground bg-muted/60 rounded-lg p-3 mb-4">
-                Application Reference: <span className="font-bold text-primary">APP-{String(applicationId).padStart(4, "0")}</span>
+                Your CRN: <span className="font-bold text-primary text-base">{applicationCrn}</span>
+                <br /><span className="text-[10px]">Save this number for future reference</span>
               </p>
             )}
+            <Link href={`/mcq-test/${applicationCrn}`}>
+              <Button className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 mb-3">
+                <GraduationCap className="w-4 h-4" /> Proceed to Assessment Test
+              </Button>
+            </Link>
             <Link href="/landing">
-              <Button className="w-full gap-2"><ArrowLeft className="w-4 h-4" /> Back to Home</Button>
+              <Button variant="outline" className="w-full gap-2"><ArrowLeft className="w-4 h-4" /> Back to Home</Button>
             </Link>
           </CardContent>
         </Card>

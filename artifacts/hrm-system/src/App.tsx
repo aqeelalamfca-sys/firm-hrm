@@ -26,6 +26,7 @@ import TaskScheduler from "@/pages/task-scheduler";
 import CredentialVault from "@/pages/credential-vault";
 import Profile from "@/pages/profile";
 import TrainingApplication from "@/pages/training-application";
+import MCQTest from "@/pages/mcq-test";
 import Applications from "@/pages/applications";
 
 const queryClient = new QueryClient({
@@ -110,6 +111,7 @@ function Router() {
     <Switch>
       <Route path="/landing" component={Landing} />
       <Route path="/apply-training" component={TrainingApplication} />
+      <Route path="/mcq-test/:crn" component={MCQTest} />
       <Route path="/login" component={Login} />
       <Route path="/employees"><ProtectedRoute component={Employees} /></Route>
       <Route path="/attendance"><ProtectedRoute component={Attendance} /></Route>

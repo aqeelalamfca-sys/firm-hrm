@@ -1,5 +1,8 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { seedMCQQuestions } from "./mcq-seed";
+
+seedMCQQuestions().catch((err) => logger.error({ err }, "Failed to seed MCQ questions"));
 
 const rawPort = process.env["PORT"];
 

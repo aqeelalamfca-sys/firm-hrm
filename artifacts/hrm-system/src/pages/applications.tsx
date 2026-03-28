@@ -188,9 +188,9 @@ export default function Applications() {
               <thead>
                 <tr className="bg-muted/40 border-b">
                   <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground">Applicant</th>
-                  <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground">CNIC</th>
-                  <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground">Email</th>
+                  <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground">CRN</th>
                   <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground">Department</th>
+                  <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground">Test</th>
                   <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground">Status</th>
                   <th className="text-left px-4 py-3 font-semibold text-xs text-muted-foreground">Applied</th>
                   <th className="text-right px-4 py-3 font-semibold text-xs text-muted-foreground">Actions</th>
@@ -204,11 +204,20 @@ export default function Applications() {
                     <tr key={app.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3">
                         <div className="font-medium text-sm">{app.fullName}</div>
-                        <div className="text-[10px] text-muted-foreground">{app.mobile}</div>
+                        <div className="text-[10px] text-muted-foreground">{app.mobile} | {app.email}</div>
                       </td>
-                      <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{app.cnic}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{app.email}</td>
+                      <td className="px-4 py-3 text-xs font-mono text-primary font-medium">{app.crn || "—"}</td>
                       <td className="px-4 py-3 text-xs">{DEPT_LABELS[app.preferredDept] || app.preferredDept}</td>
+                      <td className="px-4 py-3">
+                        {app.testStatus ? (
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${app.testStatus === "Passed" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-red-100 text-red-700 border-red-200"}`}>
+                            {app.testStatus === "Passed" ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                            {app.testScore}/{app.testTotal}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">Not taken</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${sc.color}`}>
                           <StatusIcon className="w-3 h-3" /> {sc.label}
@@ -217,10 +226,17 @@ export default function Applications() {
                       <td className="px-4 py-3 text-xs text-muted-foreground">
                         {new Date(app.createdAt).toLocaleDateString("en-PK", { day: "numeric", month: "short", year: "numeric" })}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right flex items-center gap-1 justify-end">
                         <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={() => viewApplication(app.id)}>
                           <Eye className="w-3.5 h-3.5" /> View
                         </Button>
+                        {app.pdfUrl && (
+                          <a href={`${API_BASE.replace("/api", "")}${app.pdfUrl}`} target="_blank" rel="noreferrer">
+                            <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs text-blue-600">
+                              <Download className="w-3.5 h-3.5" /> PDF
+                            </Button>
+                          </a>
+                        )}
                       </td>
                     </tr>
                   );
@@ -405,6 +421,42 @@ export default function Applications() {
                       </a>
                     )}
                   </div>
+                </div>
+              )}
+
+              {selectedApp.testStatus && (
+                <div className="mt-5">
+                  <h4 className="text-xs font-semibold text-foreground/80 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <GraduationCap className="w-3.5 h-3.5" /> Assessment Test Result
+                  </h4>
+                  <div className={`rounded-xl p-4 border ${selectedApp.testStatus === "Passed" ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        {selectedApp.testStatus === "Passed" ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <XCircle className="w-4 h-4 text-red-500" />}
+                        <span className={`text-sm font-bold ${selectedApp.testStatus === "Passed" ? "text-emerald-700" : "text-red-700"}`}>
+                          {selectedApp.testStatus}
+                        </span>
+                      </div>
+                      <span className="text-lg font-bold">{selectedApp.testScore}/{selectedApp.testTotal}</span>
+                    </div>
+                    {selectedApp.testDate && (
+                      <p className="text-[10px] text-muted-foreground">Test Date: {new Date(selectedApp.testDate).toLocaleDateString("en-PK", { day: "numeric", month: "long", year: "numeric" })}</p>
+                    )}
+                    {selectedApp.interviewDate && (
+                      <p className="text-[10px] text-muted-foreground mt-1">Interview: {new Date(selectedApp.interviewDate).toLocaleDateString("en-PK", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} at 11:00 AM</p>
+                    )}
+                    {selectedApp.pdfUrl && (
+                      <a href={`${API_BASE.replace("/api", "")}${selectedApp.pdfUrl}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 mt-2 text-xs text-blue-600 hover:underline">
+                        <Download className="w-3.5 h-3.5" /> Download Result PDF
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {selectedApp.crn && (
+                <div className="mt-3">
+                  <p className="text-[10px] text-muted-foreground">CRN: <span className="font-mono font-semibold text-primary">{selectedApp.crn}</span></p>
                 </div>
               )}
 

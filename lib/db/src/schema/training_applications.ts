@@ -11,9 +11,10 @@ export const applicationStatusEnum = pgEnum("application_status", [
 
 export const trainingApplicationsTable = pgTable("training_applications", {
   id: serial("id").primaryKey(),
+  crn: text("crn").unique(),
   fullName: text("full_name").notNull(),
   fatherName: text("father_name").notNull(),
-  cnic: text("cnic").notNull(),
+  cnic: text("cnic").notNull().unique(),
   dateOfBirth: timestamp("date_of_birth").notNull(),
   gender: text("gender").notNull(),
   maritalStatus: text("marital_status").notNull(),
@@ -60,17 +61,47 @@ export const trainingApplicationsTable = pgTable("training_applications", {
 
   declaration: boolean("declaration").notNull().default(false),
 
+  testScore: integer("test_score"),
+  testTotal: integer("test_total").default(10),
+  testStatus: text("test_status"),
+  testDate: timestamp("test_date"),
+  testAnswers: text("test_answers"),
+  interviewDate: timestamp("interview_date"),
+  pdfUrl: text("pdf_url"),
+
   status: applicationStatusEnum("status").notNull().default("pending"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const mcqQuestionsTable = pgTable("mcq_questions", {
+  id: serial("id").primaryKey(),
+  question: text("question").notNull(),
+  optionA: text("option_a").notNull(),
+  optionB: text("option_b").notNull(),
+  optionC: text("option_c").notNull(),
+  optionD: text("option_d").notNull(),
+  correct: text("correct").notNull(),
+  category: text("category").notNull(),
+  difficulty: text("difficulty").notNull().default("easy"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertTrainingApplicationSchema = createInsertSchema(trainingApplicationsTable).omit({
   id: true,
+  crn: true,
   status: true,
+  testScore: true,
+  testTotal: true,
+  testStatus: true,
+  testDate: true,
+  testAnswers: true,
+  interviewDate: true,
+  pdfUrl: true,
   createdAt: true,
   updatedAt: true,
 });
 
 export type InsertTrainingApplication = z.infer<typeof insertTrainingApplicationSchema>;
 export type TrainingApplication = typeof trainingApplicationsTable.$inferSelect;
+export type MCQQuestion = typeof mcqQuestionsTable.$inferSelect;
