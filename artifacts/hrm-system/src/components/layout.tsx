@@ -169,19 +169,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       <motion.aside 
         initial={false}
-        animate={{ width: isSidebarOpen ? 252 : 0 }}
-        className={`bg-sidebar text-sidebar-foreground flex flex-col transition-all duration-300 ease-in-out shrink-0 ${isSidebarOpen ? 'w-[252px]' : 'w-0'} md:block overflow-hidden`}
+        animate={{ width: isSidebarOpen ? 260 : 0 }}
+        className={`text-sidebar-foreground flex flex-col transition-all duration-300 ease-in-out shrink-0 ${isSidebarOpen ? 'w-[260px]' : 'w-0'} md:block overflow-hidden`}
+        style={{ background: 'linear-gradient(180deg, hsl(224 40% 14%) 0%, hsl(224 40% 10%) 100%)' }}
       >
-        <div className="px-5 py-5 flex items-center gap-2.5 font-bold text-lg tracking-tight border-b border-sidebar-border/60">
-          <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-8 h-8 rounded-lg" />
-          <span className="text-white">Alam & Aulakh</span>
+        <div className="px-5 py-5 flex items-center gap-3 font-bold text-lg tracking-tight border-b border-white/[0.06]">
+          <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center backdrop-blur-sm">
+            <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-6 h-6" />
+          </div>
+          <span className="text-white/95">Alam & Aulakh</span>
         </div>
         
-        <div className="px-3 py-3 flex-1 overflow-y-auto scrollbar-thin space-y-0.5">
+        <div className="px-3 py-4 flex-1 overflow-y-auto scrollbar-thin space-y-0.5">
           {activeSections.map((section, idx) => (
             <React.Fragment key={section.key}>
-              {idx > 0 && <div className="pt-3" />}
-              <p className="text-[11px] font-semibold text-sidebar-foreground/50 uppercase tracking-[0.08em] mb-1.5 px-3">{section.label}</p>
+              {idx > 0 && <div className="pt-4" />}
+              <p className="text-[10px] font-bold text-white/50 uppercase tracking-[0.12em] mb-2 px-3">{section.label}</p>
               {filteredItems
                 .filter((item) => item.section === section.key)
                 .map((item) => {
@@ -191,16 +194,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   return (
                     <Link key={item.href} href={item.href} className="block">
                       <div className={`
-                        flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 group cursor-pointer
+                        flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200 group cursor-pointer relative
                         ${isActive 
-                          ? 'bg-sidebar-primary text-white font-medium' 
-                          : 'text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                          ? 'text-white font-medium' 
+                          : 'text-white/55 hover:text-white/85 hover:bg-white/[0.06]'
                         }
                       `}
-                      style={isActive ? { boxShadow: '0 1px 3px rgba(0,0,0,0.12)' } : undefined}
+                      style={isActive ? { background: 'linear-gradient(135deg, hsl(217 78% 54%) 0%, hsl(217 78% 46%) 100%)', boxShadow: '0 2px 8px rgba(59,130,246,0.3), 0 1px 2px rgba(0,0,0,0.1)' } : undefined}
                       >
-                        <Icon className={`w-[18px] h-[18px] ${isActive ? 'opacity-100' : 'opacity-60 group-hover:opacity-90 transition-opacity'}`} />
+                        <Icon className={`w-[18px] h-[18px] ${isActive ? 'opacity-100' : 'opacity-50 group-hover:opacity-80 transition-opacity'}`} />
                         {item.label}
+                        {isActive && <div className="absolute right-3 w-1.5 h-1.5 rounded-full bg-white/70" />}
                       </div>
                     </Link>
                   );
@@ -209,21 +213,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
           ))}
         </div>
 
-        <div className="px-3 py-3 border-t border-sidebar-border/50">
+        <div className="px-3 py-3 border-t border-white/[0.06]">
           <Link href="/profile" className="block">
-            <div className="flex items-center gap-2.5 mb-2 px-2 cursor-pointer rounded-lg hover:bg-sidebar-accent/60 py-2 transition-colors">
-              <div className="w-9 h-9 rounded-full bg-sidebar-primary flex items-center justify-center text-sm font-semibold text-sidebar-primary-foreground">
+            <div className="flex items-center gap-2.5 mb-2 px-2.5 cursor-pointer rounded-xl hover:bg-white/[0.06] py-2.5 transition-all duration-200">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{ background: 'linear-gradient(135deg, hsl(217 78% 54%) 0%, hsl(262 70% 55%) 100%)' }}>
                 {user.name.charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate text-white/90">{user.name}</p>
-                <p className="text-[11px] text-sidebar-foreground/55 truncate capitalize">{user.role.replace(/_/g, ' ')}</p>
+                <p className="text-[11px] text-white/50 truncate capitalize">{user.role.replace(/_/g, ' ')}</p>
               </div>
             </div>
           </Link>
           <Button 
             variant="ghost" 
-            className="w-full justify-start text-sidebar-foreground/60 hover:text-red-400 hover:bg-destructive/10 transition-colors text-[13px] h-9"
+            className="w-full justify-start text-white/55 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200 text-[13px] h-9 rounded-xl"
             onClick={logout}
           >
             <LogOut className="w-4 h-4 mr-2" />
@@ -233,9 +237,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </motion.aside>
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-0">
-        <header className="h-14 bg-card border-b border-border/70 flex items-center justify-between px-6 sticky top-0 z-10 hidden md:flex">
+        <header className="h-14 bg-card/80 backdrop-blur-xl border-b border-border/40 flex items-center justify-between px-6 sticky top-0 z-10 hidden md:flex">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-muted-foreground hover:text-foreground h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-muted-foreground hover:text-foreground h-8 w-8" aria-label="Toggle sidebar">
               <Menu className="w-4 h-4" />
             </Button>
             <h2 className="font-semibold text-[15px] text-foreground capitalize tracking-tight">

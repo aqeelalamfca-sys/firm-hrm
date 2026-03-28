@@ -189,10 +189,12 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Navigation */}
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-background/95 backdrop-blur-md shadow-sm border-b border-border/30" : "bg-transparent"}`}>
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? "bg-background/90 backdrop-blur-xl shadow-lg shadow-black/[0.03] border-b border-border/20" : "bg-transparent"}`}>
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Alam & Aulakh" className="h-9 w-auto object-contain" />
+            <div className="w-9 h-9 rounded-xl bg-primary/[0.06] flex items-center justify-center">
+              <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Alam & Aulakh" className="h-6 w-auto object-contain" />
+            </div>
             <span className="text-lg font-bold tracking-tight">Alam & Aulakh</span>
           </div>
           <nav className="hidden md:flex items-center gap-1">
@@ -221,7 +223,7 @@ export default function Landing() {
                 Staff Sign In <ArrowRight className="w-3.5 h-3.5" />
               </Button>
             </Link>
-            <button className="md:hidden p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            <button className="md:hidden p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}>
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
@@ -238,34 +240,35 @@ export default function Landing() {
       </header>
 
       {/* Hero Section */}
-      <section id="home" className="relative pt-32 pb-20 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.03] via-transparent to-transparent" />
-        <div className="absolute top-20 right-0 w-[500px] h-[500px] bg-primary/[0.04] rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-violet-500/[0.03] rounded-full blur-3xl" />
+      <section id="home" className="relative pt-32 pb-24 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.04] via-primary/[0.01] to-transparent" />
+        <div className="absolute top-10 right-0 w-[600px] h-[600px] bg-blue-500/[0.05] rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-violet-500/[0.04] rounded-full blur-[100px]" />
+        <div className="absolute top-40 left-1/4 w-[300px] h-[300px] bg-emerald-500/[0.03] rounded-full blur-[80px]" />
         <div className="relative max-w-7xl mx-auto px-6">
-          <div className="grid lg:grid-cols-[1fr_400px] gap-12 items-center">
+          <div className="grid lg:grid-cols-[1fr_400px] gap-16 items-center">
             <div>
-              <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Alam & Aulakh" className="h-52 w-auto object-contain mb-4" />
-              <Badge className="mb-6 bg-primary/5 text-primary border-primary/20 text-xs font-semibold px-3 py-1">
+              <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Alam & Aulakh" className="h-52 w-auto object-contain mb-6" />
+              <Badge className="mb-6 bg-primary/[0.06] text-primary border-primary/15 text-xs font-semibold px-4 py-1.5 rounded-full backdrop-blur-sm">
                 ICAP Approved Training Organization
               </Badge>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1] mb-6">
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.08] mb-6">
                 Leading Chartered
                 <br />
-                <span className="text-primary">Accountants Firm</span>
+                <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-violet-500 bg-clip-text text-transparent">Accountants Firm</span>
               </h1>
-              <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mb-8">
+              <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mb-10">
                 Providing audit, tax, and financial & corporate advisory services with firm commitment.
                 Expert chartered accounting and international corporate services — your trusted partner
                 in Pakistan and beyond.
               </p>
               <div className="flex flex-wrap gap-3">
                 <Link href="/login">
-                  <Button size="lg" className="h-12 px-6 text-sm font-semibold shadow-md gap-2">
+                  <Button size="lg" className="h-12 px-7 text-sm font-semibold gap-2 rounded-xl" style={{ background: 'linear-gradient(135deg, hsl(217 78% 51%) 0%, hsl(217 78% 42%) 100%)', boxShadow: '0 4px 16px rgba(59,130,246,0.3)' }}>
                     Get Started <ArrowRight className="w-4 h-4" />
                   </Button>
                 </Link>
-                <button onClick={() => scrollTo("services")} className="h-12 px-6 text-sm font-semibold border border-border/60 rounded-lg bg-background hover:bg-muted/50 transition-colors inline-flex items-center gap-2">
+                <button onClick={() => scrollTo("services")} className="h-12 px-7 text-sm font-semibold border border-border/50 rounded-xl bg-card hover:bg-muted/50 transition-all duration-200 inline-flex items-center gap-2 shadow-sm">
                   Our Services <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
@@ -273,15 +276,15 @@ export default function Landing() {
 
             {/* Meeting Booking Card */}
             <div className="hidden lg:block">
-              <Card className="shadow-xl border-border/50 overflow-hidden">
-                <div className="bg-primary px-6 py-5">
+              <Card className="shadow-2xl shadow-black/[0.08] border-border/30 overflow-hidden rounded-2xl">
+                <div className="px-6 py-5" style={{ background: 'linear-gradient(135deg, hsl(217 78% 51%) 0%, hsl(217 78% 42%) 100%)' }}>
                   <div className="flex items-center gap-3 mb-1">
-                    <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center">
                       <Video className="w-5 h-5 text-white" />
                     </div>
                     <div>
                       <h3 className="text-white font-bold text-base leading-tight">Book a Partner Meeting</h3>
-                      <p className="text-white/70 text-xs">Online consultations available</p>
+                      <p className="text-white/60 text-xs">Online consultations available</p>
                     </div>
                   </div>
                 </div>
@@ -289,14 +292,14 @@ export default function Landing() {
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     Schedule a one-on-one session with our experienced Chartered Accountants. Choose your preferred partner, date, and time.
                   </p>
-                  <div className="space-y-2.5">
+                  <div className="space-y-2">
                     {PARTNERS.map((p) => (
-                      <div key={p.name} className="flex items-center gap-3 p-2.5 rounded-xl border border-border/40 bg-muted/20 hover:bg-muted/40 transition-colors">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                      <div key={p.name} className="flex items-center gap-3 p-2.5 rounded-xl border border-border/30 bg-muted/15 hover:bg-primary/[0.03] hover:border-primary/20 transition-all duration-200 cursor-pointer group">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: 'linear-gradient(135deg, hsl(217 78% 54%) 0%, hsl(262 70% 55%) 100%)' }}>
                           {p.name.split(" ").slice(-1)[0][0]}{p.name.split(" ").slice(-2, -1)[0]?.[0] || ""}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold truncate">{p.name}</p>
+                          <p className="text-xs font-semibold truncate group-hover:text-primary transition-colors">{p.name}</p>
                           <p className="text-[10px] text-muted-foreground truncate">{p.focus}</p>
                         </div>
                       </div>
@@ -304,7 +307,7 @@ export default function Landing() {
                   </div>
                   <div className="pt-1 space-y-2">
                     <Link href="/book-meeting">
-                      <Button className="w-full gap-2 shadow-sm">
+                      <Button className="w-full gap-2 rounded-xl h-10" style={{ background: 'linear-gradient(135deg, hsl(217 78% 51%) 0%, hsl(217 78% 42%) 100%)', boxShadow: '0 2px 8px rgba(59,130,246,0.25)' }}>
                         <Calendar className="w-4 h-4" /> Schedule a Meeting
                       </Button>
                     </Link>
@@ -319,14 +322,14 @@ export default function Landing() {
           </div>
 
           {/* Stats Bar */}
-          <div className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {STATS.map(({ value, label, icon: Icon }) => (
-              <div key={label} className="flex items-center gap-3 p-4 rounded-2xl bg-card border border-border/40 shadow-xs">
-                <div className="w-10 h-10 rounded-xl bg-primary/5 flex items-center justify-center shrink-0">
-                  <Icon className="w-[18px] h-[18px] text-primary" />
+          <div className="mt-20 grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {STATS.map(({ value, label, icon: Icon }, idx) => (
+              <div key={label} className="flex items-center gap-3.5 p-5 rounded-2xl bg-card border border-border/30 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group">
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${idx === 0 ? 'bg-blue-500/10' : idx === 1 ? 'bg-emerald-500/10' : idx === 2 ? 'bg-violet-500/10' : 'bg-amber-500/10'}`}>
+                  <Icon className={`w-5 h-5 ${idx === 0 ? 'text-blue-600' : idx === 1 ? 'text-emerald-600' : idx === 2 ? 'text-violet-600' : 'text-amber-600'}`} />
                 </div>
                 <div>
-                  <p className="text-xl font-bold">{value}</p>
+                  <p className="text-2xl font-bold tracking-tight">{value}</p>
                   <p className="text-[11px] text-muted-foreground font-medium">{label}</p>
                 </div>
               </div>
@@ -336,10 +339,10 @@ export default function Landing() {
       </section>
 
       {/* About Section with Tabs */}
-      <section id="about" className="py-20 bg-muted/20">
+      <section id="about" className="py-24 bg-muted/20">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-10">
-            <Badge className="mb-3 bg-violet-500/5 text-violet-600 border-violet-200 text-xs font-semibold px-3 py-1">About Us</Badge>
+          <div className="text-center mb-12">
+            <Badge className="mb-3 bg-violet-500/[0.06] text-violet-600 border-violet-200/60 text-xs font-semibold px-4 py-1.5 rounded-full">About Us</Badge>
             <h2 className="text-3xl font-bold tracking-tight mb-3">Building Excellence in Chartered Accountancy</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-sm">
               From M/s. Aqeel Alam & Co. established in 2016 to Alam & Aulakh — our journey reflects
@@ -496,10 +499,10 @@ export default function Landing() {
       </section>
 
       {/* Services Section */}
-      <section id="services" className="py-20">
+      <section id="services" className="py-24">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-12">
-            <Badge className="mb-3 bg-emerald-500/5 text-emerald-600 border-emerald-200 text-xs font-semibold px-3 py-1">Services</Badge>
+          <div className="text-center mb-14">
+            <Badge className="mb-3 bg-emerald-500/[0.06] text-emerald-600 border-emerald-200/60 text-xs font-semibold px-4 py-1.5 rounded-full">Services</Badge>
             <h2 className="text-3xl font-bold tracking-tight mb-3">Comprehensive Service Portfolio</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-sm">
               Expert financial solutions for businesses operating locally and internationally — from
@@ -509,12 +512,12 @@ export default function Landing() {
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {SERVICES.map(({ title, desc, icon: Icon, color, items }) => (
-              <Card key={title} className="border-border/40 shadow-xs hover:shadow-md transition-shadow group">
+              <Card key={title} className="border-border/30 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group rounded-2xl overflow-hidden">
                 <CardContent className="p-6">
-                  <div className={`w-12 h-12 rounded-xl ${color} flex items-center justify-center mb-4`}>
+                  <div className={`w-12 h-12 rounded-xl ${color} flex items-center justify-center mb-4 group-hover:scale-105 transition-transform duration-300`}>
                     <Icon className="w-6 h-6" />
                   </div>
-                  <h3 className="text-base font-bold mb-2">{title}</h3>
+                  <h3 className="text-base font-bold mb-2 group-hover:text-primary transition-colors">{title}</h3>
                   <p className="text-xs text-muted-foreground leading-relaxed mb-4">{desc}</p>
                   <div className="space-y-1.5">
                     {items.map(item => (
@@ -532,11 +535,13 @@ export default function Landing() {
       </section>
 
       {/* Track Record */}
-      <section className="py-16 bg-sidebar text-sidebar-foreground">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-10">
+      <section className="py-20 text-white relative overflow-hidden" style={{ background: 'linear-gradient(135deg, hsl(224 40% 14%) 0%, hsl(217 78% 22%) 50%, hsl(224 40% 10%) 100%)' }}>
+        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-[100px]" />
+        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-violet-500/8 rounded-full blur-[80px]" />
+        <div className="relative max-w-7xl mx-auto px-6">
+          <div className="text-center mb-12">
             <h2 className="text-3xl font-bold tracking-tight mb-3">Proven Track Record</h2>
-            <p className="text-sidebar-foreground/60 max-w-2xl mx-auto text-sm">
+            <p className="text-white/60 max-w-2xl mx-auto text-sm">
               Delivering excellence across Pakistan and beyond since 2016.
             </p>
           </div>
@@ -546,10 +551,10 @@ export default function Landing() {
               { value: "PKR 200B+", label: "Revenue Managed", desc: "Managed FBR tax services and corporate tax compliance for businesses with aggregate annual revenues" },
               { value: "PKR 50B+", label: "Deal Value", desc: "Facilitated corporate transactions, company incorporation, and business valuations" },
             ].map(({ value, label, desc }) => (
-              <div key={label} className="text-center p-6 rounded-2xl bg-sidebar-accent/30 border border-sidebar-border/20">
-                <p className="text-3xl font-bold text-primary mb-1">{value}</p>
-                <p className="text-sm font-semibold mb-2">{label}</p>
-                <p className="text-xs text-sidebar-foreground/50 leading-relaxed">{desc}</p>
+              <div key={label} className="text-center p-7 rounded-2xl bg-white/[0.04] border border-white/[0.06] backdrop-blur-sm hover:bg-white/[0.06] transition-all duration-300">
+                <p className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-blue-300 bg-clip-text text-transparent mb-1">{value}</p>
+                <p className="text-sm font-semibold text-white/90 mb-2">{label}</p>
+                <p className="text-xs text-white/55 leading-relaxed">{desc}</p>
               </div>
             ))}
           </div>
@@ -560,9 +565,9 @@ export default function Landing() {
               { value: "12", label: "Provinces Covered" },
               { value: "500+", label: "Professionals Trained" },
             ].map(({ value, label }) => (
-              <div key={label} className="flex items-center gap-3 p-4 rounded-xl bg-sidebar-accent/20 border border-sidebar-border/10">
-                <p className="text-xl font-bold text-primary">{value}</p>
-                <p className="text-[11px] text-sidebar-foreground/60 leading-tight">{label}</p>
+              <div key={label} className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+                <p className="text-xl font-bold text-blue-400">{value}</p>
+                <p className="text-[11px] text-white/60 leading-tight">{label}</p>
               </div>
             ))}
           </div>
@@ -570,10 +575,10 @@ export default function Landing() {
       </section>
 
       {/* Industries Section */}
-      <section id="industries" className="py-20">
+      <section id="industries" className="py-24">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-10">
-            <Badge className="mb-3 bg-amber-500/5 text-amber-600 border-amber-200 text-xs font-semibold px-3 py-1">Industries</Badge>
+          <div className="text-center mb-12">
+            <Badge className="mb-3 bg-amber-500/[0.06] text-amber-600 border-amber-200/60 text-xs font-semibold px-4 py-1.5 rounded-full">Industries</Badge>
             <h2 className="text-3xl font-bold tracking-tight mb-3">Industry Expertise</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-sm">
               Comprehensive coverage across diverse industries nationwide with deep domain expertise.
@@ -586,9 +591,9 @@ export default function Landing() {
                 <button
                   key={ind.name}
                   onClick={() => setSelectedIndustry(ind)}
-                  className="group flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-medium bg-muted/60 text-foreground/70 border border-border/40 hover:bg-primary/5 hover:text-primary hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer"
+                  className="group flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-medium bg-card text-foreground/70 border border-border/30 shadow-sm hover:bg-primary/[0.04] hover:text-primary hover:border-primary/25 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
                 >
-                  <Icon className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+                  <Icon className="w-3.5 h-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
                   {ind.name}
                 </button>
               );
@@ -642,10 +647,10 @@ export default function Landing() {
       </section>
 
       {/* Leadership Team */}
-      <section id="team" className="py-20 bg-muted/20">
+      <section id="team" className="py-24 bg-muted/20">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-10">
-            <Badge className="mb-3 bg-rose-500/5 text-rose-600 border-rose-200 text-xs font-semibold px-3 py-1">Leadership</Badge>
+          <div className="text-center mb-12">
+            <Badge className="mb-3 bg-rose-500/[0.06] text-rose-600 border-rose-200/60 text-xs font-semibold px-4 py-1.5 rounded-full">Leadership</Badge>
             <h2 className="text-3xl font-bold tracking-tight mb-3">Our Leadership Team</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-sm">
               Six partners bringing extensive Big Four experience — providing top-tier audit, tax,
@@ -654,15 +659,15 @@ export default function Landing() {
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {TEAM.map((member) => (
+            {TEAM.map((member, idx) => (
               <Card
                 key={member.name}
-                className="border-border/40 shadow-xs hover:shadow-md hover:border-primary/20 transition-all cursor-pointer group"
+                className="border-border/30 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group rounded-2xl overflow-hidden"
                 onClick={() => setSelectedPartner(member)}
               >
                 <CardContent className="p-6">
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-lg font-bold shrink-0 group-hover:bg-primary/15 transition-colors">
+                    <div className="w-14 h-14 rounded-2xl text-white flex items-center justify-center text-lg font-bold shrink-0 group-hover:scale-105 transition-transform duration-300" style={{ background: `linear-gradient(135deg, ${['hsl(217 78% 54%)', 'hsl(160 60% 42%)', 'hsl(262 70% 55%)', 'hsl(38 92% 52%)', 'hsl(0 72% 55%)', 'hsl(200 70% 50%)'][idx]} 0%, ${['hsl(217 78% 42%)', 'hsl(160 60% 34%)', 'hsl(262 70% 42%)', 'hsl(38 92% 42%)', 'hsl(0 72% 42%)', 'hsl(200 70% 38%)'][idx]} 100%)` }}>
                       {member.initials}
                     </div>
                     <div>
@@ -673,11 +678,11 @@ export default function Landing() {
                   </div>
                   <p className="text-xs text-muted-foreground mb-3">{member.focus}</p>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 text-[11px]">
-                      <span className="px-2 py-1 rounded-md bg-muted/60 text-muted-foreground font-medium">{member.exp}</span>
-                      <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 font-medium">{member.bg}</span>
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="px-2.5 py-1 rounded-full bg-muted/50 text-muted-foreground font-medium">{member.exp}</span>
+                      <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium">{member.bg}</span>
                     </div>
-                    <span className="text-[10px] text-muted-foreground/50 group-hover:text-primary/60 transition-colors">View Profile →</span>
+                    <span className="text-[10px] text-muted-foreground/40 group-hover:text-primary transition-colors">View Profile →</span>
                   </div>
                 </CardContent>
               </Card>
@@ -815,11 +820,11 @@ export default function Landing() {
       </section>
 
       {/* Contact Section */}
-      <section id="contact" className="py-20 bg-muted/20">
+      <section id="contact" className="py-24 bg-muted/20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-10">
-              <Badge className="mb-3 bg-primary/5 text-primary border-primary/20 text-xs font-semibold px-3 py-1">Contact</Badge>
+            <div className="text-center mb-12">
+              <Badge className="mb-3 bg-primary/[0.06] text-primary border-primary/15 text-xs font-semibold px-4 py-1.5 rounded-full">Contact</Badge>
               <h2 className="text-3xl font-bold tracking-tight mb-3">Connect with Pakistan's Leading Chartered Accountants</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto text-sm">
                 Contact us for expert audit, tax, corporate, and strategic business advisory services.
@@ -827,41 +832,41 @@ export default function Landing() {
               </p>
             </div>
 
-            <div className="grid sm:grid-cols-3 gap-5 mb-8">
-              <Card className="border-border/40 shadow-xs text-center">
-                <CardContent className="p-6">
-                  <div className="w-12 h-12 rounded-xl bg-primary/5 flex items-center justify-center mx-auto mb-3">
-                    <MapPin className="w-5 h-5 text-primary" />
+            <div className="grid sm:grid-cols-3 gap-5 mb-10">
+              <Card className="border-border/30 shadow-sm text-center rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+                <CardContent className="p-7">
+                  <div className="w-13 h-13 rounded-xl bg-blue-500/10 flex items-center justify-center mx-auto mb-4" style={{ width: 52, height: 52 }}>
+                    <MapPin className="w-5 h-5 text-blue-600" />
                   </div>
                   <h4 className="text-sm font-bold mb-1">Head Office — Lahore</h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     Suite # 5 & 6, Ground Floor, New 1-Campus, Ross Residencia, Canal Road, Lahore, Punjab 54000
                   </p>
-                  <p className="text-xs text-primary font-medium mt-2">0423-7459-666</p>
+                  <p className="text-xs text-primary font-semibold mt-3">0423-7459-666</p>
                 </CardContent>
               </Card>
-              <Card className="border-border/40 shadow-xs text-center">
-                <CardContent className="p-6">
-                  <div className="w-12 h-12 rounded-xl bg-violet-500/5 flex items-center justify-center mx-auto mb-3">
+              <Card className="border-border/30 shadow-sm text-center rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+                <CardContent className="p-7">
+                  <div className="rounded-xl bg-violet-500/10 flex items-center justify-center mx-auto mb-4" style={{ width: 52, height: 52 }}>
                     <Building2 className="w-5 h-5 text-violet-600" />
                   </div>
                   <h4 className="text-sm font-bold mb-1">Islamabad Office</h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     16th Floor, State Life Building No. 5, F-6, Jinnah Avenue, Islamabad
                   </p>
-                  <p className="text-xs text-primary font-medium mt-2">051-8357-873</p>
+                  <p className="text-xs text-primary font-semibold mt-3">051-8357-873</p>
                 </CardContent>
               </Card>
-              <Card className="border-border/40 shadow-xs text-center">
-                <CardContent className="p-6">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-500/5 flex items-center justify-center mx-auto mb-3">
+              <Card className="border-border/30 shadow-sm text-center rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+                <CardContent className="p-7">
+                  <div className="rounded-xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4" style={{ width: 52, height: 52 }}>
                     <UserCheck className="w-5 h-5 text-emerald-600" />
                   </div>
                   <h4 className="text-sm font-bold mb-1">Focal Partner</h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     Mr. Aqeel Alam, FCA<br />Managing Partner
                   </p>
-                  <p className="text-xs text-primary font-medium mt-2">0321-111-2041</p>
+                  <p className="text-xs text-primary font-semibold mt-3">0321-111-2041</p>
                   <p className="text-xs text-muted-foreground">info@aqeelalam.com</p>
                 </CardContent>
               </Card>
@@ -869,7 +874,7 @@ export default function Landing() {
 
             <div className="text-center">
               <Link href="/login">
-                <Button size="lg" className="h-12 px-8 text-sm font-semibold shadow-md gap-2">
+                <Button size="lg" className="h-12 px-8 text-sm font-semibold gap-2 rounded-xl" style={{ background: 'linear-gradient(135deg, hsl(217 78% 51%) 0%, hsl(217 78% 42%) 100%)', boxShadow: '0 4px 16px rgba(59,130,246,0.3)' }}>
                   Access Portal <ArrowRight className="w-4 h-4" />
                 </Button>
               </Link>
@@ -879,11 +884,13 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="py-8 border-t border-border/30">
+      <footer className="py-10 border-t border-border/20" style={{ background: 'linear-gradient(180deg, hsl(220 20% 97%) 0%, hsl(220 20% 94%) 100%)' }}>
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-2.5">
-              <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Alam & Aulakh" className="h-7 w-auto object-contain" />
+              <div className="w-8 h-8 rounded-lg bg-primary/[0.06] flex items-center justify-center">
+                <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Alam & Aulakh" className="h-5 w-auto object-contain" />
+              </div>
               <span className="text-sm font-bold">Alam & Aulakh</span>
               <span className="text-xs text-muted-foreground">Chartered Accountants</span>
             </div>
