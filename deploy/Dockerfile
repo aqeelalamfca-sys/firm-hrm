@@ -1,4 +1,4 @@
-FROM node:24-alpine AS base
+FROM node:24-slim AS base
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 
@@ -20,7 +20,7 @@ ENV BASE_PATH=/
 RUN pnpm --filter @workspace/api-server run build
 RUN pnpm --filter @workspace/hrm-system run build
 
-FROM base AS production
+FROM node:24-slim AS production
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/artifacts/api-server/dist ./dist
@@ -32,6 +32,6 @@ ENV PORT=5000
 EXPOSE 5000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:5000/api/health || exit 1
+  CMD node -e "fetch('http://localhost:5000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
 CMD ["node", "--enable-source-maps", "./dist/index.mjs"]
