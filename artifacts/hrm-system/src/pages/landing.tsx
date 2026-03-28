@@ -245,6 +245,7 @@ export default function Landing() {
         <div className="relative max-w-7xl mx-auto px-6">
           <div className="grid lg:grid-cols-[1fr_400px] gap-12 items-center">
             <div>
+              <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Alam & Aulakh" className="h-28 w-auto object-contain mb-6" />
               <Badge className="mb-6 bg-primary/5 text-primary border-primary/20 text-xs font-semibold px-3 py-1">
                 ICAP Approved Training Organization
               </Badge>
