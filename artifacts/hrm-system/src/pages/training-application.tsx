@@ -408,6 +408,83 @@ export default function TrainingApplication() {
         <Card className="shadow-lg border-border/40">
           <CardContent className="p-6 sm:p-8">
             <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-primary" />
+              Training Preferences
+            </h2>
+            <p className="text-xs text-muted-foreground mb-6">Select your training preferences.</p>
+            <div className="space-y-4">
+              <div className="grid sm:grid-cols-3 gap-4">
+                <div>
+                  <Label className="text-sm">Registration Based On *</Label>
+                  <Select value={form.icapLevel} onValueChange={v => handleChange("icapLevel", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select basis" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="caf_qualified">CAF Qualified</SelectItem>
+                      <SelectItem value="graduation">Graduation</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FieldError field="icapLevel" />
+                </div>
+                <div>
+                  <Label className="text-sm">Preferred Training Period *</Label>
+                  <Select value={form.trainingPeriod} onValueChange={v => handleChange("trainingPeriod", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select period" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2.5">2.5 Years</SelectItem>
+                      <SelectItem value="3.5">3.5 Years</SelectItem>
+                      <SelectItem value="4">4 Years</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FieldError field="trainingPeriod" />
+                </div>
+                <div>
+                  <Label className="text-sm">FTS *</Label>
+                  <Select value={form.fts} onValueChange={v => handleChange("fts", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select FTS" /></SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 71 }, (_, i) => i + 30).map(n => (
+                        <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldError field="fts" />
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm">Preferred Location *</Label>
+                  <Select value={form.preferredLocation} onValueChange={v => handleChange("preferredLocation", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="lahore">Lahore Office</SelectItem>
+                      <SelectItem value="islamabad">Islamabad Office</SelectItem>
+                      <SelectItem value="any">Either Location</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FieldError field="preferredLocation" />
+                </div>
+                <div>
+                  <Label className="text-sm">Preferred Department *</Label>
+                  <Select value={form.preferredDept} onValueChange={v => handleChange("preferredDept", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="audit">Audit & Assurance</SelectItem>
+                      <SelectItem value="tax">Tax Advisory</SelectItem>
+                      <SelectItem value="corporate">Corporate Services</SelectItem>
+                      <SelectItem value="advisory">Advisory & Consulting</SelectItem>
+                      <SelectItem value="any">No Preference</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FieldError field="preferredDept" />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg border-border/40">
+          <CardContent className="p-6 sm:p-8">
+            <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
               <Phone className="w-5 h-5 text-primary" />
               Contact Information
             </h2>
@@ -533,83 +610,6 @@ export default function TrainingApplication() {
                     <Label className="text-sm">Marks/CGPA</Label>
                     <Input value={form.graduationMarks} onChange={e => handleChange("graduationMarks", e.target.value)} placeholder="e.g. 3.5/4.0 or 65%" />
                   </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-lg border-border/40">
-          <CardContent className="p-6 sm:p-8">
-            <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-primary" />
-              Training Preferences
-            </h2>
-            <p className="text-xs text-muted-foreground mb-6">Select your training preferences.</p>
-            <div className="space-y-4">
-              <div className="grid sm:grid-cols-3 gap-4">
-                <div>
-                  <Label className="text-sm">Registration Based On *</Label>
-                  <Select value={form.icapLevel} onValueChange={v => handleChange("icapLevel", v)}>
-                    <SelectTrigger><SelectValue placeholder="Select basis" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="caf_qualified">CAF Qualified</SelectItem>
-                      <SelectItem value="graduation">Graduation</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FieldError field="icapLevel" />
-                </div>
-                <div>
-                  <Label className="text-sm">Preferred Training Period *</Label>
-                  <Select value={form.trainingPeriod} onValueChange={v => handleChange("trainingPeriod", v)}>
-                    <SelectTrigger><SelectValue placeholder="Select period" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="2.5">2.5 Years</SelectItem>
-                      <SelectItem value="3.5">3.5 Years</SelectItem>
-                      <SelectItem value="4">4 Years</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FieldError field="trainingPeriod" />
-                </div>
-                <div>
-                  <Label className="text-sm">FTS *</Label>
-                  <Select value={form.fts} onValueChange={v => handleChange("fts", v)}>
-                    <SelectTrigger><SelectValue placeholder="Select FTS" /></SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 71 }, (_, i) => i + 30).map(n => (
-                        <SelectItem key={n} value={String(n)}>{n}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FieldError field="fts" />
-                </div>
-              </div>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm">Preferred Location *</Label>
-                  <Select value={form.preferredLocation} onValueChange={v => handleChange("preferredLocation", v)}>
-                    <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="lahore">Lahore Office</SelectItem>
-                      <SelectItem value="islamabad">Islamabad Office</SelectItem>
-                      <SelectItem value="any">Either Location</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FieldError field="preferredLocation" />
-                </div>
-                <div>
-                  <Label className="text-sm">Preferred Department *</Label>
-                  <Select value={form.preferredDept} onValueChange={v => handleChange("preferredDept", v)}>
-                    <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="audit">Audit & Assurance</SelectItem>
-                      <SelectItem value="tax">Tax Advisory</SelectItem>
-                      <SelectItem value="corporate">Corporate Services</SelectItem>
-                      <SelectItem value="advisory">Advisory & Consulting</SelectItem>
-                      <SelectItem value="any">No Preference</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FieldError field="preferredDept" />
                 </div>
               </div>
             </div>
