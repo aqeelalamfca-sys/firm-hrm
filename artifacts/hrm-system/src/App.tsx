@@ -8,6 +8,7 @@ import { DepartmentProvider } from "@/hooks/use-departments";
 import { Layout } from "@/components/layout";
 
 import NotFound from "@/pages/not-found";
+import Landing from "@/pages/landing";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import Employees from "@/pages/employees";
@@ -78,7 +79,7 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 
   React.useEffect(() => {
     if (!isLoading && !user) {
-      navigate("/login");
+      navigate("/landing");
     }
   }, [isLoading, user, navigate]);
 
@@ -105,6 +106,7 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 function Router() {
   return (
     <Switch>
+      <Route path="/landing" component={Landing} />
       <Route path="/login" component={Login} />
       <Route path="/employees"><ProtectedRoute component={Employees} /></Route>
       <Route path="/attendance"><ProtectedRoute component={Attendance} /></Route>

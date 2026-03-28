@@ -174,7 +174,8 @@ All under `/api`:
 
 ## Frontend Pages
 
-17 pages total:
+18 pages total:
+- `/landing` - Public landing page (firm overview, services, team, contact — accessible without authentication)
 - `/login` - Login page
 - `/` - Dashboard (role-based: Trainee=Light Blue tasks/attendance, Manager=Green staff/leave approvals, Partner/Admin=Deep Red executive overview with invoices/payroll/staff; all roles get Time In/Out card, leave apply, PKT time)
 - `/employees` - Employee management
