@@ -50,9 +50,21 @@ const authLimiter = rateLimit({
 
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
+app.get("/api/health", (_req: Request, res: Response) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 app.use("/api/auth", authLimiter);
 app.use("/api", apiLimiter);
 app.use("/api", router);
+
+if (process.env.NODE_ENV === "production") {
+  const publicDir = path.join(import.meta.dirname, "public");
+  app.use(express.static(publicDir));
+  app.get("*", (_req: Request, res: Response) => {
+    res.sendFile(path.join(publicDir, "index.html"));
+  });
+}
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   logger.error({ err: err.message, stack: err.stack }, "Unhandled error");

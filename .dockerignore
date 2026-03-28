@@ -1,0 +1,12 @@
+node_modules
+.git
+.cache
+.local
+attached_assets
+artifacts/mockup-sandbox
+deploy
+*.md
+!deploy/Dockerfile
+.replit
+replit.nix
+replit_agent
