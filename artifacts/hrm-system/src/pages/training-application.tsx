@@ -58,7 +58,10 @@ export default function TrainingApplication() {
     gender: "",
     maritalStatus: "",
     mobile: "",
-    alternateMobile: "",
+    emergencyMobile: "",
+    emergencyName: "",
+    emergencyRelation: "",
+    emergencyRelationOther: "",
     email: "",
     currentAddress: "",
     permanentAddress: "",
@@ -174,6 +177,10 @@ export default function TrainingApplication() {
     if (!form.interBoard) newErrors.interBoard = "Board is required";
     if (!form.interYear) newErrors.interYear = "Year is required";
     if (!form.interMarks.trim()) newErrors.interMarks = "Marks/Grade is required";
+    if (!form.emergencyMobile.trim()) newErrors.emergencyMobile = "Emergency contact number is required";
+    if (!form.emergencyName.trim()) newErrors.emergencyName = "Contact person name is required";
+    if (!form.emergencyRelation) newErrors.emergencyRelation = "Relation is required";
+    if (form.emergencyRelation === "other" && !form.emergencyRelationOther.trim()) newErrors.emergencyRelationOther = "Please specify the relation";
     if (!form.icapLevel) newErrors.icapLevel = "Registration basis is required";
     if (!form.trainingPeriod) newErrors.trainingPeriod = "Training period is required";
     if (!form.fts) newErrors.fts = "FTS is required";
@@ -496,10 +503,43 @@ export default function TrainingApplication() {
                   <Input value={form.mobile} onChange={e => handleChange("mobile", e.target.value)} placeholder="03xx-xxxxxxx" />
                   <FieldError field="mobile" />
                 </div>
-                <div>
-                  <Label className="text-sm">Alternate Mobile</Label>
-                  <Input value={form.alternateMobile} onChange={e => handleChange("alternateMobile", e.target.value)} placeholder="Optional" />
+              </div>
+              <div className="mt-4 p-4 bg-muted/30 rounded-lg border border-border/50">
+                <p className="text-sm font-semibold mb-3">Emergency Contact *</p>
+                <div className="grid sm:grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-sm">Contact Number *</Label>
+                    <Input value={form.emergencyMobile} onChange={e => handleChange("emergencyMobile", e.target.value)} placeholder="03xx-xxxxxxx" />
+                    <FieldError field="emergencyMobile" />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Contact Person Name *</Label>
+                    <Input value={form.emergencyName} onChange={e => handleChange("emergencyName", e.target.value)} placeholder="Full name" />
+                    <FieldError field="emergencyName" />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Relation *</Label>
+                    <Select value={form.emergencyRelation} onValueChange={v => { handleChange("emergencyRelation", v); if (v !== "other") handleChange("emergencyRelationOther", ""); }}>
+                      <SelectTrigger><SelectValue placeholder="Select relation" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="spouse">Spouse</SelectItem>
+                        <SelectItem value="father">Father</SelectItem>
+                        <SelectItem value="mother">Mother</SelectItem>
+                        <SelectItem value="brother">Brother</SelectItem>
+                        <SelectItem value="sister">Sister</SelectItem>
+                        <SelectItem value="other">Other (specify)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FieldError field="emergencyRelation" />
+                  </div>
                 </div>
+                {form.emergencyRelation === "other" && (
+                  <div className="mt-3">
+                    <Label className="text-sm">Specify Relation *</Label>
+                    <Input value={form.emergencyRelationOther} onChange={e => handleChange("emergencyRelationOther", e.target.value)} placeholder="e.g. Uncle, Cousin, Friend" />
+                    <FieldError field="emergencyRelationOther" />
+                  </div>
+                )}
               </div>
               <div>
                 <Label className="text-sm">Email Address *</Label>
