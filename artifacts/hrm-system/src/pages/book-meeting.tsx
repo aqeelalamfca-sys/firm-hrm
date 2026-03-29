@@ -441,7 +441,7 @@ export default function BookMeeting() {
                               isSelected
                                 ? "bg-primary text-white border-primary shadow-md"
                                 : booked
-                                  ? "bg-muted/40 text-muted-foreground/40 border-border/30 cursor-not-allowed line-through"
+                                  ? "bg-muted/20 text-muted-foreground/25 border-border/20 cursor-not-allowed"
                                   : "border-border/50 hover:border-primary/40 hover:bg-primary/5"
                             }`}
                           >
