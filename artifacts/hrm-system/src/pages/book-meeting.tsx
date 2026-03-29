@@ -35,6 +35,24 @@ const TIME_SLOTS = [
   "03:00 PM", "03:30 PM", "04:00 PM", "04:30 PM",
 ];
 
+const MAX_AVAILABLE_SLOTS = 6;
+
+function getAutoBookedSlots(date: string, partner: string): string[] {
+  let hash = 0;
+  const seed = date + partner;
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+  }
+  const shuffled = [...TIME_SLOTS];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    hash = ((hash << 5) - hash + i) | 0;
+    const j = Math.abs(hash) % (i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const slotsToBlock = TIME_SLOTS.length - MAX_AVAILABLE_SLOTS;
+  return shuffled.slice(0, slotsToBlock);
+}
+
 const PURPOSES = [
   "Statutory Audit",
   "Tax Advisory & Compliance",
@@ -156,12 +174,20 @@ export default function BookMeeting() {
     if (!date || !partner) return;
     setLoadingSlots(true);
     try {
+      const autoBooked = getAutoBookedSlots(date, partner);
       const res = await fetch(`${API_BASE}/meetings/public/slots?date=${date}&partner=${encodeURIComponent(partner)}`);
       if (res.ok) {
         const data = await res.json();
-        setBookedTimes(data.bookedTimes || []);
+        const realBooked = data.bookedTimes || [];
+        const merged = [...new Set([...autoBooked, ...realBooked])];
+        setBookedTimes(merged);
+      } else {
+        setBookedTimes(autoBooked);
       }
-    } catch {} finally {
+    } catch {
+      const autoBooked = getAutoBookedSlots(date, partner);
+      setBookedTimes(autoBooked);
+    } finally {
       setLoadingSlots(false);
     }
   };
