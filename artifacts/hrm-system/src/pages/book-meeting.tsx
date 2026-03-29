@@ -55,6 +55,43 @@ function getFirstDayOfMonth(year: number, month: number) {
   return new Date(year, month, 1).getDay();
 }
 
+const PAKISTAN_PUBLIC_HOLIDAYS: Record<string, string> = {
+  "2026-01-17": "Shab-e-Meraj",
+  "2026-02-05": "Kashmir Day",
+  "2026-03-01": "Shab-e-Barat",
+  "2026-03-20": "Eid-ul-Fitr",
+  "2026-03-21": "Eid-ul-Fitr",
+  "2026-03-22": "Eid-ul-Fitr",
+  "2026-03-23": "Pakistan Day",
+  "2026-05-01": "Labour Day",
+  "2026-05-27": "Eid-ul-Adha",
+  "2026-05-28": "Eid-ul-Adha",
+  "2026-05-29": "Eid-ul-Adha",
+  "2026-06-17": "Muharram (9th)",
+  "2026-06-18": "Ashura (10th Muharram)",
+  "2026-08-14": "Independence Day",
+  "2026-08-27": "Eid Milad-un-Nabi",
+  "2026-11-09": "Iqbal Day",
+  "2026-12-25": "Quaid-e-Azam Day",
+  "2027-01-06": "Shab-e-Meraj",
+  "2027-02-05": "Kashmir Day",
+  "2027-02-19": "Shab-e-Barat",
+  "2027-03-10": "Eid-ul-Fitr",
+  "2027-03-11": "Eid-ul-Fitr",
+  "2027-03-12": "Eid-ul-Fitr",
+  "2027-03-23": "Pakistan Day",
+  "2027-05-01": "Labour Day",
+  "2027-05-17": "Eid-ul-Adha",
+  "2027-05-18": "Eid-ul-Adha",
+  "2027-05-19": "Eid-ul-Adha",
+  "2027-06-07": "Muharram (9th)",
+  "2027-06-08": "Ashura (10th Muharram)",
+  "2027-08-14": "Independence Day",
+  "2027-08-17": "Eid Milad-un-Nabi",
+  "2027-11-09": "Iqbal Day",
+  "2027-12-25": "Quaid-e-Azam Day",
+};
+
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -96,10 +133,17 @@ export default function BookMeeting() {
   const isDateDisabled = (day: number) => {
     const date = new Date(currentYear, currentMonth, day);
     const dayOfWeek = date.getDay();
-    if (dayOfWeek === 0) return true;
+    if (dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6) return true;
     const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    if (date < todayDate) return true;
+    if (date <= todayDate) return true;
+    const dateStr = formatDate(day);
+    if (PAKISTAN_PUBLIC_HOLIDAYS[dateStr]) return true;
     return false;
+  };
+
+  const getHolidayName = (day: number): string | null => {
+    const dateStr = formatDate(day);
+    return PAKISTAN_PUBLIC_HOLIDAYS[dateStr] || null;
   };
 
   const formatDate = (day: number) => {
@@ -309,26 +353,43 @@ export default function BookMeeting() {
                     const dateStr = formatDate(day);
                     const isSelected = selectedDate === dateStr;
                     const isToday = day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
+                    const holiday = getHolidayName(day);
+                    const date = new Date(currentYear, currentMonth, day);
+                    const dayOfWeek = date.getDay();
+                    const isWeekend = dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6;
+                    const tooltipText = holiday ? holiday : isWeekend ? (dayOfWeek === 5 ? "Friday" : dayOfWeek === 6 ? "Saturday" : "Sunday") + " — Office Closed" : isToday ? "Same-day booking not available" : undefined;
 
                     return (
                       <button
                         key={day}
                         disabled={disabled}
                         onClick={() => handleDateSelect(day)}
-                        className={`h-10 rounded-lg text-sm font-medium transition-all ${
+                        title={tooltipText}
+                        className={`h-10 rounded-lg text-sm font-medium transition-all relative ${
                           isSelected
                             ? "bg-primary text-white shadow-md"
                             : isToday
-                              ? "bg-primary/10 text-primary font-bold"
-                              : disabled
-                                ? "text-muted-foreground/30 cursor-not-allowed"
-                                : "hover:bg-muted/60 text-foreground"
+                              ? "bg-amber-50 text-amber-500 font-bold cursor-not-allowed"
+                              : holiday
+                                ? "text-red-300 cursor-not-allowed bg-red-50/50"
+                                : isWeekend && !disabled
+                                  ? "text-muted-foreground/30 cursor-not-allowed"
+                                  : disabled
+                                    ? "text-muted-foreground/30 cursor-not-allowed"
+                                    : "hover:bg-muted/60 text-foreground"
                         }`}
                       >
                         {day}
+                        {holiday && <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-red-400" />}
                       </button>
                     );
                   })}
+                </div>
+
+                <div className="flex items-center gap-4 mt-3 text-[10px] text-muted-foreground">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-muted-foreground/20" /> Fri/Sat/Sun closed</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400" /> Public holiday</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> Today</span>
                 </div>
 
                 {selectedDate && selectedPartner && (
