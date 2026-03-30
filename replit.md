@@ -35,6 +35,9 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - **Client & Invoice Management:** Client master with financial details, and a full invoice lifecycle (Draft, Approved, Issued, Paid) with WHT/GST tax calculations and aging reports.
 - **Engagement & Task Management:** Tracking client engagements through their lifecycle and a task scheduler with calendar/list/week views, priority levels, and dynamic, seniority-based task allocation.
 - **Document Management:** Version-controlled document storage with categories, soft delete (trash and restore functionality), and permanent deletion.
+- **Role-Based Data Isolation:** Employees and trainees can only view their own records (leaves, employee profile). Only admins/HR/managers/partners can view all records and approve/reject leaves. Employee creation/editing restricted to admin roles.
+- **Trainee-to-Employee Auto-Linking:** When a training application status is changed to "selected", an employee record is automatically created with data from the application (name, email, phone, CNIC, department, ICAP status).
+- **ICAP/Articles Tracking:** Employee records include ICAP registration status (Registered/Not Registered/In Progress/Exempted), articles ending date, and articles extension period fields.
 - **Audit Trail:** Comprehensive logging of all system actions for accountability and compliance.
 - **Credential Vault:** Secure, encrypted storage for client portal credentials (e.g., FBR, SECP, PRA logins).
 - **Notifications:** In-app notification system with real-time updates for important events.

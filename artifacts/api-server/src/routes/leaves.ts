@@ -3,15 +3,29 @@ import { db } from "@workspace/db";
 import { leavesTable, employeesTable, usersTable } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { createNotification } from "./notifications";
+import { requireRoles, type AuthenticatedRequest } from "../middleware/auth";
+
+const ADMIN_ROLES = ["super_admin", "hr_admin", "partner", "manager"];
 
 const router = Router();
 
-router.get("/", async (req, res) => {
+router.get("/", async (req: AuthenticatedRequest, res) => {
   try {
     const { employeeId, status } = req.query;
+    const user = req.user!;
 
     const conditions: any[] = [];
-    if (employeeId) conditions.push(eq(leavesTable.employeeId, parseInt(employeeId as string)));
+
+    if (!ADMIN_ROLES.includes(user.role)) {
+      if (user.employeeId) {
+        conditions.push(eq(leavesTable.employeeId, user.employeeId));
+      } else {
+        return res.json([]);
+      }
+    } else if (employeeId) {
+      conditions.push(eq(leavesTable.employeeId, parseInt(employeeId as string)));
+    }
+
     if (status) conditions.push(eq(leavesTable.status, status as any));
 
     const records = conditions.length > 0
@@ -56,9 +70,19 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", async (req: AuthenticatedRequest, res) => {
   try {
-    const { employeeId, leaveType, fromDate, toDate, reason } = req.body;
+    const { leaveType, fromDate, toDate, reason } = req.body;
+    const user = req.user!;
+
+    let employeeId = req.body.employeeId;
+    if (!ADMIN_ROLES.includes(user.role)) {
+      if (!user.employeeId) {
+        return res.status(400).json({ error: "No employee record linked to your account" });
+      }
+      employeeId = user.employeeId;
+    }
+
     if (!employeeId || !leaveType || !fromDate || !toDate || !reason) {
       return res.status(400).json({ error: "Missing required fields" });
     }
@@ -90,7 +114,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", requireRoles(...ADMIN_ROLES), async (req: AuthenticatedRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     const { status, approvalNotes } = req.body;
@@ -100,7 +124,7 @@ router.put("/:id", async (req, res) => {
       return res.status(400).json({ error: "Rejection reason is required" });
     }
 
-    const reviewerUserId = (req as any).user?.id || null;
+    const reviewerUserId = req.user?.id || null;
 
     const [record] = await db.update(leavesTable).set({
       status,

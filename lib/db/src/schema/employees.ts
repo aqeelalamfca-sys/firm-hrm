@@ -25,6 +25,9 @@ export const employeesTable = pgTable("employees", {
   cnic: text("cnic"),
   address: text("address"),
   trainingPeriod: text("training_period"),
+  icapRegistrationStatus: text("icap_registration_status"),
+  articlesEndingDate: date("articles_ending_date"),
+  articlesExtensionPeriod: text("articles_extension_period"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -23,6 +23,9 @@ const employeeSchema = z.object({
   designation: z.string().min(2, "Designation is required"),
   joiningDate: z.string().min(1, "Date is required"),
   salary: z.coerce.number().min(1, "Salary must be positive"),
+  icapRegistrationStatus: z.string().optional(),
+  articlesEndingDate: z.string().optional(),
+  articlesExtensionPeriod: z.string().optional(),
 });
 
 export default function Employees() {
@@ -51,7 +54,7 @@ export default function Employees() {
   const form = useForm<z.infer<typeof employeeSchema>>({
     resolver: zodResolver(employeeSchema),
     defaultValues: {
-      firstName: "", lastName: "", email: "", department: "", designation: "", joiningDate: new Date().toISOString().split('T')[0], salary: 0
+      firstName: "", lastName: "", email: "", department: "", designation: "", joiningDate: new Date().toISOString().split('T')[0], salary: 0, icapRegistrationStatus: "", articlesEndingDate: "", articlesExtensionPeriod: ""
     }
   });
 
@@ -115,6 +118,38 @@ export default function Employees() {
                     <FormItem><FormLabel>Monthly Salary</FormLabel><FormControl><Input type="number" {...field} className="bg-muted/50 border-0" /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="icapRegistrationStatus" render={({ field }) => (
+                    <FormItem><FormLabel>ICAP Registration Status</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger className="bg-muted/50 border-0"><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="Registered">Registered</SelectItem>
+                          <SelectItem value="Not Registered">Not Registered</SelectItem>
+                          <SelectItem value="In Progress">In Progress</SelectItem>
+                          <SelectItem value="Exempted">Exempted</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    <FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="articlesEndingDate" render={({ field }) => (
+                    <FormItem><FormLabel>Articles Ending Date</FormLabel><FormControl><Input type="date" {...field} className="bg-muted/50 border-0" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
+                <FormField control={form.control} name="articlesExtensionPeriod" render={({ field }) => (
+                  <FormItem><FormLabel>Articles Extension Period</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl><SelectTrigger className="bg-muted/50 border-0"><SelectValue placeholder="Select period (if any)" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="N/A">N/A</SelectItem>
+                        <SelectItem value="3 Months">3 Months</SelectItem>
+                        <SelectItem value="6 Months">6 Months</SelectItem>
+                        <SelectItem value="9 Months">9 Months</SelectItem>
+                        <SelectItem value="12 Months">12 Months</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  <FormMessage /></FormItem>
+                )} />
                 <div className="pt-4 flex justify-end gap-3">
                   <Button variant="ghost" type="button" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
                   <Button type="submit" disabled={createMutation.isPending} className="shadow-md shadow-primary/20">

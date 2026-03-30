@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { trainingApplicationsTable, mcqQuestionsTable } from "@workspace/db";
+import { trainingApplicationsTable, mcqQuestionsTable, employeesTable } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { type AuthenticatedRequest, authMiddleware, requireRoles } from "../middleware/auth";
 import { logActivity } from "../middleware/activity-logger";
@@ -8,6 +8,12 @@ import path from "path";
 import fs from "fs";
 import multer from "multer";
 import PDFDocument from "pdfkit";
+
+async function generateEmployeeCode(): Promise<string> {
+  const [result] = await db.select({ count: sql<number>`count(*)` }).from(employeesTable);
+  const count = Number(result.count) + 1;
+  return `EMP${String(count).padStart(4, "0")}`;
+}
 
 const router = Router();
 
@@ -526,6 +532,37 @@ router.patch("/:id/status", authMiddleware, requireRoles("super_admin", "partner
       return res.status(404).json({ error: "Application not found" });
     }
 
+    let employeeRecord = null;
+    if (status === "selected") {
+      const existingEmp = await db.select({ id: employeesTable.id })
+        .from(employeesTable)
+        .where(eq(employeesTable.email, updated.email));
+
+      if (existingEmp.length === 0) {
+        const employeeCode = await generateEmployeeCode();
+        const nameParts = updated.fullName.trim().split(/\s+/);
+        const firstName = nameParts[0];
+        const lastName = nameParts.slice(1).join(" ") || nameParts[0];
+
+        const [newEmp] = await db.insert(employeesTable).values({
+          employeeCode,
+          firstName,
+          lastName,
+          email: updated.email,
+          phone: updated.mobile,
+          department: updated.preferredDept || "Audit",
+          designation: "Trainee",
+          joiningDate: new Date().toISOString().split("T")[0],
+          salary: "0",
+          status: "active",
+          cnic: updated.cnic,
+          address: updated.currentAddress,
+          icapRegistrationStatus: updated.icapRegNo ? "Registered" : "Not Registered",
+        }).returning();
+        employeeRecord = newEmp;
+      }
+    }
+
     await logActivity({
       userId: req.user?.id ?? 0,
       userName: req.user?.name ?? "System",
@@ -533,10 +570,10 @@ router.patch("/:id/status", authMiddleware, requireRoles("super_admin", "partner
       module: "training_application",
       entityId: updated.id,
       entityType: "training_application",
-      description: `Updated training application status to ${status}`,
+      description: `Updated training application status to ${status}${employeeRecord ? ` — Employee ${employeeRecord.employeeCode} auto-created` : ""}`,
     });
 
-    res.json(updated);
+    res.json({ ...updated, employeeCreated: !!employeeRecord, employeeCode: employeeRecord?.employeeCode || null });
   } catch (error) {
     console.error("Error updating application status:", error);
     res.status(500).json({ error: "Failed to update status" });

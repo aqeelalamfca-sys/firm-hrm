@@ -256,8 +256,7 @@ export default function Leaves() {
                           </div>
                         )}
 
-                        {/* Actions */}
-                        {leave.status === 'pending' && (
+                        {leave.status === 'pending' && user && ['super_admin', 'hr_admin', 'partner', 'manager'].includes(user.role) && (
                           <div className="flex items-center gap-2 sm:self-center shrink-0">
                             <Button
                               size="sm"

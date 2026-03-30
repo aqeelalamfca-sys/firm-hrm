@@ -2,7 +2,9 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { employeesTable } from "@workspace/db";
 import { eq, and, sql, inArray } from "drizzle-orm";
+import { type AuthenticatedRequest, requireRoles } from "../middleware/auth";
 
+const ADMIN_ROLES = ["super_admin", "hr_admin", "partner", "manager"];
 const router = Router();
 
 async function generateEmployeeCode(): Promise<string> {
@@ -29,14 +31,27 @@ function formatEmployee(emp: any, reportingManagerName: string | null = null) {
     cnic: emp.cnic,
     address: emp.address,
     trainingPeriod: emp.trainingPeriod,
+    icapRegistrationStatus: emp.icapRegistrationStatus,
+    articlesEndingDate: emp.articlesEndingDate,
+    articlesExtensionPeriod: emp.articlesExtensionPeriod,
     createdAt: emp.createdAt,
   };
 }
 
-router.get("/", async (req, res) => {
+router.get("/", async (req: AuthenticatedRequest, res) => {
   try {
     const { department, status } = req.query;
+    const user = req.user!;
     const conditions = [];
+
+    if (!ADMIN_ROLES.includes(user.role)) {
+      if (user.employeeId) {
+        conditions.push(eq(employeesTable.id, user.employeeId));
+      } else {
+        return res.json([]);
+      }
+    }
+
     if (department) conditions.push(eq(employeesTable.department, department as string));
     if (status) conditions.push(eq(employeesTable.status, status as any));
 
@@ -58,9 +73,15 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", async (req: AuthenticatedRequest, res) => {
   try {
     const id = parseInt(req.params.id);
+    const user = req.user!;
+
+    if (!ADMIN_ROLES.includes(user.role) && user.employeeId !== id) {
+      return res.status(403).json({ error: "Insufficient permissions" });
+    }
+
     const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, id));
     if (!emp) return res.status(404).json({ error: "Employee not found" });
 
@@ -77,9 +98,9 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", requireRoles(...ADMIN_ROLES), async (req, res) => {
   try {
-    const { firstName, lastName, email, phone, department, designation, joiningDate, salary, reportingManagerId, cnic, address, trainingPeriod } = req.body;
+    const { firstName, lastName, email, phone, department, designation, joiningDate, salary, reportingManagerId, cnic, address, trainingPeriod, icapRegistrationStatus, articlesEndingDate, articlesExtensionPeriod } = req.body;
 
     if (!firstName || !lastName || !email || !department || !designation || !joiningDate || !salary) {
       return res.status(400).json({ error: "Missing required fields" });
@@ -100,6 +121,9 @@ router.post("/", async (req, res) => {
       cnic: cnic || null,
       address: address || null,
       trainingPeriod: trainingPeriod || null,
+      icapRegistrationStatus: icapRegistrationStatus || null,
+      articlesEndingDate: articlesEndingDate || null,
+      articlesExtensionPeriod: articlesExtensionPeriod || null,
     }).returning();
 
     res.status(201).json({ ...emp, salary: Number(emp.salary) });
@@ -109,12 +133,12 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", requireRoles(...ADMIN_ROLES), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const updates: Record<string, any> = {};
 
-    const fields = ["firstName", "lastName", "phone", "department", "designation", "status", "reportingManagerId", "address", "cnic", "trainingPeriod"];
+    const fields = ["firstName", "lastName", "phone", "department", "designation", "status", "reportingManagerId", "address", "cnic", "trainingPeriod", "icapRegistrationStatus", "articlesEndingDate", "articlesExtensionPeriod"];
     for (const f of fields) {
       if (req.body[f] !== undefined) updates[f] = req.body[f];
     }
