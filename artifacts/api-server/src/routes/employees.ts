@@ -75,7 +75,7 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
 
 router.get("/:id", async (req: AuthenticatedRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const user = req.user!;
 
     if (!ADMIN_ROLES.includes(user.role) && user.employeeId !== id) {
@@ -135,7 +135,7 @@ router.post("/", requireRoles(...ADMIN_ROLES), async (req, res) => {
 
 router.put("/:id", requireRoles(...ADMIN_ROLES), async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const updates: Record<string, any> = {};
 
     const fields = ["firstName", "lastName", "phone", "department", "designation", "status", "reportingManagerId", "address", "cnic", "trainingPeriod", "icapRegistrationStatus", "articlesEndingDate", "articlesExtensionPeriod"];
@@ -157,7 +157,7 @@ router.put("/:id", requireRoles(...ADMIN_ROLES), async (req, res) => {
 
 router.delete("/:id", requireRoles(...ADMIN_ROLES), async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const [emp] = await db.delete(employeesTable).where(eq(employeesTable.id, id)).returning();
     if (!emp) return res.status(404).json({ error: "Employee not found" });
     res.json({ message: "Employee deleted successfully", id: emp.id });

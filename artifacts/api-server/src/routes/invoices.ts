@@ -2,7 +2,9 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { invoicesTable, clientsTable } from "@workspace/db";
 import { eq, and, inArray, sql } from "drizzle-orm";
+import { requireRoles } from "../middleware/auth";
 
+const ADMIN_ROLES = ["super_admin", "hr_admin", "partner", "manager"];
 const router = Router();
 
 async function generateInvoiceNumber(): Promise<string> {
@@ -224,9 +226,9 @@ router.put("/:id/status", async (req, res) => {
   res.json(formatInvoice(inv, clients[0]?.name || "Unknown"));
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireRoles(...ADMIN_ROLES), async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const [deleted] = await db.delete(invoicesTable).where(eq(invoicesTable.id, id)).returning();
     if (!deleted) return res.status(404).json({ error: "Invoice not found" });
     res.json({ message: "Invoice deleted successfully", id: deleted.id });

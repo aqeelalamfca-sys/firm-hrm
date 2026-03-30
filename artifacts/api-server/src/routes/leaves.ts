@@ -116,7 +116,7 @@ router.post("/", async (req: AuthenticatedRequest, res) => {
 
 router.put("/:id", requireRoles(...ADMIN_ROLES), async (req: AuthenticatedRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const { status, approvalNotes } = req.body;
     if (!status) return res.status(400).json({ error: "Status required" });
 
@@ -172,7 +172,7 @@ router.put("/:id", requireRoles(...ADMIN_ROLES), async (req: AuthenticatedReques
 
 router.delete("/:id", requireRoles(...ADMIN_ROLES), async (req: AuthenticatedRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const [deleted] = await db.delete(leavesTable).where(eq(leavesTable.id, id)).returning();
     if (!deleted) return res.status(404).json({ error: "Leave record not found" });
     res.json({ message: "Leave deleted successfully", id: deleted.id });

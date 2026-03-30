@@ -2,9 +2,10 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { engagementsTable, engagementAssignmentsTable, clientsTable, employeesTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
-import { type AuthenticatedRequest } from "../middleware/auth";
+import { type AuthenticatedRequest, requireRoles } from "../middleware/auth";
 import { logActivity } from "../middleware/activity-logger";
 
+const ADMIN_ROLES = ["super_admin", "hr_admin", "partner", "manager"];
 const router = Router();
 
 function generateEngagementCode(): string {
@@ -254,9 +255,9 @@ router.post("/:id/assignments", async (req: AuthenticatedRequest, res) => {
   }
 });
 
-router.delete("/:id", async (req: AuthenticatedRequest, res) => {
+router.delete("/:id", requireRoles(...ADMIN_ROLES), async (req: AuthenticatedRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     await db.delete(engagementAssignmentsTable).where(eq(engagementAssignmentsTable.engagementId, id));
     const [deleted] = await db.delete(engagementsTable).where(eq(engagementsTable.id, id)).returning();
     if (!deleted) return res.status(404).json({ error: "Engagement not found" });
