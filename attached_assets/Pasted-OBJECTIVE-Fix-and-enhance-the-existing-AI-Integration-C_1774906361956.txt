@@ -1,0 +1,319 @@
+OBJECTIVE:
+Fix and enhance the existing "AI Integration (ChatGPT API)" module to:
+
+1. Resolve "Unauthorized" API issue
+2. Ensure secure server-side API usage
+3. Enable auto-generation of regulatory updates (FBR, SECP, PSX, SBP)
+4. Display real-time updates on Landing Page (scroll + cards)
+5. Implement scheduled auto-refresh (cron-based)
+6. Ensure session stability (fix "Session Expired")
+7. Maintain audit logs + admin control
+8. Ensure production-grade security + performance
+
+DO NOT STOP until 100% functional end-to-end.
+
+--------------------------------------------------
+PHASE 1 — FIX API AUTHORIZATION (CRITICAL)
+--------------------------------------------------
+
+ISSUE:
+"Unauthorized" error → API not called correctly server-side
+
+FIX:
+
+✔ Move API call strictly to backend
+✔ NEVER call OpenAI from frontend
+
+IMPLEMENT:
+
+- Create service:
+  /server/services/ai.service.ts
+
+CODE:
+
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export async function generateRegulatoryUpdates() {
+  const prompt = `
+  Generate latest regulatory updates for Pakistan:
+  - FBR (tax, SROs, ATL, deadlines)
+  - SECP (Companies Act, filings)
+  - SBP (banking, forex)
+  - PSX (market, compliance)
+
+  Format:
+  - Title
+  - Authority
+  - Summary (2–3 lines)
+  - Effective Date
+  - Priority: High/Medium/Low
+  - Category: Tax / Corporate / Financial / Compliance
+
+  Keep professional for Chartered Accountancy firm.
+  Max 5 updates.
+  `;
+
+  const response = await client.chat.completions.create({
+    model: "gpt-5.3",
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  return response.choices[0].message.content;
+}
+
+✔ Ensure environment variable:
+.env
+OPENAI_API_KEY=your_key_here
+
+✔ Restart server after saving
+
+--------------------------------------------------
+PHASE 2 — BACKEND API ENDPOINT
+--------------------------------------------------
+
+Create:
+
+/server/routes/ai.routes.ts
+
+import express from "express";
+import { generateRegulatoryUpdates } from "../services/ai.service";
+
+const router = express.Router();
+
+router.get("/generate-updates", async (req, res) => {
+  try {
+    const data = await generateRegulatoryUpdates();
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+export default router;
+
+✔ Register route in app.ts
+
+--------------------------------------------------
+PHASE 3 — DATABASE (CACHE + HISTORY)
+--------------------------------------------------
+
+Create table:
+
+regulatory_updates
+
+Fields:
+- id
+- title
+- authority
+- summary
+- effective_date
+- priority
+- category
+- created_at
+- source = "AI"
+
+✔ Save generated results to DB
+✔ Avoid calling API on every page load
+
+--------------------------------------------------
+PHASE 4 — AUTO GENERATION (CRON JOB)
+--------------------------------------------------
+
+Install:
+npm install node-cron
+
+Create:
+/server/jobs/update.job.ts
+
+import cron from "node-cron";
+import { generateRegulatoryUpdates } from "../services/ai.service";
+
+cron.schedule("0 */3 * * *", async () => {
+  console.log("Running regulatory update job...");
+
+  const updates = await generateRegulatoryUpdates();
+
+  // Parse + save to DB
+});
+
+✔ Runs every 3 hours
+
+--------------------------------------------------
+PHASE 5 — ADMIN PANEL FIX
+--------------------------------------------------
+
+Fix existing UI:
+
+✔ "Save Key" → store in ENV (not DB)
+✔ "Test" button → call backend API
+
+Add:
+
+POST /api/test-key
+
+✔ Validate API key by sending test request
+
+✔ Remove "Unauthorized" by:
+- Correct header usage
+- Correct model name
+- Correct backend usage
+
+--------------------------------------------------
+PHASE 6 — SESSION EXPIRED FIX
+--------------------------------------------------
+
+ISSUE:
+Session expires while saving
+
+FIX:
+
+✔ Implement JWT refresh token
+✔ Increase session timeout (e.g. 8 hours)
+✔ Add Axios interceptor:
+
+if (401) → auto refresh token → retry request
+
+✔ Backend:
+- middleware to verify token
+- refresh endpoint
+
+--------------------------------------------------
+PHASE 7 — LANDING PAGE INTEGRATION
+--------------------------------------------------
+
+Create component:
+
+/client/components/RegulatoryTicker.tsx
+
+FEATURES:
+
+✔ Auto-scroll ticker (top bar)
+✔ Card view below
+✔ Color coding:
+
+High → Red
+Medium → Orange
+Low → Green
+
+✔ Example UI:
+
+[FBR] New SRO issued for withholding tax changes (High)
+
+✔ Fetch from:
+GET /api/regulatory-updates
+
+✔ Auto refresh every 5 minutes
+
+--------------------------------------------------
+PHASE 8 — UI ENHANCEMENT (IMPORTANT)
+--------------------------------------------------
+
+Landing Page Sections:
+
+1. 🔴 LIVE TICKER (top)
+2. 📊 UPDATE CARDS
+3. 🔎 FILTER:
+   - FBR
+   - SECP
+   - SBP
+   - PSX
+
+4. 📅 Sort by latest
+
+--------------------------------------------------
+PHASE 9 — AI OUTPUT PARSER (CRITICAL)
+--------------------------------------------------
+
+Convert AI text → structured JSON
+
+Example:
+
+{
+  title: "",
+  authority: "",
+  summary: "",
+  effective_date: "",
+  priority: "",
+  category: ""
+}
+
+✔ Build parser utility
+
+--------------------------------------------------
+PHASE 10 — SECURITY
+--------------------------------------------------
+
+✔ Store API key in ENV only
+✔ Encrypt sensitive configs
+✔ Rate limit API calls
+✔ Prevent frontend exposure
+
+--------------------------------------------------
+PHASE 11 — FAILSAFE SYSTEM
+--------------------------------------------------
+
+If API fails:
+
+✔ Show last saved updates
+✔ Log error
+✔ Retry after 10 mins
+
+--------------------------------------------------
+PHASE 12 — LOGGING & AUDIT TRAIL
+--------------------------------------------------
+
+Create:
+
+ai_logs table
+
+Fields:
+- request
+- response
+- status
+- timestamp
+
+✔ For compliance (ICAP / audit-ready system)
+
+--------------------------------------------------
+PHASE 13 — PERFORMANCE OPTIMIZATION
+--------------------------------------------------
+
+✔ Use caching (Redis optional)
+✔ Do not call API repeatedly
+✔ Lazy load UI
+
+--------------------------------------------------
+PHASE 14 — FINAL VALIDATION CHECKLIST
+--------------------------------------------------
+
+✔ API key working
+✔ No "Unauthorized"
+✔ No session expiry issue
+✔ Updates auto-generated
+✔ Landing page live ticker working
+✔ Data saving in DB
+✔ Cron job running
+✔ Secure backend handling
+✔ UI clean + responsive
+
+--------------------------------------------------
+FINAL OUTPUT:
+--------------------------------------------------
+
+A fully automated AI-powered regulatory update engine:
+✔ Auto-fetches updates
+✔ Stores securely
+✔ Displays live on landing page
+✔ Admin-controlled
+✔ Audit-compliant
+✔ Production-ready SaaS module
+
+DO NOT STOP UNTIL:
+✔ Errors resolved
+✔ UI connected
+✔ Backend stable
+✔ Auto system running
