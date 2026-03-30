@@ -133,11 +133,14 @@ export default function Settings() {
         setApiKeyConfigured(true);
         setChatgptApiKey("");
         toast({ title: "Saved", description: "ChatGPT API key has been saved securely." });
+      } else if (res.status === 401 || res.status === 403) {
+        toast({ title: "Session Expired", description: "Please log in again to save settings.", variant: "destructive" });
       } else {
-        toast({ title: "Error", description: "Failed to save API key", variant: "destructive" });
+        const data = await res.json().catch(() => null);
+        toast({ title: "Error", description: data?.error || "Failed to save API key", variant: "destructive" });
       }
     } catch {
-      toast({ title: "Error", description: "Failed to save API key", variant: "destructive" });
+      toast({ title: "Error", description: "Network error — check your connection and try again.", variant: "destructive" });
     } finally {
       setApiKeySaving(false);
     }

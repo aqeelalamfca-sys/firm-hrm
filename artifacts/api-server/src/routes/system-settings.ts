@@ -36,6 +36,10 @@ router.put("/:key", async (req: AuthenticatedRequest, res) => {
       return res.status(400).json({ error: "Value is required" });
     }
 
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
     const existing = await db
       .select()
       .from(systemSettingsTable)
@@ -46,13 +50,13 @@ router.put("/:key", async (req: AuthenticatedRequest, res) => {
     if (existing.length > 0) {
       [result] = await db
         .update(systemSettingsTable)
-        .set({ value, description, updatedBy: req.user!.id, updatedAt: new Date() })
+        .set({ value, description, updatedBy: req.user.id, updatedAt: new Date() })
         .where(eq(systemSettingsTable.key, key))
         .returning();
     } else {
       [result] = await db
         .insert(systemSettingsTable)
-        .values({ key, value, description, updatedBy: req.user!.id })
+        .values({ key, value, description, updatedBy: req.user.id })
         .returning();
     }
 

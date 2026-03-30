@@ -63,8 +63,11 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - **CI/CD**: GitHub Actions (`.github/workflows/deploy.yml`) — auto-deploys on push to `main`
 - **Containers**: `ana-backend` (5002:5000), `ana-db` (5433:5432)
 - **Docker files**: `deploy/Dockerfile`, `deploy/docker-compose.yml`
-- **Nginx config**: `deploy/nginx-ana-ca.conf` (proxies to ana-backend)
-- **Setup script**: `deploy/vps-setup.sh` (one-time VPS setup)
+- **Nginx**: Running inside `auditwise-nginx` container (shared with other apps); ana-ca.com block in `/opt/auditwise/nginx/nginx-ssl.conf`; proxies to `172.17.0.1:5002`
+- **SSL**: Let's Encrypt cert at `/opt/auditwise/nginx/ssl/ana-ca.com/` (expires Jun 26, 2026)
+- **DB Password**: Set via `.env` file in `/root/apps/ana-ca/deploy/` (`DB_PASSWORD=ANA_Secure_DB_2024!`)
+- **Admin Login**: `admin@calfirm.com` / `Admin@123`
+- **Deploy Steps**: Sync source → `docker compose build --no-cache ana-backend` → `docker compose up -d ana-backend` → `docker network connect auditwise_default ana-backend` → reset admin password hash
 - **Full guide**: `deploy/DEPLOY.md`
 
 ## External Dependencies
