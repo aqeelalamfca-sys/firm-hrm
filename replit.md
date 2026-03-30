@@ -42,6 +42,16 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - **Credential Vault:** Secure, encrypted storage for client portal credentials (e.g., FBR, SECP, PRA logins).
 - **Notifications:** In-app notification system with real-time updates for important events.
 - **Reports:** Generation of various reports for attendance, payroll, and invoices.
+- **Regulatory Live Updates:** AI-powered regulatory intelligence panel on the landing page with live ticker and category cards (FBR/SECP/PSX/SBP). Admin CRUD page at `/regulatory-updates` for managing updates manually or via AI generation.
+- **System Settings:** Admin settings page at `/settings` with ChatGPT API key management (stored securely, never returned in API responses) and storage provider configuration.
+
+**Regulatory Updates System:**
+- Frontend panel: `artifacts/hrm-system/src/components/regulatory-live-panel.tsx`
+- Admin page: `artifacts/hrm-system/src/pages/regulatory-updates.tsx`
+- Settings page: `artifacts/hrm-system/src/pages/settings.tsx` (AI Integration + Storage Configuration)
+- Backend routes: `artifacts/api-server/src/routes/regulatory-updates.ts`, `artifacts/api-server/src/routes/system-settings.ts`
+- DB schema: `lib/db/src/schema/regulatory_updates.ts` (tables: `regulatory_updates`, `system_settings`)
+- AI uses Replit AI Integration proxy (env: `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`)
 
 ## Deployment & CI/CD
 

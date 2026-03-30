@@ -1,0 +1,209 @@
+import { Router } from "express";
+import { db } from "@workspace/db";
+import { regulatoryUpdatesTable, systemSettingsTable } from "@workspace/db";
+import { eq, desc, and, sql } from "drizzle-orm";
+import { authMiddleware, requireRoles } from "../middleware/auth";
+import type { AuthenticatedRequest } from "../middleware/auth";
+import OpenAI from "openai";
+
+const router = Router();
+
+function getOpenAIClient(): OpenAI | null {
+  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+  if (!baseURL || !apiKey) return null;
+  return new OpenAI({ baseURL, apiKey });
+}
+
+router.get("/", async (_req, res) => {
+  try {
+    const updates = await db
+      .select()
+      .from(regulatoryUpdatesTable)
+      .where(eq(regulatoryUpdatesTable.isActive, true))
+      .orderBy(desc(regulatoryUpdatesTable.createdAt))
+      .limit(50);
+
+    res.json({ updates });
+  } catch (error) {
+    console.error("Error fetching regulatory updates:", error);
+    res.status(500).json({ error: "Failed to fetch updates" });
+  }
+});
+
+router.post("/", authMiddleware, requireRoles("super_admin", "partner"), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { category, text, priority, source } = req.body;
+
+    if (!category || !text) {
+      return res.status(400).json({ error: "Category and text are required" });
+    }
+
+    const validCategories = ["FBR", "SECP", "PSX", "SBP"];
+    if (!validCategories.includes(category)) {
+      return res.status(400).json({ error: "Invalid category" });
+    }
+
+    const [update] = await db
+      .insert(regulatoryUpdatesTable)
+      .values({
+        category,
+        text,
+        priority: priority || "medium",
+        source: source || "manual",
+        createdBy: req.user!.id,
+        updatedBy: req.user!.id,
+      })
+      .returning();
+
+    res.status(201).json(update);
+  } catch (error) {
+    console.error("Error creating regulatory update:", error);
+    res.status(500).json({ error: "Failed to create update" });
+  }
+});
+
+router.put("/:id", authMiddleware, requireRoles("super_admin", "partner"), async (req: AuthenticatedRequest, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
+
+    const { category, text, priority, isActive } = req.body;
+
+    const updateData: Record<string, unknown> = { updatedBy: req.user!.id, updatedAt: new Date() };
+    if (category !== undefined) updateData.category = category;
+    if (text !== undefined) updateData.text = text;
+    if (priority !== undefined) updateData.priority = priority;
+    if (isActive !== undefined) updateData.isActive = isActive;
+
+    const [updated] = await db
+      .update(regulatoryUpdatesTable)
+      .set(updateData)
+      .where(eq(regulatoryUpdatesTable.id, id))
+      .returning();
+
+    if (!updated) return res.status(404).json({ error: "Update not found" });
+    res.json(updated);
+  } catch (error) {
+    console.error("Error updating regulatory update:", error);
+    res.status(500).json({ error: "Failed to update" });
+  }
+});
+
+router.delete("/:id", authMiddleware, requireRoles("super_admin", "partner"), async (req: AuthenticatedRequest, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
+
+    const [deleted] = await db
+      .delete(regulatoryUpdatesTable)
+      .where(eq(regulatoryUpdatesTable.id, id))
+      .returning();
+
+    if (!deleted) return res.status(404).json({ error: "Update not found" });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting regulatory update:", error);
+    res.status(500).json({ error: "Failed to delete" });
+  }
+});
+
+router.post("/generate-ai", authMiddleware, requireRoles("super_admin", "partner"), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { category, topic } = req.body;
+
+    if (!category) {
+      return res.status(400).json({ error: "Category is required" });
+    }
+
+    const openai = getOpenAIClient();
+    if (!openai) {
+      return res.status(503).json({ error: "AI service not configured" });
+    }
+
+    const prompt = topic
+      ? `Generate a professional regulatory update about: ${topic}\n\nCategory: ${category}\nTone: Chartered Accountant advisory\nLength: Max 25 words\nFormat: Single concise statement`
+      : `Generate latest professional regulatory update in 1 line:\n\nCategory: ${category}\nFocus: ${category === "FBR" ? "Tax deadline / SRO / ATL" : category === "SECP" ? "Company registration / compliance" : category === "PSX" ? "Stock market / listing rules" : "Banking regulations / monetary policy"}\nTone: Chartered Accountant advisory\nLength: Max 25 words`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: "You are a Pakistan regulatory expert specializing in FBR (Federal Board of Revenue), SECP (Securities and Exchange Commission of Pakistan), PSX (Pakistan Stock Exchange), and SBP (State Bank of Pakistan). Generate short, professional regulatory updates suitable for a Chartered Accountancy firm's clients. Be factual and concise.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    });
+
+    const generatedText = response.choices[0]?.message?.content?.trim();
+    if (!generatedText) {
+      return res.status(500).json({ error: "AI failed to generate content" });
+    }
+
+    const [update] = await db
+      .insert(regulatoryUpdatesTable)
+      .values({
+        category,
+        text: generatedText,
+        priority: "medium",
+        source: "ai",
+        createdBy: req.user!.id,
+        updatedBy: req.user!.id,
+      })
+      .returning();
+
+    res.status(201).json(update);
+  } catch (error) {
+    console.error("Error generating AI update:", error);
+    res.status(500).json({ error: "Failed to generate AI update" });
+  }
+});
+
+router.post("/generate-ai-preview", authMiddleware, requireRoles("super_admin", "partner"), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { category, topic } = req.body;
+
+    if (!category) {
+      return res.status(400).json({ error: "Category is required" });
+    }
+
+    const openai = getOpenAIClient();
+    if (!openai) {
+      return res.status(503).json({ error: "AI service not configured" });
+    }
+
+    const prompt = topic
+      ? `Generate a professional regulatory update about: ${topic}\n\nCategory: ${category}\nTone: Chartered Accountant advisory\nLength: Max 25 words\nFormat: Single concise statement`
+      : `Generate latest professional regulatory update in 1 line:\n\nCategory: ${category}\nFocus: ${category === "FBR" ? "Tax deadline / SRO / ATL" : category === "SECP" ? "Company registration / compliance" : category === "PSX" ? "Stock market / listing rules" : "Banking regulations / monetary policy"}\nTone: Chartered Accountant advisory\nLength: Max 25 words`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: "You are a Pakistan regulatory expert specializing in FBR, SECP, PSX, and SBP. Generate short, professional regulatory updates suitable for a Chartered Accountancy firm's clients. Be factual and concise.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    });
+
+    const generatedText = response.choices[0]?.message?.content?.trim();
+    if (!generatedText) {
+      return res.status(500).json({ error: "AI failed to generate content" });
+    }
+
+    res.json({ text: generatedText });
+  } catch (error) {
+    console.error("Error generating AI preview:", error);
+    res.status(500).json({ error: "Failed to generate AI preview" });
+  }
+});
+
+export default router;

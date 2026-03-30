@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import RegulatoryLivePanel from "@/components/regulatory-live-panel";
 import {
   Shield, FileText, Banknote, Users, BarChart3, Building2, Globe, ChevronRight,
   CheckCircle2, ArrowRight, Star, Award, BookOpen, Calculator, Briefcase,
@@ -248,29 +249,31 @@ export default function Landing() {
         <div className="relative max-w-7xl mx-auto px-6">
           <div className="grid lg:grid-cols-[1fr_400px] gap-16 items-center">
             <div>
-              <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Alam & Aulakh" className="h-52 w-auto object-contain mb-6" />
-              <Badge className="mb-6 bg-primary/[0.06] text-primary border-primary/15 text-xs font-semibold px-4 py-1.5 rounded-full backdrop-blur-sm">
-                ICAP Approved Training Organization
-              </Badge>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.08] mb-6">
-                Leading Chartered
-                <br />
-                <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-violet-500 bg-clip-text text-transparent">Accountants Firm</span>
-              </h1>
-              <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mb-10">
-                Providing audit, tax, and financial & corporate advisory services with firm commitment.
-                Expert chartered accounting and international corporate services — your trusted partner
-                in Pakistan and beyond.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <Link href="/login">
-                  <Button size="lg" className="h-12 px-7 text-sm font-semibold gap-2 rounded-xl" style={{ background: 'linear-gradient(135deg, hsl(217 78% 51%) 0%, hsl(217 78% 42%) 100%)', boxShadow: '0 4px 16px rgba(59,130,246,0.3)' }}>
-                    Get Started <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </Link>
-                <button onClick={() => scrollTo("services")} className="h-12 px-7 text-sm font-semibold border border-border/50 rounded-xl bg-card hover:bg-muted/50 transition-all duration-200 inline-flex items-center gap-2 shadow-sm">
-                  Our Services <ChevronRight className="w-4 h-4" />
-                </button>
+              <RegulatoryLivePanel />
+              <div className="mt-8">
+                <Badge className="mb-6 bg-primary/[0.06] text-primary border-primary/15 text-xs font-semibold px-4 py-1.5 rounded-full backdrop-blur-sm">
+                  ICAP Approved Training Organization
+                </Badge>
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.08] mb-6">
+                  Leading Chartered
+                  <br />
+                  <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-violet-500 bg-clip-text text-transparent">Accountants Firm</span>
+                </h1>
+                <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mb-10">
+                  Providing audit, tax, and financial & corporate advisory services with firm commitment.
+                  Expert chartered accounting and international corporate services — your trusted partner
+                  in Pakistan and beyond.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <Link href="/login">
+                    <Button size="lg" className="h-12 px-7 text-sm font-semibold gap-2 rounded-xl" style={{ background: 'linear-gradient(135deg, hsl(217 78% 51%) 0%, hsl(217 78% 42%) 100%)', boxShadow: '0 4px 16px rgba(59,130,246,0.3)' }}>
+                      Get Started <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                  <button onClick={() => scrollTo("services")} className="h-12 px-7 text-sm font-semibold border border-border/50 rounded-xl bg-card hover:bg-muted/50 transition-all duration-200 inline-flex items-center gap-2 shadow-sm">
+                    Our Services <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
 

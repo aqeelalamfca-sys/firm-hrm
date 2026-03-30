@@ -32,6 +32,7 @@ const Applications = lazy(() => import("@/pages/applications"));
 const BookMeeting = lazy(() => import("@/pages/book-meeting"));
 const ManageMeetings = lazy(() => import("@/pages/manage-meetings"));
 const Settings = lazy(() => import("@/pages/settings"));
+const RegulatoryUpdates = lazy(() => import("@/pages/regulatory-updates"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -140,6 +141,7 @@ function Router() {
         <Route path="/applications"><ProtectedRoute component={Applications} /></Route>
         <Route path="/manage-meetings"><ProtectedRoute component={ManageMeetings} /></Route>
         <Route path="/settings"><ProtectedRoute component={Settings} /></Route>
+        <Route path="/regulatory-updates"><ProtectedRoute component={RegulatoryUpdates} /></Route>
         <Route path="/"><ProtectedRoute component={Dashboard} /></Route>
         <Route component={NotFound} />
       </Switch>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import {
   Settings as SettingsIcon, HardDrive, Cloud, CheckCircle2,
-  AlertCircle, FolderOpen, RefreshCw, Save, ExternalLink
+  AlertCircle, FolderOpen, RefreshCw, Save, ExternalLink,
+  Key, Eye, EyeOff, Sparkles, Shield
 } from "lucide-react";
 
 interface StorageProvider {
@@ -22,9 +23,22 @@ interface StorageProvider {
   color: string;
 }
 
+interface SystemSetting {
+  id: number;
+  key: string;
+  value: string;
+  description: string | null;
+}
+
 export default function Settings() {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+  const [apiKeySaving, setApiKeySaving] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [chatgptApiKey, setChatgptApiKey] = useState("");
+  const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
+  const [settings, setSettings] = useState<SystemSetting[]>([]);
+
   const [providers, setProviders] = useState<StorageProvider[]>([
     {
       id: "google_drive",
@@ -69,6 +83,65 @@ export default function Settings() {
   ]);
 
   const [activeProvider, setActiveProvider] = useState("local");
+
+  const getAuthHeaders = useCallback(() => {
+    const token = localStorage.getItem("auth_token");
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  }, []);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch("/api/system-settings", {
+          headers: getAuthHeaders(),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSettings(data.settings || []);
+          const apiKeySetting = data.settings?.find((s: any) => s.key === "chatgpt_api_key");
+          if (apiKeySetting?.configured) {
+            setApiKeyConfigured(true);
+          }
+        }
+      } catch {
+      }
+    };
+    fetchSettings();
+  }, [getAuthHeaders]);
+
+  const handleSaveApiKey = async () => {
+    if (!chatgptApiKey.trim()) {
+      toast({ title: "Validation", description: "API key is required", variant: "destructive" });
+      return;
+    }
+
+    setApiKeySaving(true);
+    try {
+      const res = await fetch("/api/system-settings/chatgpt_api_key", {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          value: chatgptApiKey,
+          description: "ChatGPT API Key for regulatory update generation",
+        }),
+      });
+
+      if (res.ok) {
+        setApiKeyConfigured(true);
+        setChatgptApiKey("");
+        toast({ title: "Saved", description: "ChatGPT API key has been saved securely." });
+      } else {
+        toast({ title: "Error", description: "Failed to save API key", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to save API key", variant: "destructive" });
+    } finally {
+      setApiKeySaving(false);
+    }
+  };
 
   const toggleProvider = (id: string) => {
     setProviders(prev =>
@@ -138,13 +211,88 @@ export default function Settings() {
             <SettingsIcon className="w-6 h-6 text-primary" />
             Settings
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">Configure storage providers and system preferences</p>
+          <p className="text-sm text-muted-foreground mt-1">Configure API integrations, storage providers, and system preferences</p>
         </div>
         <Button onClick={handleSave} disabled={saving} className="gap-2">
           {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Save Changes
         </Button>
       </div>
+
+      <Card className="border-primary/20">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-violet-500" />
+            AI Integration
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">Configure ChatGPT API for AI-powered regulatory update generation on the landing page.</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="border rounded-xl p-5 border-violet-200/60 bg-violet-50/30">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center shrink-0">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-semibold text-sm">ChatGPT API</h3>
+                  {apiKeyConfigured ? (
+                    <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50 text-[10px] gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> Configured
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-[10px] gap-1">
+                      <AlertCircle className="w-3 h-3" /> Not Configured
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed mb-3">
+                  Powers AI-generated regulatory updates for FBR, SECP, PSX, and SBP. Updates are displayed on the landing page to attract visitors.
+                </p>
+
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1.5 block">API Key</Label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                        <Input
+                          type={showApiKey ? "text" : "password"}
+                          value={chatgptApiKey}
+                          onChange={(e) => setChatgptApiKey(e.target.value)}
+                          placeholder="sk-..."
+                          className="h-9 text-xs pl-9 pr-9 font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowApiKey(!showApiKey)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {showApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={handleSaveApiKey}
+                        disabled={apiKeySaving}
+                        className="h-9 gap-1.5 text-xs"
+                      >
+                        {apiKeySaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        Save Key
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-lg p-2.5">
+                    <Shield className="w-3.5 h-3.5 mt-0.5 shrink-0 text-blue-500" />
+                    <p>Your API key is stored securely and encrypted. It is used server-side only for generating regulatory updates via the admin panel.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3">

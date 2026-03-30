@@ -19,6 +19,8 @@ import notificationsRouter from "./notifications";
 import departmentsRouter from "./departments";
 import applicationsRouter from "./applications";
 import meetingsRouter from "./meetings";
+import regulatoryUpdatesRouter from "./regulatory-updates";
+import systemSettingsRouter from "./system-settings";
 
 const router: IRouter = Router();
 
@@ -26,6 +28,7 @@ router.use(healthRouter);
 router.use("/auth", authRouter);
 router.use("/applications", applicationsRouter);
 router.use("/meetings", meetingsRouter);
+router.use("/regulatory-updates", regulatoryUpdatesRouter);
 
 router.use(authMiddleware);
 
@@ -44,5 +47,6 @@ router.use("/documents", documentsRouter);
 router.use("/tasks", tasksRouter);
 router.use("/notifications", notificationsRouter);
 router.use("/departments", departmentsRouter);
+router.use("/system-settings", requireRoles("super_admin", "partner"), systemSettingsRouter);
 
 export default router;

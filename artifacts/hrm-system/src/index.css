@@ -365,3 +365,17 @@ label[for],
   background-repeat: no-repeat;
   animation: shimmer-green 2s linear infinite, bounce-glow-green 2s ease-in-out infinite;
 }
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: inline-flex;
+  animation: marquee 30s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}

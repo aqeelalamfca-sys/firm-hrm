@@ -14,3 +14,4 @@ export * from "./tasks";
 export * from "./notifications";
 export * from "./training_applications";
 export * from "./meetings";
+export * from "./regulatory_updates";

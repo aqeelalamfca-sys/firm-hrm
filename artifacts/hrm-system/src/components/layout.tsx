@@ -27,6 +27,7 @@ import {
   GraduationCap,
   Video,
   Settings,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -58,6 +59,7 @@ const navItems: NavItem[] = [
   { href: "/manage-meetings", label: "Meeting Management", icon: Video, section: "admin", roles: ["super_admin", "partner"] },
   { href: "/audit-trail", label: "Audit Trail", icon: ScrollText, section: "admin", roles: ["super_admin", "partner", "hr_admin"] },
   { href: "/user-management", label: "User Management", icon: UserCog, section: "admin", roles: ["super_admin", "partner", "hr_admin"] },
+  { href: "/regulatory-updates", label: "Regulatory Updates", icon: Zap, section: "admin", roles: ["super_admin", "partner"] },
   { href: "/settings", label: "Settings", icon: Settings, section: "admin", roles: ["super_admin", "partner"] },
 ];
 
