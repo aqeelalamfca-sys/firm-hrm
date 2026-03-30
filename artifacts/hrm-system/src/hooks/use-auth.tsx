@@ -45,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const userData = await getCurrentUser();
         setUser(userData as User);
+        tryRefreshToken(token);
       } catch (error) {
         console.error("Failed to load user:", error);
         localStorage.removeItem("hrm_token");
@@ -54,6 +55,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     loadUser();
+  }, [token]);
+
+  const tryRefreshToken = async (currentToken: string) => {
+    try {
+      const res = await fetch("/api/auth/refresh", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${currentToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.refreshed && data.token) {
+          localStorage.setItem("hrm_token", data.token);
+          setToken(data.token);
+        }
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (!token) return;
+    const interval = setInterval(() => tryRefreshToken(token), 60 * 60 * 1000);
+    return () => clearInterval(interval);
   }, [token]);
 
   const login = async (credentials: { email: string; password: string }) => {

@@ -8,7 +8,8 @@ import { logActivity } from "../middleware/activity-logger";
 const router = Router();
 
 const TOKEN_SECRET = process.env.JWT_SECRET || process.env.TOKEN_SECRET || crypto.randomBytes(32).toString("hex");
-const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000;
+const TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+const REFRESH_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 
 function hashPassword(password: string): string {
   return crypto.createHash("sha256").update(password + "hrm_salt_2024").digest("hex");
@@ -94,6 +95,41 @@ router.get("/me", async (req, res) => {
       role: user.role,
       employeeId: user.employeeId,
     });
+  } catch {
+    res.status(401).json({ error: "Invalid token" });
+  }
+});
+
+router.post("/refresh", async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const token = authHeader.slice(7);
+    const parts = token.split(".");
+    if (parts.length !== 2) return res.status(401).json({ error: "Invalid token" });
+
+    const [payloadB64, signature] = parts;
+    const expectedSig = crypto.createHmac("sha256", TOKEN_SECRET).update(payloadB64).digest("base64url");
+    if (signature !== expectedSig) return res.status(401).json({ error: "Invalid token" });
+
+    const decoded = JSON.parse(Buffer.from(payloadB64, "base64url").toString());
+    const timeLeft = decoded.exp - Date.now();
+
+    if (timeLeft < 0) return res.status(401).json({ error: "Token expired. Please login again." });
+
+    const users = await db.select().from(usersTable).where(eq(usersTable.id, decoded.userId));
+    const user = users[0];
+    if (!user) return res.status(401).json({ error: "User not found" });
+
+    if (timeLeft < REFRESH_WINDOW_MS) {
+      const newToken = generateToken(user.id);
+      return res.json({ token: newToken, refreshed: true });
+    }
+
+    res.json({ token, refreshed: false });
   } catch {
     res.status(401).json({ error: "Invalid token" });
   }

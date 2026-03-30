@@ -29,7 +29,7 @@ async function getOpenAIClient(): Promise<OpenAI | null> {
     .limit(1);
 
   const storedKey = settings[0]?.value;
-  if (storedKey && storedKey.length > 10) {
+  if (storedKey && storedKey.startsWith("sk-") && storedKey.length > 20) {
     return new OpenAI({ apiKey: storedKey });
   }
 

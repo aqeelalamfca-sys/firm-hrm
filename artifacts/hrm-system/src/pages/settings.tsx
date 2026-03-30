@@ -90,7 +90,7 @@ export default function Settings() {
   const [activeProvider, setActiveProvider] = useState("local");
 
   const getAuthHeaders = useCallback(() => {
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("hrm_token");
     return {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

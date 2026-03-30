@@ -68,11 +68,14 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - **CI/CD**: GitHub Actions (`.github/workflows/deploy.yml`) — auto-deploys on push to `main`
 - **Containers**: `ana-backend` (5002:5000), `ana-db` (5433:5432)
 - **Docker files**: `deploy/Dockerfile`, `deploy/docker-compose.yml`
-- **Nginx**: Running inside `auditwise-nginx` container (shared with other apps); ana-ca.com block in `/opt/auditwise/nginx/nginx-ssl.conf`; proxies to `172.17.0.1:5002`
+- **Nginx**: Running inside `auditwise-nginx` container (shared with other apps); ana-ca.com block in `/opt/auditwise/nginx/nginx-ssl.conf` and `/opt/auditwise/nginx/default.conf`; proxies to Docker DNS `ana-backend:5000` via `resolver 127.0.0.11` (NOT hardcoded IP)
 - **SSL**: Let's Encrypt cert at `/opt/auditwise/nginx/ssl/ana-ca.com/` (expires Jun 26, 2026)
 - **DB Password**: Set via `.env` file in `/root/apps/ana-ca/deploy/` (`DB_PASSWORD=ANA_Secure_DB_2024!`)
 - **Admin Login**: `admin@calfirm.com` / `Admin@123`
-- **Deploy Steps**: Sync source → `docker compose build --no-cache ana-backend` → `docker compose up -d ana-backend` → `docker network connect auditwise_default ana-backend` → reset admin password hash
+- **Docker Network**: `ana-backend` auto-joins `auditwise_auditwise` external network via docker-compose config
+- **JWT**: Uses `JWT_SECRET` env var (set in deploy `.env`); tokens valid 7 days with auto-refresh at 2 days remaining
+- **Deploy Steps**: Sync source → `docker compose build --no-cache ana-backend` → `docker compose up -d --force-recreate ana-backend` (network auto-joins)
+- **Token storage key**: Frontend uses `hrm_token` in localStorage (NOT `auth_token`)
 - **Full guide**: `deploy/DEPLOY.md`
 
 ## External Dependencies
