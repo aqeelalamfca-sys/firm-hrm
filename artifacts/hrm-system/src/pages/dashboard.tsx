@@ -11,7 +11,8 @@ import {
   Users, FileText, Banknote, CalendarCheck, TrendingUp, TrendingDown,
   ArrowRight, Clock, AlertCircle, CheckCircle, ChevronRight, ListTodo, Calendar,
   LogIn, LogOut as LogOutIcon, Palmtree, ClipboardList, Shield, BarChart3, Receipt,
-  CheckCircle2, XCircle, Coffee, X, Info, HelpCircle, Eye, Briefcase
+  CheckCircle2, XCircle, Coffee, X, Info, HelpCircle, Eye, Briefcase,
+  BookOpen, ChevronDown, ChevronUp, Sparkles
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
@@ -83,6 +84,17 @@ export default function Dashboard() {
   const [allLeaves, setAllLeaves] = React.useState<any[]>([]);
   const [allInvoices, setAllInvoices] = React.useState<any[]>([]);
   const [allEmployees, setAllEmployees] = React.useState<any[]>([]);
+  const [guideItems, setGuideItems] = React.useState<any[]>([]);
+  const [guideExpanded, setGuideExpanded] = React.useState(true);
+  const [guideDismissed, setGuideDismissed] = React.useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem("guide_dismissed");
+      const storedDate = localStorage.getItem("guide_dismissed_date");
+      const today = new Date().toISOString().split("T")[0];
+      if (storedDate !== today) { localStorage.removeItem("guide_dismissed"); localStorage.setItem("guide_dismissed_date", today); return []; }
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
 
   React.useEffect(() => {
     const timer = setInterval(() => setPktTime(getPKTTime()), 60000);
@@ -115,6 +127,15 @@ export default function Dashboard() {
 
     fetch("/api/invoices", { headers }).then(r => r.json()).then(setAllInvoices).catch(() => {});
     fetch("/api/employees", { headers }).then(r => r.json()).then(setAllEmployees).catch(() => {});
+    fetch("/api/dashboard/guide", { headers }).then(r => { if (!r.ok) throw new Error(); return r.json(); }).then(data => { if (Array.isArray(data)) setGuideItems(data); }).catch(() => {});
+  }, [token]);
+
+  React.useEffect(() => {
+    if (!token) return;
+    const interval = setInterval(() => {
+      fetch("/api/dashboard/guide", { headers }).then(r => { if (!r.ok) throw new Error(); return r.json(); }).then(data => { if (Array.isArray(data)) setGuideItems(data); }).catch(() => {});
+    }, 60000);
+    return () => clearInterval(interval);
   }, [token]);
 
   async function handleTimeIn() {
@@ -627,6 +648,76 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {guideItems.filter(g => !guideDismissed.includes(g.id)).length > 0 && (
+        <Card className="border-primary/20 bg-gradient-to-r from-primary/5 via-background to-primary/5 overflow-hidden">
+          <div
+            className="flex items-center justify-between px-5 py-3 cursor-pointer select-none"
+            onClick={() => setGuideExpanded(!guideExpanded)}
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-primary/10">
+                <Sparkles className="w-4 h-4 text-primary" />
+              </div>
+              <h3 className="font-semibold text-sm tracking-tight">Your Daily Guide</h3>
+              <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-medium">
+                {guideItems.filter(g => !guideDismissed.includes(g.id)).length} items
+              </Badge>
+            </div>
+            <Button variant="ghost" size="icon" className="h-7 w-7">
+              {guideExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </Button>
+          </div>
+          {guideExpanded && (
+            <CardContent className="px-5 pb-4 pt-0 space-y-2">
+              {guideItems.filter(g => !guideDismissed.includes(g.id)).map((item) => {
+                const priorityStyles: Record<string, { bg: string; border: string; icon: string; iconBg: string }> = {
+                  urgent: { bg: "bg-red-50/80", border: "border-red-200", icon: "text-red-600", iconBg: "bg-red-100" },
+                  warning: { bg: "bg-amber-50/80", border: "border-amber-200", icon: "text-amber-600", iconBg: "bg-amber-100" },
+                  info: { bg: "bg-blue-50/80", border: "border-blue-200", icon: "text-blue-600", iconBg: "bg-blue-100" },
+                  success: { bg: "bg-emerald-50/80", border: "border-emerald-200", icon: "text-emerald-600", iconBg: "bg-emerald-100" },
+                };
+                const iconMap: Record<string, React.ReactNode> = {
+                  calendar: <Calendar className="w-3.5 h-3.5" />,
+                  clock: <Clock className="w-3.5 h-3.5" />,
+                  check: <CheckCircle className="w-3.5 h-3.5" />,
+                  alert: <AlertCircle className="w-3.5 h-3.5" />,
+                  receipt: <Receipt className="w-3.5 h-3.5" />,
+                  file: <FileText className="w-3.5 h-3.5" />,
+                  clipboard: <ClipboardList className="w-3.5 h-3.5" />,
+                  briefcase: <Briefcase className="w-3.5 h-3.5" />,
+                  users: <Users className="w-3.5 h-3.5" />,
+                };
+                const style = priorityStyles[item.priority] || priorityStyles.info;
+                return (
+                  <div key={item.id} className={`flex items-start gap-3 p-3 rounded-lg border ${style.bg} ${style.border} transition-all hover:shadow-sm`}>
+                    <div className={`p-1.5 rounded-md ${style.iconBg} ${style.icon} mt-0.5 shrink-0`}>
+                      {iconMap[item.icon] || <Info className="w-3.5 h-3.5" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold leading-tight mb-0.5">{item.title}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{item.message}</p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {item.action && (
+                        <Link href={item.action}>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2">
+                            View <ArrowRight className="w-3 h-3" />
+                          </Button>
+                        </Link>
+                      )}
+                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-40 hover:opacity-100"
+                        onClick={() => setGuideDismissed(prev => { const next = [...prev, item.id]; try { localStorage.setItem("guide_dismissed", JSON.stringify(next)); } catch {} return next; })}>
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          )}
+        </Card>
+      )}
 
       {/* Top Action Cards Row */}
       <div className={`grid gap-4 ${isTrainee ? "grid-cols-1 sm:grid-cols-3" : isManager ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"}`}>

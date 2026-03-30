@@ -271,4 +271,103 @@ router.get("/invoice-summary", async (req, res) => {
   }
 });
 
+router.get("/guide", async (req: AuthenticatedRequest, res) => {
+  try {
+    const role = req.user!.role;
+    const employeeId = req.user!.employeeId;
+    const today = new Date().toISOString().split("T")[0];
+    const guides: { id: string; icon: string; title: string; message: string; action?: string; priority: "info" | "warning" | "success" | "urgent" }[] = [];
+
+    if (["super_admin", "partner", "hr_admin", "manager"].includes(role)) {
+      const [pendingLeaveCount] = await db.select({ count: sql<number>`COUNT(*)` }).from(leavesTable).where(eq(leavesTable.status, "pending"));
+      const pending = Number(pendingLeaveCount.count);
+      if (pending > 0) {
+        guides.push({ id: "pending-leaves", icon: "calendar", title: "Leave Requests Pending", message: `You have ${pending} leave request${pending > 1 ? "s" : ""} waiting for your approval. Review and respond to keep your team informed.`, action: "/leaves", priority: pending > 3 ? "urgent" : "warning" });
+      }
+
+      const [totalEmpResult] = await db.select({ count: sql<number>`COUNT(*)` }).from(employeesTable).where(eq(employeesTable.status, "active"));
+      const [presentResult] = await db.select({ count: sql<number>`COUNT(DISTINCT employee_id)` }).from(attendanceTable).where(sql`date = ${today}`);
+      const totalEmp = Number(totalEmpResult.count);
+      const presentEmp = Number(presentResult.count);
+      if (totalEmp > 0 && presentEmp === 0) {
+        guides.push({ id: "no-attendance", icon: "clock", title: "No Attendance Marked Yet", message: "No one has been marked present today. Consider reminding your team to clock in or mark attendance manually.", action: "/attendance", priority: "warning" });
+      } else if (totalEmp > 0) {
+        const absentCount = totalEmp - presentEmp;
+        const absentPct = Math.round((absentCount / totalEmp) * 100);
+        if (absentPct > 30) {
+          guides.push({ id: "high-absence", icon: "alert", title: "High Absence Rate Today", message: `${absentCount} out of ${totalEmp} employees (${absentPct}%) haven't checked in yet today.`, action: "/attendance", priority: "warning" });
+        } else {
+          guides.push({ id: "attendance-ok", icon: "check", title: "Attendance Looking Good", message: `${presentEmp} out of ${totalEmp} employees are present today (${Math.round((presentEmp / totalEmp) * 100)}%).`, action: "/attendance", priority: "success" });
+        }
+      }
+    }
+
+    if (["super_admin", "partner", "finance_officer"].includes(role)) {
+      const [overdueStats] = await db.select({
+        count: sql<number>`COUNT(*)`,
+        total: sql<number>`COALESCE(SUM(total_amount), 0)`,
+      }).from(invoicesTable).where(eq(invoicesTable.status, "overdue"));
+      const overdueCount = Number(overdueStats.count);
+      if (overdueCount > 0) {
+        guides.push({ id: "overdue-invoices", icon: "receipt", title: "Overdue Invoices", message: `${overdueCount} invoice${overdueCount > 1 ? "s" : ""} worth Rs. ${Number(overdueStats.total).toLocaleString("en-PK")} ${overdueCount > 1 ? "are" : "is"} past due. Follow up with clients to collect payments.`, action: "/invoices", priority: "urgent" });
+      }
+
+      const [draftStats] = await db.select({ count: sql<number>`COUNT(*)` }).from(invoicesTable).where(eq(invoicesTable.status, "draft"));
+      const draftCount = Number(draftStats.count);
+      if (draftCount > 0) {
+        guides.push({ id: "draft-invoices", icon: "file", title: "Draft Invoices", message: `${draftCount} invoice${draftCount > 1 ? "s are" : " is"} still in draft. Review and issue ${draftCount > 1 ? "them" : "it"} to start the billing cycle.`, action: "/invoices", priority: "info" });
+      }
+    }
+
+    if (["super_admin", "partner", "manager"].includes(role)) {
+      const [engStats] = await db.select({
+        planning: sql<number>`COUNT(*) FILTER (WHERE engagement_status = 'planning')`,
+        review: sql<number>`COUNT(*) FILTER (WHERE engagement_status = 'review')`,
+      }).from(engagementsTable);
+      const planningCount = Number(engStats.planning);
+      const reviewCount = Number(engStats.review);
+      if (reviewCount > 0) {
+        guides.push({ id: "review-engagements", icon: "clipboard", title: "Engagements Ready for Review", message: `${reviewCount} engagement${reviewCount > 1 ? "s" : ""} are in the review stage. Complete the review to move them to completion.`, action: "/engagements", priority: "warning" });
+      }
+      if (planningCount > 0) {
+        guides.push({ id: "planning-engagements", icon: "briefcase", title: "Engagements in Planning", message: `${planningCount} engagement${planningCount > 1 ? "s" : ""} are being planned. Start execution when ready.`, action: "/engagements", priority: "info" });
+      }
+    }
+
+    if (["trainee", "employee"].includes(role) && employeeId) {
+      const [myLeaves] = await db.select({ count: sql<number>`COUNT(*)` }).from(leavesTable)
+        .where(and(eq(leavesTable.employeeId, employeeId), eq(leavesTable.status, "pending")));
+      const myPending = Number(myLeaves.count);
+      if (myPending > 0) {
+        guides.push({ id: "my-pending-leaves", icon: "calendar", title: "Your Leave Requests", message: `You have ${myPending} pending leave request${myPending > 1 ? "s" : ""}. You'll be notified once they are approved or rejected.`, action: "/leaves", priority: "info" });
+      }
+
+      const [myAttendance] = await db.select({ count: sql<number>`COUNT(*)` }).from(attendanceTable)
+        .where(and(eq(attendanceTable.employeeId, employeeId), sql`date = ${today}`));
+      if (Number(myAttendance.count) === 0) {
+        guides.push({ id: "clock-in-reminder", icon: "clock", title: "Clock In Reminder", message: "You haven't clocked in today. Mark your attendance to keep your record up to date.", priority: "warning" });
+      } else {
+        guides.push({ id: "clocked-in", icon: "check", title: "Attendance Marked", message: "You're clocked in for today. Have a productive day!", priority: "success" });
+      }
+    }
+
+    if (role === "hr_admin") {
+      const [newEmpCount] = await db.select({ count: sql<number>`COUNT(*)` }).from(employeesTable)
+        .where(sql`joining_date >= CURRENT_DATE - INTERVAL '30 days'`);
+      const newCount = Number(newEmpCount.count);
+      if (newCount > 0) {
+        guides.push({ id: "new-employees", icon: "users", title: "Recent Joiners", message: `${newCount} employee${newCount > 1 ? "s" : ""} joined in the last 30 days. Ensure their onboarding tasks are complete.`, action: "/employees", priority: "info" });
+      }
+    }
+
+    const priorityOrder = { urgent: 0, warning: 1, info: 2, success: 3 };
+    guides.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+
+    res.json(guides);
+  } catch (error) {
+    console.error("Error fetching guide:", error);
+    res.status(500).json({ error: "Failed to fetch guide" });
+  }
+});
+
 export default router;
