@@ -57,6 +57,8 @@ async function generateUpdate(openai: OpenAI, category: string): Promise<string>
   return text.replace(/^["']|["']$/g, "");
 }
 
+let isRunning = false;
+
 async function runAutoGeneration(): Promise<void> {
   if (isRunning) {
     console.log("[Auto-Gen] Already running, skipping overlapping execution");
