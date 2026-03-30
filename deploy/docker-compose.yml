@@ -31,6 +31,8 @@ services:
       NODE_ENV: production
       PORT: "5000"
       DATABASE_URL: postgresql://ana_user:${DB_PASSWORD:-change_me_in_production}@ana-db:5432/ana_hrm
+      TOKEN_SECRET: ${JWT_SECRET:-change_me_in_production}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change_me_in_production}
     depends_on:
       ana-db:
         condition: service_healthy

@@ -1,131 +1,183 @@
 # Deployment Guide — ana-ca.com on Hostinger VPS
 
-## Prerequisites
-- Hostinger VPS with Docker & Docker Compose installed
-- Existing auditwise project running (will not be affected)
-- Domain ana-ca.com with GoDaddy DNS access
+## Architecture
 
-## Step 1: DNS Setup (GoDaddy)
-
-Add these DNS records:
 ```
-A Record:  ana-ca.com      →  YOUR_VPS_IP
-A Record:  www.ana-ca.com  →  YOUR_VPS_IP
+Replit (develop) → GitHub (firm-hrm) → GitHub Actions (CI/CD) → Hostinger VPS (Docker)
 ```
 
-## Step 2: Push Code to GitHub
+- **Replit**: Development environment — code, test, iterate
+- **GitHub**: Source of truth — code is pushed here automatically
+- **GitHub Actions**: CI/CD — auto-deploys to VPS on every push to `main`
+- **Hostinger VPS**: Production — Docker containers serve the live app
 
-1. Create a new GitHub repository (e.g., `ana-ca-app`)
-2. From Replit, connect via the Version Control tab in the sidebar, or push manually:
-```bash
-git remote add github https://github.com/YOUR_USERNAME/ana-ca-app.git
-git push github main
-```
+## VPS Info
 
-## Step 3: Clone on VPS
+- **IP**: 187.77.130.117
+- **OS**: Ubuntu 22.04 LTS
+- **Containers**: `ana-backend` (port 5002:5000), `ana-db` (port 5433:5432)
+- **Domain**: ana-ca.com
 
-```bash
-ssh root@YOUR_VPS_IP
-cd ~
-git clone https://github.com/YOUR_USERNAME/ana-ca-app.git ana-ca-app
-cd ana-ca-app
-```
+---
 
-## Step 4: Configure Environment
+## Quick Setup (First Time)
+
+### Option A: Automated Setup
+
+SSH into your VPS and run the setup script:
 
 ```bash
-cp deploy/.env.example deploy/.env
-nano deploy/.env
+ssh root@187.77.130.117
+curl -sSL https://raw.githubusercontent.com/aqeelalamfca-sys/firm-hrm/main/deploy/vps-setup.sh | bash
 ```
 
-Set a strong database password:
-```
-DB_PASSWORD=your_strong_password_here
-```
-
-## Step 5: Build & Start Containers
+Or clone first, then run:
 
 ```bash
-cd ~/ana-ca-app/deploy
+git clone https://github.com/aqeelalamfca-sys/firm-hrm.git ~/firm-hrm
+cd ~/firm-hrm
+bash deploy/vps-setup.sh
+```
+
+### Option B: Manual Setup
+
+Follow the steps below.
+
+---
+
+## Step 1: DNS Setup
+
+Point your domain to the VPS IP. Add these DNS records:
+
+```
+A Record:  ana-ca.com      →  187.77.130.117
+A Record:  www.ana-ca.com  →  187.77.130.117
+```
+
+## Step 2: GitHub Secrets
+
+Go to: https://github.com/aqeelalamfca-sys/firm-hrm/settings/secrets/actions
+
+Add these secrets:
+
+| Secret Name    | Value                              |
+|---------------|-------------------------------------|
+| VPS_HOST       | 187.77.130.117                     |
+| VPS_USERNAME   | root                               |
+| VPS_SSH_KEY    | (VPS private SSH key - see below)  |
+| VPS_PORT       | 22                                 |
+
+### Generate SSH Key on VPS
+
+```bash
+ssh root@187.77.130.117
+ssh-keygen -t ed25519 -f ~/.ssh/github_deploy -N "" -C "github-actions"
+cat ~/.ssh/github_deploy.pub >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+cat ~/.ssh/github_deploy   # Copy this as VPS_SSH_KEY secret
+```
+
+## Step 3: Clone & Configure on VPS
+
+```bash
+ssh root@187.77.130.117
+git clone https://github.com/aqeelalamfca-sys/firm-hrm.git ~/firm-hrm
+cd ~/firm-hrm/deploy
+cp .env.example .env
+nano .env
+```
+
+Set strong values:
+```
+DB_PASSWORD=your_strong_password
+JWT_SECRET=your_jwt_secret
+ENCRYPTION_KEY=your_encryption_key
+```
+
+## Step 4: Build & Start Containers
+
+```bash
+cd ~/firm-hrm/deploy
 docker compose --env-file .env up -d --build
 ```
 
 This starts:
 - `ana-db` — PostgreSQL 16 on port 5433 (external), 5432 (internal)
-- `ana-backend` — Node.js app on port 5001 (external), 5000 (internal)
+- `ana-backend` — Node.js app on port 5002 (external), 5000 (internal)
 
-Verify containers are running:
+Verify:
 ```bash
-docker ps
+docker ps --filter "name=ana-"
+curl http://localhost:5002/api/health
 ```
 
-## Step 6: Run Database Migration
+## Step 5: Configure Nginx
 
+### If Nginx runs on the host:
 ```bash
-docker exec -it ana-backend sh -c "cd /app && node -e \"
-  const { Pool } = require('pg');
-  // DB migrations are handled by Drizzle push
-\""
+cp ~/firm-hrm/deploy/nginx-ana-ca.conf /etc/nginx/sites-available/ana-ca.com
+ln -sf /etc/nginx/sites-available/ana-ca.com /etc/nginx/sites-enabled/
+nginx -t
+systemctl reload nginx
 ```
 
-Or connect directly and run the schema:
+### If Nginx runs in a Docker container:
 ```bash
-docker exec -it ana-db psql -U ana_user -d ana_hrm
+docker cp ~/firm-hrm/deploy/nginx-ana-ca.conf YOUR_NGINX_CONTAINER:/etc/nginx/conf.d/ana-ca.conf
+docker exec YOUR_NGINX_CONTAINER nginx -t
+docker exec YOUR_NGINX_CONTAINER nginx -s reload
 ```
 
-## Step 7: Configure Nginx (on the VPS host or in existing nginx container)
-
-### Option A: If nginx runs on the host
-```bash
-sudo cp ~/ana-ca-app/deploy/nginx-ana-ca.conf /etc/nginx/sites-available/ana-ca.com
-sudo ln -s /etc/nginx/sites-available/ana-ca.com /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-### Option B: If nginx runs in a Docker container (auditwise-nginx)
-```bash
-docker cp ~/ana-ca-app/deploy/nginx-ana-ca.conf auditwise-nginx:/etc/nginx/conf.d/ana-ca.conf
-docker exec auditwise-nginx nginx -t
-docker exec auditwise-nginx nginx -s reload
-```
-
-**Important:** If using Docker nginx, make sure `ana-backend` is on the same Docker network as `auditwise-nginx`, or use the host IP instead of container name in the proxy_pass.
-
-To connect networks:
-```bash
-docker network connect auditwise_default ana-backend
-```
-
-## Step 8: SSL Certificate
+## Step 6: SSL Certificate
 
 ```bash
-sudo apt install certbot python3-certbot-nginx -y
-sudo certbot --nginx -d ana-ca.com -d www.ana-ca.com --non-interactive --agree-tos -m admin@ana-ca.com
+apt install certbot python3-certbot-nginx -y
+certbot --nginx -d ana-ca.com -d www.ana-ca.com --non-interactive --agree-tos -m admin@ana-ca.com
 ```
 
-## Step 9: Verify
+## Step 7: Verify
 
 ```bash
 curl -I https://ana-ca.com
 curl https://ana-ca.com/api/health
 ```
 
-You should see `{"status":"ok","timestamp":"..."}` from the health endpoint.
+Expected: `{"status":"ok","timestamp":"..."}`
+
+---
+
+## CI/CD: Automatic Deployment
+
+After setup, every push to `main` on GitHub triggers automatic deployment via GitHub Actions.
+
+### How it works:
+1. You develop in Replit
+2. Code is pushed to GitHub (`firm-hrm` repo)
+3. GitHub Actions runs `.github/workflows/deploy.yml`
+4. The workflow SSHes into your VPS
+5. Pulls latest code, rebuilds Docker containers
+6. Verifies the backend is healthy
+
+### Manual trigger:
+Go to GitHub → Actions → "Deploy to Hostinger VPS" → "Run workflow"
+
+---
 
 ## Ports Used
 
 | Service      | Internal | External | Notes                    |
 |-------------|----------|----------|--------------------------|
 | ana-db      | 5432     | 5433     | PostgreSQL               |
-| ana-backend | 5000     | 5001     | Node.js API + Frontend   |
-
-No conflicts with existing auditwise project (ports 80, 443, 5000, 5432).
+| ana-backend | 5000     | 5002     | Node.js API + Frontend   |
 
 ## Updating the App
 
+### Automatic (recommended):
+Push to `main` on GitHub — deployment happens automatically.
+
+### Manual:
 ```bash
-cd ~/ana-ca-app
+cd ~/firm-hrm
 git pull origin main
 cd deploy
 docker compose --env-file .env up -d --build
@@ -141,12 +193,16 @@ docker logs ana-db -f
 
 Restart:
 ```bash
-cd ~/ana-ca-app/deploy
+cd ~/firm-hrm/deploy
 docker compose restart
 ```
 
 Full rebuild:
 ```bash
+cd ~/firm-hrm/deploy
 docker compose --env-file .env down
 docker compose --env-file .env up -d --build
 ```
+
+Check GitHub Actions logs:
+https://github.com/aqeelalamfca-sys/firm-hrm/actions

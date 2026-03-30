@@ -1,0 +1,74 @@
+name: Deploy to Hostinger VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script_stop: true
+          timeout: 300s
+          script: |
+            set -e
+
+            APP_DIR=~/firm-hrm
+            DEPLOY_DIR="$APP_DIR/deploy"
+
+            if [ ! -d "$APP_DIR" ]; then
+              echo ">>> Cloning repository..."
+              git clone https://github.com/aqeelalamfca-sys/firm-hrm.git "$APP_DIR"
+            fi
+
+            cd "$APP_DIR"
+
+            echo ">>> Pulling latest code..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            if [ ! -f "$DEPLOY_DIR/.env" ]; then
+              echo ">>> Creating .env from example..."
+              cp "$DEPLOY_DIR/.env.example" "$DEPLOY_DIR/.env"
+              echo "WARNING: Using default .env — update DB_PASSWORD!"
+            fi
+
+            echo ">>> Building and deploying containers..."
+            cd "$DEPLOY_DIR"
+            docker compose --env-file .env down --remove-orphans || true
+            docker compose --env-file .env up -d --build --force-recreate
+
+            echo ">>> Waiting for containers to be healthy..."
+            sleep 10
+
+            echo ">>> Container status:"
+            docker ps --filter "name=ana-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+            echo ">>> Checking backend health..."
+            for i in 1 2 3 4 5; do
+              if curl -sf http://localhost:5002/api/health > /dev/null 2>&1; then
+                echo "Backend is healthy!"
+                break
+              fi
+              echo "Attempt $i: waiting..."
+              sleep 5
+            done
+
+            echo ">>> Deployment complete!"

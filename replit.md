@@ -43,6 +43,20 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - **Notifications:** In-app notification system with real-time updates for important events.
 - **Reports:** Generation of various reports for attendance, payroll, and invoices.
 
+## Deployment & CI/CD
+
+**Pipeline**: Replit → GitHub → GitHub Actions → Hostinger VPS (Docker)
+
+- **GitHub Repo**: https://github.com/aqeelalamfca-sys/firm-hrm
+- **VPS**: Hostinger Ubuntu 22.04 (187.77.130.117)
+- **Domain**: ana-ca.com
+- **CI/CD**: GitHub Actions (`.github/workflows/deploy.yml`) — auto-deploys on push to `main`
+- **Containers**: `ana-backend` (5002:5000), `ana-db` (5433:5432)
+- **Docker files**: `deploy/Dockerfile`, `deploy/docker-compose.yml`
+- **Nginx config**: `deploy/nginx-ana-ca.conf` (proxies to ana-backend)
+- **Setup script**: `deploy/vps-setup.sh` (one-time VPS setup)
+- **Full guide**: `deploy/DEPLOY.md`
+
 ## External Dependencies
 
 - **Database:** PostgreSQL

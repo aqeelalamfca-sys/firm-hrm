@@ -1,0 +1,192 @@
+🚀 ULTIMATE MASTER PROMPT (REPLIT / FULL-STACK)
+🎯 OBJECTIVE
+
+Transform the left blank/logo section of landing page into a Live Regulatory Intelligence Panel, powered by:
+
+ChatGPT API (auto summarization)
+Admin portal (manual + AI updates)
+Real-time frontend auto-refresh
+Multi-source regulatory feeds (FBR, SECP, PSX, SBP)
+🧠 CORE REQUIREMENTS
+1. REMOVE EXISTING UI
+Remove:
+Logo image block (left side)
+Empty/blank area
+Replace with:
+👉 Regulatory Live Updates Panel
+🎨 FRONTEND (NEXT.JS / REACT)
+🔷 COMPONENT: RegulatoryLivePanel.tsx
+Layout (Professional Card Grid + Ticker)
+Top: Live ticker (scrolling)
+Middle: 4 cards (FBR, SECP, PSX, SBP)
+Bottom: CTA
+💻 UI STRUCTURE
+<section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+  {/* LEFT PANEL (REPLACEMENT AREA) */}
+  <div className="bg-white rounded-2xl shadow p-5">
+
+    {/* HEADER */}
+    <div className="flex justify-between items-center mb-3">
+      <h2 className="text-lg font-semibold">
+        ⚡ Regulatory Live Updates
+      </h2>
+      <span className="text-xs text-green-600">● Live</span>
+    </div>
+
+    {/* TICKER */}
+    <div className="overflow-hidden whitespace-nowrap border-y py-2 mb-4">
+      <div className="animate-marquee">
+        {updates.map(u => (
+          <span key={u.id} className="mr-10 text-sm">
+            {u.badge} {u.text}
+          </span>
+        ))}
+      </div>
+    </div>
+
+    {/* GRID */}
+    <div className="grid grid-cols-2 gap-4">
+      {["FBR","SECP","PSX","SBP"].map(cat => (
+        <div key={cat} className="p-3 border rounded-xl">
+          <h4 className="font-medium mb-2">{cat}</h4>
+          {updates
+            .filter(u => u.category === cat)
+            .slice(0,3)
+            .map(u => (
+              <p key={u.id} className="text-xs mb-1">
+                • {u.text}
+              </p>
+            ))
+          }
+        </div>
+      ))}
+    </div>
+
+    {/* CTA */}
+    <button className="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg">
+      Book Consultation on These Updates
+    </button>
+
+  </div>
+
+</section>
+🎨 CSS (IMPORTANT)
+@keyframes marquee {
+  0% { transform: translateX(100%) }
+  100% { transform: translateX(-100%) }
+}
+
+.animate-marquee {
+  display: inline-block;
+  animation: marquee 25s linear infinite;
+}
+⚙️ BACKEND (.NET / NODE API)
+🔷 DATABASE TABLE: regulatory_updates
+Field	Type
+id	UUID
+category	varchar (FBR/SECP/PSX/SBP)
+text	text
+source	varchar
+priority	int
+created_at	datetime
+is_active	boolean
+🔷 API ENDPOINTS
+1. GET (Frontend Fetch)
+GET /api/updates
+2. POST (Admin Add)
+POST /api/admin/update
+3. AI AUTO GENERATE
+POST /api/admin/generate-ai-update
+🤖 CHATGPT API INTEGRATION
+🔷 FUNCTION: AUTO UPDATE GENERATOR
+async function generateUpdate(topic) {
+  const res = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      {
+        role: "system",
+        content: "You are a Pakistan regulatory expert (FBR, SECP, PSX, SBP). Generate short professional update for clients."
+      },
+      {
+        role: "user",
+        content: topic
+      }
+    ]
+  });
+
+  return res.choices[0].message.content;
+}
+🔷 AUTO PROMPT LOGIC
+
+Use this structured prompt:
+
+Generate latest professional regulatory update in 1 line:
+
+Category: FBR
+Focus: Tax deadline / SRO / ATL
+Tone: Chartered Accountant advisory
+Length: Max 20 words
+🧑‍💼 ADMIN PANEL (CRITICAL)
+🔷 PAGE: /admin/regulatory
+FEATURES:
+
+✔ Add update manually
+✔ Generate via AI
+✔ Edit / Delete
+✔ Set priority
+✔ Toggle active
+
+💻 ADMIN UI
+<form>
+  <select name="category">
+    <option>FBR</option>
+    <option>SECP</option>
+    <option>PSX</option>
+    <option>SBP</option>
+  </select>
+
+  <textarea placeholder="Write update"></textarea>
+
+  <button>Add Update</button>
+  <button type="button">Generate via AI</button>
+</form>
+🔄 REAL-TIME AUTO UPDATE
+FRONTEND AUTO REFRESH
+useEffect(() => {
+  fetchUpdates();
+  const interval = setInterval(fetchUpdates, 60000);
+  return () => clearInterval(interval);
+}, []);
+🔐 SECURITY (IMPORTANT)
+
+✔ Admin routes protected (JWT + RBAC)
+✔ Only Partner/Admin can publish
+✔ Audit log:
+
+created_by
+updated_by
+timestamp
+🚀 ADVANCED FEATURES (NEXT LEVEL)
+✔ Priority-Based Highlight
+High → Red badge
+Medium → Yellow
+Low → Grey
+✔ AI Weekly Digest (AUTO)
+Generate summary email
+Send to clients
+✔ Client Impact Button
+
+Each update:
+👉 “How this affects your business”
+
+📊 FINAL UX POSITIONING
+
+Instead of empty logo area:
+
+👉 You now show:
+
+✔ Authority
+✔ Real-time intelligence
+✔ Advisory positioning
+✔ Client engagement trigger
