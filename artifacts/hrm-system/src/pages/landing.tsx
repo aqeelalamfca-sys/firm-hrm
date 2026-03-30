@@ -247,51 +247,52 @@ export default function Landing() {
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-violet-500/[0.04] rounded-full blur-[100px]" />
         <div className="absolute top-40 left-1/4 w-[300px] h-[300px] bg-emerald-500/[0.03] rounded-full blur-[80px]" />
         <div className="relative max-w-7xl mx-auto px-6">
-          <div className="grid lg:grid-cols-2 gap-6 mb-10">
+          <div className="grid lg:grid-cols-2 gap-6 mb-12">
             <RegulatoryLivePanel />
             <div className="hidden lg:block">
-              <Card className="shadow-2xl shadow-black/[0.08] border-border/30 overflow-hidden rounded-2xl h-full">
-                <div className="px-6 py-5" style={{ background: 'linear-gradient(135deg, hsl(217 78% 51%) 0%, hsl(217 78% 42%) 100%)' }}>
-                  <div className="flex items-center gap-3 mb-1">
-                    <div className="w-9 h-9 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center">
-                      <Video className="w-5 h-5 text-white" />
+              <div className="rounded-2xl border border-slate-200/60 bg-white overflow-hidden h-full flex flex-col shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.04)]">
+                <div className="px-5 py-4 bg-gradient-to-r from-blue-600 to-indigo-700">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center">
+                      <Video className="w-4.5 h-4.5 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-white font-bold text-base leading-tight">Book a Partner Meeting</h3>
-                      <p className="text-white/60 text-xs">Online consultations available</p>
+                      <h3 className="text-white font-semibold text-[15px] tracking-tight">Book a Partner Meeting</h3>
+                      <p className="text-white/50 text-[11px]">Schedule a consultation with our experts</p>
                     </div>
                   </div>
                 </div>
-                <CardContent className="p-5 space-y-4">
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Schedule a one-on-one session with our experienced Chartered Accountants. Choose your preferred partner, date, and time.
+                <div className="p-4 flex-1 flex flex-col">
+                  <p className="text-[12px] text-slate-500 leading-relaxed mb-4">
+                    Choose your preferred partner for a one-on-one consultation on audit, tax, or advisory matters.
                   </p>
-                  <div className="space-y-2">
-                    {PARTNERS.map((p) => (
-                      <div key={p.name} className="flex items-center gap-3 p-2.5 rounded-xl border border-border/30 bg-muted/15 hover:bg-primary/[0.03] hover:border-primary/20 transition-all duration-200 cursor-pointer group">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: 'linear-gradient(135deg, hsl(217 78% 54%) 0%, hsl(262 70% 55%) 100%)' }}>
+                  <div className="space-y-1.5 flex-1">
+                    {PARTNERS.map((p, idx) => (
+                      <div key={p.name} className="flex items-center gap-3 p-2.5 rounded-xl border border-slate-100 bg-white hover:bg-slate-50/80 hover:border-slate-200 transition-all duration-200 cursor-pointer group">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-sm" style={{ background: `linear-gradient(135deg, ${idx % 2 === 0 ? '#3b82f6' : '#6366f1'} 0%, ${idx % 2 === 0 ? '#2563eb' : '#4f46e5'} 100%)` }}>
                           {p.name.split(" ").slice(-1)[0][0]}{p.name.split(" ").slice(-2, -1)[0]?.[0] || ""}
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold truncate group-hover:text-primary transition-colors">{p.name}</p>
-                          <p className="text-[10px] text-muted-foreground truncate">{p.focus}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] font-medium text-slate-800 truncate group-hover:text-blue-600 transition-colors">{p.name}</p>
+                          <p className="text-[10px] text-slate-400 truncate">{p.focus}</p>
                         </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-400 transition-colors shrink-0" />
                       </div>
                     ))}
                   </div>
-                  <div className="pt-1 space-y-2">
+                  <div className="pt-3 mt-3 border-t border-slate-100 space-y-2.5">
                     <Link href="/book-meeting">
-                      <Button className="w-full gap-2 rounded-xl h-10" style={{ background: 'linear-gradient(135deg, hsl(217 78% 51%) 0%, hsl(217 78% 42%) 100%)', boxShadow: '0 2px 8px rgba(59,130,246,0.25)' }}>
+                      <Button className="w-full gap-2 rounded-xl h-11 text-[13px] font-medium bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-[0_2px_8px_rgba(59,130,246,0.3)]">
                         <Calendar className="w-4 h-4" /> Schedule a Meeting
                       </Button>
                     </Link>
-                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground justify-center">
+                    <div className="flex items-center gap-4 text-[10px] text-slate-400 justify-center">
                       <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-emerald-500" /> Free consultation</span>
-                      <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-primary" /> 30–60 min sessions</span>
+                      <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-blue-400" /> 30–60 min sessions</span>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
           </div>
 

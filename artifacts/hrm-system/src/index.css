@@ -379,3 +379,12 @@ label[for],
 .animate-marquee:hover {
   animation-play-state: paused;
 }
+
+.animate-marquee-slow {
+  display: inline-flex;
+  animation: marquee 80s linear infinite;
+}
+
+.animate-marquee-slow:hover {
+  animation-play-state: paused;
+}
