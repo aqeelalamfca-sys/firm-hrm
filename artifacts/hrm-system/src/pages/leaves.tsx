@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useGetLeaves, useUpdateLeave, useApplyLeave } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/use-auth";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +10,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Check, X, Clock, Palmtree, Plus, CalendarDays, Smile, Stethoscope, MessageSquare, User } from "lucide-react";
+import { Check, X, Clock, Palmtree, Plus, CalendarDays, Smile, Stethoscope, MessageSquare, User, Trash2 } from "lucide-react";
+
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 const LEAVE_ICONS: Record<string, any> = {
   annual: Smile,
@@ -38,6 +40,9 @@ export default function Leaves() {
   const [activeTab, setActiveTab] = useState("all");
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; leaveId: number | null; employeeName: string }>({ open: false, leaveId: null, employeeName: "" });
   const [rejectReason, setRejectReason] = useState("");
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; leave: any | null }>({ open: false, leave: null });
+
+  const isAdmin = user && ['super_admin', 'hr_admin', 'partner', 'manager'].includes(user.role);
 
   const requestOpts = { request: { headers: { Authorization: `Bearer ${token}` } } };
   const { data: leaves = [], isLoading } = useGetLeaves({}, requestOpts);
@@ -62,6 +67,26 @@ export default function Leaves() {
         toast({ title: "Leave status updated" });
       }
     }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`${API_BASE}/leaves/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to delete");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leaves"] });
+      setDeleteDialog({ open: false, leave: null });
+      toast({ title: "Leave deleted successfully" });
+    },
+    onError: (err: any) => toast({ title: err.message || "Failed to delete leave", variant: "destructive" }),
   });
 
   const handleApply = (e: React.FormEvent<HTMLFormElement>) => {
@@ -256,7 +281,7 @@ export default function Leaves() {
                           </div>
                         )}
 
-                        {leave.status === 'pending' && user && ['super_admin', 'hr_admin', 'partner', 'manager'].includes(user.role) && (
+                        {leave.status === 'pending' && isAdmin && (
                           <div className="flex items-center gap-2 sm:self-center shrink-0">
                             <Button
                               size="sm"
@@ -279,6 +304,12 @@ export default function Leaves() {
                               <X className="w-3.5 h-3.5" /> Reject
                             </Button>
                           </div>
+                        )}
+                        {isAdmin && (
+                          <Button variant="ghost" size="icon" className="hover:bg-red-50 text-muted-foreground hover:text-red-600 h-8 w-8 shrink-0"
+                            onClick={() => setDeleteDialog({ open: true, leave })}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
                         )}
                       </div>
                     </CardContent>
@@ -332,6 +363,27 @@ export default function Leaves() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteDialog.open} onOpenChange={(open) => { if (!open) setDeleteDialog({ open: false, leave: null }); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-display text-red-600">Delete Leave</DialogTitle>
+            <DialogDescription>This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete the leave record for <span className="font-semibold text-foreground">{deleteDialog.leave?.employeeName}</span>?
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setDeleteDialog({ open: false, leave: null })}>Cancel</Button>
+            <Button variant="destructive" disabled={deleteMutation.isPending}
+              onClick={() => deleteDialog.leave && deleteMutation.mutate(deleteDialog.leave.id)}>
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

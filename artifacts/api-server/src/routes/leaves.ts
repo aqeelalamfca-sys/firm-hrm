@@ -170,4 +170,16 @@ router.put("/:id", requireRoles(...ADMIN_ROLES), async (req: AuthenticatedReques
   }
 });
 
+router.delete("/:id", requireRoles(...ADMIN_ROLES), async (req: AuthenticatedRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [deleted] = await db.delete(leavesTable).where(eq(leavesTable.id, id)).returning();
+    if (!deleted) return res.status(404).json({ error: "Leave record not found" });
+    res.json({ message: "Leave deleted successfully", id: deleted.id });
+  } catch (error) {
+    console.error("Error deleting leave:", error);
+    res.status(500).json({ error: "Failed to delete leave" });
+  }
+});
+
 export default router;

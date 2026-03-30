@@ -155,4 +155,19 @@ router.put("/:id", requireRoles(...ADMIN_ROLES), async (req, res) => {
   }
 });
 
+router.delete("/:id", requireRoles(...ADMIN_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [emp] = await db.delete(employeesTable).where(eq(employeesTable.id, id)).returning();
+    if (!emp) return res.status(404).json({ error: "Employee not found" });
+    res.json({ message: "Employee deleted successfully", id: emp.id });
+  } catch (error: any) {
+    console.error("Error deleting employee:", error);
+    if (error?.code === "23503") {
+      return res.status(409).json({ error: "Cannot delete employee — they have linked records (leaves, attendance, etc.). Change their status to 'terminated' instead." });
+    }
+    res.status(500).json({ error: "Failed to delete employee" });
+  }
+});
+
 export default router;

@@ -1,14 +1,16 @@
 import React, { useState } from "react";
 import { useGetClients, useCreateClient } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/use-auth";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, Briefcase, Phone, Mail, Building2, TrendingDown } from "lucide-react";
+import { Search, Plus, Briefcase, Phone, Mail, Building2, TrendingDown, Trash2 } from "lucide-react";
+
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
 import { useDepartments } from "@/hooks/use-departments";
 import { DepartmentBadge } from "@/components/department-badge";
 import { DepartmentSelect } from "@/components/department-select";
@@ -25,6 +27,7 @@ export default function Clients() {
   const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formDeptId, setFormDeptId] = useState("");
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; client: any | null }>({ open: false, client: null });
   const { selectedDepartmentId } = useDepartments();
 
   const requestOpts = { request: { headers: { Authorization: `Bearer ${token}` } } };
@@ -40,6 +43,26 @@ export default function Clients() {
       },
       onError: () => toast({ title: "Failed to add client", variant: "destructive" })
     }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`${API_BASE}/clients/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to delete");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      setDeleteDialog({ open: false, client: null });
+      toast({ title: "Client deleted successfully" });
+    },
+    onError: (err: any) => toast({ title: err.message || "Failed to delete client", variant: "destructive" }),
   });
 
   const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
@@ -251,13 +274,40 @@ export default function Clients() {
                       {client.outstandingBalance > 0 ? `Rs. ${client.outstandingBalance.toLocaleString('en-PK')}` : 'Cleared ✓'}
                     </p>
                   </div>
-                  <p className="text-xs text-muted-foreground font-mono">{client.clientCode}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-muted-foreground font-mono">{client.clientCode}</p>
+                    <Button variant="ghost" size="icon" className="hover:bg-red-50 text-muted-foreground hover:text-red-600 h-7 w-7"
+                      onClick={() => setDeleteDialog({ open: true, client })}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      <Dialog open={deleteDialog.open} onOpenChange={(open) => { if (!open) setDeleteDialog({ open: false, client: null }); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-display text-red-600">Delete Client</DialogTitle>
+            <DialogDescription>This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete <span className="font-semibold text-foreground">{deleteDialog.client?.name}</span> ({deleteDialog.client?.clientCode})?
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setDeleteDialog({ open: false, client: null })}>Cancel</Button>
+            <Button variant="destructive" disabled={deleteMutation.isPending}
+              onClick={() => deleteDialog.client && deleteMutation.mutate(deleteDialog.client.id)}>
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

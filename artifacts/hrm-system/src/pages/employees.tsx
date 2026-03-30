@@ -1,19 +1,21 @@
 import React, { useState } from "react";
 import { useGetEmployees, useCreateEmployee, Employee } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/use-auth";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, MoreHorizontal, Building2, Phone, Mail, Users } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Plus, Search, MoreHorizontal, Building2, Phone, Mail, Users, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 const employeeSchema = z.object({
   firstName: z.string().min(2, "First name is required"),
@@ -29,11 +31,14 @@ const employeeSchema = z.object({
 });
 
 export default function Employees() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; employee: any | null }>({ open: false, employee: null });
+
+  const isAdmin = user && ['super_admin', 'hr_admin', 'partner', 'manager'].includes(user.role);
 
   const requestOpts = { request: { headers: { Authorization: `Bearer ${token}` } } };
   const { data: employees = [], isLoading } = useGetEmployees({}, requestOpts);
@@ -49,6 +54,26 @@ export default function Employees() {
       },
       onError: () => toast({ title: "Failed to create employee", variant: "destructive" })
     }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`${API_BASE}/employees/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to delete");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      setDeleteDialog({ open: false, employee: null });
+      toast({ title: "Employee deleted successfully" });
+    },
+    onError: (err: any) => toast({ title: err.message || "Failed to delete employee", variant: "destructive" }),
   });
 
   const form = useForm<z.infer<typeof employeeSchema>>({
@@ -227,7 +252,12 @@ export default function Employees() {
                       </Badge>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Button variant="ghost" size="icon" className="hover:bg-muted"><MoreHorizontal className="w-4 h-4" /></Button>
+                      {isAdmin && (
+                        <Button variant="ghost" size="icon" className="hover:bg-red-50 text-muted-foreground hover:text-red-600"
+                          onClick={() => setDeleteDialog({ open: true, employee: emp })}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -236,6 +266,27 @@ export default function Employees() {
           </table>
         </div>
       </Card>
+
+      <Dialog open={deleteDialog.open} onOpenChange={(open) => { if (!open) setDeleteDialog({ open: false, employee: null }); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-display text-red-600">Delete Employee</DialogTitle>
+            <DialogDescription>This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete <span className="font-semibold text-foreground">{deleteDialog.employee?.firstName} {deleteDialog.employee?.lastName}</span> ({deleteDialog.employee?.employeeCode})?
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setDeleteDialog({ open: false, employee: null })}>Cancel</Button>
+            <Button variant="destructive" disabled={deleteMutation.isPending}
+              onClick={() => deleteDialog.employee && deleteMutation.mutate(deleteDialog.employee.id)}>
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
   Plus, FileText, CheckCircle, Send, AlertTriangle, ChevronRight,
-  Receipt, Eye, Download, Pencil, Save, X, Loader2
+  Receipt, Eye, Download, Pencil, Save, X, Loader2, Trash2
 } from "lucide-react";
 import { useDepartments } from "@/hooks/use-departments";
 import { DepartmentBadge } from "@/components/department-badge";
@@ -50,6 +50,8 @@ export default function Invoices() {
   const [clients, setClients] = useState<any[]>([]);
   const [engagements, setEngagements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; invoice: any | null }>({ open: false, invoice: null });
+  const [deleting, setDeleting] = useState(false);
 
   const headers: Record<string, string> = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
@@ -625,6 +627,10 @@ export default function Invoices() {
                 <Button className="w-full gap-2 mt-2" variant="outline" onClick={() => handlePrintInvoice(detailInvoice)}>
                   <Download className="w-4 h-4" /> Download / Print Invoice
                 </Button>
+                <Button className="w-full gap-2 mt-2 border-red-200 text-red-600 hover:bg-red-50" variant="outline"
+                  onClick={() => { setDeleteDialog({ open: true, invoice: detailInvoice }); setDetailInvoice(null); }}>
+                  <Trash2 className="w-4 h-4" /> Delete Invoice
+                </Button>
               </div>
             </>
           )}
@@ -731,6 +737,39 @@ export default function Invoices() {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteDialog.open} onOpenChange={(open) => { if (!open) setDeleteDialog({ open: false, invoice: null }); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-display text-red-600">Delete Invoice</DialogTitle>
+            <DialogDescription>This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete invoice <span className="font-semibold text-foreground">#{deleteDialog.invoice?.invoiceNumber}</span>?
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setDeleteDialog({ open: false, invoice: null })}>Cancel</Button>
+            <Button variant="destructive" disabled={deleting}
+              onClick={async () => {
+                if (!deleteDialog.invoice) return;
+                setDeleting(true);
+                try {
+                  const res = await fetch(`/api/invoices/${deleteDialog.invoice.id}`, { method: "DELETE", headers });
+                  if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+                  setInvoices(invoices.filter(i => i.id !== deleteDialog.invoice!.id));
+                  setDeleteDialog({ open: false, invoice: null });
+                  toast({ title: "Invoice deleted successfully" });
+                } catch (err: any) {
+                  toast({ title: err.message || "Failed to delete invoice", variant: "destructive" });
+                } finally { setDeleting(false); }
+              }}>
+              {deleting ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

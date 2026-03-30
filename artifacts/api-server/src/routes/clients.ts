@@ -117,4 +117,19 @@ router.put("/:id", async (req, res) => {
   res.json({ ...client, ...financials });
 });
 
+router.delete("/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [deleted] = await db.delete(clientsTable).where(eq(clientsTable.id, id)).returning();
+    if (!deleted) return res.status(404).json({ error: "Client not found" });
+    res.json({ message: "Client deleted successfully", id: deleted.id });
+  } catch (error: any) {
+    console.error("Error deleting client:", error);
+    if (error?.code === "23503") {
+      return res.status(409).json({ error: "Cannot delete client — they have linked invoices or engagements. Remove those first." });
+    }
+    res.status(500).json({ error: "Failed to delete client" });
+  }
+});
+
 export default router;

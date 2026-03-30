@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, ClipboardList, Calendar, Users, ArrowRight, Building2 } from "lucide-react";
+import { Plus, ClipboardList, Calendar, Users, ArrowRight, Building2, Trash2 } from "lucide-react";
 import { useDepartments } from "@/hooks/use-departments";
 import { DepartmentBadge } from "@/components/department-badge";
 import { DepartmentSelect } from "@/components/department-select";
@@ -39,6 +39,8 @@ export default function Engagements() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState("all");
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; engagement: any | null }>({ open: false, engagement: null });
+  const [deleting, setDeleting] = useState(false);
   const [form, setForm] = useState({
     clientId: "",
     title: "",
@@ -207,31 +209,69 @@ export default function Engagements() {
                     </div>
                     {eng.description && <p className="text-sm text-muted-foreground mt-2">{eng.description}</p>}
                   </div>
-                  {eng.status !== "completed" && eng.status !== "cancelled" && (
-                    <div className="flex gap-2 ml-4">
-                      {eng.status === "planning" && (
-                        <Button size="sm" variant="outline" onClick={() => handleStatusChange(eng.id, "execution")} className="gap-1">
-                          Start <ArrowRight className="w-3 h-3" />
-                        </Button>
-                      )}
-                      {eng.status === "execution" && (
-                        <Button size="sm" variant="outline" onClick={() => handleStatusChange(eng.id, "review")} className="gap-1">
-                          Review <ArrowRight className="w-3 h-3" />
-                        </Button>
-                      )}
-                      {eng.status === "review" && (
-                        <Button size="sm" variant="default" onClick={() => handleStatusChange(eng.id, "completed")} className="gap-1">
-                          Complete
-                        </Button>
-                      )}
-                    </div>
-                  )}
+                  <div className="flex gap-2 ml-4">
+                    {eng.status !== "completed" && eng.status !== "cancelled" && (
+                      <>
+                        {eng.status === "planning" && (
+                          <Button size="sm" variant="outline" onClick={() => handleStatusChange(eng.id, "execution")} className="gap-1">
+                            Start <ArrowRight className="w-3 h-3" />
+                          </Button>
+                        )}
+                        {eng.status === "execution" && (
+                          <Button size="sm" variant="outline" onClick={() => handleStatusChange(eng.id, "review")} className="gap-1">
+                            Review <ArrowRight className="w-3 h-3" />
+                          </Button>
+                        )}
+                        {eng.status === "review" && (
+                          <Button size="sm" variant="default" onClick={() => handleStatusChange(eng.id, "completed")} className="gap-1">
+                            Complete
+                          </Button>
+                        )}
+                      </>
+                    )}
+                    <Button variant="ghost" size="icon" className="hover:bg-red-50 text-muted-foreground hover:text-red-600 h-8 w-8"
+                      onClick={() => setDeleteDialog({ open: true, engagement: eng })}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           ))
         )}
       </div>
+
+      <Dialog open={deleteDialog.open} onOpenChange={(open) => { if (!open) setDeleteDialog({ open: false, engagement: null }); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-display text-red-600">Delete Engagement</DialogTitle>
+            <DialogDescription>This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete <span className="font-semibold text-foreground">{deleteDialog.engagement?.title}</span> ({deleteDialog.engagement?.engagementCode})?
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setDeleteDialog({ open: false, engagement: null })}>Cancel</Button>
+            <Button variant="destructive" disabled={deleting}
+              onClick={async () => {
+                if (!deleteDialog.engagement) return;
+                setDeleting(true);
+                try {
+                  const res = await fetch(`/api/engagements/${deleteDialog.engagement.id}`, { method: "DELETE", headers });
+                  if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+                  setEngagements(engagements.filter(e => e.id !== deleteDialog.engagement!.id));
+                  setDeleteDialog({ open: false, engagement: null });
+                } catch (err: any) {
+                  alert(err.message || "Failed to delete engagement");
+                } finally { setDeleting(false); }
+              }}>
+              {deleting ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

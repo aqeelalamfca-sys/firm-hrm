@@ -254,4 +254,28 @@ router.post("/:id/assignments", async (req: AuthenticatedRequest, res) => {
   }
 });
 
+router.delete("/:id", async (req: AuthenticatedRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await db.delete(engagementAssignmentsTable).where(eq(engagementAssignmentsTable.engagementId, id));
+    const [deleted] = await db.delete(engagementsTable).where(eq(engagementsTable.id, id)).returning();
+    if (!deleted) return res.status(404).json({ error: "Engagement not found" });
+
+    await logActivity({
+      userId: req.user?.id ?? 0,
+      userName: req.user?.name ?? "System",
+      action: "delete",
+      module: "engagement",
+      entityId: deleted.id,
+      entityType: "engagement",
+      description: `Deleted engagement ${deleted.engagementCode}`,
+    });
+
+    res.json({ message: "Engagement deleted successfully", id: deleted.id });
+  } catch (error) {
+    console.error("Error deleting engagement:", error);
+    res.status(500).json({ error: "Failed to delete engagement" });
+  }
+});
+
 export default router;

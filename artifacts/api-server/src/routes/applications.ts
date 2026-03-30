@@ -580,4 +580,27 @@ router.patch("/:id/status", authMiddleware, requireRoles("super_admin", "partner
   }
 });
 
+router.delete("/:id", authMiddleware, requireRoles("super_admin", "partner", "hr_admin"), async (req: AuthenticatedRequest, res: any) => {
+  try {
+    const id = parseInt(req.params.id as string);
+    const [deleted] = await db.delete(trainingApplicationsTable).where(eq(trainingApplicationsTable.id, id)).returning();
+    if (!deleted) return res.status(404).json({ error: "Application not found" });
+
+    await logActivity({
+      userId: req.user?.id ?? 0,
+      userName: req.user?.name ?? "System",
+      action: "delete",
+      module: "training_application",
+      entityId: deleted.id,
+      entityType: "training_application",
+      description: `Deleted training application ${deleted.crn} (${deleted.fullName})`,
+    });
+
+    res.json({ message: "Application deleted successfully", id: deleted.id });
+  } catch (error) {
+    console.error("Error deleting application:", error);
+    res.status(500).json({ error: "Failed to delete application" });
+  }
+});
+
 export default router;

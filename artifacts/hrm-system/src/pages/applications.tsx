@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Search, Filter, Eye, UserCheck, UserX, Star, Clock, Users, FileText, Download,
   GraduationCap, MapPin, Phone, Mail, Briefcase, Calendar, CheckCircle2, XCircle,
-  AlertCircle, Loader2
+  AlertCircle, Loader2, Trash2
 } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
@@ -64,6 +64,7 @@ export default function Applications() {
   const [deptFilter, setDeptFilter] = useState("all");
   const [selectedApp, setSelectedApp] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; app: any | null }>({ open: false, app: null });
 
   const { data: applications = [], isLoading } = useQuery({
     queryKey: ["applications", search, statusFilter, deptFilter],
@@ -89,6 +90,20 @@ export default function Applications() {
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) =>
+      fetchWithAuth(`${API_BASE}/applications/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["applications"] });
+      setDeleteDialog({ open: false, app: null });
+      setSelectedApp(null);
+      toast({ title: "Application deleted successfully" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to delete", variant: "destructive" });
     },
   });
 
@@ -495,8 +510,36 @@ export default function Applications() {
                   ))}
                 </div>
               </div>
+
+              <div className="mt-4 pt-4 border-t border-border/40">
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs border-red-200 text-red-600 hover:bg-red-50"
+                  onClick={() => { setDeleteDialog({ open: true, app: selectedApp }); }}>
+                  <Trash2 className="w-3.5 h-3.5" /> Delete Application
+                </Button>
+              </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteDialog.open} onOpenChange={(open) => { if (!open) setDeleteDialog({ open: false, app: null }); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-display text-red-600">Delete Application</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to permanently delete the application from <span className="font-semibold text-foreground">{deleteDialog.app?.fullName}</span> (CRN: {deleteDialog.app?.crn})?
+            </p>
+            <p className="text-xs text-red-500 mt-2">This action cannot be undone.</p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setDeleteDialog({ open: false, app: null })}>Cancel</Button>
+            <Button variant="destructive" disabled={deleteMutation.isPending}
+              onClick={() => deleteDialog.app && deleteMutation.mutate(deleteDialog.app.id)}>
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
