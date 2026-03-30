@@ -247,39 +247,10 @@ export default function Landing() {
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-violet-500/[0.04] rounded-full blur-[100px]" />
         <div className="absolute top-40 left-1/4 w-[300px] h-[300px] bg-emerald-500/[0.03] rounded-full blur-[80px]" />
         <div className="relative max-w-7xl mx-auto px-6">
-          <div className="grid lg:grid-cols-[1fr_400px] gap-16 items-center">
-            <div>
-              <RegulatoryLivePanel />
-              <div className="mt-8">
-                <Badge className="mb-6 bg-primary/[0.06] text-primary border-primary/15 text-xs font-semibold px-4 py-1.5 rounded-full backdrop-blur-sm">
-                  ICAP Approved Training Organization
-                </Badge>
-                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.08] mb-6">
-                  Leading Chartered
-                  <br />
-                  <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-violet-500 bg-clip-text text-transparent">Accountants Firm</span>
-                </h1>
-                <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mb-10">
-                  Providing audit, tax, and financial & corporate advisory services with firm commitment.
-                  Expert chartered accounting and international corporate services — your trusted partner
-                  in Pakistan and beyond.
-                </p>
-                <div className="flex flex-wrap gap-3">
-                  <Link href="/login">
-                    <Button size="lg" className="h-12 px-7 text-sm font-semibold gap-2 rounded-xl" style={{ background: 'linear-gradient(135deg, hsl(217 78% 51%) 0%, hsl(217 78% 42%) 100%)', boxShadow: '0 4px 16px rgba(59,130,246,0.3)' }}>
-                      Get Started <ArrowRight className="w-4 h-4" />
-                    </Button>
-                  </Link>
-                  <button onClick={() => scrollTo("services")} className="h-12 px-7 text-sm font-semibold border border-border/50 rounded-xl bg-card hover:bg-muted/50 transition-all duration-200 inline-flex items-center gap-2 shadow-sm">
-                    Our Services <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Meeting Booking Card */}
+          <div className="grid lg:grid-cols-2 gap-6 mb-10">
+            <RegulatoryLivePanel />
             <div className="hidden lg:block">
-              <Card className="shadow-2xl shadow-black/[0.08] border-border/30 overflow-hidden rounded-2xl">
+              <Card className="shadow-2xl shadow-black/[0.08] border-border/30 overflow-hidden rounded-2xl h-full">
                 <div className="px-6 py-5" style={{ background: 'linear-gradient(135deg, hsl(217 78% 51%) 0%, hsl(217 78% 42%) 100%)' }}>
                   <div className="flex items-center gap-3 mb-1">
                     <div className="w-9 h-9 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center">
@@ -321,6 +292,32 @@ export default function Landing() {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+          </div>
+
+          <div className="text-center max-w-3xl mx-auto">
+            <Badge className="mb-6 bg-primary/[0.06] text-primary border-primary/15 text-xs font-semibold px-4 py-1.5 rounded-full backdrop-blur-sm">
+              ICAP Approved Training Organization
+            </Badge>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.08] mb-6">
+              Leading Chartered
+              <br />
+              <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-violet-500 bg-clip-text text-transparent">Accountants Firm</span>
+            </h1>
+            <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-10">
+              Providing audit, tax, and financial & corporate advisory services with firm commitment.
+              Expert chartered accounting and international corporate services — your trusted partner
+              in Pakistan and beyond.
+            </p>
+            <div className="flex flex-wrap gap-3 justify-center">
+              <Link href="/login">
+                <Button size="lg" className="h-12 px-7 text-sm font-semibold gap-2 rounded-xl" style={{ background: 'linear-gradient(135deg, hsl(217 78% 51%) 0%, hsl(217 78% 42%) 100%)', boxShadow: '0 4px 16px rgba(59,130,246,0.3)' }}>
+                  Get Started <ArrowRight className="w-4 h-4" />
+                </Button>
+              </Link>
+              <button onClick={() => scrollTo("services")} className="h-12 px-7 text-sm font-semibold border border-border/50 rounded-xl bg-card hover:bg-muted/50 transition-all duration-200 inline-flex items-center gap-2 shadow-sm">
+                Our Services <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
 

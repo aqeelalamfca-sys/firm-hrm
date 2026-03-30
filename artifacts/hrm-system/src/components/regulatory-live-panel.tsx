@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Link } from "wouter";
-import { Zap, TrendingUp, Building2, Landmark, BarChart3, ArrowRight, AlertCircle } from "lucide-react";
+import { Zap, TrendingUp, Building2, Landmark, BarChart3, AlertCircle } from "lucide-react";
 
 interface RegulatoryUpdate {
   id: number;
@@ -89,7 +87,7 @@ export default function RegulatoryLivePanel() {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg border border-border/30 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-lg border border-border/30 overflow-hidden h-full flex flex-col">
       <div className="px-5 pt-5 pb-3">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-bold flex items-center gap-2">
@@ -122,7 +120,7 @@ export default function RegulatoryLivePanel() {
         </div>
       )}
 
-      <div className="p-5">
+      <div className="p-5 flex-1">
         <div className="grid grid-cols-2 gap-3">
           {categories.map(cat => {
             const config = CATEGORY_CONFIG[cat];
@@ -165,14 +163,6 @@ export default function RegulatoryLivePanel() {
           })}
         </div>
 
-        <Link href="/book-meeting">
-          <Button
-            className="w-full mt-4 gap-2 rounded-xl h-10 text-sm"
-            style={{ background: 'linear-gradient(135deg, hsl(217 78% 51%) 0%, hsl(217 78% 42%) 100%)', boxShadow: '0 2px 8px rgba(59,130,246,0.25)' }}
-          >
-            Book Consultation on These Updates <ArrowRight className="w-4 h-4" />
-          </Button>
-        </Link>
       </div>
     </div>
   );
