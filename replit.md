@@ -48,10 +48,15 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 **Regulatory Updates System:**
 - Frontend panel: `artifacts/hrm-system/src/components/regulatory-live-panel.tsx`
 - Admin page: `artifacts/hrm-system/src/pages/regulatory-updates.tsx`
-- Settings page: `artifacts/hrm-system/src/pages/settings.tsx` (AI Integration + Storage Configuration)
+- Settings page: `artifacts/hrm-system/src/pages/settings.tsx` (AI Integration + Auto-Gen Config + Storage Configuration)
 - Backend routes: `artifacts/api-server/src/routes/regulatory-updates.ts`, `artifacts/api-server/src/routes/system-settings.ts`
-- DB schema: `lib/db/src/schema/regulatory_updates.ts` (tables: `regulatory_updates`, `system_settings`)
-- AI uses Replit AI Integration proxy (env: `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`)
+- Scheduler: `artifacts/api-server/src/scheduler/auto-regulatory.ts` (auto-generates updates every N hours)
+- DB schema: `lib/db/src/schema/regulatory_updates.ts` (tables: `regulatory_updates`, `auto_gen_logs`, `system_settings`)
+- AI uses Replit AI Integration proxy (env: `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`) or falls back to `chatgpt_api_key` from system_settings table
+- Auto-gen runs on server startup, configurable via Settings (enable/disable, interval 1-24h)
+- Settings page has "Test" button to verify API key connectivity
+- Regulatory Updates admin page has "Run Now" button and "View Logs" for auto-gen history
+- Config keys in `system_settings`: `auto_gen_enabled`, `auto_gen_interval_hours`, `chatgpt_api_key`
 
 ## Deployment & CI/CD
 

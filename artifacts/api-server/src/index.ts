@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedMCQQuestions } from "./mcq-seed";
+import { startAutoGenScheduler } from "./scheduler/auto-regulatory";
 
 seedMCQQuestions().catch((err) => logger.error({ err }, "Failed to seed MCQ questions"));
 
@@ -25,4 +26,6 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  startAutoGenScheduler();
 });

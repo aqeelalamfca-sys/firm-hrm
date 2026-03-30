@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Settings as SettingsIcon, HardDrive, Cloud, CheckCircle2,
   AlertCircle, FolderOpen, RefreshCw, Save, ExternalLink,
-  Key, Eye, EyeOff, Sparkles, Shield
+  Key, Eye, EyeOff, Sparkles, Shield, FlaskConical, Timer, Power
 } from "lucide-react";
 
 interface StorageProvider {
@@ -34,10 +34,15 @@ export default function Settings() {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [apiKeySaving, setApiKeySaving] = useState(false);
+  const [apiKeyTesting, setApiKeyTesting] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [chatgptApiKey, setChatgptApiKey] = useState("");
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
+  const [apiTestResult, setApiTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [settings, setSettings] = useState<SystemSetting[]>([]);
+  const [autoGenEnabled, setAutoGenEnabled] = useState(true);
+  const [autoGenInterval, setAutoGenInterval] = useState(2);
+  const [autoGenSaving, setAutoGenSaving] = useState(false);
 
   const [providers, setProviders] = useState<StorageProvider[]>([
     {
@@ -109,7 +114,21 @@ export default function Settings() {
       } catch {
       }
     };
+    const fetchAutoGenConfig = async () => {
+      try {
+        const res = await fetch("/api/system-settings/auto-gen-config", {
+          headers: getAuthHeaders(),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAutoGenEnabled(data.enabled);
+          setAutoGenInterval(data.intervalHours);
+        }
+      } catch {
+      }
+    };
     fetchSettings();
+    fetchAutoGenConfig();
   }, [getAuthHeaders]);
 
   const handleSaveApiKey = async () => {
@@ -143,6 +162,51 @@ export default function Settings() {
       toast({ title: "Error", description: "Network error — check your connection and try again.", variant: "destructive" });
     } finally {
       setApiKeySaving(false);
+    }
+  };
+
+  const handleTestApiKey = async () => {
+    setApiKeyTesting(true);
+    setApiTestResult(null);
+    try {
+      const res = await fetch("/api/system-settings/test-api-key", {
+        method: "POST",
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setApiTestResult({ success: true, message: data.message });
+        toast({ title: "Test Passed", description: data.message });
+      } else {
+        setApiTestResult({ success: false, message: data.error });
+        toast({ title: "Test Failed", description: data.error, variant: "destructive" });
+      }
+    } catch {
+      setApiTestResult({ success: false, message: "Network error — check your connection" });
+      toast({ title: "Error", description: "Network error during API test", variant: "destructive" });
+    } finally {
+      setApiKeyTesting(false);
+    }
+  };
+
+  const handleSaveAutoGenConfig = async () => {
+    setAutoGenSaving(true);
+    try {
+      const res = await fetch("/api/system-settings/auto-gen-config", {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ enabled: autoGenEnabled, intervalHours: autoGenInterval }),
+      });
+      if (res.ok) {
+        toast({ title: "Saved", description: `Auto-generation ${autoGenEnabled ? "enabled" : "disabled"}, interval: ${autoGenInterval}h` });
+      } else {
+        const data = await res.json().catch(() => null);
+        toast({ title: "Error", description: data?.error || "Failed to save config", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to save auto-gen config", variant: "destructive" });
+    } finally {
+      setAutoGenSaving(false);
     }
   };
 
@@ -283,8 +347,33 @@ export default function Settings() {
                         {apiKeySaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                         Save Key
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleTestApiKey}
+                        disabled={apiKeyTesting}
+                        className="h-9 gap-1.5 text-xs"
+                      >
+                        {apiKeyTesting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <FlaskConical className="w-3.5 h-3.5" />}
+                        Test
+                      </Button>
                     </div>
                   </div>
+
+                  {apiTestResult && (
+                    <div className={`flex items-start gap-2 text-[11px] rounded-lg p-2.5 ${
+                      apiTestResult.success
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : "bg-red-50 text-red-700 border border-red-200"
+                    }`}>
+                      {apiTestResult.success ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      )}
+                      <p>{apiTestResult.message}</p>
+                    </div>
+                  )}
 
                   <div className="flex items-start gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-lg p-2.5">
                     <Shield className="w-3.5 h-3.5 mt-0.5 shrink-0 text-blue-500" />
@@ -292,6 +381,83 @@ export default function Settings() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-violet-200/60">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Timer className="w-5 h-5 text-violet-500" />
+            Auto-Generation Configuration
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">Configure automatic regulatory update generation schedule and behavior.</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="border rounded-xl p-5 border-violet-200/60 bg-violet-50/30">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
+                    <Power className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-sm">Auto-Generation</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Automatically generate regulatory updates using AI
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={autoGenEnabled}
+                    onCheckedChange={setAutoGenEnabled}
+                  />
+                  <span className="text-xs font-medium">
+                    {autoGenEnabled ? (
+                      <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50 text-[10px]">Enabled</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground border-border text-[10px]">Disabled</Badge>
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">Generation Interval</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={24}
+                      value={autoGenInterval}
+                      onChange={(e) => setAutoGenInterval(Math.max(1, Math.min(24, parseInt(e.target.value) || 2)))}
+                      className="h-9 text-xs w-20"
+                    />
+                    <span className="text-xs text-muted-foreground">hours</span>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">Categories Generated</Label>
+                  <div className="flex gap-1.5 mt-1">
+                    {["FBR", "SECP", "PSX", "SBP"].map(cat => (
+                      <Badge key={cat} variant="outline" className="text-[10px]">{cat}</Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                size="sm"
+                onClick={handleSaveAutoGenConfig}
+                disabled={autoGenSaving}
+                className="gap-1.5 text-xs bg-violet-600 hover:bg-violet-700"
+              >
+                {autoGenSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                Save Configuration
+              </Button>
             </div>
           </div>
         </CardContent>

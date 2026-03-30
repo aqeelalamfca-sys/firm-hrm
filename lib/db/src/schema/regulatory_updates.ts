@@ -32,6 +32,18 @@ export const regulatoryUpdatesTable = pgTable("regulatory_updates", {
   index("regulatory_updates_priority_idx").on(t.priority),
 ]);
 
+export const autoGenLogsTable = pgTable("auto_gen_logs", {
+  id: serial("id").primaryKey(),
+  category: regulatoryCategoryEnum("category").notNull(),
+  generatedText: text("generated_text"),
+  status: text("status").notNull().default("success"),
+  errorMessage: text("error_message"),
+  runAt: timestamp("run_at").defaultNow().notNull(),
+}, (t) => [
+  index("auto_gen_logs_run_at_idx").on(t.runAt),
+  index("auto_gen_logs_status_idx").on(t.status),
+]);
+
 export const systemSettingsTable = pgTable("system_settings", {
   id: serial("id").primaryKey(),
   key: text("key").notNull().unique(),

@@ -17,7 +17,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import {
   Zap, Plus, Trash2, Edit2, Sparkles, RefreshCw, Save,
-  Landmark, Building2, BarChart3, TrendingUp, Eye, EyeOff
+  Landmark, Building2, BarChart3, TrendingUp, Eye, EyeOff,
+  Clock, CheckCircle2, XCircle, AlertCircle, PlayCircle, Timer
 } from "lucide-react";
 
 interface RegulatoryUpdate {
@@ -29,6 +30,15 @@ interface RegulatoryUpdate {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+interface AutoGenLog {
+  id: number;
+  category: string;
+  generatedText: string | null;
+  status: string;
+  errorMessage: string | null;
+  runAt: string;
 }
 
 const CATEGORIES = ["FBR", "SECP", "PSX", "SBP"] as const;
@@ -51,10 +61,13 @@ export default function RegulatoryUpdatesAdmin() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [updates, setUpdates] = useState<RegulatoryUpdate[]>([]);
+  const [autoGenLogs, setAutoGenLogs] = useState<AutoGenLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [triggeringAutoGen, setTriggeringAutoGen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [showLogs, setShowLogs] = useState(false);
 
   const [form, setForm] = useState({
     category: "FBR" as string,
@@ -214,6 +227,46 @@ export default function RegulatoryUpdatesAdmin() {
     }
   };
 
+  const fetchAutoGenLogs = useCallback(async () => {
+    try {
+      const res = await fetch("/api/regulatory-updates/auto-gen-logs", {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAutoGenLogs(data.logs || []);
+      }
+    } catch {
+      // silently fail
+    }
+  }, [getAuthHeaders]);
+
+  useEffect(() => {
+    if (showLogs) fetchAutoGenLogs();
+  }, [showLogs, fetchAutoGenLogs]);
+
+  const handleTriggerAutoGen = async () => {
+    setTriggeringAutoGen(true);
+    try {
+      const res = await fetch("/api/regulatory-updates/auto-gen-trigger", {
+        method: "POST",
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        toast({ title: "Triggered", description: "Auto-generation run completed" });
+        fetchUpdates();
+        if (showLogs) fetchAutoGenLogs();
+      } else {
+        const data = await res.json();
+        toast({ title: "Error", description: data.error || "Failed to trigger", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to trigger auto-generation", variant: "destructive" });
+    } finally {
+      setTriggeringAutoGen(false);
+    }
+  };
+
   const handleEdit = (update: RegulatoryUpdate) => {
     setEditingId(update.id);
     setForm({
@@ -223,6 +276,18 @@ export default function RegulatoryUpdatesAdmin() {
       topic: "",
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const statusIcon = (status: string) => {
+    if (status === "success") return <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />;
+    if (status === "error") return <XCircle className="w-3.5 h-3.5 text-red-500" />;
+    return <AlertCircle className="w-3.5 h-3.5 text-amber-500" />;
+  };
+
+  const statusColor = (status: string) => {
+    if (status === "success") return "bg-green-50 text-green-700 border-green-200";
+    if (status === "error") return "bg-red-50 text-red-700 border-red-200";
+    return "bg-amber-50 text-amber-700 border-amber-200";
   };
 
   return (
@@ -361,6 +426,76 @@ export default function RegulatoryUpdatesAdmin() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-violet-200 bg-gradient-to-r from-violet-50/50 to-indigo-50/50">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Timer className="w-5 h-5 text-violet-500" />
+              Auto-Generation (Every 2 Hours)
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs"
+                onClick={() => setShowLogs(!showLogs)}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                {showLogs ? "Hide Logs" : "View Logs"}
+              </Button>
+              <Button
+                size="sm"
+                className="gap-1.5 text-xs bg-violet-600 hover:bg-violet-700"
+                onClick={handleTriggerAutoGen}
+                disabled={triggeringAutoGen}
+              >
+                {triggeringAutoGen ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <PlayCircle className="w-3.5 h-3.5" />
+                )}
+                Run Now
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-xs text-muted-foreground mb-3">
+            The system automatically generates one regulatory update per category (FBR, SECP, PSX, SBP) every 2 hours using AI. Requires a valid ChatGPT API key in Settings.
+          </p>
+          {showLogs && (
+            <div className="border rounded-xl bg-white p-3 space-y-2 max-h-80 overflow-y-auto">
+              {autoGenLogs.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">No auto-generation logs yet</p>
+              ) : (
+                autoGenLogs.map(log => (
+                  <div key={log.id} className="flex items-start gap-2.5 p-2 rounded-lg border text-xs">
+                    {statusIcon(log.status)}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <Badge variant="outline" className="text-[10px] py-0">{log.category}</Badge>
+                        <Badge variant="outline" className={`text-[10px] py-0 ${statusColor(log.status)}`}>
+                          {log.status}
+                        </Badge>
+                        <span className="text-[10px] text-muted-foreground ml-auto">
+                          {new Date(log.runAt).toLocaleString()}
+                        </span>
+                      </div>
+                      {log.generatedText && (
+                        <p className="text-muted-foreground truncate">{log.generatedText}</p>
+                      )}
+                      {log.errorMessage && (
+                        <p className="text-red-500 truncate">{log.errorMessage}</p>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3">

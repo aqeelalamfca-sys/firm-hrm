@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { regulatoryUpdatesTable, systemSettingsTable } from "@workspace/db";
+import { regulatoryUpdatesTable, systemSettingsTable, autoGenLogsTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { authMiddleware, requireRoles } from "../middleware/auth";
 import type { AuthenticatedRequest } from "../middleware/auth";
 import OpenAI from "openai";
+import { runAutoGeneration } from "../scheduler/auto-regulatory";
 
 const router = Router();
 
@@ -203,6 +204,30 @@ router.post("/generate-ai-preview", authMiddleware, requireRoles("super_admin", 
   } catch (error) {
     console.error("Error generating AI preview:", error);
     res.status(500).json({ error: "Failed to generate AI preview" });
+  }
+});
+
+router.get("/auto-gen-logs", authMiddleware, requireRoles("super_admin", "partner"), async (_req, res) => {
+  try {
+    const logs = await db
+      .select()
+      .from(autoGenLogsTable)
+      .orderBy(desc(autoGenLogsTable.runAt))
+      .limit(100);
+    res.json({ logs });
+  } catch (error) {
+    console.error("Error fetching auto-gen logs:", error);
+    res.status(500).json({ error: "Failed to fetch logs" });
+  }
+});
+
+router.post("/auto-gen-trigger", authMiddleware, requireRoles("super_admin", "partner"), async (_req, res) => {
+  try {
+    await runAutoGeneration();
+    res.json({ success: true, message: "Auto-generation triggered successfully" });
+  } catch (error) {
+    console.error("Error triggering auto-gen:", error);
+    res.status(500).json({ error: "Failed to trigger auto-generation" });
   }
 });
 
