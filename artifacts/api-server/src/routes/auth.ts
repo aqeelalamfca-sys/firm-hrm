@@ -7,7 +7,7 @@ import { logActivity } from "../middleware/activity-logger";
 
 const router = Router();
 
-const TOKEN_SECRET = process.env.TOKEN_SECRET || crypto.randomBytes(32).toString("hex");
+const TOKEN_SECRET = process.env.JWT_SECRET || process.env.TOKEN_SECRET || crypto.randomBytes(32).toString("hex");
 const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 function hashPassword(password: string): string {
