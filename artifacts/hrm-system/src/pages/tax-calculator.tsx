@@ -704,19 +704,18 @@ export default function TaxCalculator() {
         {activeTab === "docanalyzer" && (
           <div className="space-y-6">
             {/* Hero Banner */}
-            <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-[#312e81] via-[#4338ca] to-[#6366f1] p-6 sm:p-8 text-white shadow-xl shadow-indigo-500/15">
+            <div className="relative rounded-xl overflow-hidden bg-gradient-to-r from-[#312e81] via-[#4338ca] to-[#6366f1] px-5 py-4 text-white shadow-md shadow-indigo-500/10">
               <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNCI+PHBhdGggZD0iTTM2IDM0aDR2MWgtNHYtMXptMC04aDR2MWgtNHYtMXptLTE2IDhoNHYxaC00di0xem0wLThoNHYxaC00di0xeiIvPjwvZz48L2c+PC9zdmc+')] opacity-60" />
-              <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="px-2 py-0.5 rounded-md bg-white/15 text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">Law-Integrated Intelligent Engine</span>
-                    <span className="px-2 py-0.5 rounded-md bg-emerald-400/20 text-emerald-200 text-[10px] font-bold uppercase tracking-wider">GPT-4o + OCR</span>
+              <div className="relative flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h2 className="text-base font-bold tracking-tight">Intelligent Tax Analysis Engine</h2>
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-400/20 text-emerald-200 text-[8px] font-bold uppercase tracking-wider shrink-0">GPT-4o + OCR</span>
                   </div>
-                  <h2 className="text-xl sm:text-2xl font-bold mb-2 tracking-tight">Intelligent Tax Analysis Engine</h2>
-                  <p className="text-indigo-100 text-sm leading-relaxed max-w-xl">Upload a document or describe any transaction. Our Intelligent engine scans against ITO 2001, Sales Tax Act 1990, Provincial ST, FED Act 2005 & Finance Act 2025 — returning section-wise, rate-wise, condition-based tax analysis with legal citations.</p>
+                  <p className="text-indigo-200 text-[11px] leading-relaxed">Describe a transaction or upload a document — our engine maps it to ITO 2001, Sales Tax Act 1990, Provincial ST, FED Act 2005 & Finance Act 2025 with section-wise legal citations.</p>
                 </div>
-                <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/20 shadow-inner shrink-0">
-                  <FileSearch className="w-8 h-8 text-white" />
+                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/20 shrink-0">
+                  <FileSearch className="w-5 h-5 text-white" />
                 </div>
               </div>
             </div>
