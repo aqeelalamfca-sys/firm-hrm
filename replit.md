@@ -69,13 +69,23 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - Property tax supports ATL/Non-ATL/Late Filer with slab-based rates
 - Salary tax uses progressive slabs with surcharge for income >10M
 
-**AI Document Tax Analyzer (First Tab):**
+**Law-Integrated AI Tax Engine (First Tab):**
 - Backend: `artifacts/api-server/src/routes/tax-analyze.ts` — POST `/api/tax-analyze`
 - Accepts PDF, Images (JPG/PNG/WebP/GIF), Excel (.xlsx/.xls), CSV uploads via multer (15MB limit)
 - PDF text extraction via `pdf-parse`, Excel via `xlsx`, Images sent as base64 to GPT-4o vision
-- Uses Replit AI Integration proxy (`AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`)
-- Returns structured JSON: document_summary, extracted_items, tax_analysis (with ATL/Non-ATL rates, adjustability, risk flags), compliance_notes, total_tax_exposure
-- Frontend: drag-and-drop upload zone, loading spinner, results display with color-coded risk flags (High=red, Medium=amber, Low=green), adjustability badges (Final/Minimum/Adjustable), compliance advisory notes
+- Uses Replit AI Integration proxy (`AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`), falls back to `chatgpt_api_key` from system_settings (VPS)
+- **Law-Integrated System Prompt** with full Pakistan tax law knowledge base:
+  - ITO 2001 (all WHT sections: 148-156A, 231A-236K), Income Tax Rules 2002
+  - Sales Tax Act 1990 (Sec 3, schedules), Sales Tax Rules 2006
+  - Provincial Sales Tax (PRA 16%, SRB 13%, KPRA 15%, BRA 15%)
+  - Federal Excise Act 2005, Finance Act 2025
+- **Multi-Tax Mapping Engine**: Transaction → Nature → Law(s) → Section(s) → Rate(s) → Treatment
+- **Mandatory Legal Fields**: Every tax finding must include `applicable_law`, `section_reference`, `source_text` (law citation), `legal_basis` (Confirmed / Insufficient)
+- **Compliance Check**: `missing_tax_check` array flags non-deducted taxes
+- **Server-side Validation**: Enforces mandatory fields, auto-sets "Insufficient legal basis" for missing section references
+- **Improved Error Handling**: Specific messages for HTTP 400/429/500/502/503 from OpenAI API, content filter detection
+- Returns structured JSON: document_summary, extracted_items, tax_analysis (with applicable_law, section_reference, source_text, legal_basis, ATL/Non-ATL rates, adjustability, risk flags), compliance_notes, missing_tax_check, total_tax_exposure
+- Frontend: full-screen modal popup for results with legal citations section (BookOpen icon), missing tax check section (ShieldAlert icon), Confirmed/Review legal basis badges
 - Route mounted before auth middleware (public endpoint, same as tax calculator page)
 
 ## Deployment & CI/CD

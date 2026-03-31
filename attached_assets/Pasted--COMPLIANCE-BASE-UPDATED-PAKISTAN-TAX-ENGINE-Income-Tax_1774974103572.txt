@@ -1,0 +1,73 @@
+🔷 **COMPLIANCE BASE — UPDATED (PAKISTAN TAX ENGINE)**
+
+✔ **Income Tax Ordinance, 2001**
+✔ **Income Tax Rules, 2002**
+✔ **Withholding Tax Regime (Sections 148–236, ITO 2001)**
+✔ **Advance Tax Provisions (Sec 147 & Transaction-based taxes)**
+
+✔ **Sales Tax Act, 1990 (Goods)**
+✔ **Sales Tax Rules, 2006**
+✔ **Sales Tax Special Procedures & SROs**
+✔ **Withholding Sales Tax Rules (FBR & Sector-specific)**
+
+✔ **Provincial Sales Tax on Services:**
+
+* Punjab Sales Tax on Services Act, 2012 (PRA)
+* Sindh Sales Tax on Services Act, 2011 (SRB)
+* KP Finance Act / KPRA Laws
+* Balochistan Revenue Authority Act (BRA)
+* ICT Tax on Services Ordinance, 2001
+
+✔ **Federal Excise Act, 2005 (FED)**
+✔ **FED Rules & First Schedule (Dutiable Goods/Services)**
+
+✔ **Finance Act (Latest Year – Dynamic Rates Engine)**
+
+✔ **Schedules & Rate Structures:**
+
+* Income Tax Schedules (1st to 8th)
+* Sales Tax Schedules (1st, 2nd, 3rd, 6th)
+* Provincial Service Schedules
+* FED First Schedule
+
+✔ **Regulatory Framework:**
+
+* SROs (Statutory Regulatory Orders)
+* Circulars & Notifications (FBR, PRA, SRB, KPRA, BRA)
+* Public Rulings / Clarifications
+
+✔ **Digital Compliance Systems:**
+
+* IRIS (Income Tax Portal)
+* FBR Sales Tax System
+* PRA / SRB / KPRA / BRA Portals
+
+✔ **Audit & Enforcement Framework:**
+
+* Audit Provisions (ITO, STA, PST Acts)
+* Penalty & Default Surcharge Rules
+* Record Keeping & Invoice Requirements
+
+✔ **Special Regimes & Sectors:**
+
+* Final Tax Regime (FTR)
+* Minimum Tax (Sec 113)
+* Super Tax (Sec 4C)
+* Retail / Tier-1 POS Regime
+* Builders & Developers Regime
+* Export Facilitation Schemes
+
+✔ **Cross-Tax Integration Layer:**
+
+* Income Tax ↔ Sales Tax linkage
+* Withholding ↔ Adjustable tax reconciliation
+* FED ↔ Sales Tax interaction
+
+🎯 **SYSTEM NOTE (FOR UI DISPLAY):**
+This compliance base must be:
+✔ Dynamic (Finance Act updates yearly)
+✔ Searchable (section-wise)
+✔ Linked with AI Tax Engine
+✔ Used as “Single Source of Truth”
+
+END.
