@@ -812,7 +812,16 @@ export default function TaxCalculator() {
                 </div>
 
                 {/* Unified Analyze Button */}
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-3">
+                  {(docFile || docTextInput.trim().length > 0 || docResult || docError) && (
+                    <button
+                      onClick={() => { setDocFile(null); setDocTextInput(""); setDocResult(null); setDocError(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                      disabled={docAnalyzing || docTextAnalyzing}
+                      className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" /> Refresh
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       if (docFile) {
