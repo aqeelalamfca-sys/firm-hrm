@@ -175,6 +175,7 @@ export default function Landing() {
   const [scrolled, setScrolled] = useState(false);
   const [selectedIndustry, setSelectedIndustry] = useState<typeof INDUSTRIES[0] | null>(null);
   const [selectedPartner, setSelectedPartner] = useState<typeof TEAM[0] | null>(null);
+  const [selectedBookingPartner, setSelectedBookingPartner] = useState<string | null>(null);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -298,11 +299,15 @@ export default function Landing() {
               <div className="flex items-center gap-2.5">
                 <Video className="w-4 h-4 text-white/80" />
                 <span className="text-white font-semibold text-[13px]">Book a Partner Meeting</span>
-                <span className="text-blue-200/50 text-[11px] font-medium hidden sm:inline">— Free consultation · 30–60 min</span>
+                {selectedBookingPartner ? (
+                  <span className="text-emerald-300 text-[11px] font-semibold hidden sm:inline">— {selectedBookingPartner} selected</span>
+                ) : (
+                  <span className="text-blue-200/50 text-[11px] font-medium hidden sm:inline">— Select a partner below</span>
+                )}
               </div>
-              <Link href="/book-meeting">
-                <Button size="sm" className="h-7 px-4 text-[11px] font-semibold rounded-lg bg-white/15 hover:bg-white/25 text-white border-0 backdrop-blur-sm">
-                  <Calendar className="w-3 h-3 mr-1.5" /> Schedule
+              <Link href={`/book-meeting${selectedBookingPartner ? `?partner=${encodeURIComponent(selectedBookingPartner)}` : ''}`}>
+                <Button size="sm" className={`h-7 px-4 text-[11px] font-semibold rounded-lg border-0 backdrop-blur-sm transition-all ${selectedBookingPartner ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30' : 'bg-white/15 hover:bg-white/25 text-white'}`}>
+                  <Calendar className="w-3 h-3 mr-1.5" /> {selectedBookingPartner ? 'Book Now' : 'Schedule'}
                 </Button>
               </Link>
             </div>
@@ -317,13 +322,29 @@ export default function Landing() {
                     "from-sky-500 to-sky-600",
                     "from-blue-600 to-indigo-600",
                   ];
+                  const isSelected = selectedBookingPartner === p.name;
                   return (
-                    <div key={p.name} className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-slate-100 hover:border-blue-200/60 hover:bg-blue-50/30 transition-all cursor-pointer group min-w-0">
-                      <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${colors[idx % colors.length]} flex items-center justify-center text-[10px] font-bold text-white shrink-0 transition-transform group-hover:scale-110`}>
-                        {p.initials}
+                    <div
+                      key={p.name}
+                      onClick={() => setSelectedBookingPartner(isSelected ? null : p.name)}
+                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-all cursor-pointer group min-w-0 ${
+                        isSelected
+                          ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500/30 shadow-md'
+                          : 'border-slate-100 hover:border-blue-200/60 hover:bg-blue-50/30'
+                      }`}
+                    >
+                      <div className="relative shrink-0">
+                        <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${colors[idx % colors.length]} flex items-center justify-center text-[10px] font-bold text-white transition-transform ${isSelected ? 'scale-110' : 'group-hover:scale-110'}`}>
+                          {p.initials}
+                        </div>
+                        {isSelected && (
+                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center ring-2 ring-white">
+                            <CheckCircle2 className="w-3 h-3 text-white" />
+                          </div>
+                        )}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[11px] font-semibold text-slate-800 group-hover:text-blue-700 truncate">{p.name}</p>
+                        <p className={`text-[11px] font-semibold truncate ${isSelected ? 'text-blue-700' : 'text-slate-800 group-hover:text-blue-700'}`}>{p.name}</p>
                         <p className="text-[9px] text-slate-400 font-medium truncate">{p.focus}</p>
                       </div>
                     </div>
