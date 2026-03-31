@@ -1,0 +1,81 @@
+I want you to act as a senior full-stack developer. Build a complete, production-ready web application titled "Pakistan Withholding Tax Calculator (Finance Act 2025)".
+
+**Objective:** Create a tool that allows users (taxpayers, accountants, businesses) to calculate withholding tax liability across 24+ categories as per the provided data. The application must handle the complexity of the Income Tax Ordinance, 2001, specifically differentiating between Active Taxpayers (ATL), Non-Active Taxpayers (Non-ATL), and Late Filer statuses.
+
+**Data Source:** Use the data provided in the uploaded Excel file (`WHT-Rates-DownloadableSheet.xlsx`) and cross-reference with the PDF for complex provisions. Treat the Excel sheet as the primary source of truth for rates.
+
+**Tech Stack:**
+- **Frontend:** React.js with Tailwind CSS for styling.
+- **State Management:** React hooks (useState, useEffect).
+- **Logic:** Pure JavaScript/TypeScript for calculations.
+
+**Core Functionality:**
+The app must have a main dashboard that allows users to toggle between "ATL", "Non-ATL", and "Late Filer" status. All calculations must update dynamically based on this selection.
+
+You must implement the following 24 modules exactly as described in the user prompt:
+
+1.  **Comprehensive Tax Rate Tables:** A view that displays all rates in a sortable/filterable table format, showing the difference between ATL/Non-ATL/Late Filer side-by-side.
+
+2.  **Import Tax Analysis (Sec 148):** Input for "Goods Category" (Part I, II, III), "Importer Type" (Standard/Commercial), and "Value". Handle special logic for Mobile Phones (PCT 8517.1219 and 8517.1211) using fixed rupee ranges.
+
+3.  **Salary & Pension Tax (Sec 149):** Input for "Annual Taxable Income". Implement the progressive slab system (0% up to 600k, 1% on next, etc.). Add a toggle for "Pensioner" (Sec 149IA) to apply the Rs. 10 million threshold and age-based surcharge.
+
+4.  **Investment Income Tax (Sec 150 & 151):**
+    - **Dividend:** Dropdown for entities (IPPs, REITs, Mutual Funds). Mutual Funds require a sub-option for "Investment Composition" (Debt vs Equities).
+    - **Profit on Debt:** Input for "Amount", "Type" (Bank Deposit, Govt Security, Sukuk), and for Sukuk, input "Holder Type" and "Return Amount" to determine the correct slab (Rs. 1 million threshold).
+
+5.  **Non-Resident Payment (Sec 152):** Input for "Payment Type" (IT Services, Contracts, Sports Persons, Sukuk) and "Gross Amount". Apply the specific rates for non-residents.
+
+6.  **Domestic Payments (Sec 153):** Input for "Transaction Type" (Goods/Services/Contract). For Goods, include options for "Rice/Cotton Seed", "Toll Manufacturing", and "Standard". For E-commerce, differentiate between "Digital Payment" and "Cash on Delivery".
+
+7.  **Export Sector (Sec 154 & 154A):** Input for "Export Type" (Goods/Services). If Services, check for "PSEB Registration" to apply the 0.25% rate.
+
+8.  **Rental Income (Sec 155):** Input for "Rent Amount" and "Entity Type" (Individual/AOP vs Company). Implement slab-based calculations for individuals.
+
+9.  **Miscellaneous Income (Sec 156):** Input for "Prize Type" (Bond/Lottery/Promotion) and "Amount". Include "Petroleum Products" (Sec 156A).
+
+10. **Advance Tax on Vehicles (Sec 231B):** Complex module. Inputs: "Engine Capacity (CC)", "Vehicle Value", and "Registration Type" (Standard/Lump Sum/Imported). Implement the 3 tiers:
+    - Tier 1: Percentage of Value (231B(1)).
+    - Tier 2: Fixed Rupee Rates (231B(2)).
+    - Tier 3: Lump Sum (231B(2A)).
+    - Apply the "10% reduction per year from date of registration" logic mentioned in the PDF endnotes.
+
+11. **Cash Withdrawals (Sec 231AB):** Input for "Withdrawal Amount". Apply 0.8% for Non-ATL only.
+
+12. **Foreign Domestic Workers (Sec 231C):** Input for "Number of Workers". Apply fixed tax of Rs. 200,000 (ATL) / Rs. 400,000 (Non-ATL).
+
+13. **Brokerage & Commission (Sec 233):** Input for "Broker Type" (Advertising Agent, Life Insurance Agent, General) and "Commission Amount".
+
+14. **Annual Motor Vehicle Tax (Sec 234):** Input for "Vehicle Type" (Goods Transport/Passenger/Private), "Weight" or "Seats" or "CC". Implement the rates for goods transport (per kg) and passenger transport (per seat).
+
+15. **Electricity Consumption (Sec 235):** Input for "Consumer Type" (Commercial/Industrial/Domestic Non-ATL) and "Bill Amount". Implement the slab logic (Rs. 500 threshold, Rs. 20,000 threshold) and the specific formula for Commercial vs Industrial.
+
+16. **Telephone & Internet (Sec 236):** Input for "Bill Type" (Landline/Mobile/Internet) and "Amount" or "Prepaid Card Value". Apply 10% on landline exceeding Rs. 1,000, and 15% on mobile/internet.
+
+17. **Sale by Public Auction (Sec 236A):** Input for "Auction Type" (Goods/Immovable Property/Train Services) and "Sale Price".
+
+18. **Immovable Property (Sec 236C & 236K):**
+    - **Transfer (236C):** Input "Consideration Amount" (slabs: <50M, 50-100M, >100M).
+    - **Purchase (236K):** Input "Fair Market Value" (slabs: <50M, 50-100M, >100M).
+
+19. **Foreign TV & Ads (Sec 236CA):** Input for "Content Type" (Serial Episode/Single Episode/Ad), and for Ads, input "Duration (Seconds)". Calculate fixed rates.
+
+20. **Functions & Gatherings (Sec 236CB):** Input for "Total Bill Amount". Apply 10% (ATL) / 20% (Non-ATL).
+
+21. **Sales to Distributors/Retailers (Sec 236G & 236H):** Input for "Product Type" (Fertilizer/Other) and "Sale Value".
+
+22. **Remittances Abroad (Sec 236Y):** Input for "Remittance Amount". Apply 5% (ATL) / 10% (Non-ATL).
+
+23. **Bonus Shares (Sec 236Z):** Input for "Value of Bonus Shares". Apply 10% (ATL) / 20% (Non-ATL).
+
+24. **Comparative Analysis:** A summary card or chart showing the total tax liability if the user was an ATL vs Non-ATL vs Late Filer based on the aggregated inputs from all modules (if they fill multiple sections).
+
+**UI/UX Requirements:**
+- **Responsive Design:** Must work on desktop and mobile.
+- **Navigation:** Use a sidebar or top navbar to navigate between the 24 sections.
+- **Dashboard:** The landing page should have a high-level summary and the status toggle (ATL/Non-ATL/Late Filer).
+- **Input Validation:** All numeric inputs must validate that the user enters positive numbers. Show error messages if inputs are invalid.
+- **Results Display:** Show the calculated tax amount in bold, with a breakdown of the formula used.
+
+**Instructions:**
+Please generate all the necessary files. Ensure the logic for the progressive tax slabs (Salary) and the complex conditional rates (like Sukuk threshold, Vehicle depreciation) is mathematically accurate. Create a realistic `data.js` file to store all the rate configurations imported from the Excel data to keep the components clean.

@@ -208,15 +208,12 @@ export default function Landing() {
           </nav>
           <div className="flex items-center gap-2">
             <Link href="/book-meeting">
-              <div className="relative hidden sm:block">
-                <span className="absolute inset-0 rounded-lg animate-ping-slow bg-blue-400/40 pointer-events-none" />
-                <Button size="sm" variant="outline" className="h-9 text-[13px] font-semibold gap-1.5 relative border-blue-400 text-blue-600 hover:bg-blue-50 hover:border-blue-500 shadow-[0_0_10px_2px_rgba(59,130,246,0.25)] animate-glow-blue">
-                  <Video className="w-3.5 h-3.5" /> Book Meeting
-                </Button>
-              </div>
+              <Button size="sm" variant="outline" className="h-9 text-[13px] font-semibold gap-1.5 hidden sm:flex border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-400 transition-all duration-200">
+                <Video className="w-3.5 h-3.5" /> Book Meeting
+              </Button>
             </Link>
             <Link href="/apply-training">
-              <Button size="sm" variant="outline" className="h-9 text-[13px] font-semibold gap-1.5 hidden sm:flex border-emerald-400 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-500 animate-shimmer-green relative overflow-hidden">
+              <Button size="sm" variant="outline" className="h-9 text-[13px] font-semibold gap-1.5 hidden sm:flex border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-400 transition-all duration-200">
                 <GraduationCap className="w-3.5 h-3.5" /> Apply for Training
               </Button>
             </Link>
@@ -246,7 +243,7 @@ export default function Landing() {
       </div>
 
       {/* Hero Section */}
-      <section id="home" className="relative pt-28 pb-16 overflow-hidden">
+      <section id="home" className="relative pt-28 pb-10 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.04] via-primary/[0.01] to-transparent" />
         <div className="absolute top-10 right-0 w-[600px] h-[600px] bg-blue-500/[0.05] rounded-full blur-[120px]" />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-violet-500/[0.04] rounded-full blur-[100px]" />
@@ -258,7 +255,7 @@ export default function Landing() {
             {/* LEFT COLUMN — Metrics & Expertise */}
             <div className="hidden lg:flex flex-col gap-4 pt-4">
               <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 mb-3">Proven Track Record</h3>
+                <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-3">Proven Track Record</h3>
                 <div className="space-y-3">
                   {[
                     { val: "PKR 500B+", label: "Assets Audited", icon: BarChart3, color: "text-blue-600 bg-blue-50" },
@@ -279,10 +276,10 @@ export default function Landing() {
               </div>
 
               <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 mb-3">Core Expertise</h3>
+                <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-3">Core Expertise</h3>
                 <div className="flex flex-wrap gap-1.5">
                   {["Audit & Assurance", "Tax Planning", "IFRS Compliance", "Corporate Advisory", "Forensic Accounting", "Business Valuation"].map(tag => (
-                    <span key={tag} className="text-[9px] font-semibold px-2 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
+                    <span key={tag} className="text-[10px] font-semibold px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
                       {tag}
                     </span>
                   ))}
@@ -290,10 +287,10 @@ export default function Landing() {
               </div>
 
               <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 mb-3">Industries We Serve</h3>
+                <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-3">Industries We Serve</h3>
                 <div className="flex flex-wrap gap-1.5">
                   {["Financial Services", "Oil & Gas", "Manufacturing", "Technology", "Real Estate", "Government", "Pharmaceuticals", "Energy & Mining"].map(ind => (
-                    <span key={ind} className="text-[9px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                    <span key={ind} className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-600">
                       {ind}
                     </span>
                   ))}
@@ -332,17 +329,15 @@ export default function Landing() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-1.5 justify-center mb-5">
+              <div className="flex flex-wrap gap-2 justify-center mb-6">
                 {[
-                  { label: "QCR Rated", color: "bg-amber-500/10 text-amber-700 border-amber-200 ring-amber-300/30" },
-                  { label: "ICAEW Authorized Employer", color: "bg-sky-500/10 text-sky-700 border-sky-200 ring-sky-300/30" },
-                  { label: "ICAP Approved Training Org", color: "bg-blue-500/10 text-blue-700 border-blue-200 ring-blue-300/30" },
-                  { label: "AOB Registered", color: "bg-emerald-500/10 text-emerald-700 border-emerald-200 ring-emerald-300/30" },
+                  { label: "QCR Rated", color: "bg-slate-50 text-slate-700 border-slate-200" },
+                  { label: "ICAEW Authorized Employer", color: "bg-slate-50 text-slate-700 border-slate-200" },
+                  { label: "ICAP Approved Training Org", color: "bg-slate-50 text-slate-700 border-slate-200" },
+                  { label: "AOB Registered", color: "bg-slate-50 text-slate-700 border-slate-200" },
                 ].map((cred) => (
-                  <span key={cred.label} className={`inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-semibold px-2.5 py-0.5 rounded-full border ring-1 backdrop-blur-sm ${cred.color}`}>
-                    <svg className="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                  <span key={cred.label} className={`inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold px-3 py-1 rounded-full border ${cred.color}`}>
+                    <CheckCircle2 className="w-3 h-3 text-blue-500 shrink-0" />
                     {cred.label}
                   </span>
                 ))}
@@ -371,8 +366,8 @@ export default function Landing() {
             {/* RIGHT COLUMN — CTA Panel, Contact, Trust */}
             <div className="hidden lg:flex flex-col gap-4 pt-4">
               <div className="rounded-xl border border-blue-200/50 bg-gradient-to-br from-blue-50 to-white p-4 shadow-sm">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-blue-600 mb-3">Book a Consultation</h3>
-                <p className="text-[11px] text-slate-600 leading-relaxed mb-3">
+                <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-blue-600 mb-3">Book a Consultation</h3>
+                <p className="text-[12px] text-slate-600 leading-relaxed mb-3">
                   Get expert advice from our partners with Big Four experience.
                 </p>
                 <button onClick={() => scrollTo("contact")} className="w-full h-9 text-xs font-semibold rounded-lg text-white flex items-center justify-center gap-1.5" style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' }}>
@@ -381,28 +376,28 @@ export default function Landing() {
               </div>
 
               <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 mb-3">Trust Signals</h3>
-                <div className="space-y-2">
+                <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-3">Trust Signals</h3>
+                <div className="space-y-2.5">
                   {[
                     { icon: Shield, text: "Big Four Trained Partners" },
                     { icon: Users, text: "6 Expert Partners" },
                     { icon: Award, text: "Since 2016" },
                     { icon: Globe, text: "International Reach" },
                   ].map(t => (
-                    <div key={t.text} className="flex items-center gap-2 text-[11px] text-slate-600">
-                      <t.icon className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    <div key={t.text} className="flex items-center gap-2.5 text-[12px] text-slate-600">
+                      <t.icon className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                       <span>{t.text}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <a href="https://www.auditwise.tech" target="_blank" rel="noopener noreferrer" className="rounded-xl border border-violet-200/50 bg-gradient-to-br from-violet-50 to-white p-4 shadow-sm hover:shadow-md transition-all group block">
+              <a href="https://www.auditwise.tech" target="_blank" rel="noopener noreferrer" className="rounded-xl border border-violet-200/50 bg-gradient-to-br from-violet-50 to-white p-4 shadow-sm hover:shadow-md transition-all duration-200 group block">
                 <div className="flex items-center gap-2 mb-2">
                   <Monitor className="w-4 h-4 text-violet-600" />
-                  <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-violet-600">Audit Software</h3>
+                  <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-violet-600">Audit Software</h3>
                 </div>
-                <p className="text-[11px] text-slate-600 leading-relaxed mb-3">
+                <p className="text-[12px] text-slate-600 leading-relaxed mb-3">
                   Our proprietary audit management platform for efficient engagements.
                 </p>
                 <span className="w-full h-8 text-[11px] font-semibold rounded-lg text-white flex items-center justify-center gap-1.5" style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)' }}>
@@ -410,12 +405,12 @@ export default function Landing() {
                 </span>
               </a>
 
-              <button onClick={() => scrollTo("about")} className="rounded-xl border border-emerald-200/50 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm text-left hover:shadow-md transition-all group">
+              <button onClick={() => scrollTo("about")} className="rounded-xl border border-emerald-200/50 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm text-left hover:shadow-md transition-all duration-200 group">
                 <div className="flex items-center gap-2 mb-1">
                   <GraduationCap className="w-4 h-4 text-emerald-600" />
-                  <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-600">Training Program</h3>
+                  <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-emerald-600">Training Program</h3>
                 </div>
-                <p className="text-[11px] text-slate-600 leading-relaxed">
+                <p className="text-[12px] text-slate-600 leading-relaxed">
                   ICAP &amp; ICAEW approved — launch your CA career with us.
                 </p>
               </button>
@@ -433,7 +428,7 @@ export default function Landing() {
           `}</style>
 
           {/* Stats Bar */}
-          <div className="mt-20 grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-4">
             {STATS.map(({ value, label, icon: Icon }, idx) => (
               <div key={label} className="flex items-center gap-3.5 p-5 rounded-2xl bg-card border border-border/30 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group">
                 <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${idx === 0 ? 'bg-blue-500/10' : idx === 1 ? 'bg-emerald-500/10' : idx === 2 ? 'bg-violet-500/10' : 'bg-amber-500/10'}`}>
@@ -511,7 +506,7 @@ export default function Landing() {
       </section>
 
       {/* About Section with Tabs */}
-      <section id="about" className="py-24 bg-muted/20">
+      <section id="about" className="py-20 bg-muted/20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-12">
             <Badge className="mb-3 bg-violet-500/[0.06] text-violet-600 border-violet-200/60 text-xs font-semibold px-4 py-1.5 rounded-full">About Us</Badge>
@@ -671,7 +666,7 @@ export default function Landing() {
       </section>
 
       {/* Services Section */}
-      <section id="services" className="py-24">
+      <section id="services" className="py-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-14">
             <Badge className="mb-3 bg-emerald-500/[0.06] text-emerald-600 border-emerald-200/60 text-xs font-semibold px-4 py-1.5 rounded-full">Services</Badge>
@@ -747,7 +742,7 @@ export default function Landing() {
       </section>
 
       {/* Industries Section */}
-      <section id="industries" className="py-24">
+      <section id="industries" className="py-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-12">
             <Badge className="mb-3 bg-amber-500/[0.06] text-amber-600 border-amber-200/60 text-xs font-semibold px-4 py-1.5 rounded-full">Industries</Badge>
@@ -819,7 +814,7 @@ export default function Landing() {
       </section>
 
       {/* Leadership Team */}
-      <section id="team" className="py-24 bg-muted/20">
+      <section id="team" className="py-20 bg-muted/20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-12">
             <Badge className="mb-3 bg-rose-500/[0.06] text-rose-600 border-rose-200/60 text-xs font-semibold px-4 py-1.5 rounded-full">Leadership</Badge>
@@ -992,7 +987,7 @@ export default function Landing() {
       </section>
 
       {/* Contact Section */}
-      <section id="contact" className="py-24 bg-muted/20">
+      <section id="contact" className="py-20 bg-muted/20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
@@ -1073,15 +1068,15 @@ export default function Landing() {
             </div>
 
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">Lahore Office</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">Head Office — Lahore</h4>
               <div className="space-y-2 text-xs text-muted-foreground">
                 <div className="flex items-start gap-2">
                   <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
-                  <span>Office 1-A, 2nd Floor, Al-Hafeez Heights, Main Boulevard, Gulberg III, Lahore</span>
+                  <span>Suite # 5 &amp; 6, Ground Floor, New 1-Campus, Ross Residencia, Canal Road, Lahore, Punjab 54000</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Phone className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                  <span>+92 42 3578 1234</span>
+                  <span>0423-7459-666</span>
                 </div>
               </div>
             </div>
@@ -1091,11 +1086,11 @@ export default function Landing() {
               <div className="space-y-2 text-xs text-muted-foreground">
                 <div className="flex items-start gap-2">
                   <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
-                  <span>Office 301, 3rd Floor, Evacuee Trust Complex, F-5/1, Islamabad</span>
+                  <span>16th Floor, State Life Building No. 5, F-6, Jinnah Avenue, Islamabad</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Phone className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                  <span>+92 51 2816 789</span>
+                  <span>051-8357-873</span>
                 </div>
               </div>
             </div>
@@ -1105,11 +1100,15 @@ export default function Landing() {
               <div className="space-y-2 text-xs text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <Mail className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                  <span>info@ana-ca.com</span>
+                  <span>info@aqeelalam.com</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Phone className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <span>0321-111-2041</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Globe className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                  <span>www.ana-ca.com</span>
+                  <a href="https://www.ana-ca.com" className="hover:text-blue-600 hover:underline transition-colors">www.ana-ca.com</a>
                 </div>
                 <div className="flex items-center gap-2">
                   <Monitor className="w-3.5 h-3.5 text-violet-500 shrink-0" />
