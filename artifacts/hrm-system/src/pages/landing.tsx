@@ -405,6 +405,19 @@ export default function Landing() {
                 </span>
               </a>
 
+              <Link href="/tax-calculator" className="rounded-xl border border-blue-200/50 bg-gradient-to-br from-blue-50 to-white p-4 shadow-sm hover:shadow-md transition-all duration-200 group block">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calculator className="w-4 h-4 text-blue-600" />
+                  <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-blue-600">Tax Calculator</h3>
+                </div>
+                <p className="text-[12px] text-slate-600 leading-relaxed mb-3">
+                  WHT &amp; Income Tax calculator — Finance Act 2025 rates.
+                </p>
+                <span className="w-full h-8 text-[11px] font-semibold rounded-lg text-white flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-blue-700">
+                  <Calculator className="w-3.5 h-3.5" /> Calculate Now
+                </span>
+              </Link>
+
               <button onClick={() => scrollTo("about")} className="rounded-xl border border-emerald-200/50 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm text-left hover:shadow-md transition-all duration-200 group">
                 <div className="flex items-center gap-2 mb-1">
                   <GraduationCap className="w-4 h-4 text-emerald-600" />

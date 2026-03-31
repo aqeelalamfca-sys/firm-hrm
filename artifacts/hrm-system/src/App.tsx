@@ -33,6 +33,7 @@ const BookMeeting = lazy(() => import("@/pages/book-meeting"));
 const ManageMeetings = lazy(() => import("@/pages/manage-meetings"));
 const Settings = lazy(() => import("@/pages/settings"));
 const RegulatoryUpdates = lazy(() => import("@/pages/regulatory-updates"));
+const TaxCalculator = lazy(() => import("@/pages/tax-calculator"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -123,6 +124,7 @@ function Router() {
         <Route path="/apply-training" component={TrainingApplication} />
         <Route path="/mcq-test/:crn" component={MCQTest} />
         <Route path="/book-meeting" component={BookMeeting} />
+        <Route path="/tax-calculator" component={TaxCalculator} />
         <Route path="/login" component={Login} />
         <Route path="/employees"><ProtectedRoute component={Employees} /></Route>
         <Route path="/attendance"><ProtectedRoute component={Attendance} /></Route>

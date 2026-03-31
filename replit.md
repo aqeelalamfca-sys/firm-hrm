@@ -58,6 +58,17 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - Regulatory Updates admin page has "Run Now" button and "View Logs" for auto-gen history
 - Config keys in `system_settings`: `auto_gen_enabled`, `auto_gen_interval_hours`, `chatgpt_api_key`
 
+**Pakistan WHT Tax Calculator:**
+- Public page at `/tax-calculator` (no auth required)
+- Source: `artifacts/hrm-system/src/pages/tax-calculator.tsx`
+- Route registered in `App.tsx` as lazy-loaded component
+- Action button on landing page right sidebar (blue "Calculate Now" card)
+- 8 tabs: Rate Tables, WHT Calculator, Salary Tax, Property Tax, Vehicle Tax, Investment Income, Rental Income, Other Sections
+- All rates per Finance Act 2025 (FBR Rate Card) with ATL/Non-ATL global toggle
+- Covers 80+ WHT categories including Sec 148, 149, 150, 151, 152, 153, 154, 155, 156, 231B, 233, 234, 236C, 236K, 236CB, 236G, 236H, 236Y, 236Z
+- Property tax supports ATL/Non-ATL/Late Filer with slab-based rates
+- Salary tax uses progressive slabs with surcharge for income >10M
+
 ## Deployment & CI/CD
 
 **Pipeline**: Replit → GitHub → GitHub Actions → Hostinger VPS (Docker)
