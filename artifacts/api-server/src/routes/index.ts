@@ -21,6 +21,7 @@ import applicationsRouter from "./applications";
 import meetingsRouter from "./meetings";
 import regulatoryUpdatesRouter from "./regulatory-updates";
 import systemSettingsRouter from "./system-settings";
+import taxAnalyzeRouter from "./tax-analyze";
 
 const router: IRouter = Router();
 
@@ -29,6 +30,7 @@ router.use("/auth", authRouter);
 router.use("/applications", applicationsRouter);
 router.use("/meetings", meetingsRouter);
 router.use("/regulatory-updates", regulatoryUpdatesRouter);
+router.use("/tax-analyze", taxAnalyzeRouter);
 
 router.use(authMiddleware);
 

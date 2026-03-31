@@ -1,11 +1,12 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 import { Link } from "wouter";
 import {
   ArrowLeft, Calculator, FileText, Building2, Car, Home as HomeIcon,
   Banknote, Receipt, Truck, BarChart3, ChevronDown, ChevronUp, Info,
   CheckCircle2, AlertTriangle, Shield, TrendingUp, AlertCircle,
   Layers, Target, Zap, RefreshCw, Download, ClipboardList,
-  ShoppingCart, Globe, CreditCard, Users
+  ShoppingCart, Globe, CreditCard, Users, Upload, Loader2, FileSearch,
+  Eye, Search
 } from "lucide-react";
 
 // ─── Formatters ────────────────────────────────────────────────────────────────
@@ -272,10 +273,11 @@ const RATE_TABLE_SECTIONS = [
 ];
 
 // ─── TAB DEFINITION ────────────────────────────────────────────────────────────
-type TabKey = "exposure" | "income" | "wht" | "salestax" | "property" | "vehicle" | "investment" | "rental" | "rates";
+type TabKey = "docanalyzer" | "exposure" | "income" | "wht" | "salestax" | "property" | "vehicle" | "investment" | "rental" | "rates";
 
 const TABS: { key: TabKey; label: string; icon: any; badge?: string }[] = [
-  { key: "exposure",  label: "Tax Exposure",  icon: Target,     badge: "NEW" },
+  { key: "docanalyzer", label: "AI Analyzer", icon: FileSearch, badge: "AI" },
+  { key: "exposure",  label: "Tax Exposure",  icon: Target },
   { key: "income",    label: "Income Tax",    icon: Banknote },
   { key: "wht",       label: "WHT Calc",      icon: Calculator },
   { key: "salestax",  label: "Sales Tax",     icon: ShoppingCart },
@@ -288,9 +290,40 @@ const TABS: { key: TabKey; label: string; icon: any; badge?: string }[] = [
 
 // ─── MAIN COMPONENT ────────────────────────────────────────────────────────────
 export default function TaxCalculator() {
-  const [activeTab, setActiveTab] = useState<TabKey>("exposure");
+  const [activeTab, setActiveTab] = useState<TabKey>("docanalyzer");
   const [filerStatus, setFilerStatus] = useState("atl");
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+
+  // ── Doc Analyzer State ─────────────────────────────────────────────────────
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [docAnalyzing, setDocAnalyzing] = useState(false);
+  const [docError, setDocError] = useState<string | null>(null);
+  const [docResult, setDocResult] = useState<any>(null);
+  const [docDragOver, setDocDragOver] = useState(false);
+
+  const handleDocUpload = useCallback(async (file: File) => {
+    setDocFile(file);
+    setDocError(null);
+    setDocResult(null);
+    setDocAnalyzing(true);
+    try {
+      const formData = new FormData();
+      formData.append("document", file);
+      const apiBase = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+      const resp = await fetch(`${apiBase}/api/tax-analyze?filer=${filerStatus}`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Analysis failed");
+      setDocResult(data);
+    } catch (err: any) {
+      setDocError(err.message || "Failed to analyze document");
+    } finally {
+      setDocAnalyzing(false);
+    }
+  }, [filerStatus]);
 
   // ── Exposure Tab State ───────────────────────────────────────────────────────
   const [entityType,    setEntityType]    = useState("company_private");
@@ -581,6 +614,302 @@ export default function TaxCalculator() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 0 — AI DOCUMENT TAX ANALYZER
+            ══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "docanalyzer" && (
+          <div className="space-y-5">
+            <div className="rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-700 p-5 text-white shadow-lg">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-base font-bold mb-1 flex items-center gap-2">
+                    <FileSearch className="w-5 h-5" /> AI Document Tax Analyzer
+                  </h2>
+                  <p className="text-violet-100 text-xs">Upload any invoice, receipt, or financial document — AI will identify every applicable tax under Pakistan law</p>
+                </div>
+                <div className="bg-white/20 rounded-full p-3">
+                  <Zap className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              {/* Upload Area */}
+              <div className="lg:col-span-2">
+                <div
+                  onDragOver={e => { e.preventDefault(); setDocDragOver(true); }}
+                  onDragLeave={() => setDocDragOver(false)}
+                  onDrop={e => {
+                    e.preventDefault(); setDocDragOver(false);
+                    const f = e.dataTransfer.files[0];
+                    if (f) handleDocUpload(f);
+                  }}
+                  onClick={() => !docAnalyzing && fileInputRef.current?.click()}
+                  className={`relative rounded-2xl border-2 border-dashed p-8 text-center cursor-pointer transition-all
+                    ${docDragOver ? "border-violet-500 bg-violet-50 scale-[1.01]" : docFile ? "border-green-300 bg-green-50/50" : "border-slate-200 bg-white hover:border-violet-300 hover:bg-violet-50/30"}`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.xlsx,.xls,.csv"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleDocUpload(f); }}
+                  />
+                  {docAnalyzing ? (
+                    <div className="space-y-3">
+                      <Loader2 className="w-10 h-10 mx-auto text-violet-600 animate-spin" />
+                      <p className="text-sm font-semibold text-violet-700">AI is analyzing your document…</p>
+                      <p className="text-[10px] text-slate-500">Extracting data, identifying taxes, computing exposure</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <Upload className="w-10 h-10 mx-auto text-slate-400" />
+                      <div>
+                        <p className="text-sm font-bold text-slate-700">{docFile ? docFile.name : "Drop document here or click to upload"}</p>
+                        <p className="text-[10px] text-slate-400 mt-1">PDF, Image (JPG/PNG), Excel, CSV — up to 15MB</p>
+                      </div>
+                      {docFile && !docResult && (
+                        <button
+                          onClick={e => { e.stopPropagation(); handleDocUpload(docFile); }}
+                          className="mt-2 px-6 py-2.5 bg-violet-600 text-white rounded-xl text-xs font-bold hover:bg-violet-700 transition-colors shadow-md"
+                        >
+                          Upload & Analyze
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {docError && (
+                  <div className="mt-3 flex items-start gap-2 p-3 rounded-xl border border-red-200 bg-red-50">
+                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-red-700">{docError}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Info Panel */}
+              <div className="space-y-4">
+                <Card>
+                  <SectionTitle>How It Works</SectionTitle>
+                  <div className="space-y-3">
+                    {[
+                      { n: "1", t: "Upload Document", d: "Invoice, receipt, contract, statement" },
+                      { n: "2", t: "AI Extracts Data", d: "OCR + parsing identifies all amounts" },
+                      { n: "3", t: "Tax Classification", d: "Auto-maps to sections & rates" },
+                      { n: "4", t: "Full Exposure Report", d: "Tax breakdown with risk flags" },
+                    ].map(s => (
+                      <div key={s.n} className="flex items-start gap-2.5">
+                        <div className="w-6 h-6 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center text-[10px] font-bold shrink-0">{s.n}</div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-700">{s.t}</p>
+                          <p className="text-[10px] text-slate-400">{s.d}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+                <Card>
+                  <SectionTitle>Compliance Base</SectionTitle>
+                  <div className="space-y-1.5">
+                    {[
+                      "Income Tax Ordinance 2001",
+                      "Sales Tax Act 1990",
+                      "Provincial ST (PRA, SRB, KPRA, BRA)",
+                      "Federal Excise Duty Act 2005",
+                      "Finance Act 2025 (Latest Rates)",
+                    ].map(l => (
+                      <div key={l} className="flex items-center gap-2 text-[11px] text-slate-600">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                        {l}
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </div>
+            </div>
+
+            {/* ── RESULTS ─────────────────────────────────────── */}
+            {docResult && (
+              <div className="space-y-5">
+                {/* Document Summary */}
+                {docResult.document_summary && (
+                  <Card>
+                    <SectionTitle>Document Summary</SectionTitle>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {[
+                        { l: "Type", v: docResult.document_summary.document_type },
+                        { l: "Nature", v: docResult.document_summary.nature },
+                        { l: "Date", v: docResult.document_summary.date || "—" },
+                        { l: "Total Amount", v: docResult.document_summary.total_amount ? fmt(docResult.document_summary.total_amount) : "—" },
+                      ].map(f => (
+                        <div key={f.l} className="bg-slate-50 rounded-xl p-3">
+                          <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">{f.l}</p>
+                          <p className="text-xs font-bold text-slate-800 mt-1">{f.v}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {docResult.document_summary.parties?.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-[10px] text-slate-500 font-semibold mb-1.5">Parties</p>
+                        <div className="flex flex-wrap gap-2">
+                          {docResult.document_summary.parties.map((p: any, i: number) => (
+                            <span key={i} className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg font-medium">
+                              {p.name} {p.ntn_cnic ? `(${p.ntn_cnic})` : ""} — {p.role}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                )}
+
+                {/* Extracted Line Items */}
+                {docResult.extracted_items?.length > 0 && (
+                  <Card>
+                    <SectionTitle>Extracted Items</SectionTitle>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200">
+                            <th className="text-left py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase">Description</th>
+                            <th className="text-right py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase">Gross</th>
+                            <th className="text-right py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase">Tax</th>
+                            <th className="text-right py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase">Net</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {docResult.extracted_items.map((item: any, i: number) => (
+                            <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50">
+                              <td className="py-2 px-3 text-slate-700 font-medium">{item.description}</td>
+                              <td className="py-2 px-3 text-right tabular-nums">{item.gross_amount ? fmt(item.gross_amount) : "—"}</td>
+                              <td className="py-2 px-3 text-right tabular-nums text-red-600">{item.tax_amount ? fmt(item.tax_amount) : "—"}</td>
+                              <td className="py-2 px-3 text-right tabular-nums font-semibold">{item.net_amount ? fmt(item.net_amount) : "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Card>
+                )}
+
+                {/* Tax Analysis Table */}
+                {docResult.tax_analysis?.length > 0 && (
+                  <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                    <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-slate-800">Tax Exposure Analysis</h3>
+                      <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 px-2.5 py-1 rounded-lg">
+                        {docResult.tax_analysis.length} tax head{docResult.tax_analysis.length > 1 ? "s" : ""} identified
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200">
+                            <th className="text-left py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tax Type</th>
+                            <th className="text-left py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Section</th>
+                            <th className="text-left py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nature</th>
+                            <th className="text-right py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Rate</th>
+                            <th className="text-right py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tax Amount</th>
+                            <th className="text-center py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Adjust.</th>
+                            <th className="text-center py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Risk</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {docResult.tax_analysis.map((t: any, i: number) => {
+                            const isHigh = t.risk_flag?.toLowerCase() === "high";
+                            const isMed = t.risk_flag?.toLowerCase() === "medium";
+                            return (
+                              <tr key={i} className={`border-b border-slate-50 hover:bg-slate-50/50 ${isHigh ? "bg-red-50/40" : ""}`}>
+                                <td className="py-2.5 px-3 font-semibold text-slate-800">{t.tax_type}</td>
+                                <td className="py-2.5 px-3 text-slate-600">{t.section_reference}</td>
+                                <td className="py-2.5 px-3 text-slate-600 max-w-48 truncate" title={t.nature_of_transaction}>{t.nature_of_transaction}</td>
+                                <td className="py-2.5 px-3 text-right font-bold text-blue-700 tabular-nums">
+                                  {filerStatus === "atl" ? t.atl_rate : t.non_atl_rate}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-bold tabular-nums text-slate-800">
+                                  {fmt(filerStatus === "atl" ? (t.tax_amount_atl ?? 0) : (t.tax_amount_non_atl ?? 0))}
+                                </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                                    t.adjustability === "Final" ? "bg-red-100 text-red-700" :
+                                    t.adjustability === "Minimum" ? "bg-amber-100 text-amber-700" :
+                                    "bg-green-100 text-green-700"
+                                  }`}>{t.adjustability}</span>
+                                </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                                    isHigh ? "bg-red-100 text-red-700" :
+                                    isMed ? "bg-amber-100 text-amber-700" :
+                                    "bg-green-100 text-green-700"
+                                  }`}>{t.risk_flag}</span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Conditions / Notes per tax row */}
+                    <div className="px-5 py-3 border-t border-slate-100 space-y-2">
+                      {docResult.tax_analysis.filter((t: any) => t.conditions || t.risk_reason).map((t: any, i: number) => (
+                        <div key={i} className={`flex items-start gap-2 text-[10px] p-2 rounded-lg ${
+                          t.risk_flag?.toLowerCase() === "high" ? "bg-red-50 text-red-700" : "bg-slate-50 text-slate-600"
+                        }`}>
+                          <Info className="w-3 h-3 shrink-0 mt-0.5" />
+                          <span><strong>{t.tax_type}:</strong> {t.conditions}{t.risk_reason ? ` — ${t.risk_reason}` : ""}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Total Exposure Summary */}
+                {docResult.total_tax_exposure && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200 p-5">
+                      <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-1">Total Tax — ATL</p>
+                      <p className="text-xl font-bold text-blue-800 tabular-nums">{fmt(docResult.total_tax_exposure.atl ?? 0)}</p>
+                      <p className="text-[10px] text-blue-500 mt-1">Active Taxpayer List rate</p>
+                    </div>
+                    <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-2xl border border-red-200 p-5">
+                      <p className="text-[10px] text-red-600 font-bold uppercase tracking-wider mb-1">Total Tax — Non-ATL</p>
+                      <p className="text-xl font-bold text-red-800 tabular-nums">{fmt(docResult.total_tax_exposure.non_atl ?? 0)}</p>
+                      <p className="text-[10px] text-red-500 mt-1">Non-ATL higher withholding rate</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Compliance Notes */}
+                {docResult.compliance_notes?.length > 0 && (
+                  <Card>
+                    <SectionTitle>Compliance Notes & Advisory</SectionTitle>
+                    <div className="space-y-2">
+                      {docResult.compliance_notes.map((note: string, i: number) => (
+                        <div key={i} className="flex items-start gap-2 text-[11px] text-slate-700 p-2 rounded-lg bg-amber-50/60 border border-amber-100">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                          <span>{note}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Re-analyze Button */}
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => { setDocResult(null); setDocFile(null); setDocError(null); }}
+                    className="px-6 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors flex items-center gap-2"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Analyze Another Document
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ══════════════════════════════════════════════════════════════════════
             TAB 1 — TAX EXPOSURE CALCULATOR
