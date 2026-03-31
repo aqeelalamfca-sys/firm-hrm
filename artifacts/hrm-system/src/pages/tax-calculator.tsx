@@ -752,17 +752,27 @@ export default function TaxCalculator() {
                 </Card>
                 <Card>
                   <SectionTitle>Compliance Base</SectionTitle>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {[
-                      "Income Tax Ordinance 2001",
-                      "Sales Tax Act 1990",
-                      "Provincial ST (PRA, SRB, KPRA, BRA)",
-                      "Federal Excise Duty Act 2005",
-                      "Finance Act 2025 (Latest Rates)",
-                    ].map(l => (
-                      <div key={l} className="flex items-center gap-2.5 text-[11px] text-slate-600 p-1.5 rounded-lg hover:bg-slate-50 transition-colors">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                        <span className="font-medium">{l}</span>
+                      { heading: "Income Tax Laws", items: ["Income Tax Ordinance, 2001", "Income Tax Rules, 2002", "WHT Regime (Sec 148–236)", "Advance Tax (Sec 147 & Transaction-based)"] },
+                      { heading: "Sales Tax (Goods)", items: ["Sales Tax Act, 1990", "Sales Tax Rules, 2006", "ST Special Procedures & SROs", "Withholding Sales Tax Rules"] },
+                      { heading: "Provincial ST on Services", items: ["Punjab (PRA) — ST on Services Act, 2012", "Sindh (SRB) — ST on Services Act, 2011", "KPK (KPRA) — KP Finance Act", "Balochistan (BRA) — Revenue Authority Act", "ICT — Tax on Services Ordinance, 2001"] },
+                      { heading: "FED & Finance Act", items: ["Federal Excise Act, 2005", "FED Rules & First Schedule", "Finance Act (Latest — Dynamic Rates)"] },
+                      { heading: "Schedules & Rates", items: ["Income Tax Schedules (1st–8th)", "Sales Tax Schedules (1st, 2nd, 3rd, 6th)", "Provincial Service Schedules", "FED First Schedule"] },
+                      { heading: "Regulatory Framework", items: ["SROs & Notifications (FBR/PRA/SRB)", "Public Rulings & Clarifications", "IRIS / FBR / PRA / SRB Portals"] },
+                      { heading: "Special Regimes", items: ["Final Tax Regime (FTR)", "Minimum Tax (Sec 113)", "Super Tax (Sec 4C)", "Retail / Tier-1 POS Regime", "Builders & Developers Regime", "Export Facilitation Schemes"] },
+                      { heading: "Cross-Tax Integration", items: ["Income Tax ↔ Sales Tax linkage", "WHT ↔ Adjustable tax reconciliation", "FED ↔ Sales Tax interaction"] },
+                    ].map(group => (
+                      <div key={group.heading}>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">{group.heading}</p>
+                        <div className="space-y-0.5">
+                          {group.items.map(item => (
+                            <div key={item} className="flex items-center gap-2 text-[10px] text-slate-600 py-0.5">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                              <span>{item}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
