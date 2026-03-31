@@ -250,45 +250,56 @@ export default function Landing() {
           <div className="grid lg:grid-cols-2 gap-6 mb-12">
             <RegulatoryLivePanel />
             <div className="hidden lg:block">
-              <div className="rounded-2xl border border-slate-200/60 bg-white overflow-hidden h-full flex flex-col shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.04)]">
-                <div className="px-5 py-4 bg-gradient-to-r from-blue-600 to-indigo-700">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center">
-                      <Video className="w-4.5 h-4.5 text-white" />
+              <div className="rounded-2xl bg-white border border-slate-200/80 overflow-hidden h-full flex flex-col shadow-lg shadow-slate-200/50">
+                <div className="relative px-6 py-5 bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 overflow-hidden">
+                  <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyem0wLTMwVjBoLTJ2NEgwdjJoMzRWMGgyem0tMiAxNmgtNHYtNEgyNHY0aC00djRoNHY0aDR2LTRoNHYtNHptLTggOGgtNHYtNGgtNHY0aC00djRoNHY0aDR2LTRoNHYtNHoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-30" />
+                  <div className="relative flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/20">
+                      <Video className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-white font-semibold text-[15px] tracking-tight">Book a Partner Meeting</h3>
-                      <p className="text-white/50 text-[11px]">Schedule a consultation with our experts</p>
+                      <h3 className="text-white font-bold text-[17px] tracking-tight">Book a Partner Meeting</h3>
+                      <p className="text-blue-100/60 text-[11px] font-medium mt-0.5">Schedule a consultation with our experts</p>
                     </div>
                   </div>
                 </div>
-                <div className="p-4 flex-1 flex flex-col">
-                  <p className="text-[12px] text-slate-500 leading-relaxed mb-4">
+                <div className="p-5 flex-1 flex flex-col">
+                  <p className="text-[12px] text-slate-500 leading-relaxed mb-4 font-medium">
                     Choose your preferred partner for a one-on-one consultation on audit, tax, or advisory matters.
                   </p>
                   <div className="space-y-1.5 flex-1">
-                    {PARTNERS.map((p, idx) => (
-                      <div key={p.name} className="flex items-center gap-3 p-2.5 rounded-xl border border-slate-100 bg-white hover:bg-slate-50/80 hover:border-slate-200 transition-all duration-200 cursor-pointer group">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-sm" style={{ background: `linear-gradient(135deg, ${idx % 2 === 0 ? '#3b82f6' : '#6366f1'} 0%, ${idx % 2 === 0 ? '#2563eb' : '#4f46e5'} 100%)` }}>
-                          {p.name.split(" ").slice(-1)[0][0]}{p.name.split(" ").slice(-2, -1)[0]?.[0] || ""}
+                    {PARTNERS.map((p, idx) => {
+                      const colors = [
+                        "from-blue-500 to-blue-600",
+                        "from-indigo-500 to-indigo-600",
+                        "from-violet-500 to-violet-600",
+                        "from-purple-500 to-purple-600",
+                        "from-sky-500 to-sky-600",
+                        "from-blue-600 to-indigo-600",
+                      ];
+                      return (
+                        <div key={p.name} className="flex items-center gap-3.5 p-3 rounded-xl border border-slate-100/80 bg-white hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/30 hover:border-blue-200/60 transition-all duration-300 cursor-pointer group hover:shadow-sm">
+                          <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors[idx % colors.length]} flex items-center justify-center text-[11px] font-bold text-white shrink-0 shadow-sm transition-transform duration-300 group-hover:scale-105`}>
+                            {p.initials}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[13px] font-semibold text-slate-800 truncate group-hover:text-blue-700 transition-colors">{p.name}</p>
+                            <p className="text-[10px] text-slate-400 truncate font-medium mt-0.5">{p.focus}</p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all duration-300 shrink-0" />
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-medium text-slate-800 truncate group-hover:text-blue-600 transition-colors">{p.name}</p>
-                          <p className="text-[10px] text-slate-400 truncate">{p.focus}</p>
-                        </div>
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-400 transition-colors shrink-0" />
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
-                  <div className="pt-3 mt-3 border-t border-slate-100 space-y-2.5">
+                  <div className="pt-4 mt-4 border-t border-slate-100 space-y-3">
                     <Link href="/book-meeting">
-                      <Button className="w-full gap-2 rounded-xl h-11 text-[13px] font-medium bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-[0_2px_8px_rgba(59,130,246,0.3)]">
-                        <Calendar className="w-4 h-4" /> Schedule a Meeting
+                      <Button className="w-full gap-2.5 rounded-xl h-12 text-[13px] font-semibold bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-700 hover:via-indigo-700 hover:to-violet-700 shadow-lg shadow-blue-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/30 hover:-translate-y-0.5">
+                        <Calendar className="w-[18px] h-[18px]" /> Schedule a Meeting
                       </Button>
                     </Link>
-                    <div className="flex items-center gap-4 text-[10px] text-slate-400 justify-center">
-                      <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-emerald-500" /> Free consultation</span>
-                      <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-blue-400" /> 30–60 min sessions</span>
+                    <div className="flex items-center gap-5 text-[10px] text-slate-400 justify-center font-medium">
+                      <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Free consultation</span>
+                      <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-blue-400" /> 30–60 min sessions</span>
                     </div>
                   </div>
                 </div>
