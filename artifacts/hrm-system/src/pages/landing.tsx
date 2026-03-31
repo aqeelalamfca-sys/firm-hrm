@@ -296,6 +296,33 @@ export default function Landing() {
                   ))}
                 </div>
               </div>
+
+              <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
+                <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-3">Trust Signals</h3>
+                <div className="space-y-2.5">
+                  {[
+                    { icon: Shield, text: "Big Four Trained Partners" },
+                    { icon: Users, text: "6 Expert Partners" },
+                    { icon: Award, text: "Since 2016" },
+                    { icon: Globe, text: "International Reach" },
+                  ].map(t => (
+                    <div key={t.text} className="flex items-center gap-2.5 text-[12px] text-slate-600">
+                      <t.icon className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                      <span>{t.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button onClick={() => scrollTo("about")} className="rounded-xl border border-emerald-200/50 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm text-left hover:shadow-md transition-all duration-200 group w-full">
+                <div className="flex items-center gap-2 mb-1">
+                  <GraduationCap className="w-4 h-4 text-emerald-600" />
+                  <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-emerald-600">Training Program</h3>
+                </div>
+                <p className="text-[12px] text-slate-600 leading-relaxed">
+                  ICAP &amp; ICAEW approved — launch your CA career with us.
+                </p>
+              </button>
             </div>
 
             {/* CENTER COLUMN — Logo, Tagline, Certifications, CTA */}
@@ -375,23 +402,6 @@ export default function Landing() {
                 </button>
               </div>
 
-              <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
-                <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-3">Trust Signals</h3>
-                <div className="space-y-2.5">
-                  {[
-                    { icon: Shield, text: "Big Four Trained Partners" },
-                    { icon: Users, text: "6 Expert Partners" },
-                    { icon: Award, text: "Since 2016" },
-                    { icon: Globe, text: "International Reach" },
-                  ].map(t => (
-                    <div key={t.text} className="flex items-center gap-2.5 text-[12px] text-slate-600">
-                      <t.icon className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                      <span>{t.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               <a href="https://www.auditwise.tech" target="_blank" rel="noopener noreferrer" className="rounded-xl border border-violet-200/50 bg-gradient-to-br from-violet-50 to-white p-4 shadow-sm hover:shadow-md transition-all duration-200 group block">
                 <div className="flex items-center gap-2 mb-2">
                   <Monitor className="w-4 h-4 text-violet-600" />
@@ -417,16 +427,6 @@ export default function Landing() {
                   <Calculator className="w-3.5 h-3.5" /> Calculate Now
                 </span>
               </Link>
-
-              <button onClick={() => scrollTo("about")} className="rounded-xl border border-emerald-200/50 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm text-left hover:shadow-md transition-all duration-200 group">
-                <div className="flex items-center gap-2 mb-1">
-                  <GraduationCap className="w-4 h-4 text-emerald-600" />
-                  <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-emerald-600">Training Program</h3>
-                </div>
-                <p className="text-[12px] text-slate-600 leading-relaxed">
-                  ICAP &amp; ICAEW approved — launch your CA career with us.
-                </p>
-              </button>
             </div>
 
           </div>
