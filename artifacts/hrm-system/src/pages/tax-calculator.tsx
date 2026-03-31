@@ -6,7 +6,7 @@ import {
   CheckCircle2, AlertTriangle, Shield, TrendingUp, AlertCircle,
   Layers, Target, Zap, RefreshCw, Download, ClipboardList,
   ShoppingCart, Globe, CreditCard, Users, Upload, Loader2, FileSearch,
-  Eye, Search, X
+  Eye, Search, X, BookOpen, ShieldAlert
 } from "lucide-react";
 
 // ─── Formatters ────────────────────────────────────────────────────────────────
@@ -634,11 +634,11 @@ export default function TaxCalculator() {
               <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="px-2 py-0.5 rounded-md bg-white/15 text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">Powered by GPT-4o</span>
-                    <span className="px-2 py-0.5 rounded-md bg-emerald-400/20 text-emerald-200 text-[10px] font-bold uppercase tracking-wider">Vision + OCR</span>
+                    <span className="px-2 py-0.5 rounded-md bg-white/15 text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">Law-Integrated AI Engine</span>
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-400/20 text-emerald-200 text-[10px] font-bold uppercase tracking-wider">GPT-4o + OCR</span>
                   </div>
-                  <h2 className="text-xl sm:text-2xl font-bold mb-2 tracking-tight">AI Document Tax Analyzer</h2>
-                  <p className="text-indigo-100 text-sm leading-relaxed max-w-xl">Upload any invoice, receipt, or financial document and our AI will instantly identify every applicable tax under Pakistan law with section references, rates, and compliance notes.</p>
+                  <h2 className="text-xl sm:text-2xl font-bold mb-2 tracking-tight">AI Tax Analysis Engine</h2>
+                  <p className="text-indigo-100 text-sm leading-relaxed max-w-xl">Upload any invoice, receipt, or financial document. Our AI scans against ITO 2001, Sales Tax Act 1990, Provincial ST, FED Act 2005 & Finance Act 2025 — returning section-wise, rate-wise, condition-based tax analysis with legal citations.</p>
                 </div>
                 <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/20 shadow-inner shrink-0">
                   <FileSearch className="w-8 h-8 text-white" />
@@ -737,8 +737,8 @@ export default function TaxCalculator() {
                     {[
                       { n: "1", t: "Upload Document", d: "Invoice, receipt, contract, or statement", c: "from-blue-500 to-blue-600" },
                       { n: "2", t: "AI Extracts Data", d: "OCR + parsing identifies all amounts", c: "from-violet-500 to-violet-600" },
-                      { n: "3", t: "Tax Classification", d: "Auto-maps to sections & applicable rates", c: "from-indigo-500 to-indigo-600" },
-                      { n: "4", t: "Full Exposure Report", d: "Detailed tax breakdown with risk flags", c: "from-emerald-500 to-emerald-600" },
+                      { n: "3", t: "Law Mapping Engine", d: "Maps to ITO, ST Act, FED sections & rates", c: "from-indigo-500 to-indigo-600" },
+                      { n: "4", t: "Legal Tax Report", d: "Section citations, compliance & risk flags", c: "from-emerald-500 to-emerald-600" },
                     ].map(s => (
                       <div key={s.n} className="flex items-start gap-3">
                         <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${s.c} text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-sm`}>{s.n}</div>
@@ -910,11 +910,12 @@ export default function TaxCalculator() {
                               <thead>
                                 <tr className="bg-slate-50/80">
                                   <th className="text-left py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tax Type</th>
-                                  <th className="text-left py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Section</th>
+                                  <th className="text-left py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Law / Section</th>
                                   <th className="text-left py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nature</th>
                                   <th className="text-right py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Rate</th>
                                   <th className="text-right py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tax Amount</th>
                                   <th className="text-center py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Adjust.</th>
+                                  <th className="text-center py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Basis</th>
                                   <th className="text-center py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Risk</th>
                                 </tr>
                               </thead>
@@ -922,10 +923,14 @@ export default function TaxCalculator() {
                                 {docResult.tax_analysis.map((t: any, i: number) => {
                                   const isHigh = t.risk_flag?.toLowerCase() === "high";
                                   const isMed = t.risk_flag?.toLowerCase() === "medium";
+                                  const isInsufficient = t.legal_basis?.toLowerCase().includes("insufficient");
                                   return (
                                     <tr key={i} className={`border-t border-slate-50 hover:bg-slate-50/50 ${isHigh ? "bg-red-50/40" : ""}`}>
                                       <td className="py-2.5 px-3 font-semibold text-slate-800">{t.tax_type}</td>
-                                      <td className="py-2.5 px-3 text-slate-600">{t.section_reference}</td>
+                                      <td className="py-2.5 px-3">
+                                        <div className="text-slate-800 font-medium">{t.section_reference}</div>
+                                        {t.applicable_law && <div className="text-[9px] text-slate-400 mt-0.5">{t.applicable_law}</div>}
+                                      </td>
                                       <td className="py-2.5 px-3 text-slate-600 max-w-48 truncate" title={t.nature_of_transaction}>{t.nature_of_transaction}</td>
                                       <td className="py-2.5 px-3 text-right font-bold text-blue-700 tabular-nums">
                                         {filerStatus === "atl" ? t.atl_rate : t.non_atl_rate}
@@ -942,6 +947,11 @@ export default function TaxCalculator() {
                                       </td>
                                       <td className="py-2.5 px-3 text-center">
                                         <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                                          isInsufficient ? "bg-orange-100 text-orange-700" : "bg-emerald-100 text-emerald-700"
+                                        }`}>{isInsufficient ? "Review" : "Confirmed"}</span>
+                                      </td>
+                                      <td className="py-2.5 px-3 text-center">
+                                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
                                           isHigh ? "bg-red-100 text-red-700" :
                                           isMed ? "bg-amber-100 text-amber-700" :
                                           "bg-green-100 text-green-700"
@@ -953,6 +963,19 @@ export default function TaxCalculator() {
                               </tbody>
                             </table>
                           </div>
+
+                          {/* Source Text / Legal Citations */}
+                          {docResult.tax_analysis.some((t: any) => t.source_text) && (
+                            <div className="px-5 py-3 border-t border-slate-100 space-y-2">
+                              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-1">Legal Citations</p>
+                              {docResult.tax_analysis.filter((t: any) => t.source_text).map((t: any, i: number) => (
+                                <div key={i} className="flex items-start gap-2 text-[10px] p-2.5 rounded-lg bg-indigo-50/60 text-indigo-800 border border-indigo-100/60">
+                                  <BookOpen className="w-3 h-3 shrink-0 mt-0.5 text-indigo-400" />
+                                  <span><strong>{t.section_reference}:</strong> {t.source_text}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
 
                           {/* Conditions / Notes per tax row */}
                           <div className="px-5 py-3 border-t border-slate-100 space-y-2">
@@ -984,11 +1007,28 @@ export default function TaxCalculator() {
                           </div>
                         </div>
                       )}
+
+                      {/* Missing Tax Check */}
+                      {docResult.missing_tax_check?.length > 0 && (
+                        <div className="bg-white rounded-2xl border border-red-200/60 shadow-sm p-5">
+                          <h3 className="text-[13px] font-bold text-red-800 mb-3 flex items-center gap-2"><span className="w-1 h-4 rounded-full bg-gradient-to-b from-red-500 to-rose-600 inline-block" />Non-Compliance / Missing Tax Deductions</h3>
+                          <div className="space-y-2">
+                            {docResult.missing_tax_check.map((item: string, i: number) => (
+                              <div key={i} className="flex items-start gap-3 text-[11px] text-red-800 p-3 rounded-xl bg-gradient-to-r from-red-50 to-rose-50/50 border border-red-200/50">
+                                <div className="w-5 h-5 rounded-md bg-red-100 flex items-center justify-center shrink-0">
+                                  <ShieldAlert className="w-2.5 h-2.5 text-red-600" />
+                                </div>
+                                <span className="leading-relaxed">{item}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Modal Footer */}
                     <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200/60 bg-white rounded-b-2xl">
-                      <p className="text-[10px] text-slate-400">AI analysis is for reference only — verify with applicable legislation</p>
+                      <p className="text-[10px] text-slate-400">Law-integrated AI analysis — always verify with applicable legislation</p>
                       <div className="flex gap-3">
                         <button
                           onClick={() => { setDocResult(null); setDocFile(null); setDocError(null); }}

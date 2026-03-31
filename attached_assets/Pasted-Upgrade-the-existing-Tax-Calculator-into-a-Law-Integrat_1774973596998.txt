@@ -1,0 +1,177 @@
+Upgrade the existing Tax Calculator into a **Law-Integrated AI Tax Engine (Pakistan)**.
+
+OBJECTIVE:
+The system must **scan, index, and understand tax laws** and respond with **section-wise, rate-wise, condition-based tax answers** automatically.
+
+---
+
+## 🔷 PHASE 1 — LEGAL KNOWLEDGE BASE (CORE)
+
+1. Ingest and index the following documents:
+
+* Income Tax Ordinance 2001
+* Income Tax Rules 2002
+* Sales Tax Act 1990
+* Sales Tax Rules 2006
+* Provincial Sales Tax Acts (PRA, SRB, KPRA, BRA)
+* Federal Excise Act 2005
+* Finance Act (latest)
+* SROs / Notifications
+
+2. Build a **Legal Knowledge Engine**:
+
+* Convert documents → structured chunks
+
+* Tag each chunk:
+  • Law Name
+  • Section Number
+  • Tax Type
+  • Keywords (services, imports, contracts, etc.)
+
+* Store in:
+  → Vector DB (semantic search)
+  → Structured DB (section mapping)
+
+---
+
+## 🔷 PHASE 2 — AI LEGAL REASONING ENGINE
+
+When user uploads document OR enters transaction:
+
+AI must:
+
+1. Understand transaction context
+
+2. Search legal database
+
+3. Identify:
+   ✔ Applicable law
+   ✔ Section reference
+   ✔ Tax type
+   ✔ Rate
+   ✔ Conditions / exceptions
+
+4. Apply multi-tax logic:
+
+* Income Tax
+* Withholding Income Tax
+* Advance Tax
+* Sales Tax (Federal)
+* Provincial Sales Tax
+* Withholding Sales Tax
+* FED
+
+---
+
+## 🔷 PHASE 3 — INTELLIGENT TAX MAPPING
+
+Create auto-mapping engine:
+
+Transaction → Nature → Section → Rate → Treatment
+
+Examples:
+
+* Service → Sec 153 / PSTS
+* Import → Sec 148 + Sales Tax + FED
+* Salary → Sec 149
+
+Include:
+✔ ATL vs Non-ATL logic
+✔ Threshold checks
+✔ Final vs adjustable tax
+
+---
+
+## 🔷 PHASE 4 — RESPONSE ENGINE (STRICT OUTPUT)
+
+Return structured AI response:
+
+* Tax Type
+* Applicable Law
+* Section Reference
+* Rate (%)
+* Tax Amount
+* Nature (Final / Adjustable / Minimum)
+* Conditions (thresholds, exemptions, etc.)
+* Source (law reference text snippet)
+* Risk Flag
+
+---
+
+## 🔷 PHASE 5 — DOCUMENT SCANNING (AI + OCR)
+
+* Upload PDFs, images, Excel
+* Extract text (OCR)
+* Identify:
+  • Invoice type
+  • Parties
+  • Amounts
+  • Tax indicators
+
+Feed into AI engine automatically.
+
+---
+
+## 🔷 PHASE 6 — CONTINUOUS UPDATE ENGINE
+
+* Allow updating laws (Finance Act yearly)
+* Version control:
+  → Rate changes
+  → Section amendments
+
+---
+
+## 🔷 PHASE 7 — VALIDATION & COMPLIANCE
+
+* Cross-check:
+  ✔ Missing taxes
+  ✔ Incorrect rates
+  ✔ Non-compliance
+
+* AI suggestions:
+  “Applicable withholding under Sec 153 not deducted”
+
+---
+
+## 🔷 PHASE 8 — PERFORMANCE REQUIREMENT
+
+* Fast semantic search (<2 sec)
+* Accurate legal mapping
+* No hallucination:
+  → Always cite section reference
+
+---
+
+## 🔷 FINAL GOAL
+
+System becomes:
+
+✔ AI Tax Consultant
+✔ Law-driven calculator
+✔ Audit-ready compliance engine
+
+---
+
+## 🔷 TECH STACK (MANDATORY)
+
+* Backend: Node / .NET
+* Vector DB: Pinecone / Weaviate / PGVector
+* OCR: Tesseract / AWS Textract
+* LLM: OpenAI / local model
+* Database: PostgreSQL
+
+---
+
+## 🔷 RULE (CRITICAL)
+
+AI must NEVER give answer without:
+
+✔ Section reference
+✔ Applicable law
+✔ Rate
+✔ Condition
+
+Otherwise mark as:
+“Insufficient legal basis”
+
+END.
