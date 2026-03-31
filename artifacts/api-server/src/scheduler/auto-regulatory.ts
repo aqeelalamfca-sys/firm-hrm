@@ -38,7 +38,13 @@ async function getOpenAIClient(): Promise<OpenAI | null> {
 
 function getTodayStr(): string {
   const d = new Date();
-  return d.toLocaleDateString("en-PK", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const day = d.toLocaleDateString("en-PK", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const startOfWeek = new Date(d);
+  startOfWeek.setDate(d.getDate() - d.getDay() + 1);
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 4);
+  const weekRange = `${startOfWeek.toLocaleDateString("en-PK", { month: "short", day: "numeric" })} – ${endOfWeek.toLocaleDateString("en-PK", { month: "short", day: "numeric", year: "numeric" })}`;
+  return `${day} (Week of ${weekRange})`;
 }
 
 const CATEGORY_SYSTEM_PROMPT: Record<string, string> = {
@@ -60,7 +66,7 @@ async function generateUpdate(openai: OpenAI, category: string): Promise<string>
       },
       {
         role: "user",
-        content: `Today is ${today}. Generate a unique professional update for ${category} relevant to today.\nFocus areas: ${CATEGORY_FOCUS[category]}\nTone: Authoritative advisory\nLength: Max 35 words\nFormat: Single concise statement without quotes\nIMPORTANT: The update must be for TODAY only — no past dates or expired deadlines.`,
+        content: `Today is ${today}. Generate a unique professional update for ${category} relevant to this current week and today.\nFocus areas: ${CATEGORY_FOCUS[category]}\nTone: Authoritative advisory\nLength: Max 35 words\nFormat: Single concise statement without quotes\nIMPORTANT: The update must reflect current week developments — no past months, past years, or expired deadlines. Reference this week's date range if relevant.`,
       },
     ],
     temperature: 0.9,
