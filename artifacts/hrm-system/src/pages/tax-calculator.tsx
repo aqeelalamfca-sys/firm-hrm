@@ -315,6 +315,15 @@ export default function TaxCalculator() {
         method: "POST",
         body: formData,
       });
+      const contentType = resp.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(
+          resp.status === 413 ? "File too large. Please reduce file size and try again." :
+          resp.status === 502 || resp.status === 503 ? "AI service temporarily unavailable. Please try again in a few seconds." :
+          resp.status === 429 ? "Rate limit reached. Please wait a moment and try again." :
+          `Server returned an unexpected response (HTTP ${resp.status}). Please try again.`
+        );
+      }
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Analysis failed");
       setDocResult(data);
