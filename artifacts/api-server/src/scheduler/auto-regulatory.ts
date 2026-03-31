@@ -6,11 +6,23 @@ import OpenAI from "openai";
 const CATEGORIES = ["FBR", "SECP", "PSX", "SBP"] as const;
 const INTERVAL_MS = 2 * 60 * 60 * 1000;
 
-const CATEGORY_FOCUS: Record<string, string> = {
-  FBR: "Pakistan tax deadlines, SROs, withholding tax rates, active taxpayer list, income tax returns, sales tax updates",
-  SECP: "Company registration, annual returns, beneficial ownership, corporate governance, compliance requirements",
-  PSX: "KSE-100 index movement, top gaining and losing stocks with percentage changes, stock buy/sell recommendations, sector-wise performance (banking, cement, oil & gas, fertilizer, pharma), trading volume highlights, IPO announcements, PSX market capitalization changes",
-  SBP: "Daily KIBOR rates (1-week, 1-month, 3-month, 6-month, 12-month), USD/PKR and major currency exchange rates (GBP, EUR, SAR, AED, CNY), SBP policy rate updates, T-bill auction results, government savings schemes (DSC, SSC, Behbood) profit rates, foreign reserves position, remittance inflows, banking sector circulars",
+const CATEGORY_SEARCH_QUERIES: Record<string, string[]> = {
+  FBR: [
+    "FBR Pakistan latest news today tax update",
+    "Pakistan Federal Board Revenue SRO notification this week",
+  ],
+  SECP: [
+    "SECP Pakistan latest notification today",
+    "Pakistan Securities Exchange Commission corporate governance update",
+  ],
+  PSX: [
+    "KSE 100 index today Pakistan stock exchange",
+    "PSX top gainers losers today Pakistan stocks",
+  ],
+  SBP: [
+    "SBP policy rate Pakistan today",
+    "USD PKR exchange rate today Pakistan KIBOR rate",
+  ],
 };
 
 const PRIORITY_OPTIONS = ["high", "medium", "low"] as const;
@@ -38,25 +50,138 @@ async function getOpenAIClient(): Promise<OpenAI | null> {
 
 function getTodayStr(): string {
   const d = new Date();
-  const day = d.toLocaleDateString("en-PK", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-  const startOfWeek = new Date(d);
-  startOfWeek.setDate(d.getDate() - d.getDay() + 1);
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 4);
-  const weekRange = `${startOfWeek.toLocaleDateString("en-PK", { month: "short", day: "numeric" })} – ${endOfWeek.toLocaleDateString("en-PK", { month: "short", day: "numeric", year: "numeric" })}`;
-  return `${day} (Week of ${weekRange})`;
+  return d.toLocaleDateString("en-PK", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 }
 
-const CATEGORY_SYSTEM_PROMPT: Record<string, string> = {
-  FBR: "You are a Pakistan Federal Board of Revenue (FBR) expert. Generate ONE short, professional tax/regulatory update for a CA firm's website ticker. CRITICAL: You MUST ONLY use the exact date/year provided by the user — NEVER reference 2023, 2024, or any past year. All dates must be in 2026. Keep under 30 words. No quotation marks.",
-  SECP: "You are a Pakistan SECP expert. Generate ONE short, professional corporate governance/compliance update for a CA firm's website ticker. CRITICAL: You MUST ONLY use the exact date/year provided by the user — NEVER reference 2023, 2024, or any past year. All dates must be in 2026. Keep under 30 words. No quotation marks.",
-  PSX: "You are a Pakistan Stock Exchange analyst. Generate ONE short market update with specific stock names (OGDC, HBL, LUCK, ENGRO, PPL, PSO, FFC, HUBC, SYS, TRG, MARI), percentage movements, and buy/sell recommendations. CRITICAL: You MUST ONLY use the exact date/year provided by the user — NEVER reference 2023, 2024, or any past year. Keep under 35 words. No quotation marks.",
-  SBP: "You are a State Bank of Pakistan financial analyst. Generate ONE short update about KIBOR rates, currency exchange rates (USD/PKR, GBP/PKR, EUR/PKR, SAR/PKR, AED/PKR), SBP policy rate, savings scheme profit rates, or foreign reserves. CRITICAL: You MUST ONLY use the exact date/year provided by the user — NEVER reference 2023, 2024, or any past year. Use realistic current numbers. Keep under 35 words. No quotation marks.",
-};
+async function fetchExchangeRates(): Promise<string> {
+  try {
+    const res = await fetch("https://open.er-api.com/v6/latest/USD");
+    if (!res.ok) return "";
+    const data = await res.json() as any;
+    const rates = data.rates || {};
+    const pkr = rates.PKR || "N/A";
+    const gbpToPkr = rates.PKR && rates.GBP ? (rates.PKR / rates.GBP).toFixed(2) : "N/A";
+    const eurToPkr = rates.PKR && rates.EUR ? (rates.PKR / rates.EUR).toFixed(2) : "N/A";
+    const sarToPkr = rates.PKR && rates.SAR ? (rates.PKR / rates.SAR).toFixed(2) : "N/A";
+    const aedToPkr = rates.PKR && rates.AED ? (rates.PKR / rates.AED).toFixed(2) : "N/A";
+    return `Real exchange rates as of today: USD/PKR=${pkr}, GBP/PKR=${gbpToPkr}, EUR/PKR=${eurToPkr}, SAR/PKR=${sarToPkr}, AED/PKR=${aedToPkr}`;
+  } catch (e) {
+    console.log("[Auto-Gen] Failed to fetch exchange rates:", e);
+    return "";
+  }
+}
+
+async function searchWeb(query: string): Promise<string> {
+  try {
+    const encodedQuery = encodeURIComponent(query);
+    const res = await fetch(`https://www.googleapis.com/customsearch/v1?q=${encodedQuery}&key=none&cx=none`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    return "";
+  } catch {
+    return "";
+  }
+}
+
+async function fetchRealTimeContext(category: string): Promise<string> {
+  const parts: string[] = [];
+  const today = getTodayStr();
+  parts.push(`Current date: ${today}`);
+
+  if (category === "SBP") {
+    const rates = await fetchExchangeRates();
+    if (rates) parts.push(rates);
+
+    try {
+      const res = await fetch("https://www.sbp.org.pk/ecodata/kibor.asp", {
+        signal: AbortSignal.timeout(8000),
+      });
+      if (res.ok) {
+        const html = await res.text();
+        const kiborMatch = html.match(/KIBOR[\s\S]{0,500}/i);
+        if (kiborMatch) parts.push(`KIBOR data snippet: ${kiborMatch[0].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').substring(0, 300)}`);
+      }
+    } catch {}
+
+    try {
+      const res = await fetch("https://www.sbp.org.pk/ecodata/rates/war/WAR-Current.asp", {
+        signal: AbortSignal.timeout(8000),
+      });
+      if (res.ok) {
+        const html = await res.text();
+        const snippet = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').substring(0, 500);
+        if (snippet.length > 50) parts.push(`SBP weighted average rates snippet: ${snippet}`);
+      }
+    } catch {}
+  }
+
+  if (category === "PSX") {
+    try {
+      const res = await fetch("https://dps.psx.com.pk/market-summary", {
+        signal: AbortSignal.timeout(8000),
+        headers: { "User-Agent": "Mozilla/5.0" },
+      });
+      if (res.ok) {
+        const html = await res.text();
+        const cleaned = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+        const kseMatch = cleaned.match(/KSE[\s\S]{0,400}/i);
+        if (kseMatch) parts.push(`PSX market data: ${kseMatch[0].substring(0, 400)}`);
+        else parts.push(`PSX data snippet: ${cleaned.substring(0, 400)}`);
+      }
+    } catch {}
+
+    const rates = await fetchExchangeRates();
+    if (rates) parts.push(rates);
+  }
+
+  if (category === "FBR") {
+    try {
+      const res = await fetch("https://www.fbr.gov.pk/", {
+        signal: AbortSignal.timeout(8000),
+        headers: { "User-Agent": "Mozilla/5.0" },
+      });
+      if (res.ok) {
+        const html = await res.text();
+        const cleaned = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+        const newsMatch = cleaned.match(/(?:notification|SRO|circular|deadline|tax)[\s\S]{0,300}/i);
+        if (newsMatch) parts.push(`FBR website content: ${newsMatch[0].substring(0, 300)}`);
+      }
+    } catch {}
+  }
+
+  if (category === "SECP") {
+    try {
+      const res = await fetch("https://www.secp.gov.pk/", {
+        signal: AbortSignal.timeout(8000),
+        headers: { "User-Agent": "Mozilla/5.0" },
+      });
+      if (res.ok) {
+        const html = await res.text();
+        const cleaned = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+        const newsMatch = cleaned.match(/(?:notification|circular|compliance|governance|registration)[\s\S]{0,300}/i);
+        if (newsMatch) parts.push(`SECP website content: ${newsMatch[0].substring(0, 300)}`);
+      }
+    } catch {}
+  }
+
+  return parts.join("\n");
+}
 
 async function generateUpdate(openai: OpenAI, category: string): Promise<string> {
   const today = getTodayStr();
-  const systemPrompt = CATEGORY_SYSTEM_PROMPT[category] || `You are a Pakistan regulatory expert specializing in ${category}. Generate ONE short, professional, factual regulatory update for today. Keep it under 30 words. Do NOT use quotation marks.`;
+  const realTimeContext = await fetchRealTimeContext(category);
+
+  console.log(`[Auto-Gen] ${category} real-time context length: ${realTimeContext.length} chars`);
+
+  const systemPrompts: Record<string, string> = {
+    FBR: "You are a Pakistan FBR news summarizer. You MUST ONLY state facts from the REAL DATA provided below. If no real data is provided, generate a general advisory about current FBR compliance requirements WITHOUT inventing specific dates, SRO numbers, or deadlines. Never fabricate information. Keep under 35 words. No quotation marks.",
+    SECP: "You are a Pakistan SECP news summarizer. You MUST ONLY state facts from the REAL DATA provided below. If no real data is provided, generate a general advisory about SECP compliance WITHOUT inventing specific dates or circular numbers. Never fabricate information. Keep under 35 words. No quotation marks.",
+    PSX: "You are a Pakistan Stock Exchange analyst. You MUST ONLY use the REAL MARKET DATA provided below. Report actual KSE-100 values, actual stock movements, and actual percentages from the data. If no real data is available, state general market sentiment WITHOUT inventing specific numbers. Never fabricate stock prices or percentages. Keep under 35 words. No quotation marks.",
+    SBP: "You are a State Bank of Pakistan analyst. You MUST ONLY use the REAL FINANCIAL DATA provided below (exchange rates, KIBOR rates, policy rate). Report the exact numbers from the data. If no real data is available, provide general SBP advisory WITHOUT inventing rates. Never fabricate numbers. Keep under 35 words. No quotation marks.",
+  };
+
+  const systemPrompt = systemPrompts[category] || "You are a Pakistan regulatory expert. Summarize ONLY the real data provided. Never fabricate information. Keep under 35 words. No quotation marks.";
+
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
@@ -66,10 +191,10 @@ async function generateUpdate(openai: OpenAI, category: string): Promise<string>
       },
       {
         role: "user",
-        content: `Today is ${today}. Generate a unique professional update for ${category} relevant to this current week and today.\nFocus areas: ${CATEGORY_FOCUS[category]}\nTone: Authoritative advisory\nLength: Max 35 words\nFormat: Single concise statement without quotes\nIMPORTANT: The update must reflect current week developments — no past months, past years, or expired deadlines. Reference this week's date range if relevant.`,
+        content: `Today is ${today}.\n\nREAL DATA (use ONLY this information — do NOT invent or fabricate any numbers, rates, or facts):\n${realTimeContext || "No real-time data available for this category."}\n\nGenerate a single concise ticker update for ${category} based STRICTLY on the real data above. If real data has specific numbers (exchange rates, index values), you MUST use those exact numbers. Do not round or change them.`,
       },
     ],
-    temperature: 0.9,
+    temperature: 0.3,
   });
 
   const text = response.choices[0]?.message?.content?.trim();
