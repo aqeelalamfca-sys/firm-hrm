@@ -240,15 +240,18 @@ export default function Landing() {
         )}
       </header>
 
+      <div className="fixed top-16 left-0 right-0 z-40">
+        <RegulatoryLivePanel />
+      </div>
+
       {/* Hero Section */}
-      <section id="home" className="relative pt-32 pb-24 overflow-hidden">
+      <section id="home" className="relative pt-40 pb-24 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.04] via-primary/[0.01] to-transparent" />
         <div className="absolute top-10 right-0 w-[600px] h-[600px] bg-blue-500/[0.05] rounded-full blur-[120px]" />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-violet-500/[0.04] rounded-full blur-[100px]" />
         <div className="absolute top-40 left-1/4 w-[300px] h-[300px] bg-emerald-500/[0.03] rounded-full blur-[80px]" />
         <div className="relative max-w-7xl mx-auto px-6">
           <div className="space-y-5 mb-12">
-            <RegulatoryLivePanel />
 
             <div className="rounded-2xl bg-white border border-slate-200/80 overflow-hidden shadow-lg shadow-slate-200/50">
               <div className="relative px-6 py-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 overflow-hidden">
