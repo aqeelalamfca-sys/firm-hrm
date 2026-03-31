@@ -333,8 +333,11 @@ router.post("/", (req: Request, res: Response, next: Function) => {
       const errMsg = apiErr?.message || "Unknown AI error";
       logger.error({ err: apiErr, status }, "OpenAI API call failed");
 
-      if (status === 400 && isImage) {
-        res.status(422).json({ error: "Image could not be processed by AI. Try a clearer photo, reduce file size, or upload a PDF/CSV instead." });
+      if (status === 400) {
+        const hint = isImage
+          ? "Image could not be processed by AI. Try a clearer photo, reduce file size, or upload a PDF/CSV instead."
+          : "Document could not be processed. Try a smaller file or different format.";
+        res.status(422).json({ error: hint });
         return;
       }
       if (status === 429) {
@@ -367,6 +370,22 @@ router.post("/", (req: Request, res: Response, next: Function) => {
     } catch {
       res.status(500).json({ error: "AI returned invalid response format. Please try again." });
       return;
+    }
+
+    if (result.tax_analysis && Array.isArray(result.tax_analysis)) {
+      result.tax_analysis = result.tax_analysis.map((t: any) => ({
+        ...t,
+        applicable_law: t.applicable_law || "Not specified",
+        section_reference: t.section_reference || "Not specified",
+        source_text: t.source_text || "",
+        legal_basis: (!t.section_reference || t.section_reference === "N/A" || t.section_reference === "Not specified")
+          ? "Insufficient legal basis"
+          : (t.legal_basis || "Confirmed"),
+      }));
+    }
+
+    if (!result.missing_tax_check) {
+      result.missing_tax_check = [];
     }
 
     res.json({
