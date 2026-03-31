@@ -31,7 +31,7 @@ const CATEGORY_CONFIG: Record<string, {
     textColor: "text-rose-300",
     dotColor: "bg-rose-400",
     labelBg: "bg-rose-500/20 text-rose-300 ring-rose-400/20",
-    speed: "160s",
+    speed: "45s",
   },
   SECP: {
     icon: Building2,
@@ -42,7 +42,7 @@ const CATEGORY_CONFIG: Record<string, {
     textColor: "text-blue-300",
     dotColor: "bg-blue-400",
     labelBg: "bg-blue-500/20 text-blue-300 ring-blue-400/20",
-    speed: "180s",
+    speed: "55s",
   },
   PSX: {
     icon: BarChart3,
@@ -53,7 +53,7 @@ const CATEGORY_CONFIG: Record<string, {
     textColor: "text-emerald-300",
     dotColor: "bg-emerald-400",
     labelBg: "bg-emerald-500/20 text-emerald-300 ring-emerald-400/20",
-    speed: "200s",
+    speed: "50s",
   },
   SBP: {
     icon: TrendingUp,
@@ -64,7 +64,7 @@ const CATEGORY_CONFIG: Record<string, {
     textColor: "text-violet-300",
     dotColor: "bg-violet-400",
     labelBg: "bg-violet-500/20 text-violet-300 ring-violet-400/20",
-    speed: "220s",
+    speed: "60s",
   },
 };
 
@@ -195,6 +195,34 @@ export default function RegulatoryLivePanel() {
             </div>
           );
         })}
+
+        {(() => {
+          const allUpdates = updates.filter(u => u.isActive !== false);
+          if (allUpdates.length === 0) return null;
+          return (
+            <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-xl py-3 px-4 cursor-default">
+              <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-slate-900 to-transparent z-10 rounded-l-xl" />
+              <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-slate-900 to-transparent z-10 rounded-r-xl" />
+              <div
+                className="flex whitespace-nowrap"
+                style={{ animation: "marquee 70s linear infinite" }}
+              >
+                {[...allUpdates, ...allUpdates, ...allUpdates].map((u, idx) => {
+                  const config = CATEGORY_CONFIG[u.category];
+                  return (
+                    <span key={`all-${u.id}-${idx}`} className="inline-flex items-center gap-2.5 mr-14 text-[13px]">
+                      <span className={`inline-flex items-center gap-1.5 font-bold uppercase tracking-wide text-[9px] px-2 py-0.5 rounded ring-1 ${config?.labelBg || "bg-slate-500/20 text-slate-300 ring-slate-400/20"}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${config?.dotColor || "bg-slate-400"}`} />
+                        {u.category}
+                      </span>
+                      <span className="text-slate-300 font-medium">{u.text}</span>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
