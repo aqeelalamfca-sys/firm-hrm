@@ -8,6 +8,7 @@ COPY lib/db/package.json lib/db/
 COPY lib/api-spec/package.json lib/api-spec/
 COPY lib/api-zod/package.json lib/api-zod/
 COPY lib/api-client-react/package.json lib/api-client-react/
+COPY lib/integrations-openai-ai-server/package.json lib/integrations-openai-ai-server/
 COPY artifacts/api-server/package.json artifacts/api-server/
 COPY artifacts/hrm-system/package.json artifacts/hrm-system/
 RUN pnpm install --frozen-lockfile --prod=false
