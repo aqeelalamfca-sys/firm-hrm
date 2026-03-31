@@ -256,9 +256,9 @@ export default function Landing() {
             <div className="flex justify-center mb-7">
               <div className="inline-flex items-center gap-4 sm:gap-5">
                 <img
-                  src={`${import.meta.env.BASE_URL}images/hero-logo.jpg`}
+                  src={`${import.meta.env.BASE_URL}images/hero-logo.png`}
                   alt="Alam & Aulakh Chartered Accountants"
-                  className="h-16 sm:h-20 lg:h-24 w-auto object-contain rounded-xl"
+                  className="h-16 sm:h-20 lg:h-24 w-auto object-contain"
                 />
                 <div className="text-left border-l-2 border-blue-500/30 pl-4 sm:pl-5">
                   <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-wide text-slate-800 leading-tight">
