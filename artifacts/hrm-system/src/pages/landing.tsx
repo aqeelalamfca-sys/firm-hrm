@@ -1056,19 +1056,79 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="py-10 border-t border-border/20" style={{ background: 'linear-gradient(180deg, hsl(220 20% 97%) 0%, hsl(220 20% 94%) 100%)' }}>
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-primary/[0.06] flex items-center justify-center">
-                <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Alam & Aulakh" className="h-5 w-auto object-contain" />
+      <footer className="border-t border-border/20" style={{ background: 'linear-gradient(180deg, hsl(220 20% 97%) 0%, hsl(220 20% 93%) 100%)' }}>
+        <div className="max-w-7xl mx-auto px-6 py-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
+            <div>
+              <div className="flex items-center gap-2.5 mb-3">
+                <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Alam & Aulakh" className="h-7 w-auto object-contain" />
+                <div>
+                  <p className="text-sm font-bold text-slate-800">Alam &amp; Aulakh</p>
+                  <p className="text-[10px] text-slate-500 font-medium tracking-wider uppercase">Chartered Accountants</p>
+                </div>
               </div>
-              <span className="text-sm font-bold">Alam & Aulakh</span>
-              <span className="text-xs text-muted-foreground">Chartered Accountants</span>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Premier CA firm providing audit, tax, and financial advisory services across Pakistan and internationally.
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Alam & Aulakh — Enterprise HRM & invoicing for chartered accountants.
+
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">Lahore Office</h4>
+              <div className="space-y-2 text-xs text-muted-foreground">
+                <div className="flex items-start gap-2">
+                  <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
+                  <span>Office 1-A, 2nd Floor, Al-Hafeez Heights, Main Boulevard, Gulberg III, Lahore</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Phone className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <span>+92 42 3578 1234</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">Islamabad Office</h4>
+              <div className="space-y-2 text-xs text-muted-foreground">
+                <div className="flex items-start gap-2">
+                  <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
+                  <span>Office 301, 3rd Floor, Evacuee Trust Complex, F-5/1, Islamabad</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Phone className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <span>+92 51 2816 789</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">Get in Touch</h4>
+              <div className="space-y-2 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <span>info@ana-ca.com</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Globe className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <span>www.ana-ca.com</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Monitor className="w-3.5 h-3.5 text-violet-500 shrink-0" />
+                  <a href="https://www.auditwise.tech" target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:underline">www.auditwise.tech</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-border/30 pt-5 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <p className="text-[11px] text-muted-foreground">
+              &copy; {new Date().getFullYear()} Alam &amp; Aulakh, Chartered Accountants. All rights reserved.
             </p>
+            <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+              <span>QCR Rated</span>
+              <span>ICAEW Authorized Employer</span>
+              <span>ICAP Approved</span>
+              <span>AOB Registered</span>
+            </div>
           </div>
         </div>
       </footer>

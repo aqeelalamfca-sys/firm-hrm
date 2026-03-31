@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>FBR Withholding Tax Rate Card | Finance Act 2025</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #f0f4f8;
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            padding: 2rem 1.5rem;
+            color: #0b2b3d;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #1a5f7a, #0e3e52);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -0.3px;
+        }
+
+        .header p {
+            color: #2c5a6e;
+            margin-top: 0.4rem;
+            font-size: 0.9rem;
+            border-left: 3px solid #1e7b9e;
+            padding-left: 1rem;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            border-bottom: 2px solid #cbdde6;
+            margin-bottom: 1.8rem;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-size: 0.95rem;
+            font-weight: 500;
+            border-radius: 30px 30px 0 0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #2c5a6e;
+            font-family: inherit;
+        }
+
+        .tab-btn:hover {
+            background: #e2edf2;
+            color: #0f4b63;
+        }
+
+        .tab-btn.active {
+            background: white;
+            color: #136b8d;
+            border-bottom: 3px solid #136b8d;
+            font-weight: 600;
+            box-shadow: 0 -2px 6px rgba(0,0,0,0.02);
+        }
+
+        /* Tab panes */
+        .tab-pane {
+            display: none;
+            animation: fade 0.25s ease;
+        }
+
+        .tab-pane.active-pane {
+            display: block;
+        }
+
+        @keyframes fade {
+            from { opacity: 0; transform: translateY(6px);}
+            to { opacity: 1; transform: translateY(0);}
+        }
+
+        /* Cards & tables */
+        .card {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.03), 0 2px 6px rgba(0,0,0,0.05);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid #e2edf2;
+        }
+
+        .card h2 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 1.2rem;
+            color: #1c617d;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .rate-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            display: block;
+        }
+
+        .rate-table th,
+        .rate-table td {
+            border: 1px solid #dee9ef;
+            padding: 0.7rem 0.8rem;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .rate-table th {
+            background-color: #eaf3f8;
+            font-weight: 600;
+            color: #0b4b63;
+        }
+
+        .rate-table tr:nth-child(even) {
+            background-color: #f9fdfe;
+        }
+
+        .badge {
+            background: #eef2fa;
+            padding: 0.2rem 0.5rem;
+            border-radius: 30px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: #1e5c78;
+        }
+
+        .calc-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .calc-box {
+            flex: 1;
+            min-width: 220px;
+            background: #f9fefc;
+            padding: 1rem;
+            border-radius: 20px;
+            border: 1px solid #cde3ec;
+        }
+
+        .calc-box label {
+            font-weight: 500;
+            display: block;
+            margin: 0.8rem 0 0.3rem 0;
+            font-size: 0.8rem;
+            color: #1a5e7a;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 0.6rem;
+            border-radius: 14px;
+            border: 1px solid #cbdde6;
+            background: white;
+            font-family: inherit;
+            font-size: 0.9rem;
+        }
+
+        .result {
+            margin-top: 1rem;
+            background: #e9f2f7;
+            padding: 0.8rem;
+            border-radius: 16px;
+            font-weight: 500;
+        }
+
+        hr {
+            margin: 1rem 0;
+            border-color: #d4e3ec;
+        }
+
+        .footer-note {
+            text-align: center;
+            font-size: 0.7rem;
+            color: #5c7e8f;
+            margin-top: 2.5rem;
+            border-top: 1px solid #cde3ec;
+            padding-top: 1.2rem;
+        }
+
+        @media (max-width: 680px) {
+            body { padding: 1rem; }
+            .tab-btn { padding: 0.5rem 1rem; font-size: 0.8rem;}
+            .rate-table td, .rate-table th { padding: 0.5rem; font-size: 0.75rem;}
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>📋 Withholding Tax Rate Card 2025</h1>
+        <p>Finance Act 2025 — FBR Pakistan | ATL / Non-ATL / Late Filer rates | Advance tax & annual liability</p>
+    </div>
+
+    <!-- Tabs navigation -->
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="tab1">📌 Rates by Section</button>
+        <button class="tab-btn" data-tab="tab2">⚙️ WHT Calculator</button>
+        <button class="tab-btn" data-tab="tab3">📊 Advance Tax & Annual Liability</button>
+        <button class="tab-btn" data-tab="tab4">🚗 Motor Vehicle Tax</button>
+        <button class="tab-btn" data-tab="tab5">🏠 Property (236C/236K)</button>
+    </div>
+
+    <!-- TAB 1: Rate Card Summary -->
+    <div id="tab1" class="tab-pane active-pane">
+        <div class="card">
+            <h2>📑 Key Withholding Tax Rates (ATL / Non-ATL)</h2>
+            <div style="overflow-x: auto;">
+                <table class="rate-table">
+                    <thead>
+                        <tr><th>Section</th><th>Description</th><th>ATL Rate</th><th>Non-ATL Rate</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>148 Imports</td><td>Goods Part-I (Twelfth Schedule)</td><td>1.00%</td><td>2.00%</td></tr>
+                        <tr><td>148 Imports</td><td>Goods Part-II (commercial importers)</td><td>3.50%</td><td>7.00%</td></tr>
+                        <tr><td>148 Imports</td><td>Pharma products (Proviso 1b)</td><td>4.00%</td><td>8.00%</td></tr>
+                        <tr><td>153(1)(a)</td><td>Supplies – Companies (other than toll mfg)</td><td>5.00%</td><td>10.00%</td></tr>
+                        <tr><td>153(1)(a)</td><td>Supplies – Non-companies (other than toll)</td><td>5.50%</td><td>11.00%</td></tr>
+                        <tr><td>153(1)(b)</td><td>Services – IT & IT enabled</td><td>4.00%</td><td>8.00%</td></tr>
+                        <tr><td>153(1)(c)</td><td>Contracts – Company</td><td>7.50%</td><td>15.00%</td></tr>
+                        <tr><td>155 Rent</td><td>Rent of immovable property (Company)</td><td>15.00%</td><td>30.00%</td></tr>
+                        <tr><td>150 Dividend</td><td>Dividend (REIT / others general)</td><td>15.00%</td><td>30.00%</td></tr>
+                        <tr><td>151 Profit on Debt</td><td>Banking company deposit (general)</td><td>20.00%</td><td>40.00%</td></tr>
+                        <tr><td>236G</td><td>Sales to Distributor (Fertilizers)</td><td>0.25%</td><td>0.70%</td></tr>
+                        <tr><td>236H</td><td>Sales to Retailers</td><td>0.50%</td><td>2.50%</td></tr>
+                        <tr><td>236CB</td><td>Functions & Gatherings</td><td>10.00%</td><td>20.00%</td></tr>
+                        <tr><td>236Y</td><td>Amount remitted abroad via cards</td><td>5.00%</td><td>10.00%</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="footer-note" style="margin-top:1rem; text-align:left;">*Late filer rates apply for specific sections (236C,236K). Refer to full schedule.</div>
+        </div>
+        <div class="card">
+            <h2>💰 Salary Tax Slabs (Individual / AOP) – Progressive ATL</h2>
+            <table class="rate-table">
+                <tr><th>Taxable Income (Rs)</th><th>Tax Amount (ATL)</th></tr>
+                <tr><td>Up to 600,000</td><td>0%</td></tr>
+                <tr><td>600,001 – 1,200,000</td><td>1% of amount exceeding 600,000</td></tr>
+                <tr><td>1,200,001 – 2,200,000</td><td>Rs 6,000 + 11% exceeding 1.2M</td></tr>
+                <tr><td>2,200,001 – 3,200,000</td><td>Rs 116,000 + 23% exceeding 2.2M</td></tr>
+                <tr><td>3,200,001 – 4,100,000</td><td>Rs 346,000 + 30% exceeding 3.2M</td></tr>
+                <tr><td>Above 4,100,000</td><td>Rs 616,000 + 35% exceeding 4.1M + surcharge 9% if income >10M</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB 2: Transaction WHT Calculator -->
+    <div id="tab2" class="tab-pane">
+        <div class="card">
+            <h2>🧮 Calculate Withholding Tax on Transaction</h2>
+            <div class="calc-group">
+                <div class="calc-box">
+                    <label>💼 Taxpayer Status</label>
+                    <select id="taxpayerType">
+                        <option value="company">Company</option>
+                        <option value="individual">Individual / AOP</option>
+                    </select>
+                    <label>📌 Filer Status</label>
+                    <select id="filerStatus">
+                        <option value="atl">ATL (Active Taxpayer)</option>
+                        <option value="nonatl">Non-ATL</option>
+                    </select>
+                    <label>📂 Transaction Type</label>
+                    <select id="transType">
+                        <option value="supply_company">Supply of goods (Company - other than toll)</option>
+                        <option value="supply_noncompany">Supply of goods (Non-company)</option>
+                        <option value="services_it">Services (IT/IT enabled)</option>
+                        <option value="contract_company">Contract (Company)</option>
+                        <option value="rent_company">Rent (Immovable property - Company)</option>
+                        <option value="import_part1">Import Goods Part-I</option>
+                        <option value="sale_retailer">Sale to Retailer (236H)</option>
+                        <option value="function_bill">Function/Gathering Bill (236CB)</option>
+                    </select>
+                    <label>💰 Transaction Amount (Rs)</label>
+                    <input type="number" id="transAmount" placeholder="Enter amount" value="500000">
+                    <div class="result" id="whtResult">→ WHT Liability: Rs 0</div>
+                </div>
+                <div class="calc-box">
+                    <h3 style="font-size:1rem; margin-bottom:0.5rem;">⚡ Rate Reference</h3>
+                    <div id="rateRefMsg" style="font-size:0.8rem; color:#2c697f;">Select transaction to see applicable rate</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: Advance Tax & Annual Income Tax Liability -->
+    <div id="tab3" class="tab-pane">
+        <div class="card">
+            <h2>📆 Advance Tax (Quarterly) & Annual Liability</h2>
+            <div class="calc-group">
+                <div class="calc-box">
+                    <label>Taxpayer Category</label>
+                    <select id="annualType">
+                        <option value="individual">Individual / AOP (Salary/Business)</option>
+                        <option value="company">Company (Corporate Tax)</option>
+                    </select>
+                    <label>Estimated Annual Taxable Income (Rs)</label>
+                    <input type="number" id="annualIncome" placeholder="Total annual income" value="8500000">
+                    <label>Advance Tax Paid in 4 quarters (Rs)</label>
+                    <input type="number" id="advancePaid" placeholder="Total advance paid during year" value="0">
+                    <label>WHT already deducted (creditable)</label>
+                    <input type="number" id="whtCredits" placeholder="Total WHT u/s 147,148,153 etc" value="0">
+                    <button id="calcAnnualBtn" style="margin-top:1rem; background:#136b8d; color:white; border:none; padding:0.6rem; border-radius:40px; cursor:pointer; font-weight:600;">Compute Liability</button>
+                    <div class="result" id="annualResult" style="margin-top:1rem;">Annual Tax: -- | Net Payable/Refund: --</div>
+                </div>
+                <div class="calc-box">
+                    <h3>📌 Quarterly Advance (Estimate)</h3>
+                    <p style="font-size:0.8rem;">For Companies: 25% of estimated annual tax each quarter (due Sep, Dec, Mar, Jun). <br> For Individuals: 25% of last year’s tax or 25% of estimated.<br><strong>Quarterly installment (indicative):</strong></p>
+                    <div id="quarterlyHint" style="background:#e5f0f5; padding:0.6rem; border-radius:14px;">Select income & type to show quarterly amount</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 4: Motor Vehicle Tax (Section 231B / 234) -->
+    <div id="tab4" class="tab-pane">
+        <div class="card">
+            <h2>🚘 Motor Vehicle Tax (Registration & Annual)</h2>
+            <div class="calc-group">
+                <div class="calc-box">
+                    <label>Select Vehicle Engine Capacity (cc)</label>
+                    <select id="engineCC">
+                        <option value="upto850">Up to 850 cc</option>
+                        <option value="851_1000">851cc - 1000cc</option>
+                        <option value="1001_1300">1001cc - 1300cc</option>
+                        <option value="1301_1600">1301cc - 1600cc</option>
+                        <option value="1601_1800">1601cc - 1800cc</option>
+                        <option value="1801_2000">1801cc - 2000cc</option>
+                        <option value="2001_2500">2001cc - 2500cc</option>
+                        <option value="2501_3000">2501cc - 3000cc</option>
+                        <option value="above3000">Above 3000cc</option>
+                    </select>
+                    <label>Filer Status</label>
+                    <select id="vehicleFiler">
+                        <option value="atl">ATL</option>
+                        <option value="nonatl">Non-ATL</option>
+                    </select>
+                    <label>Value of Vehicle (Rs) – for % based rates (231B(1))</label>
+                    <input type="number" id="vehicleValue" placeholder="Value (if % based)" value="2000000">
+                    <div class="result" id="vehicleTaxResult">→ Tax (Section 231B(2) or % based): Rs 0</div>
+                    <div class="result" style="margin-top:0.6rem; background:#f6f1e0;" id="annualMotorTax">Annual Motor Vehicle Tax (Sec 234): See rate card</div>
+                </div>
+                <div class="calc-box">
+                    <p><strong>📖 Notes:</strong> Sec 231B(2) provides fixed rupee tax for registration; Sec 231B(1) % of value for high cc. For above 3000cc, 12% (ATL) / 36% (Non-ATL) of value. Annual token tax under Sec 234 ranges from Rs 800 to Rs 10,000 (ATL).</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 5: Immovable Property Transfer & Purchase (236C / 236K) -->
+    <div id="tab5" class="tab-pane">
+        <div class="card">
+            <h2>🏢 Advance Tax on Immovable Property</h2>
+            <div class="calc-group">
+                <div class="calc-box">
+                    <label>Transaction Type</label>
+                    <select id="propType">
+                        <option value="transfer">Transfer of Property (Seller) – Sec 236C</option>
+                        <option value="purchase">Purchase of Property (Buyer) – Sec 236K</option>
+                    </select>
+                    <label>Property Value / Consideration (Rs)</label>
+                    <input type="number" id="propValue" placeholder="Fair market value or consideration" value="45000000">
+                    <label>Filer Status</label>
+                    <select id="propFiler">
+                        <option value="atl">ATL</option>
+                        <option value="nonatl">Non-ATL</option>
+                        <option value="late">Late Filer</option>
+                    </select>
+                    <div class="result" id="propertyTaxResult">Advance Tax: Rs 0</div>
+                </div>
+                <div class="calc-box">
+                    <h3>📜 Slabs (236C Transfer - Consideration)</h3>
+                    <ul style="font-size:0.75rem; margin-top:0.5rem;">
+                        <li>≤50M: ATL 4.5% / Non-ATL 11.5% / Late 7.5%</li>
+                        <li>50M-100M: ATL 5% / Non-ATL 11.5% / Late 8.5%</li>
+                        <li>>100M: ATL 5.5% / Non-ATL 11.5% / Late 9.5%</li>
+                    </ul>
+                    <h3>🏷️ 236K Purchase Slabs</h3>
+                    <ul style="font-size:0.75rem;">
+                        <li>≤50M: ATL 1.5% / Non-ATL 10.5% / Late 4.5%</li>
+                        <li>50M-100M: ATL 2% / Non-ATL 14.5% / Late 5.5%</li>
+                        <li>>100M: ATL 2.5% / Non-ATL 18.5% / Late 6.5%</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="footer-note">Disclaimer: Based on Finance Act 2025 (FBR Rate Card). For statutory accuracy, refer to original Income Tax Ordinance 2001. Rates subject to update.</div>
+</div>
+
+<script>
+    // Helper to format currency
+    function formatCurrency(value) {
+        return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0 }).format(value);
+    }
+
+    // WHT Calculator Logic (Tab2)
+    function computeTransactionWHT() {
+        const transType = document.getElementById('transType').value;
+        const filer = document.getElementById('filerStatus').value;
+        let rate = 0;
+        let rateDesc = "";
+        const amount = parseFloat(document.getElementById('transAmount').value) || 0;
+
+        const ratesMap = {
+            supply_company: { atl: 0.05, nonatl: 0.10, desc: "Supply (Company) ATL 5% / Non-ATL 10%" },
+            supply_noncompany: { atl: 0.055, nonatl: 0.11, desc: "Supply (Non-company) ATL 5.5% / Non-ATL 11%" },
+            services_it: { atl: 0.04, nonatl: 0.08, desc: "IT/IT enabled services ATL 4% / Non-ATL 8%" },
+            contract_company: { atl: 0.075, nonatl: 0.15, desc: "Contract (Company) ATL 7.5% / Non-ATL 15%" },
+            rent_company: { atl: 0.15, nonatl: 0.30, desc: "Rent (Company) ATL 15% / Non-ATL 30%" },
+            import_part1: { atl: 0.01, nonatl: 0.02, desc: "Import Part-I goods ATL 1% / Non-ATL 2%" },
+            sale_retailer: { atl: 0.005, nonatl: 0.025, desc: "Sale to Retailer (236H) ATL 0.5% / Non-ATL 2.5%" },
+            function_bill: { atl: 0.10, nonatl: 0.20, desc: "Function/Gathering ATL 10% / Non-ATL 20%" }
+        };
+        const selected = ratesMap[transType];
+        if(selected) {
+            rate = filer === 'atl' ? selected.atl : selected.nonatl;
+            rateDesc = selected.desc;
+        }
+        const tax = amount * rate;
+        document.getElementById('whtResult').innerHTML = `→ WHT Liability: ${formatCurrency(tax)} (Rate: ${(rate*100).toFixed(2)}%)<br><span style="font-size:0.7rem;">${rateDesc}</span>`;
+        document.getElementById('rateRefMsg').innerHTML = `<strong>Applicable rate:</strong> ${(rate*100).toFixed(2)}% on Rs ${formatCurrency(amount)}`;
+    }
+
+    // Annual Tax Liability (company / individual)
+    function computeAnnualTax() {
+        let income = parseFloat(document.getElementById('annualIncome').value) || 0;
+        const type = document.getElementById('annualType').value;
+        let annualTax = 0;
+        if(type === 'individual') {
+            // slab progressive ATL (individual)
+            if(income <= 600000) annualTax = 0;
+            else if(income <= 1200000) annualTax = (income - 600000) * 0.01;
+            else if(income <= 2200000) annualTax = 6000 + (income - 1200000) * 0.11;
+            else if(income <= 3200000) annualTax = 116000 + (income - 2200000) * 0.23;
+            else if(income <= 4100000) annualTax = 346000 + (income - 3200000) * 0.30;
+            else annualTax = 616000 + (income - 4100000) * 0.35;
+            // surcharge for income >10M (9% on tax)
+            if(income > 10000000) annualTax = annualTax * 1.09;
+        } else {
+            // Company: standard corporate rate 29% for 2025 (as per prevalent rate)
+            annualTax = income * 0.29;
+        }
+        const advance = parseFloat(document.getElementById('advancePaid').value) || 0;
+        const whtCredits = parseFloat(document.getElementById('whtCredits').value) || 0;
+        const totalCredits = advance + whtCredits;
+        let netPayable = annualTax - totalCredits;
+        let status = netPayable > 0 ? `Liability to pay: ${formatCurrency(netPayable)}` : `Refundable: ${formatCurrency(Math.abs(netPayable))}`;
+        document.getElementById('annualResult').innerHTML = `📊 Annual Income Tax: ${formatCurrency(annualTax)} <br> Advance+WHT Credits: ${formatCurrency(totalCredits)} <br> ${status}`;
+
+        // Quarterly estimate (simple)
+        let quarterly = (annualTax / 4);
+        document.getElementById('quarterlyHint').innerHTML = `Estimated quarterly advance (each): ${formatCurrency(quarterly)} <br><span style="font-size:0.7rem;">Due dates: Sep 15, Dec 15, Mar 15, Jun 15</span>`;
+    }
+
+    // Vehicle Tax: handle both Sec231B(2) fixed and % based for >3000cc
+    function updateVehicleTax() {
+        const cc = document.getElementById('engineCC').value;
+        const filer = document.getElementById('vehicleFiler').value;
+        const value = parseFloat(document.getElementById('vehicleValue').value) || 0;
+        let tax = 0;
+        // Fixed rates under 231B(2) for registration (non-ATL higher)
+        const fixedRates = {
+            upto850: { atl: 0, nonatl: 0 },
+            '851_1000': { atl: 5000, nonatl: 15000 },
+            '1001_1300': { atl: 7500, nonatl: 22500 },
+            '1301_1600': { atl: 12500, nonatl: 37500 },
+            '1601_1800': { atl: 18750, nonatl: 56250 },
+            '1801_2000': { atl: 25000, nonatl: 75000 },
+            '2001_2500': { atl: 37500, nonatl: 112500 },
+            '2501_3000': { atl: 50000, nonatl: 150000 },
+            above3000: { atl: 62500, nonatl: 187500 }
+        };
+        if(fixedRates[cc]) {
+            tax = filer === 'atl' ? fixedRates[cc].atl : fixedRates[cc].nonatl;
+        }
+        // override for above3000 also % based for 231B(1) but we show fixed registration + highlight
+        let msg = `Registration Tax (Sec 231B): ${formatCurrency(tax)}`;
+        if(cc === 'above3000') {
+            let percentTax = value * (filer === 'atl' ? 0.12 : 0.36);
+            msg += ` <br> ⚠️ For above 3000cc, additional 12% (ATL) / 36% (Non-ATL) of value = ${formatCurrency(percentTax)} may apply under 231B(1).`;
+            tax = tax + percentTax;
+        }
+        document.getElementById('vehicleTaxResult').innerHTML = `→ ${msg}`;
+        // Annual token tax (Sec 234) sample rate based on cc
+        let annualMap = { upto850:800, '851_1000':1500, '1001_1300':1750, '1301_1600':2500, '1601_1800':3750, '1801_2000':4500, '2001_2500':10000, '2501_3000':10000, above3000:10000 };
+        let annualAmt = annualMap[cc] || 10000;
+        if(filer === 'nonatl') annualAmt = annualAmt * 2;
+        document.getElementById('annualMotorTax').innerHTML = `Annual Token Tax (Sec 234): ${formatCurrency(annualAmt)} (ATL base)`;
+    }
+
+    // Property tax calculation (236C & 236K)
+    function computePropertyTax() {
+        let value = parseFloat(document.getElementById('propValue').value) || 0;
+        const type = document.getElementById('propType').value;
+        const filer = document.getElementById('propFiler').value;
+        let rate = 0;
+        if(type === 'transfer') {
+            if(value <= 50000000) {
+                if(filer === 'atl') rate = 0.045;
+                else if(filer === 'nonatl') rate = 0.115;
+                else rate = 0.075;
+            } else if(value <= 100000000) {
+                if(filer === 'atl') rate = 0.05;
+                else if(filer === 'nonatl') rate = 0.115;
+                else rate = 0.085;
+            } else {
+                if(filer === 'atl') rate = 0.055;
+                else if(filer === 'nonatl') rate = 0.115;
+                else rate = 0.095;
+            }
+        } else { // purchase
+            if(value <= 50000000) {
+                if(filer === 'atl') rate = 0.015;
+                else if(filer === 'nonatl') rate = 0.105;
+                else rate = 0.045;
+            } else if(value <= 100000000) {
+                if(filer === 'atl') rate = 0.02;
+                else if(filer === 'nonatl') rate = 0.145;
+                else rate = 0.055;
+            } else {
+                if(filer === 'atl') rate = 0.025;
+                else if(filer === 'nonatl') rate = 0.185;
+                else rate = 0.065;
+            }
+        }
+        const tax = value * rate;
+        document.getElementById('propertyTaxResult').innerHTML = `Advance Tax: ${formatCurrency(tax)} (Rate: ${(rate*100).toFixed(2)}%)`;
+    }
+
+    // Event listeners and initial calls
+    document.getElementById('transType').addEventListener('change', computeTransactionWHT);
+    document.getElementById('filerStatus').addEventListener('change', computeTransactionWHT);
+    document.getElementById('transAmount').addEventListener('input', computeTransactionWHT);
+    document.getElementById('calcAnnualBtn').addEventListener('click', computeAnnualTax);
+    document.getElementById('engineCC').addEventListener('change', updateVehicleTax);
+    document.getElementById('vehicleFiler').addEventListener('change', updateVehicleTax);
+    document.getElementById('vehicleValue').addEventListener('input', updateVehicleTax);
+    document.getElementById('propType').addEventListener('change', computePropertyTax);
+    document.getElementById('propValue').addEventListener('input', computePropertyTax);
+    document.getElementById('propFiler').addEventListener('change', computePropertyTax);
+    // also update property on load
+    computeTransactionWHT();
+    computeAnnualTax();
+    updateVehicleTax();
+    computePropertyTax();
+
+    // Tab switching logic
+    const tabs = document.querySelectorAll('.tab-btn');
+    const panes = document.querySelectorAll('.tab-pane');
+    tabs.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tabId = btn.getAttribute('data-tab');
+            panes.forEach(pane => pane.classList.remove('active-pane'));
+            document.getElementById(tabId).classList.add('active-pane');
+            tabs.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        });
+    });
+</script>
+</body>
+</html>
