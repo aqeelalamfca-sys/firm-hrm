@@ -68,7 +68,7 @@ export default function RegulatoryLivePanel() {
 
       <div
         className="flex whitespace-nowrap pl-16"
-        style={{ animation: "marquee 35s linear infinite" }}
+        style={{ animation: "marquee 22s linear infinite" }}
       >
         {[...activeUpdates, ...activeUpdates, ...activeUpdates].map((u, idx) => {
           const colors = CATEGORY_COLORS[u.category] || { dot: "bg-slate-400", label: "bg-slate-500/20 text-slate-300 ring-slate-400/30" };
