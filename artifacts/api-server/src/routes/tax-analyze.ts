@@ -400,4 +400,113 @@ router.post("/", (req: Request, res: Response, next: Function) => {
   }
 });
 
+router.post("/text", async (req: Request, res: Response) => {
+  try {
+    const { text, filer } = req.body;
+    const filerStatus = filer || "atl";
+
+    if (!text || typeof text !== "string" || text.trim().length < 10) {
+      res.status(400).json({ error: "Please enter a transaction description (at least 10 characters)." });
+      return;
+    }
+
+    let openai: OpenAI | null = null;
+    const baseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+    const envApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+    if (envApiKey) {
+      openai = new OpenAI(baseUrl ? { apiKey: envApiKey, baseURL: baseUrl } : { apiKey: envApiKey });
+    } else {
+      try {
+        const settings = await db
+          .select()
+          .from(systemSettingsTable)
+          .where(eq(systemSettingsTable.key, "chatgpt_api_key"))
+          .limit(1);
+        const storedKey = settings[0]?.value;
+        if (storedKey && storedKey.startsWith("sk-") && storedKey.length > 20) {
+          openai = new OpenAI({ apiKey: storedKey });
+        }
+      } catch (err) {
+        logger.error({ err }, "Failed to read API key from database");
+      }
+    }
+
+    if (!openai) {
+      res.status(500).json({ error: "AI not configured. Please set your ChatGPT API key in Admin Settings." });
+      return;
+    }
+
+    logger.info({ textLength: text.length, filer: filerStatus }, "Tax text analyze request");
+
+    const messages: any[] = [
+      { role: "system", content: TAX_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: `Analyze the following transaction/scenario for Pakistan tax implications. Taxpayer is ${filerStatus === "atl" ? "Active Taxpayer (ATL)" : "Non-Active Taxpayer (Non-ATL)"}.\n\nTransaction/Scenario:\n\`\`\`\n${text.slice(0, 12000)}\n\`\`\`\n\nIdentify ALL applicable taxes, compute amounts where possible, and provide section-wise legal analysis. Return ONLY valid JSON.`,
+      },
+    ];
+
+    let completion;
+    try {
+      completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        max_completion_tokens: 8192,
+        messages,
+        response_format: { type: "json_object" },
+      });
+    } catch (apiErr: any) {
+      const status = apiErr?.status || apiErr?.response?.status;
+      const errMsg = apiErr?.message || "Unknown AI error";
+      logger.error({ err: apiErr, status }, "OpenAI API call failed (text)");
+      if (status === 429) {
+        res.status(429).json({ error: "AI rate limit reached. Please wait a moment and try again." });
+        return;
+      }
+      if (status === 500 || status === 502 || status === 503) {
+        res.status(502).json({ error: "AI service is temporarily unavailable. Please try again in a few seconds." });
+        return;
+      }
+      res.status(500).json({ error: `AI analysis failed: ${errMsg}` });
+      return;
+    }
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) {
+      res.status(500).json({ error: "AI returned empty response. Please try rephrasing your input." });
+      return;
+    }
+
+    let result;
+    try {
+      result = JSON.parse(content);
+    } catch {
+      res.status(500).json({ error: "AI returned invalid response format. Please try again." });
+      return;
+    }
+
+    if (result.tax_analysis && Array.isArray(result.tax_analysis)) {
+      result.tax_analysis = result.tax_analysis.map((t: any) => ({
+        ...t,
+        applicable_law: t.applicable_law || "Not specified",
+        section_reference: t.section_reference || "Not specified",
+        source_text: t.source_text || "",
+        legal_basis: (!t.section_reference || t.section_reference === "N/A" || t.section_reference === "Not specified")
+          ? "Insufficient legal basis"
+          : (t.legal_basis || "Confirmed"),
+      }));
+    }
+    if (!result.missing_tax_check) result.missing_tax_check = [];
+
+    res.json({
+      success: true,
+      filename: "Text Input",
+      filer_status: filerStatus,
+      ...result,
+    });
+  } catch (err: any) {
+    logger.error({ err }, "Tax text analyze failed");
+    res.status(500).json({ error: err.message || "Analysis failed" });
+  }
+});
+
 export default router;
