@@ -397,6 +397,19 @@ export default function Landing() {
                 </div>
               </div>
 
+              <a href="https://www.auditwise.tech" target="_blank" rel="noopener noreferrer" className="rounded-xl border border-violet-200/50 bg-gradient-to-br from-violet-50 to-white p-4 shadow-sm hover:shadow-md transition-all group block">
+                <div className="flex items-center gap-2 mb-2">
+                  <Monitor className="w-4 h-4 text-violet-600" />
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-violet-600">Audit Software</h3>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed mb-3">
+                  Our proprietary audit management platform for efficient engagements.
+                </p>
+                <span className="w-full h-8 text-[11px] font-semibold rounded-lg text-white flex items-center justify-center gap-1.5" style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)' }}>
+                  <Monitor className="w-3.5 h-3.5" /> Launch AuditWise
+                </span>
+              </a>
+
               <button onClick={() => scrollTo("about")} className="rounded-xl border border-emerald-200/50 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm text-left hover:shadow-md transition-all group">
                 <div className="flex items-center gap-2 mb-1">
                   <GraduationCap className="w-4 h-4 text-emerald-600" />
