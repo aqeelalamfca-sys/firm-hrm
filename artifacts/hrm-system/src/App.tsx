@@ -116,9 +116,18 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   );
 }
 
+function ScrollToTop() {
+  const [location] = useLocation();
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location]);
+  return null;
+}
+
 function Router() {
   return (
     <Suspense fallback={<PageLoader />}>
+      <ScrollToTop />
       <Switch>
         <Route path="/landing" component={Landing} />
         <Route path="/apply-training" component={TrainingApplication} />
