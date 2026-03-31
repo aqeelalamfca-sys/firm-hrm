@@ -246,94 +246,196 @@ export default function Landing() {
       </div>
 
       {/* Hero Section */}
-      <section id="home" className="relative pt-40 pb-24 overflow-hidden">
+      <section id="home" className="relative pt-28 pb-16 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.04] via-primary/[0.01] to-transparent" />
         <div className="absolute top-10 right-0 w-[600px] h-[600px] bg-blue-500/[0.05] rounded-full blur-[120px]" />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-violet-500/[0.04] rounded-full blur-[100px]" />
         <div className="absolute top-40 left-1/4 w-[300px] h-[300px] bg-emerald-500/[0.03] rounded-full blur-[80px]" />
         <div className="relative max-w-7xl mx-auto px-6">
-          <div className="text-center max-w-3xl mx-auto">
-            <div className="flex justify-center mb-7">
-              <div className="inline-flex items-center gap-4 sm:gap-5">
-                <img
-                  src={`${import.meta.env.BASE_URL}images/hero-logo.png`}
-                  alt="Alam & Aulakh Chartered Accountants"
-                  className="h-16 sm:h-20 lg:h-24 w-auto object-contain"
-                />
-                <div className="text-left border-l-2 border-blue-500/30 pl-4 sm:pl-5">
-                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-wide text-slate-800 leading-tight">
-                    Alam <span className="text-blue-600">&amp;</span> Aulakh
-                  </h2>
-                  <p className="text-[10px] sm:text-xs font-semibold tracking-[0.25em] text-slate-500 uppercase mt-0.5">
-                    Chartered Accountants
-                  </p>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_280px] gap-6 lg:gap-8 items-start">
+
+            {/* LEFT COLUMN — Metrics & Expertise */}
+            <div className="hidden lg:flex flex-col gap-4 pt-4">
+              <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 mb-3">Proven Track Record</h3>
+                <div className="space-y-3">
+                  {[
+                    { val: "PKR 500B+", label: "Assets Audited", icon: BarChart3, color: "text-blue-600 bg-blue-50" },
+                    { val: "PKR 200B+", label: "Revenue Managed", icon: TrendingUp, color: "text-emerald-600 bg-emerald-50" },
+                    { val: "PKR 50B+", label: "Deal Value", icon: Briefcase, color: "text-violet-600 bg-violet-50" },
+                  ].map(m => (
+                    <div key={m.label} className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${m.color}`}>
+                        <m.icon className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-800">{m.val}</p>
+                        <p className="text-[10px] text-slate-500">{m.label}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 mb-3">Core Expertise</h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {["Audit & Assurance", "Tax Planning", "IFRS Compliance", "Corporate Advisory", "Forensic Accounting", "Business Valuation"].map(tag => (
+                    <span key={tag} className="text-[9px] font-semibold px-2 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 mb-3">Industries We Serve</h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {["Financial Services", "Oil & Gas", "Manufacturing", "Technology", "Real Estate", "Government", "Pharmaceuticals", "Energy & Mining"].map(ind => (
+                    <span key={ind} className="text-[9px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                      {ind}
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
 
-            <div className="max-w-2xl mx-auto mb-5 px-4 py-2.5 rounded-xl border border-blue-200/40 bg-gradient-to-r from-blue-50/60 via-white/80 to-blue-50/60 tagline-glow">
-              <p className="text-[11px] sm:text-[13px] text-slate-600 font-semibold leading-relaxed tracking-wide text-center">
-                Statutory Audit &amp; Assurance for{" "}
-                <span className="text-blue-700">Listed Entities</span>,{" "}
-                <span className="text-blue-700">Public Interest Entities (PIEs)</span>,{" "}
-                <span className="text-blue-700">Public Interest Companies (PICs)</span>,{" "}
-                Corporates of All Sizes, and{" "}
-                <span className="text-blue-700">Not-for-Profit &amp; Trust Structures</span>
+            {/* CENTER COLUMN — Logo, Tagline, Certifications, CTA */}
+            <div className="text-center">
+              <div className="flex justify-center mb-5">
+                <div className="inline-flex items-center gap-4 sm:gap-5">
+                  <img
+                    src={`${import.meta.env.BASE_URL}images/hero-logo.png`}
+                    alt="Alam & Aulakh Chartered Accountants"
+                    className="h-14 sm:h-18 lg:h-20 w-auto object-contain"
+                  />
+                  <div className="text-left border-l-2 border-blue-500/30 pl-4 sm:pl-5">
+                    <h2 className="text-lg sm:text-2xl lg:text-[26px] font-bold tracking-wide text-slate-800 leading-tight">
+                      Alam <span className="text-blue-600">&amp;</span> Aulakh
+                    </h2>
+                    <p className="text-[9px] sm:text-[11px] font-semibold tracking-[0.25em] text-slate-500 uppercase mt-0.5">
+                      Chartered Accountants
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="max-w-xl mx-auto mb-4 px-4 py-2 rounded-xl border border-blue-200/40 bg-gradient-to-r from-blue-50/60 via-white/80 to-blue-50/60 tagline-glow">
+                <p className="text-[10px] sm:text-[12px] text-slate-600 font-semibold leading-relaxed tracking-wide">
+                  Statutory Audit &amp; Assurance for{" "}
+                  <span className="text-blue-700">Listed Entities</span>,{" "}
+                  <span className="text-blue-700">PIEs</span>,{" "}
+                  <span className="text-blue-700">PICs</span>,{" "}
+                  Corporates of All Sizes &amp;{" "}
+                  <span className="text-blue-700">Not-for-Profit &amp; Trust Structures</span>
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 justify-center mb-5">
+                {[
+                  { label: "QCR Rated", color: "bg-amber-500/10 text-amber-700 border-amber-200 ring-amber-300/30" },
+                  { label: "ICAEW Authorized Employer", color: "bg-sky-500/10 text-sky-700 border-sky-200 ring-sky-300/30" },
+                  { label: "ICAP Approved Training Org", color: "bg-blue-500/10 text-blue-700 border-blue-200 ring-blue-300/30" },
+                  { label: "AOB Registered", color: "bg-emerald-500/10 text-emerald-700 border-emerald-200 ring-emerald-300/30" },
+                ].map((cred) => (
+                  <span key={cred.label} className={`inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-semibold px-2.5 py-0.5 rounded-full border ring-1 backdrop-blur-sm ${cred.color}`}>
+                    <svg className="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {cred.label}
+                  </span>
+                ))}
+              </div>
+
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight leading-[1.08] mb-4">
+                Leading Chartered
+                <br />
+                <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-violet-500 bg-clip-text text-transparent">Accountants Firm</span>
+              </h1>
+              <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-lg mx-auto mb-6">
+                Expert audit, tax, and financial &amp; corporate advisory services with firm commitment — your trusted partner in Pakistan and beyond.
               </p>
-              <style>{`
-                @keyframes tagline-shimmer {
-                  0%, 100% { box-shadow: 0 0 8px rgba(59,130,246,0.08), 0 0 0 1px rgba(59,130,246,0.06); }
-                  50% { box-shadow: 0 0 20px rgba(59,130,246,0.18), 0 0 0 1px rgba(59,130,246,0.15); }
-                }
-                .tagline-glow {
-                  animation: tagline-shimmer 2.5s ease-in-out infinite;
-                }
-                @media (prefers-reduced-motion: reduce) {
-                  .tagline-glow { animation: none; }
-                }
-              `}</style>
+              <div className="flex flex-wrap gap-3 justify-center">
+                <Link href="/login">
+                  <Button size="lg" className="h-11 px-6 text-sm font-semibold gap-2 rounded-xl" style={{ background: 'linear-gradient(135deg, hsl(217 78% 51%) 0%, hsl(217 78% 42%) 100%)', boxShadow: '0 4px 16px rgba(59,130,246,0.3)' }}>
+                    Get Started <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </Link>
+                <button onClick={() => scrollTo("services")} className="h-11 px-6 text-sm font-semibold border border-border/50 rounded-xl bg-card hover:bg-muted/50 transition-all duration-200 inline-flex items-center gap-2 shadow-sm">
+                  Our Services <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 justify-center mb-7">
-              {[
-                { label: "QCR Rated", color: "bg-amber-500/10 text-amber-700 border-amber-200 ring-amber-300/30" },
-                { label: "ICAEW Authorized Employer", color: "bg-sky-500/10 text-sky-700 border-sky-200 ring-sky-300/30" },
-                { label: "ICAP Approved Training Organization", color: "bg-blue-500/10 text-blue-700 border-blue-200 ring-blue-300/30" },
-                { label: "AOB Registered", color: "bg-emerald-500/10 text-emerald-700 border-emerald-200 ring-emerald-300/30" },
-              ].map((cred) => (
-                <span
-                  key={cred.label}
-                  className={`inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-semibold px-3 py-1 rounded-full border ring-1 backdrop-blur-sm ${cred.color}`}
-                >
-                  <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {cred.label}
-                </span>
-              ))}
-            </div>
+            {/* RIGHT COLUMN — CTA Panel, Contact, Trust */}
+            <div className="hidden lg:flex flex-col gap-4 pt-4">
+              <div className="rounded-xl border border-blue-200/50 bg-gradient-to-br from-blue-50 to-white p-4 shadow-sm">
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-blue-600 mb-3">Book a Consultation</h3>
+                <p className="text-[11px] text-slate-600 leading-relaxed mb-3">
+                  Get expert advice from our partners with Big Four experience.
+                </p>
+                <button onClick={() => scrollTo("contact")} className="w-full h-9 text-xs font-semibold rounded-lg text-white flex items-center justify-center gap-1.5" style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' }}>
+                  <Phone className="w-3.5 h-3.5" /> Schedule Meeting
+                </button>
+              </div>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.08] mb-6">
-              Leading Chartered
-              <br />
-              <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-violet-500 bg-clip-text text-transparent">Accountants Firm</span>
-            </h1>
-            <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-10">
-              Providing audit, tax, and financial & corporate advisory services with firm commitment.
-              Expert chartered accounting and international corporate services — your trusted partner
-              in Pakistan and beyond.
-            </p>
-            <div className="flex flex-wrap gap-3 justify-center">
-              <Link href="/login">
-                <Button size="lg" className="h-12 px-7 text-sm font-semibold gap-2 rounded-xl" style={{ background: 'linear-gradient(135deg, hsl(217 78% 51%) 0%, hsl(217 78% 42%) 100%)', boxShadow: '0 4px 16px rgba(59,130,246,0.3)' }}>
-                  Get Started <ArrowRight className="w-4 h-4" />
-                </Button>
-              </Link>
-              <button onClick={() => scrollTo("services")} className="h-12 px-7 text-sm font-semibold border border-border/50 rounded-xl bg-card hover:bg-muted/50 transition-all duration-200 inline-flex items-center gap-2 shadow-sm">
-                Our Services <ChevronRight className="w-4 h-4" />
+              <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 mb-3">Contact Us</h3>
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2 text-[11px] text-slate-600">
+                    <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span>Lahore &amp; Islamabad</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-slate-600">
+                    <Mail className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span>info@ana-ca.com</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-slate-600">
+                    <Globe className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span>ana-ca.com</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 mb-3">Trust Signals</h3>
+                <div className="space-y-2">
+                  {[
+                    { icon: Shield, text: "Big Four Trained Partners" },
+                    { icon: Users, text: "6 Expert Partners" },
+                    { icon: Award, text: "Since 2016" },
+                    { icon: Globe, text: "International Reach" },
+                  ].map(t => (
+                    <div key={t.text} className="flex items-center gap-2 text-[11px] text-slate-600">
+                      <t.icon className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                      <span>{t.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button onClick={() => scrollTo("about")} className="rounded-xl border border-emerald-200/50 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm text-left hover:shadow-md transition-all group">
+                <div className="flex items-center gap-2 mb-1">
+                  <GraduationCap className="w-4 h-4 text-emerald-600" />
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-600">Training Program</h3>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  ICAP &amp; ICAEW approved — launch your CA career with us.
+                </p>
               </button>
             </div>
+
           </div>
+
+          <style>{`
+            @keyframes tagline-shimmer {
+              0%, 100% { box-shadow: 0 0 8px rgba(59,130,246,0.08), 0 0 0 1px rgba(59,130,246,0.06); }
+              50% { box-shadow: 0 0 20px rgba(59,130,246,0.18), 0 0 0 1px rgba(59,130,246,0.15); }
+            }
+            .tagline-glow { animation: tagline-shimmer 2.5s ease-in-out infinite; }
+            @media (prefers-reduced-motion: reduce) { .tagline-glow { animation: none; } }
+          `}</style>
 
           {/* Stats Bar */}
           <div className="mt-20 grid grid-cols-2 sm:grid-cols-4 gap-4">
