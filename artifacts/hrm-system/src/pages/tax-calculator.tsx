@@ -857,25 +857,6 @@ export default function TaxCalculator() {
               {/* Info Panel */}
               <div className="space-y-5">
                 <Card>
-                  <SectionTitle>How It Works</SectionTitle>
-                  <div className="space-y-3.5">
-                    {[
-                      { n: "1", t: "Upload or Describe", d: "Upload a document or type a transaction", c: "from-blue-500 to-blue-600" },
-                      { n: "2", t: "AI Extracts Data", d: "OCR + parsing identifies all amounts", c: "from-violet-500 to-violet-600" },
-                      { n: "3", t: "Law Mapping Engine", d: "Maps to ITO, ST Act, FED sections & rates", c: "from-indigo-500 to-indigo-600" },
-                      { n: "4", t: "Legal Tax Report", d: "Section citations, compliance & risk flags", c: "from-emerald-500 to-emerald-600" },
-                    ].map(s => (
-                      <div key={s.n} className="flex items-start gap-3">
-                        <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${s.c} text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-sm`}>{s.n}</div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-700">{s.t}</p>
-                          <p className="text-[10px] text-slate-400 leading-relaxed">{s.d}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-                <Card>
                   <SectionTitle>Compliance Base</SectionTitle>
                   <div className="space-y-3">
                     {[
