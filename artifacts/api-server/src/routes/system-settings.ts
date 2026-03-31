@@ -28,54 +28,6 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
   }
 });
 
-router.put("/:key", async (req: AuthenticatedRequest, res) => {
-  try {
-    const { key } = req.params;
-    const { value, description } = req.body;
-
-    if (!value) {
-      return res.status(400).json({ error: "Value is required" });
-    }
-
-    if (!req.user?.id) {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-
-    const existing = await db
-      .select()
-      .from(systemSettingsTable)
-      .where(eq(systemSettingsTable.key, key))
-      .limit(1);
-
-    let result;
-    if (existing.length > 0) {
-      [result] = await db
-        .update(systemSettingsTable)
-        .set({ value, description, updatedBy: req.user.id, updatedAt: new Date() })
-        .where(eq(systemSettingsTable.key, key))
-        .returning();
-    } else {
-      [result] = await db
-        .insert(systemSettingsTable)
-        .values({ key, value, description, updatedBy: req.user.id })
-        .returning();
-    }
-
-    const isSensitive = key.toLowerCase().includes("key") || key.toLowerCase().includes("secret");
-    res.json({
-      id: result.id,
-      key: result.key,
-      value: isSensitive ? "" : result.value,
-      configured: isSensitive ? true : undefined,
-      description: result.description,
-      updatedAt: result.updatedAt,
-    });
-  } catch (error) {
-    console.error("Error updating setting:", error);
-    res.status(500).json({ error: "Failed to update setting" });
-  }
-});
-
 router.post("/test-api-key", async (req: AuthenticatedRequest, res) => {
   try {
     const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
@@ -175,6 +127,54 @@ router.put("/auto-gen-config", async (req: AuthenticatedRequest, res) => {
   } catch (error) {
     console.error("Error updating auto-gen config:", error);
     res.status(500).json({ error: "Failed to update config" });
+  }
+});
+
+router.put("/:key", async (req: AuthenticatedRequest, res) => {
+  try {
+    const { key } = req.params;
+    const { value, description } = req.body;
+
+    if (!value) {
+      return res.status(400).json({ error: "Value is required" });
+    }
+
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const existing = await db
+      .select()
+      .from(systemSettingsTable)
+      .where(eq(systemSettingsTable.key, key))
+      .limit(1);
+
+    let result;
+    if (existing.length > 0) {
+      [result] = await db
+        .update(systemSettingsTable)
+        .set({ value, description, updatedBy: req.user.id, updatedAt: new Date() })
+        .where(eq(systemSettingsTable.key, key))
+        .returning();
+    } else {
+      [result] = await db
+        .insert(systemSettingsTable)
+        .values({ key, value, description, updatedBy: req.user.id })
+        .returning();
+    }
+
+    const isSensitive = key.toLowerCase().includes("key") || key.toLowerCase().includes("secret");
+    res.json({
+      id: result.id,
+      key: result.key,
+      value: isSensitive ? "" : result.value,
+      configured: isSensitive ? true : undefined,
+      description: result.description,
+      updatedAt: result.updatedAt,
+    });
+  } catch (error) {
+    console.error("Error updating setting:", error);
+    res.status(500).json({ error: "Failed to update setting" });
   }
 });
 
