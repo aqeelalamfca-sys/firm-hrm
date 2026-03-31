@@ -1,367 +1,531 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { Link } from "wouter";
-import { ArrowLeft, Calculator, FileText, Building2, Car, Home as HomeIcon, Banknote, Receipt, Truck, Phone, Zap, Globe, PartyPopper, ShoppingCart, CreditCard, Gift, Users, BarChart3, ChevronDown, ChevronUp, Info, CheckCircle2 } from "lucide-react";
+import {
+  ArrowLeft, Calculator, FileText, Building2, Car, Home as HomeIcon,
+  Banknote, Receipt, Truck, BarChart3, ChevronDown, ChevronUp, Info,
+  CheckCircle2, AlertTriangle, Shield, TrendingUp, AlertCircle,
+  Layers, Target, Zap, RefreshCw, Download, ClipboardList,
+  ShoppingCart, Globe, CreditCard, Users
+} from "lucide-react";
 
-function formatPKR(value: number): string {
-  return new Intl.NumberFormat("en-PK", { style: "currency", currency: "PKR", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+// ─── Formatters ────────────────────────────────────────────────────────────────
+function fmt(v: number) {
+  return new Intl.NumberFormat("en-PK", { style: "currency", currency: "PKR", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
 }
+function pct(v: number) { return `${(v * 100).toFixed(2)}%`; }
+function n(s: string | number) { return parseFloat(String(s) || "0") || 0; }
 
+// ─── Tax Rates & Data ──────────────────────────────────────────────────────────
 const SALARY_SLABS = [
-  { min: 0, max: 600000, base: 0, rate: 0 },
-  { min: 600001, max: 1200000, base: 0, rate: 0.01 },
-  { min: 1200001, max: 2200000, base: 6000, rate: 0.11 },
-  { min: 2200001, max: 3200000, base: 116000, rate: 0.23 },
-  { min: 3200001, max: 4100000, base: 346000, rate: 0.30 },
+  { min: 0,       max: 600000,   base: 0,      rate: 0 },
+  { min: 600001,  max: 1200000,  base: 0,      rate: 0.01 },
+  { min: 1200001, max: 2200000,  base: 6000,   rate: 0.11 },
+  { min: 2200001, max: 3200000,  base: 116000, rate: 0.23 },
+  { min: 3200001, max: 4100000,  base: 346000, rate: 0.30 },
   { min: 4100001, max: Infinity, base: 616000, rate: 0.35 },
 ];
 
-function calcSalaryTax(income: number): number {
-  if (income <= 600000) return 0;
-  let tax = 0;
-  for (const slab of SALARY_SLABS) {
-    if (income >= slab.min && income <= slab.max) {
-      tax = slab.base + (income - slab.min + 1) * slab.rate;
-      break;
+const BUSINESS_IND_SLABS = [
+  { min: 0,        max: 600000,   base: 0,       rate: 0 },
+  { min: 600001,   max: 1200000,  base: 0,       rate: 0.015 },
+  { min: 1200001,  max: 1600000,  base: 9000,    rate: 0.075 },
+  { min: 1600001,  max: 3200000,  base: 39000,   rate: 0.15 },
+  { min: 3200001,  max: 5600000,  base: 279000,  rate: 0.20 },
+  { min: 5600001,  max: 8000000,  base: 759000,  rate: 0.25 },
+  { min: 8000001,  max: 12000000, base: 1359000, rate: 0.30 },
+  { min: 12000001, max: Infinity, base: 2559000, rate: 0.35 },
+];
+
+const SUPER_TAX_SLABS = [
+  { min: 0,         max: 150000000, rate: 0 },
+  { min: 150000001, max: 200000000, rate: 0.01 },
+  { min: 200000001, max: 250000000, rate: 0.02 },
+  { min: 250000001, max: 300000000, rate: 0.03 },
+  { min: 300000001, max: 350000000, rate: 0.04 },
+  { min: 350000001, max: 400000000, rate: 0.06 },
+  { min: 400000001, max: 500000000, rate: 0.08 },
+  { min: 500000001, max: Infinity,  rate: 0.10 },
+];
+
+function calcSlabTax(income: number, slabs: typeof SALARY_SLABS): number {
+  if (income <= 0) return 0;
+  for (const s of slabs) {
+    if (income >= s.min && income <= s.max) {
+      return (s.base ?? 0) + (income - s.min + 1) * s.rate;
     }
   }
+  return 0;
+}
+
+function calcSalaryTax(income: number): number {
+  if (income <= 600000) return 0;
+  let tax = calcSlabTax(income, SALARY_SLABS);
   if (income > 10000000) tax *= 1.09;
   return tax;
 }
 
-const WHT_RATES: Record<string, { label: string; atl: number; nonatl: number; late?: number }> = {
-  import_part1: { label: "Import Goods Part-I (Twelfth Schedule)", atl: 0.01, nonatl: 0.02 },
-  import_part2: { label: "Import Goods Part-II (Standard)", atl: 0.02, nonatl: 0.04 },
-  import_part2_commercial: { label: "Import Goods Part-II (Commercial)", atl: 0.035, nonatl: 0.07 },
-  import_part3: { label: "Import Goods Part-III (Standard)", atl: 0.055, nonatl: 0.11 },
-  import_part3_commercial: { label: "Import Goods Part-III (Commercial)", atl: 0.06, nonatl: 0.12 },
-  import_pharma: { label: "Import Pharma Products (Proviso 1b)", atl: 0.04, nonatl: 0.08 },
-  import_ev_ckd: { label: "Import CKD kits for EVs", atl: 0.01, nonatl: 0.02 },
-  supply_company: { label: "Supply of Goods — Company", atl: 0.05, nonatl: 0.10 },
-  supply_noncompany: { label: "Supply of Goods — Non-Company", atl: 0.055, nonatl: 0.11 },
-  supply_rice_cotton: { label: "Supply Rice/Cotton Seed/Edible Oils", atl: 0.015, nonatl: 0.03 },
-  supply_toll_company: { label: "Toll Manufacturing — Company", atl: 0.09, nonatl: 0.18 },
-  supply_toll_noncompany: { label: "Toll Manufacturing — Non-Company", atl: 0.11, nonatl: 0.22 },
-  services_it: { label: "Services — IT/IT Enabled", atl: 0.04, nonatl: 0.08 },
-  services_general: { label: "Services — General", atl: 0.06, nonatl: 0.12 },
-  services_other: { label: "Services — Other (Div-III Para 5)", atl: 0.15, nonatl: 0.30 },
-  contract_company: { label: "Contract — Company", atl: 0.075, nonatl: 0.15 },
-  contract_noncompany: { label: "Contract — Non-Company", atl: 0.075, nonatl: 0.15 },
-  contract_sportsperson: { label: "Contract — Sports Persons", atl: 0.10, nonatl: 0.20 },
-  rent_company: { label: "Rent of Immovable Property — Company", atl: 0.15, nonatl: 0.30 },
-  dividend_ipp: { label: "Dividend — IPPs", atl: 0.075, nonatl: 0.15 },
-  dividend_reit: { label: "Dividend — REIT/General", atl: 0.15, nonatl: 0.30 },
-  dividend_mutual_debt: { label: "Dividend — Mutual Fund (Debt >50%)", atl: 0.25, nonatl: 0.50 },
-  dividend_mutual_equity: { label: "Dividend — Mutual Fund (Equity >50%)", atl: 0.15, nonatl: 0.30 },
-  dividend_spv_reit: { label: "Dividend — REIT from SPV", atl: 0.00, nonatl: 0.00 },
-  dividend_spv_other: { label: "Dividend — Others from SPV", atl: 0.35, nonatl: 0.70 },
-  profit_bank: { label: "Profit on Debt — Bank Deposit", atl: 0.20, nonatl: 0.40 },
-  profit_govt: { label: "Profit — Govt Securities (Non-Individual)", atl: 0.20, nonatl: 0.40 },
-  profit_other: { label: "Profit on Debt — Other", atl: 0.15, nonatl: 0.30 },
-  profit_sukuk_company: { label: "Sukuk — Company Holder", atl: 0.25, nonatl: 0.50 },
-  profit_sukuk_ind_high: { label: "Sukuk — Individual (Return >1M)", atl: 0.125, nonatl: 0.25 },
-  profit_sukuk_ind_low: { label: "Sukuk — Individual (Return <1M)", atl: 0.10, nonatl: 0.20 },
-  nonresident_general: { label: "Non-Resident — General (Sec 152(1))", atl: 0.15, nonatl: 0.15 },
-  nonresident_1a: { label: "Non-Resident — Sec 152(1A)", atl: 0.07, nonatl: 0.07 },
-  nonresident_1aa: { label: "Non-Resident — IT Services (Sec 152(1AA))", atl: 0.05, nonatl: 0.05 },
-  nonresident_1aaa: { label: "Non-Resident — Sec 152(1AAA)", atl: 0.10, nonatl: 0.10 },
-  export_goods: { label: "Export of Goods (Sec 154)", atl: 0.01, nonatl: 0.02 },
-  export_indenting: { label: "Export — Indenting Commission", atl: 0.05, nonatl: 0.10 },
-  export_services_pseb: { label: "Export IT Services (PSEB Registered)", atl: 0.0025, nonatl: 0.005 },
-  prize_bond: { label: "Prize Bond / Lottery", atl: 0.15, nonatl: 0.30 },
-  prize_quiz: { label: "Quiz/Promotion Prize", atl: 0.20, nonatl: 0.40 },
-  petroleum: { label: "Petroleum Products (Sec 156A)", atl: 0.12, nonatl: 0.24 },
-  brokerage_advertising: { label: "Commission — Advertising Agent", atl: 0.10, nonatl: 0.20 },
-  brokerage_life_insurance: { label: "Commission — Life Insurance Agent", atl: 0.08, nonatl: 0.16 },
-  brokerage_general: { label: "Commission — General", atl: 0.12, nonatl: 0.24 },
-  sale_distributor: { label: "Sale to Distributor (Fertilizer)", atl: 0.0025, nonatl: 0.007 },
-  sale_distributor_other: { label: "Sale to Distributor (Other)", atl: 0.005, nonatl: 0.01 },
-  sale_retailer: { label: "Sale to Retailer (Sec 236H)", atl: 0.005, nonatl: 0.025 },
-  function_gathering: { label: "Functions & Gatherings (Sec 236CB)", atl: 0.10, nonatl: 0.20 },
-  remittance_abroad: { label: "Remittance Abroad (Sec 236Y)", atl: 0.05, nonatl: 0.10 },
-  bonus_shares: { label: "Bonus Shares (Sec 236Z)", atl: 0.10, nonatl: 0.20 },
-  cash_withdrawal: { label: "Cash Withdrawal (Sec 231AB)", atl: 0.00, nonatl: 0.008 },
-  auction_goods: { label: "Public Auction — Goods (Sec 236A)", atl: 0.10, nonatl: 0.20 },
-  auction_property: { label: "Public Auction — Property", atl: 0.05, nonatl: 0.10 },
-  foreign_tv_serial: { label: "Foreign TV Serial Episode (Sec 236CA)", atl: 0, nonatl: 0 },
-  ecommerce_digital: { label: "E-Commerce — Digital Payment", atl: 0.01, nonatl: 0.02 },
-  ecommerce_cod: { label: "E-Commerce — Cash on Delivery", atl: 0.02, nonatl: 0.04 },
-};
-
-const VEHICLE_FIXED_RATES: Record<string, { label: string; atl: number; nonatl: number }> = {
-  upto850: { label: "Up to 850 cc", atl: 0, nonatl: 0 },
-  "851_1000": { label: "851 – 1,000 cc", atl: 5000, nonatl: 15000 },
-  "1001_1300": { label: "1,001 – 1,300 cc", atl: 7500, nonatl: 22500 },
-  "1301_1600": { label: "1,301 – 1,600 cc", atl: 12500, nonatl: 37500 },
-  "1601_1800": { label: "1,601 – 1,800 cc", atl: 18750, nonatl: 56250 },
-  "1801_2000": { label: "1,801 – 2,000 cc", atl: 25000, nonatl: 75000 },
-  "2001_2500": { label: "2,001 – 2,500 cc", atl: 37500, nonatl: 112500 },
-  "2501_3000": { label: "2,501 – 3,000 cc", atl: 50000, nonatl: 150000 },
-  above3000: { label: "Above 3,000 cc", atl: 62500, nonatl: 187500 },
-};
-
-const ANNUAL_VEHICLE_TAX: Record<string, { atl: number; nonatl: number }> = {
-  upto850: { atl: 800, nonatl: 1600 },
-  "851_1000": { atl: 1500, nonatl: 3000 },
-  "1001_1300": { atl: 1750, nonatl: 3500 },
-  "1301_1600": { atl: 2500, nonatl: 5000 },
-  "1601_1800": { atl: 3750, nonatl: 7500 },
-  "1801_2000": { atl: 4500, nonatl: 9000 },
-  "2001_2500": { atl: 10000, nonatl: 20000 },
-  "2501_3000": { atl: 10000, nonatl: 20000 },
-  above3000: { atl: 10000, nonatl: 20000 },
-};
-
-const RENT_SLABS_INDIVIDUAL = [
-  { min: 0, max: 300000, rate: 0 },
-  { min: 300001, max: 600000, rate: 0.05 },
-  { min: 600001, max: 2000000, rate: 0.10 },
-  { min: 2000001, max: Infinity, rate: 0.15 },
-];
-
-function calcRentTax(amount: number, isCompany: boolean, filer: string): number {
-  if (isCompany) {
-    return amount * (filer === "atl" ? 0.15 : 0.30);
-  }
-  let tax = 0;
-  let remaining = amount;
-  for (const slab of RENT_SLABS_INDIVIDUAL) {
-    if (remaining <= 0) break;
-    const slabWidth = slab.max === Infinity ? remaining : Math.min(remaining, slab.max - slab.min + 1);
-    if (amount > slab.min) {
-      const taxable = Math.min(remaining, slab.max - Math.max(slab.min, 0));
-      tax += taxable * slab.rate;
-      remaining -= taxable;
-    }
-  }
-  if (filer === "nonatl") tax *= 2;
+function calcBusinessIndTax(income: number): number {
+  if (income <= 600000) return 0;
+  let tax = calcSlabTax(income, BUSINESS_IND_SLABS);
+  if (income > 10000000) tax *= 1.09;
   return tax;
 }
 
-function calcPropertyTax(value: number, type: string, filer: string): { tax: number; rate: number } {
-  let rate = 0;
-  if (type === "transfer") {
-    if (value <= 50000000) {
-      rate = filer === "atl" ? 0.045 : filer === "nonatl" ? 0.115 : 0.075;
-    } else if (value <= 100000000) {
-      rate = filer === "atl" ? 0.05 : filer === "nonatl" ? 0.115 : 0.085;
-    } else {
-      rate = filer === "atl" ? 0.055 : filer === "nonatl" ? 0.115 : 0.095;
-    }
-  } else {
-    if (value <= 50000000) {
-      rate = filer === "atl" ? 0.015 : filer === "nonatl" ? 0.105 : 0.045;
-    } else if (value <= 100000000) {
-      rate = filer === "atl" ? 0.02 : filer === "nonatl" ? 0.145 : 0.055;
-    } else {
-      rate = filer === "atl" ? 0.025 : filer === "nonatl" ? 0.185 : 0.065;
-    }
+function calcSuperTax(income: number, isBanking: boolean): number {
+  if (isBanking) {
+    return income > 300000000 ? income * 0.10 : 0;
   }
-  return { tax: value * rate, rate };
+  for (const s of SUPER_TAX_SLABS) {
+    if (income >= s.min && income <= s.max) return income * s.rate;
+  }
+  return 0;
 }
 
-type TabKey = "rates" | "wht" | "salary" | "property" | "vehicle" | "investment" | "rental" | "misc";
+function calcMinimumTax(turnover: number, isCompany: boolean): number {
+  return turnover * (isCompany ? 0.0125 : 0.01);
+}
 
-const TABS: { key: TabKey; label: string; icon: any }[] = [
-  { key: "rates", label: "Rate Tables", icon: FileText },
-  { key: "wht", label: "WHT Calculator", icon: Calculator },
-  { key: "salary", label: "Income Tax", icon: Banknote },
-  { key: "property", label: "Property Tax", icon: HomeIcon },
-  { key: "vehicle", label: "Vehicle Tax", icon: Car },
-  { key: "investment", label: "Investment Income", icon: BarChart3 },
-  { key: "rental", label: "Rental Income", icon: Building2 },
-  { key: "misc", label: "Other Sections", icon: Receipt },
-];
+const WHT_RATES: Record<string, { label: string; section: string; atl: number; nonatl: number }> = {
+  import_part1:         { label: "Import Goods Part-I (Twelfth Schedule)",     section: "148",    atl: 0.01,  nonatl: 0.02 },
+  import_part2:         { label: "Import Goods Part-II (Standard)",             section: "148",    atl: 0.02,  nonatl: 0.04 },
+  import_part2_commercial: { label: "Import Goods Part-II (Commercial)",        section: "148",    atl: 0.035, nonatl: 0.07 },
+  import_part3:         { label: "Import Goods Part-III (Standard)",            section: "148",    atl: 0.055, nonatl: 0.11 },
+  import_part3_commercial: { label: "Import Goods Part-III (Commercial)",       section: "148",    atl: 0.06,  nonatl: 0.12 },
+  import_pharma:        { label: "Import Pharma Products (Proviso 1b)",         section: "148",    atl: 0.04,  nonatl: 0.08 },
+  import_ev_ckd:        { label: "Import CKD kits for EVs",                    section: "148",    atl: 0.01,  nonatl: 0.02 },
+  supply_company:       { label: "Supply of Goods — Company",                   section: "153(1)(a)", atl: 0.05, nonatl: 0.10 },
+  supply_noncompany:    { label: "Supply of Goods — Non-Company",               section: "153(1)(a)", atl: 0.055, nonatl: 0.11 },
+  supply_rice_cotton:   { label: "Supply Rice/Cotton Seed/Edible Oils",         section: "153(1)(a)", atl: 0.015, nonatl: 0.03 },
+  supply_toll_company:  { label: "Toll Manufacturing — Company",                section: "153(1)(a)", atl: 0.09, nonatl: 0.18 },
+  supply_toll_noncompany: { label: "Toll Manufacturing — Non-Company",          section: "153(1)(a)", atl: 0.11, nonatl: 0.22 },
+  services_it:          { label: "Services — IT/IT Enabled",                   section: "153(1)(b)", atl: 0.04, nonatl: 0.08 },
+  services_general:     { label: "Services — General",                          section: "153(1)(b)", atl: 0.06, nonatl: 0.12 },
+  services_other:       { label: "Services — Other (Div-III Para 5)",           section: "153(1)(b)", atl: 0.15, nonatl: 0.30 },
+  contract_company:     { label: "Contract — Company",                          section: "153(1)(c)", atl: 0.075, nonatl: 0.15 },
+  contract_noncompany:  { label: "Contract — Non-Company",                      section: "153(1)(c)", atl: 0.075, nonatl: 0.15 },
+  contract_sportsperson: { label: "Contract — Sports Persons",                  section: "153(1)(c)", atl: 0.10, nonatl: 0.20 },
+  rent_company:         { label: "Rent of Immovable Property — Company",        section: "155",    atl: 0.15, nonatl: 0.30 },
+  dividend_ipp:         { label: "Dividend — IPPs",                             section: "150",    atl: 0.075, nonatl: 0.15 },
+  dividend_reit:        { label: "Dividend — REIT / General",                   section: "150",    atl: 0.15, nonatl: 0.30 },
+  dividend_mutual_debt: { label: "Dividend — Mutual Fund (Debt >50%)",          section: "150",    atl: 0.25, nonatl: 0.50 },
+  dividend_mutual_equity: { label: "Dividend — Mutual Fund (Equity >50%)",      section: "150",    atl: 0.15, nonatl: 0.30 },
+  dividend_spv_reit:    { label: "Dividend — REIT from SPV (Exempt)",           section: "150",    atl: 0.00, nonatl: 0.00 },
+  dividend_spv_other:   { label: "Dividend — Others from SPV",                  section: "150",    atl: 0.35, nonatl: 0.70 },
+  profit_bank:          { label: "Profit on Debt — Bank Deposit",               section: "151",    atl: 0.20, nonatl: 0.40 },
+  profit_govt:          { label: "Profit — Govt Securities (Non-Individual)",   section: "151",    atl: 0.20, nonatl: 0.40 },
+  profit_other:         { label: "Profit on Debt — Other",                      section: "151",    atl: 0.15, nonatl: 0.30 },
+  profit_sukuk_company: { label: "Sukuk — Company Holder",                      section: "151",    atl: 0.25, nonatl: 0.50 },
+  profit_sukuk_ind_high: { label: "Sukuk — Individual (Return >1M)",            section: "151",    atl: 0.125, nonatl: 0.25 },
+  profit_sukuk_ind_low: { label: "Sukuk — Individual (Return <1M)",             section: "151",    atl: 0.10, nonatl: 0.20 },
+  nonresident_general:  { label: "Non-Resident — General (Sec 152(1))",         section: "152",    atl: 0.15, nonatl: 0.15 },
+  nonresident_1a:       { label: "Non-Resident — Sec 152(1A)",                  section: "152",    atl: 0.07, nonatl: 0.07 },
+  nonresident_1aa:      { label: "Non-Resident — IT Services (Sec 152(1AA))",   section: "152",    atl: 0.05, nonatl: 0.05 },
+  nonresident_1aaa:     { label: "Non-Resident — Sec 152(1AAA)",                section: "152",    atl: 0.10, nonatl: 0.10 },
+  export_goods:         { label: "Export of Goods (Final Tax)",                 section: "154",    atl: 0.01, nonatl: 0.02 },
+  export_indenting:     { label: "Export — Indenting Commission",               section: "154",    atl: 0.05, nonatl: 0.10 },
+  export_services_pseb: { label: "Export IT Services (PSEB Registered)",        section: "154A",   atl: 0.0025, nonatl: 0.005 },
+  prize_bond:           { label: "Prize Bond / Lottery",                        section: "156",    atl: 0.15, nonatl: 0.30 },
+  prize_quiz:           { label: "Quiz/Promotion Prize",                        section: "156",    atl: 0.20, nonatl: 0.40 },
+  petroleum:            { label: "Petroleum Products",                           section: "156A",   atl: 0.12, nonatl: 0.24 },
+  brokerage_advertising: { label: "Commission — Advertising Agent",             section: "233",    atl: 0.10, nonatl: 0.20 },
+  brokerage_life_insurance: { label: "Commission — Life Insurance Agent",       section: "233",    atl: 0.08, nonatl: 0.16 },
+  brokerage_general:    { label: "Commission — General",                        section: "233",    atl: 0.12, nonatl: 0.24 },
+  sale_distributor:     { label: "Sale to Distributor (Fertilizer)",            section: "236G",   atl: 0.0025, nonatl: 0.007 },
+  sale_distributor_other: { label: "Sale to Distributor (Other)",               section: "236G",   atl: 0.005, nonatl: 0.01 },
+  sale_retailer:        { label: "Sale to Retailer",                            section: "236H",   atl: 0.005, nonatl: 0.025 },
+  function_gathering:   { label: "Functions & Gatherings",                      section: "236CB",  atl: 0.10, nonatl: 0.20 },
+  remittance_abroad:    { label: "Remittance Abroad",                           section: "236Y",   atl: 0.05, nonatl: 0.10 },
+  bonus_shares:         { label: "Bonus Shares",                                section: "236Z",   atl: 0.10, nonatl: 0.20 },
+  cash_withdrawal:      { label: "Cash Withdrawal (Non-ATL only)",              section: "231AB",  atl: 0.00, nonatl: 0.008 },
+  auction_goods:        { label: "Public Auction — Goods",                      section: "236A",   atl: 0.10, nonatl: 0.20 },
+  auction_property:     { label: "Public Auction — Property",                   section: "236A",   atl: 0.05, nonatl: 0.10 },
+  ecommerce_digital:    { label: "E-Commerce — Digital Payment",                section: "236W",   atl: 0.01, nonatl: 0.02 },
+  ecommerce_cod:        { label: "E-Commerce — Cash on Delivery",               section: "236W",   atl: 0.02, nonatl: 0.04 },
+};
 
-function InputField({ label, value, onChange, type = "number", placeholder }: { label: string; value: string | number; onChange: (v: string) => void; type?: string; placeholder?: string }) {
+const VEHICLE_FIXED_RATES: Record<string, { label: string; atl: number; nonatl: number }> = {
+  upto850:      { label: "Up to 850 cc",      atl: 0,     nonatl: 0 },
+  "851_1000":   { label: "851 – 1,000 cc",    atl: 5000,  nonatl: 15000 },
+  "1001_1300":  { label: "1,001 – 1,300 cc",  atl: 7500,  nonatl: 22500 },
+  "1301_1600":  { label: "1,301 – 1,600 cc",  atl: 12500, nonatl: 37500 },
+  "1601_1800":  { label: "1,601 – 1,800 cc",  atl: 18750, nonatl: 56250 },
+  "1801_2000":  { label: "1,801 – 2,000 cc",  atl: 25000, nonatl: 75000 },
+  "2001_2500":  { label: "2,001 – 2,500 cc",  atl: 37500, nonatl: 112500 },
+  "2501_3000":  { label: "2,501 – 3,000 cc",  atl: 50000, nonatl: 150000 },
+  above3000:    { label: "Above 3,000 cc",     atl: 62500, nonatl: 187500 },
+};
+
+const ANNUAL_VEHICLE_TAX: Record<string, { atl: number; nonatl: number }> = {
+  upto850:      { atl: 800,   nonatl: 1600 },
+  "851_1000":   { atl: 1500,  nonatl: 3000 },
+  "1001_1300":  { atl: 1750,  nonatl: 3500 },
+  "1301_1600":  { atl: 2500,  nonatl: 5000 },
+  "1601_1800":  { atl: 3750,  nonatl: 7500 },
+  "1801_2000":  { atl: 4500,  nonatl: 9000 },
+  "2001_2500":  { atl: 10000, nonatl: 20000 },
+  "2501_3000":  { atl: 10000, nonatl: 20000 },
+  above3000:    { atl: 10000, nonatl: 20000 },
+};
+
+// ─── Sub-components ────────────────────────────────────────────────────────────
+function InputField({ label, value, onChange, placeholder, hint }: {
+  label: string; value: string | number; onChange: (v: string) => void;
+  placeholder?: string; hint?: string;
+}) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-slate-600 mb-1.5">{label}</label>
+      <label className="block text-xs font-semibold text-slate-600 mb-1">{label}</label>
       <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        type="number" value={value} onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
       />
+      {hint && <p className="text-[10px] text-slate-400 mt-0.5">{hint}</p>}
     </div>
   );
 }
 
-function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
+function SelectField({ label, value, onChange, options, hint }: {
+  label: string; value: string; onChange: (v: string) => void;
+  options: { value: string; label: string }[]; hint?: string;
+}) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-slate-600 mb-1.5">{label}</label>
+      <label className="block text-xs font-semibold text-slate-600 mb-1">{label}</label>
       <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={value} onChange={(e) => onChange(e.target.value)}
         className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
       >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
+        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
+      {hint && <p className="text-[10px] text-slate-400 mt-0.5">{hint}</p>}
     </div>
   );
 }
 
-function ResultBox({ label, value, breakdown }: { label: string; value: string; breakdown?: string }) {
+function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <div className={`bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 ${className}`}>{children}</div>;
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h3 className="text-sm font-bold text-slate-800 mb-4">{children}</h3>;
+}
+
+function RiskBadge({ level }: { level: "high" | "medium" | "low" | "none" }) {
+  const config = {
+    high:   { label: "High Risk",   bg: "bg-red-100",    text: "text-red-700",    icon: "🔴" },
+    medium: { label: "Medium Risk", bg: "bg-amber-100",  text: "text-amber-700",  icon: "🟠" },
+    low:    { label: "Low Risk",    bg: "bg-emerald-100", text: "text-emerald-700", icon: "🟢" },
+    none:   { label: "No Exposure", bg: "bg-slate-100",  text: "text-slate-600",  icon: "⚪" },
+  }[level];
   return (
-    <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-blue-50 to-slate-50 border border-blue-100">
-      <p className="text-xs text-slate-500 font-medium mb-1">{label}</p>
-      <p className="text-xl font-bold text-blue-700">{value}</p>
-      {breakdown && <p className="text-[11px] text-slate-500 mt-1">{breakdown}</p>}
-    </div>
+    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${config.bg} ${config.text}`}>
+      {config.icon} {config.label}
+    </span>
   );
 }
 
-function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+function TaxRow({ label, amount, sub, highlight }: { label: string; amount: number; sub?: string; highlight?: boolean }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
-      <h3 className="text-base font-bold text-slate-800 mb-5">{title}</h3>
-      {children}
+    <div className={`flex items-center justify-between py-2.5 px-3 rounded-lg ${highlight ? "bg-blue-50 border border-blue-100" : "border-b border-slate-50"}`}>
+      <div>
+        <p className={`text-xs font-semibold ${highlight ? "text-blue-800" : "text-slate-700"}`}>{label}</p>
+        {sub && <p className="text-[10px] text-slate-400">{sub}</p>}
+      </div>
+      <p className={`text-sm font-bold tabular-nums ${amount > 0 ? (highlight ? "text-blue-700" : "text-slate-800") : "text-slate-400"}`}>
+        {fmt(amount)}
+      </p>
     </div>
   );
 }
 
+function AlertBox({ type, children }: { type: "info" | "warn" | "success" | "danger"; children: React.ReactNode }) {
+  const cfg = {
+    info:    { bg: "bg-blue-50",    border: "border-blue-200",   text: "text-blue-800",    Icon: Info },
+    warn:    { bg: "bg-amber-50",   border: "border-amber-200",  text: "text-amber-800",   Icon: AlertTriangle },
+    success: { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-800", Icon: CheckCircle2 },
+    danger:  { bg: "bg-red-50",     border: "border-red-200",    text: "text-red-800",     Icon: AlertCircle },
+  }[type];
+  const { bg, border, text, Icon } = cfg;
+  return (
+    <div className={`flex items-start gap-2 p-3 rounded-xl border ${bg} ${border}`}>
+      <Icon className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${text}`} />
+      <p className={`text-[11px] leading-relaxed ${text}`}>{children}</p>
+    </div>
+  );
+}
+
+// ─── RATE TABLE SECTIONS ───────────────────────────────────────────────────────
+const RATE_TABLE_SECTIONS = [
+  { title: "Imports (Sec 148)", rows: ["import_part1","import_part2","import_part2_commercial","import_part3","import_part3_commercial","import_pharma","import_ev_ckd"] },
+  { title: "Supplies & Goods (Sec 153(1)(a))", rows: ["supply_company","supply_noncompany","supply_rice_cotton","supply_toll_company","supply_toll_noncompany"] },
+  { title: "Services (Sec 153(1)(b))", rows: ["services_it","services_general","services_other"] },
+  { title: "Contracts (Sec 153(1)(c))", rows: ["contract_company","contract_noncompany","contract_sportsperson"] },
+  { title: "Dividend (Sec 150)", rows: ["dividend_ipp","dividend_reit","dividend_mutual_debt","dividend_mutual_equity","dividend_spv_reit","dividend_spv_other"] },
+  { title: "Profit on Debt (Sec 151)", rows: ["profit_bank","profit_govt","profit_other","profit_sukuk_company","profit_sukuk_ind_high","profit_sukuk_ind_low"] },
+  { title: "Non-Resident Payments (Sec 152)", rows: ["nonresident_general","nonresident_1a","nonresident_1aa","nonresident_1aaa"] },
+  { title: "Exports (Sec 154 / 154A)", rows: ["export_goods","export_indenting","export_services_pseb"] },
+  { title: "Rent (Sec 155)", rows: ["rent_company"] },
+  { title: "Prizes & Petroleum (Sec 156 / 156A)", rows: ["prize_bond","prize_quiz","petroleum"] },
+  { title: "Brokerage & Commission (Sec 233)", rows: ["brokerage_advertising","brokerage_life_insurance","brokerage_general"] },
+  { title: "Sales, Functions & Others (Sec 236 series)", rows: ["sale_distributor","sale_distributor_other","sale_retailer","function_gathering","remittance_abroad","bonus_shares","cash_withdrawal","auction_goods","auction_property","ecommerce_digital","ecommerce_cod"] },
+];
+
+// ─── TAB DEFINITION ────────────────────────────────────────────────────────────
+type TabKey = "exposure" | "income" | "wht" | "salestax" | "property" | "vehicle" | "investment" | "rental" | "rates";
+
+const TABS: { key: TabKey; label: string; icon: any; badge?: string }[] = [
+  { key: "exposure",  label: "Tax Exposure",  icon: Target,     badge: "NEW" },
+  { key: "income",    label: "Income Tax",    icon: Banknote },
+  { key: "wht",       label: "WHT Calc",      icon: Calculator },
+  { key: "salestax",  label: "Sales Tax",     icon: ShoppingCart },
+  { key: "property",  label: "Property",      icon: HomeIcon },
+  { key: "vehicle",   label: "Vehicle",       icon: Car },
+  { key: "investment", label: "Investment",   icon: BarChart3 },
+  { key: "rental",    label: "Rental",        icon: Building2 },
+  { key: "rates",     label: "Rate Tables",   icon: FileText },
+];
+
+// ─── MAIN COMPONENT ────────────────────────────────────────────────────────────
 export default function TaxCalculator() {
-  const [activeTab, setActiveTab] = useState<TabKey>("wht");
+  const [activeTab, setActiveTab] = useState<TabKey>("exposure");
   const [filerStatus, setFilerStatus] = useState("atl");
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
-  const [whtType, setWhtType] = useState("supply_company");
+  // ── Exposure Tab State ───────────────────────────────────────────────────────
+  const [entityType,    setEntityType]    = useState("company_private");
+  const [sector,        setSector]        = useState("services");
+  const [atlStatus,     setAtlStatus]     = useState("atl");
+  const [pstReg,        setPstReg]        = useState("none");
+  const [revenue,       setRevenue]       = useState("50000000");
+  const [cogs,          setCogs]          = useState("30000000");
+  const [expenses,      setExpenses]      = useState("8000000");
+  const [salaryPayroll, setSalaryPayroll] = useState("5000000");
+  const [importValue,   setImportValue]   = useState("0");
+  const [contractsRcvd, setContractsRcvd] = useState("0");
+  const [servicesRcvd,  setServicesRcvd]  = useState("0");
+  const [advancePaidExp, setAdvancePaidExp] = useState("0");
+  const [whtCreditsExp,  setWhtCreditsExp]  = useState("0");
+  const [inputTaxPaid,   setInputTaxPaid]   = useState("0");
+  const [showExposure, setShowExposure] = useState(false);
+
+  // ── Income Tab State ─────────────────────────────────────────────────────────
+  const [salaryType,    setSalaryType]    = useState("company");
+  const [salaryIncome,  setSalaryIncome]  = useState("3500000");
+  const [advancePaid,   setAdvancePaid]   = useState("0");
+  const [whtCredits,    setWhtCredits]    = useState("0");
+  const [turnoverIT,    setTurnoverIT]    = useState("50000000");
+
+  // ── WHT Tab State ────────────────────────────────────────────────────────────
+  const [whtType,   setWhtType]   = useState("supply_company");
   const [whtAmount, setWhtAmount] = useState("500000");
 
-  const [salaryIncome, setSalaryIncome] = useState("3500000");
-  const [salaryType, setSalaryType] = useState("salaried");
-  const [advancePaid, setAdvancePaid] = useState("0");
-  const [whtCredits, setWhtCredits] = useState("0");
+  // ── Sales Tax Tab State ──────────────────────────────────────────────────────
+  const [stRate,        setStRate]        = useState("0.18");
+  const [outputSales,   setOutputSales]   = useState("5000000");
+  const [inputPurchases, setInputPurchases] = useState("3000000");
+  const [inputTaxRate,  setInputTaxRate]  = useState("0.18");
+  const [disallowedPct, setDisallowedPct] = useState("0");
+  const [stProvince,    setStProvince]    = useState("federal");
+  const [serviceAmt,    setServiceAmt]    = useState("1000000");
+  const [pstRate,       setPstRate]       = useState("0.16");
 
-  const [propType, setPropType] = useState("transfer");
+  // ── Property Tab State ───────────────────────────────────────────────────────
+  const [propType,  setPropType]  = useState("transfer");
   const [propValue, setPropValue] = useState("45000000");
   const [propFiler, setPropFiler] = useState("atl");
 
-  const [vehicleCC, setVehicleCC] = useState("1301_1600");
+  // ── Vehicle Tab State ────────────────────────────────────────────────────────
+  const [vehicleCC,    setVehicleCC]    = useState("1301_1600");
   const [vehicleValue, setVehicleValue] = useState("5000000");
 
-  const [investType, setInvestType] = useState("dividend_reit");
+  // ── Investment Tab State ─────────────────────────────────────────────────────
+  const [investType,   setInvestType]   = useState("dividend_reit");
   const [investAmount, setInvestAmount] = useState("1000000");
 
+  // ── Rental Tab State ─────────────────────────────────────────────────────────
   const [rentAmount, setRentAmount] = useState("1200000");
   const [rentEntity, setRentEntity] = useState("individual");
 
-  const [miscType, setMiscType] = useState("function_gathering");
-  const [miscAmount, setMiscAmount] = useState("500000");
-
-  const [expandedSection, setExpandedSection] = useState<string | null>(null);
-
+  // ── WHT Result ───────────────────────────────────────────────────────────────
   const whtResult = useMemo(() => {
     const rate = WHT_RATES[whtType];
     if (!rate) return { tax: 0, rateUsed: 0, label: "" };
     const r = filerStatus === "atl" ? rate.atl : rate.nonatl;
-    return { tax: parseFloat(whtAmount || "0") * r, rateUsed: r, label: rate.label };
+    return { tax: n(whtAmount) * r, rateUsed: r, label: rate.label };
   }, [whtType, whtAmount, filerStatus]);
 
-  const salaryResult = useMemo(() => {
-    const income = parseFloat(salaryIncome || "0");
-    const credits = parseFloat(advancePaid || "0") + parseFloat(whtCredits || "0");
-    if (salaryType === "company") {
-      const tax = income * 0.29;
-      return { tax, net: tax - credits, quarterly: tax / 4 };
-    }
-    const tax = calcSalaryTax(income);
-    return { tax, net: tax - credits, quarterly: tax / 4 };
-  }, [salaryIncome, salaryType, advancePaid, whtCredits]);
+  // ── Income Tax Result ────────────────────────────────────────────────────────
+  const incomeResult = useMemo(() => {
+    const income = n(salaryIncome);
+    const credits = n(advancePaid) + n(whtCredits);
+    const turnover = n(turnoverIT);
+    let tax = 0;
+    let corporate = false;
+    let minTaxAmt = 0;
+    let superTaxAmt = 0;
 
+    if (salaryType === "company_small") {
+      tax = income * 0.21; corporate = true;
+    } else if (salaryType === "company_banking") {
+      tax = income * 0.39; corporate = true;
+    } else if (salaryType === "company") {
+      tax = income * 0.29; corporate = true;
+    } else if (salaryType === "salaried") {
+      tax = calcSalaryTax(income);
+    } else {
+      tax = calcBusinessIndTax(income);
+    }
+
+    if (corporate) {
+      minTaxAmt = calcMinimumTax(turnover, true);
+      superTaxAmt = calcSuperTax(income, salaryType === "company_banking");
+    }
+
+    const effectiveTax = Math.max(tax, minTaxAmt) + superTaxAmt;
+    return { tax, minTaxAmt, superTaxAmt, effectiveTax, net: effectiveTax - credits, quarterly: effectiveTax / 4, corporate };
+  }, [salaryType, salaryIncome, advancePaid, whtCredits, turnoverIT]);
+
+  // ── Sales Tax Result ─────────────────────────────────────────────────────────
+  const salesTaxResult = useMemo(() => {
+    const sales = n(outputSales);
+    const purchases = n(inputPurchases);
+    const sRate = n(stRate);
+    const iRate = n(inputTaxRate);
+    const dis = n(disallowedPct) / 100;
+
+    const outputTax = sales * sRate;
+    const grossInput = purchases * iRate;
+    const disallowedInput = grossInput * dis;
+    const allowedInput = grossInput - disallowedInput;
+    const netPayable = Math.max(0, outputTax - allowedInput);
+    const refundable = Math.max(0, allowedInput - outputTax);
+
+    const pstAmt = n(serviceAmt) * n(pstRate);
+
+    return { outputTax, allowedInput, disallowedInput, netPayable, refundable, pstAmt };
+  }, [outputSales, inputPurchases, stRate, inputTaxRate, disallowedPct, serviceAmt, pstRate]);
+
+  // ── Property Result ───────────────────────────────────────────────────────────
   const propResult = useMemo(() => {
-    return calcPropertyTax(parseFloat(propValue || "0"), propType, propFiler);
+    const val = n(propValue);
+    let rate = 0;
+    if (propType === "transfer") {
+      if (val <= 50000000)       rate = propFiler === "atl" ? 0.045 : propFiler === "nonatl" ? 0.115 : 0.075;
+      else if (val <= 100000000) rate = propFiler === "atl" ? 0.050 : propFiler === "nonatl" ? 0.115 : 0.085;
+      else                       rate = propFiler === "atl" ? 0.055 : propFiler === "nonatl" ? 0.115 : 0.095;
+    } else {
+      if (val <= 50000000)       rate = propFiler === "atl" ? 0.015 : propFiler === "nonatl" ? 0.105 : 0.045;
+      else if (val <= 100000000) rate = propFiler === "atl" ? 0.020 : propFiler === "nonatl" ? 0.145 : 0.055;
+      else                       rate = propFiler === "atl" ? 0.025 : propFiler === "nonatl" ? 0.185 : 0.065;
+    }
+    return { tax: val * rate, rate };
   }, [propValue, propType, propFiler]);
 
+  // ── Vehicle Result ────────────────────────────────────────────────────────────
   const vehicleResult = useMemo(() => {
-    const cc = vehicleCC;
-    const val = parseFloat(vehicleValue || "0");
-    const fixed = VEHICLE_FIXED_RATES[cc];
-    const annual = ANNUAL_VEHICLE_TAX[cc];
-    let reg = filerStatus === "atl" ? fixed.atl : fixed.nonatl;
-    let percentTax = 0;
-    if (cc === "above3000") {
-      percentTax = val * (filerStatus === "atl" ? 0.12 : 0.36);
-    }
-    return {
-      registration: reg,
-      percentBased: percentTax,
-      total: reg + percentTax,
-      annual: filerStatus === "atl" ? annual.atl : annual.nonatl,
-      label: fixed.label,
-    };
+    const fixed = VEHICLE_FIXED_RATES[vehicleCC];
+    const annual = ANNUAL_VEHICLE_TAX[vehicleCC];
+    const atl = filerStatus === "atl";
+    let reg = atl ? fixed.atl : fixed.nonatl;
+    let percentTax = vehicleCC === "above3000" ? n(vehicleValue) * (atl ? 0.12 : 0.36) : 0;
+    return { registration: reg, percentBased: percentTax, total: reg + percentTax, annual: atl ? annual.atl : annual.nonatl, label: fixed.label };
   }, [vehicleCC, vehicleValue, filerStatus]);
 
-  const investResult = useMemo(() => {
-    const rate = WHT_RATES[investType];
-    if (!rate) return { tax: 0, rateUsed: 0, label: "" };
-    const r = filerStatus === "atl" ? rate.atl : rate.nonatl;
-    return { tax: parseFloat(investAmount || "0") * r, rateUsed: r, label: rate.label };
-  }, [investType, investAmount, filerStatus]);
+  // ── Exposure Computation ──────────────────────────────────────────────────────
+  const exposureResult = useMemo(() => {
+    const rev = n(revenue);
+    const cogsV = n(cogs);
+    const expV = n(expenses);
+    const payroll = n(salaryPayroll);
+    const imports = n(importValue);
+    const contracts = n(contractsRcvd);
+    const services = n(servicesRcvd);
+    const advPaid = n(advancePaidExp);
+    const whtCrd = n(whtCreditsExp);
+    const inputTax = n(inputTaxPaid);
 
-  const miscResult = useMemo(() => {
-    const rate = WHT_RATES[miscType];
-    if (!rate) return { tax: 0, rateUsed: 0, label: "" };
-    const r = filerStatus === "atl" ? rate.atl : rate.nonatl;
-    return { tax: parseFloat(miscAmount || "0") * r, rateUsed: r, label: rate.label };
-  }, [miscType, miscAmount, filerStatus]);
+    const isCompany = entityType.startsWith("company");
+    const isBanking = entityType === "company_banking";
+    const isATL = atlStatus === "atl";
 
-  const RATE_TABLE_SECTIONS = [
-    {
-      title: "Imports (Sec 148)",
-      rows: ["import_part1", "import_part2", "import_part2_commercial", "import_part3", "import_part3_commercial", "import_pharma", "import_ev_ckd"],
-    },
-    {
-      title: "Supplies & Goods (Sec 153(1)(a))",
-      rows: ["supply_company", "supply_noncompany", "supply_rice_cotton", "supply_toll_company", "supply_toll_noncompany"],
-    },
-    {
-      title: "Services (Sec 153(1)(b))",
-      rows: ["services_it", "services_general", "services_other"],
-    },
-    {
-      title: "Contracts (Sec 153(1)(c))",
-      rows: ["contract_company", "contract_noncompany", "contract_sportsperson"],
-    },
-    {
-      title: "Dividend (Sec 150)",
-      rows: ["dividend_ipp", "dividend_reit", "dividend_mutual_debt", "dividend_mutual_equity", "dividend_spv_reit", "dividend_spv_other"],
-    },
-    {
-      title: "Profit on Debt (Sec 151)",
-      rows: ["profit_bank", "profit_govt", "profit_other", "profit_sukuk_company", "profit_sukuk_ind_high", "profit_sukuk_ind_low"],
-    },
-    {
-      title: "Non-Resident Payments (Sec 152)",
-      rows: ["nonresident_general", "nonresident_1a", "nonresident_1aa", "nonresident_1aaa"],
-    },
-    {
-      title: "Exports (Sec 154)",
-      rows: ["export_goods", "export_indenting", "export_services_pseb"],
-    },
-    {
-      title: "Rent (Sec 155)",
-      rows: ["rent_company"],
-    },
-    {
-      title: "Prizes & Misc (Sec 156)",
-      rows: ["prize_bond", "prize_quiz", "petroleum"],
-    },
-    {
-      title: "Brokerage & Commission (Sec 233)",
-      rows: ["brokerage_advertising", "brokerage_life_insurance", "brokerage_general"],
-    },
-    {
-      title: "Sales, Functions & Others",
-      rows: ["sale_distributor", "sale_distributor_other", "sale_retailer", "function_gathering", "remittance_abroad", "bonus_shares", "cash_withdrawal", "auction_goods", "auction_property", "ecommerce_digital", "ecommerce_cod"],
-    },
-  ];
+    // Taxable income
+    const grossProfit = rev - cogsV;
+    const taxableIncome = Math.max(0, grossProfit - expV - payroll);
+
+    // Income Tax
+    let incomeTax = 0;
+    if (entityType === "company_banking")  incomeTax = taxableIncome * 0.39;
+    else if (entityType === "company_small") incomeTax = taxableIncome * 0.21;
+    else if (isCompany)                    incomeTax = taxableIncome * 0.29;
+    else if (entityType === "individual_salaried") incomeTax = calcSalaryTax(taxableIncome);
+    else incomeTax = calcBusinessIndTax(taxableIncome);
+
+    // Minimum Tax (Sec 113) for companies
+    const minTax = isCompany ? rev * 0.0125 : rev * 0.01;
+    const effectiveIncomeTax = Math.max(incomeTax, minTax);
+
+    // Super Tax (Sec 4C)
+    const superTax = calcSuperTax(taxableIncome, isBanking);
+
+    // WHT on payroll (Sec 149) — employer's liability
+    const payrollWHT = calcSalaryTax(payroll * 0.7); // avg estimate per employee
+
+    // WHT on imports (Sec 148)
+    const importRate = isATL ? 0.02 : 0.04;
+    const importWHT = imports * importRate;
+
+    // WHT on contracts received (Sec 153)
+    const contractRate = isATL ? (isCompany ? 0.075 : 0.075) : 0.15;
+    const contractWHT = contracts * contractRate;
+
+    // WHT on services (Sec 153)
+    const serviceWHT = services * (isATL ? 0.06 : 0.12);
+
+    // Sales Tax estimate (if registered)
+    const hasSalesTax = pstReg !== "none";
+    const outputST = hasSalesTax ? rev * 0.18 : 0;
+    const inputST = hasSalesTax ? cogsV * 0.18 : 0;
+    const netSalesTax = Math.max(0, outputST - inputST - inputTax);
+
+    // Total liability
+    const totalLiability = effectiveIncomeTax + superTax + importWHT + contractWHT + serviceWHT + netSalesTax;
+    const totalCredits = advPaid + whtCrd;
+    const netExposure = Math.max(0, totalLiability - totalCredits);
+
+    // Risk classification
+    const riskRatio = rev > 0 ? netExposure / rev : 0;
+    const risk: "high" | "medium" | "low" | "none" =
+      netExposure === 0 ? "none" : riskRatio > 0.1 ? "high" : riskRatio > 0.05 ? "medium" : "low";
+
+    // Penalty simulation (default surcharge + late filing)
+    const lateFilingPenalty = Math.max(40000, effectiveIncomeTax * 0.0025);
+    const defaultSurcharge = netExposure * (1 / 12) * 0.12; // KIBOR-linked estimate
+
+    // Suggestions
+    const suggestions: { type: "warn" | "danger" | "info"; text: string }[] = [];
+    if (!isATL) suggestions.push({ type: "danger", text: "Entity is Non-ATL — all WHT rates are doubled. Ensure ATL compliance to reduce exposure significantly." });
+    if (minTax > incomeTax && isCompany) suggestions.push({ type: "warn", text: `Minimum Tax (Sec 113) applies at Rs ${fmt(minTax)} — higher than computed income tax of Rs ${fmt(incomeTax)}.` });
+    if (superTax > 0) suggestions.push({ type: "warn", text: `Super Tax (Sec 4C) of Rs ${fmt(superTax)} is applicable. Consider income planning strategies.` });
+    if (payroll > 0 && payrollWHT === 0) suggestions.push({ type: "info", text: "No withholding tax on payroll detected. Ensure Sec 149 deduction is being made and deposited." });
+    if (imports > 0) suggestions.push({ type: "info", text: `Import WHT (Sec 148) of Rs ${fmt(importWHT)} is deductible against final income tax liability.` });
+    if (!hasSalesTax && rev > 10000000) suggestions.push({ type: "warn", text: "Turnover exceeds Rs 10M — verify Sales Tax registration requirement under the Sales Tax Act 1990." });
+    if (netExposure > 0) suggestions.push({ type: "danger", text: `Net tax exposure of Rs ${fmt(netExposure)} is unpaid. Late payment will attract ${pct(0.12)} default surcharge.` });
+
+    return {
+      taxableIncome, incomeTax, minTax, effectiveIncomeTax, superTax,
+      payrollWHT, importWHT, contractWHT, serviceWHT,
+      netSalesTax, totalLiability, totalCredits, netExposure,
+      risk, lateFilingPenalty, defaultSurcharge, suggestions,
+    };
+  }, [revenue, cogs, expenses, salaryPayroll, importValue, contractsRcvd, servicesRcvd,
+      advancePaidExp, whtCreditsExp, inputTaxPaid, entityType, atlStatus, pstReg]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
+
+      {/* ── Header ── */}
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/landing">
@@ -371,27 +535,21 @@ export default function TaxCalculator() {
             </Link>
             <div className="h-5 w-px bg-slate-200" />
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-                <Calculator className="w-4.5 h-4.5 text-white" />
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shadow-sm">
+                <Target className="w-4 h-4 text-white" />
               </div>
               <div>
-                <h1 className="text-sm font-bold text-slate-800 leading-tight">WHT Calculator</h1>
-                <p className="text-[10px] text-slate-400 font-medium">Finance Act 2025</p>
+                <h1 className="text-sm font-bold text-slate-800 leading-tight">Tax Exposure Calculator</h1>
+                <p className="text-[10px] text-slate-400 font-medium">Pakistan — Finance Act 2025 • All Tax Heads</p>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-medium text-slate-500 hidden sm:block">Taxpayer Status:</span>
-            <div className="flex rounded-lg border border-slate-200 overflow-hidden">
-              {[
-                { value: "atl", label: "ATL" },
-                { value: "nonatl", label: "Non-ATL" },
-              ].map((s) => (
-                <button
-                  key={s.value}
-                  onClick={() => setFilerStatus(s.value)}
-                  className={`px-3 py-1.5 text-[11px] font-semibold transition-all ${filerStatus === s.value ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
-                >
+            <span className="text-[11px] font-medium text-slate-500 hidden sm:block">Default Status:</span>
+            <div className="flex rounded-lg border border-slate-200 overflow-hidden text-[11px] font-semibold">
+              {[{ value: "atl", label: "ATL" }, { value: "nonatl", label: "Non-ATL" }].map((s) => (
+                <button key={s.value} onClick={() => setFilerStatus(s.value)}
+                  className={`px-3 py-1.5 transition-all ${filerStatus === s.value ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>
                   {s.label}
                 </button>
               ))}
@@ -400,540 +558,931 @@ export default function TaxCalculator() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        <div className="flex gap-2 overflow-x-auto pb-3 mb-6 scrollbar-hide">
-          {TABS.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${activeTab === key ? "bg-blue-600 text-white shadow-md shadow-blue-500/20" : "bg-white text-slate-600 border border-slate-200 hover:border-blue-200 hover:text-blue-600"}`}
-            >
-              <Icon className="w-3.5 h-3.5" /> {label}
-            </button>
-          ))}
+      {/* ── Tab Bar ── */}
+      <div className="bg-white border-b border-slate-200/60 sticky top-14 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex gap-1 overflow-x-auto py-2 scrollbar-hide">
+            {TABS.map(({ key, label, icon: Icon, badge }) => (
+              <button key={key} onClick={() => setActiveTab(key)}
+                className={`relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                  activeTab === key ? "bg-blue-600 text-white shadow-md shadow-blue-500/20" : "text-slate-600 hover:bg-slate-100"
+                }`}>
+                <Icon className="w-3.5 h-3.5" /> {label}
+                {badge && <span className="absolute -top-1 -right-1 px-1 py-0.5 rounded text-[8px] font-black bg-emerald-500 text-white leading-none">{badge}</span>}
+              </button>
+            ))}
+          </div>
         </div>
+      </div>
 
-        {activeTab === "rates" && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">
-                {filerStatus === "atl" ? "Active Taxpayer (ATL)" : "Non-Active Taxpayer"}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 1 — TAX EXPOSURE CALCULATOR
+            ══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "exposure" && (
+          <div className="space-y-6">
+            {/* Hero Banner */}
+            <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 p-5 text-white shadow-lg">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-base font-bold mb-1">Total Tax Exposure Calculator</h2>
+                  <p className="text-blue-100 text-xs">Covers all major tax heads: Income Tax, WHT, Sales Tax, Super Tax, Minimum Tax (Sec 113 & 4C)</p>
+                </div>
+                <Shield className="w-10 h-10 text-blue-300 shrink-0" />
               </div>
             </div>
+
+            <div className="grid lg:grid-cols-3 gap-6">
+              {/* LEFT: Inputs */}
+              <div className="lg:col-span-2 space-y-5">
+
+                {/* PHASE 1: Entity Profile */}
+                <Card>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">1</div>
+                    <SectionTitle>Entity Profile</SectionTitle>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <SelectField label="Entity Type" value={entityType} onChange={setEntityType} options={[
+                      { value: "individual_salaried",  label: "Individual — Salaried (75%+ salary)" },
+                      { value: "individual_business",  label: "Individual — Business / AOP" },
+                      { value: "company_private",      label: "Private Company (29%)" },
+                      { value: "company_small",        label: "Small Company (21%)" },
+                      { value: "company_listed",       label: "Listed Company (29%)" },
+                      { value: "company_banking",      label: "Banking Company (39%)" },
+                      { value: "npo",                  label: "NPO / Trust" },
+                    ]} />
+                    <SelectField label="Sector" value={sector} onChange={setSector} options={[
+                      { value: "services",       label: "Services" },
+                      { value: "manufacturing",  label: "Manufacturing" },
+                      { value: "trading",        label: "Trading / Wholesale" },
+                      { value: "banking",        label: "Banking & Finance" },
+                      { value: "it",             label: "IT / IT-Enabled" },
+                      { value: "construction",   label: "Construction" },
+                      { value: "export",         label: "Export" },
+                      { value: "npo",            label: "NPO / Charity" },
+                    ]} />
+                    <SelectField label="ATL / Filer Status" value={atlStatus} onChange={setAtlStatus} options={[
+                      { value: "atl",     label: "✅ ATL — Active Taxpayer" },
+                      { value: "late",    label: "⏰ Late Filer" },
+                      { value: "nonatl",  label: "❌ Non-Filer / Non-ATL" },
+                    ]} />
+                    <SelectField label="Sales Tax / PST Registration" value={pstReg} onChange={setPstReg} options={[
+                      { value: "none",    label: "Not Registered" },
+                      { value: "federal", label: "Federal — Sales Tax (FBR)" },
+                      { value: "punjab",  label: "Punjab Revenue Authority (PRA)" },
+                      { value: "sindh",   label: "Sindh Revenue Board (SRB)" },
+                      { value: "ict",     label: "ICT (Islamabad)" },
+                    ]} />
+                  </div>
+                </Card>
+
+                {/* PHASE 2: Financial Data */}
+                <Card>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">2</div>
+                    <SectionTitle>Financial Data (Annual)</SectionTitle>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <InputField label="Total Revenue / Turnover (Rs)" value={revenue} onChange={setRevenue} hint="Gross sales / receipts for the year" />
+                    <InputField label="Cost of Goods Sold (Rs)" value={cogs} onChange={setCogs} hint="Direct costs / cost of sales" />
+                    <InputField label="Operating Expenses (Rs)" value={expenses} onChange={setExpenses} hint="Overheads, admin, marketing etc." />
+                    <InputField label="Salaries & Payroll (Rs)" value={salaryPayroll} onChange={setSalaryPayroll} hint="Total employee salaries paid" />
+                    <InputField label="Import Value (Rs)" value={importValue} onChange={setImportValue} hint="CIF value of goods imported (Sec 148)" />
+                    <InputField label="Contracts Received (Rs)" value={contractsRcvd} onChange={setContractsRcvd} hint="Value of contracts on which WHT deducted (Sec 153)" />
+                    <InputField label="Services Rendered (Rs)" value={servicesRcvd} onChange={setServicesRcvd} hint="Service receipts on which WHT deducted" />
+                  </div>
+                </Card>
+
+                {/* PHASE 3: Credits & Adjustments */}
+                <Card>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-6 h-6 rounded-full bg-emerald-600 flex items-center justify-center text-white text-[10px] font-bold">3</div>
+                    <SectionTitle>Taxes Already Paid / Adjustable Credits</SectionTitle>
+                  </div>
+                  <div className="grid sm:grid-cols-3 gap-4">
+                    <InputField label="Advance Tax Paid (Rs)" value={advancePaidExp} onChange={setAdvancePaidExp} hint="Sec 147 quarterly installments" />
+                    <InputField label="WHT Credits (Rs)" value={whtCreditsExp} onChange={setWhtCreditsExp} hint="Tax deducted at source on income" />
+                    <InputField label="Input Sales Tax (Rs)" value={inputTaxPaid} onChange={setInputTaxPaid} hint="Paid on purchases (if registered)" />
+                  </div>
+                </Card>
+
+                <button
+                  onClick={() => setShowExposure(true)}
+                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:from-blue-700 hover:to-blue-800 transition-all flex items-center justify-center gap-2">
+                  <Zap className="w-5 h-5" /> Calculate Total Tax Exposure
+                </button>
+              </div>
+
+              {/* RIGHT: Quick Reference */}
+              <div className="space-y-4">
+                <Card>
+                  <SectionTitle>How It Works</SectionTitle>
+                  <div className="space-y-3">
+                    {[
+                      { icon: "1️⃣", label: "Enter Entity Profile", sub: "Type, sector, ATL status" },
+                      { icon: "2️⃣", label: "Enter Financial Data", sub: "Revenue, costs, payroll" },
+                      { icon: "3️⃣", label: "Enter Credits Paid", sub: "Advance tax, WHT credits" },
+                      { icon: "⚡", label: "Click Calculate", sub: "Instant exposure result" },
+                    ].map((s) => (
+                      <div key={s.label} className="flex items-start gap-2.5">
+                        <span className="text-base">{s.icon}</span>
+                        <div>
+                          <p className="text-xs font-semibold text-slate-700">{s.label}</p>
+                          <p className="text-[10px] text-slate-400">{s.sub}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+                <Card>
+                  <SectionTitle>Tax Heads Covered</SectionTitle>
+                  <div className="space-y-1.5">
+                    {[
+                      "Income Tax (Ordinance 2001)",
+                      "Super Tax (Sec 4C)",
+                      "Minimum Tax (Sec 113)",
+                      "WHT on Imports (Sec 148)",
+                      "WHT on Contracts (Sec 153)",
+                      "WHT on Services (Sec 153)",
+                      "Sales Tax (Act 1990)",
+                      "Provincial Services Tax",
+                    ].map((t) => (
+                      <div key={t} className="flex items-center gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                        <span className="text-[11px] text-slate-600">{t}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </div>
+            </div>
+
+            {/* ── EXPOSURE RESULTS ── */}
+            {showExposure && (
+              <div className="space-y-5 mt-2">
+                {/* Summary Cards */}
+                <div className="grid sm:grid-cols-4 gap-4">
+                  {[
+                    { label: "Total Tax Liability",  value: exposureResult.totalLiability,  color: "text-slate-800", bg: "bg-white" },
+                    { label: "Credits & Paid",        value: exposureResult.totalCredits,    color: "text-emerald-700", bg: "bg-emerald-50" },
+                    { label: "Net Tax Exposure",      value: exposureResult.netExposure,     color: "text-red-700", bg: "bg-red-50" },
+                    { label: "Taxable Income",        value: exposureResult.taxableIncome,   color: "text-blue-700", bg: "bg-blue-50" },
+                  ].map((c) => (
+                    <div key={c.label} className={`rounded-2xl border border-slate-200/80 shadow-sm p-4 ${c.bg}`}>
+                      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">{c.label}</p>
+                      <p className={`text-xl font-black tabular-nums ${c.color}`}>{fmt(c.value)}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Risk Classification */}
+                <Card>
+                  <div className="flex items-center justify-between mb-4">
+                    <SectionTitle>Risk Classification & Exposure Breakdown</SectionTitle>
+                    <RiskBadge level={exposureResult.risk} />
+                  </div>
+                  <div className="space-y-1">
+                    <TaxRow label="Income Tax" amount={exposureResult.incomeTax}
+                      sub={`Progressive slabs / corporate rate — Taxable income: ${fmt(exposureResult.taxableIncome)}`} />
+                    <TaxRow label="Minimum Tax (Sec 113)" amount={exposureResult.minTax}
+                      sub={`${entityType.startsWith("company") ? "1.25%" : "1%"} of turnover — ${exposureResult.minTax > exposureResult.incomeTax ? "⚠ APPLIES (higher than income tax)" : "Not applicable"}`} />
+                    <TaxRow label="Super Tax (Sec 4C)" amount={exposureResult.superTax}
+                      sub={exposureResult.superTax > 0 ? `Applicable on income above Rs 150M` : "Not applicable (income below Rs 150M)"} />
+                    <TaxRow label="WHT on Imports (Sec 148)" amount={exposureResult.importWHT}
+                      sub={`Rate: ${pct(atlStatus === "atl" ? 0.02 : 0.04)} on ${fmt(n(importValue))}`} />
+                    <TaxRow label="WHT on Contracts (Sec 153)" amount={exposureResult.contractWHT}
+                      sub={`Rate: ${pct(atlStatus === "atl" ? 0.075 : 0.15)} on contracts received`} />
+                    <TaxRow label="WHT on Services (Sec 153)" amount={exposureResult.serviceWHT}
+                      sub={`Rate: ${pct(atlStatus === "atl" ? 0.06 : 0.12)} on services rendered`} />
+                    <TaxRow label="Net Sales Tax Payable" amount={exposureResult.netSalesTax}
+                      sub={pstReg === "none" ? "Not registered for Sales Tax" : `Output tax minus allowed input tax (18% standard rate)`} />
+                    <div className="mt-2 border-t border-slate-100 pt-2">
+                      <TaxRow label="Total Gross Liability" amount={exposureResult.totalLiability} highlight />
+                      <TaxRow label="Less: Credits & Tax Paid" amount={-exposureResult.totalCredits}
+                        sub="Advance tax + WHT credits" />
+                      <TaxRow label="Net Exposure (Unpaid)" amount={exposureResult.netExposure} highlight />
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Penalty Simulation */}
+                {exposureResult.netExposure > 0 && (
+                  <Card>
+                    <SectionTitle>Penalty & Default Surcharge Simulation</SectionTitle>
+                    <div className="grid sm:grid-cols-3 gap-4">
+                      <div className="p-3 rounded-xl bg-red-50 border border-red-100">
+                        <p className="text-[10px] font-semibold text-red-500 uppercase">Late Filing Penalty</p>
+                        <p className="text-lg font-bold text-red-700">{fmt(exposureResult.lateFilingPenalty)}</p>
+                        <p className="text-[10px] text-red-500 mt-0.5">Sec 182 — higher of Rs 40,000 or 0.25% of tax</p>
+                      </div>
+                      <div className="p-3 rounded-xl bg-amber-50 border border-amber-100">
+                        <p className="text-[10px] font-semibold text-amber-500 uppercase">Default Surcharge (12% p.a.)</p>
+                        <p className="text-lg font-bold text-amber-700">{fmt(exposureResult.defaultSurcharge)}</p>
+                        <p className="text-[10px] text-amber-500 mt-0.5">Sec 205 — KIBOR-linked, approx. for 1 month</p>
+                      </div>
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase">Total Worst Case</p>
+                        <p className="text-lg font-bold text-slate-800">{fmt(exposureResult.netExposure + exposureResult.lateFilingPenalty + exposureResult.defaultSurcharge)}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Exposure + penalties if unpaid</p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                {/* AI-Style Suggestions */}
+                {exposureResult.suggestions.length > 0 && (
+                  <Card>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Zap className="w-4 h-4 text-blue-600" />
+                      <SectionTitle>Tax Advisory — Automated Findings</SectionTitle>
+                    </div>
+                    <div className="space-y-2.5">
+                      {exposureResult.suggestions.map((s, i) => (
+                        <AlertBox key={i} type={s.type}>{s.text}</AlertBox>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Scenario Comparison */}
+                <Card>
+                  <SectionTitle>Scenario Comparison</SectionTitle>
+                  <div className="grid sm:grid-cols-3 gap-4">
+                    {[
+                      {
+                        label: "🟢 Best Case (Tax Optimized)",
+                        desc: "Proper tax planning, all credits utilized, ATL status maintained",
+                        value: Math.max(0, exposureResult.totalLiability * 0.75 - exposureResult.totalCredits),
+                        sub: "Assumes 25% reduction via planning",
+                        bg: "bg-emerald-50 border-emerald-200",
+                        text: "text-emerald-700",
+                      },
+                      {
+                        label: "🟡 Recommended Position",
+                        desc: "Compliant filing, all taxes paid, no penalties",
+                        value: Math.max(0, exposureResult.netExposure),
+                        sub: "Net exposure to be paid",
+                        bg: "bg-blue-50 border-blue-200",
+                        text: "text-blue-700",
+                      },
+                      {
+                        label: "🔴 Worst Case (FBR Audit)",
+                        desc: "Disallowances, penalties, default surcharge, AAAR proceedings",
+                        value: exposureResult.netExposure * 1.5 + exposureResult.lateFilingPenalty + exposureResult.defaultSurcharge,
+                        sub: "Includes 50% additional demand + penalties",
+                        bg: "bg-red-50 border-red-200",
+                        text: "text-red-700",
+                      },
+                    ].map((s) => (
+                      <div key={s.label} className={`p-4 rounded-xl border ${s.bg}`}>
+                        <p className="text-xs font-bold text-slate-700 mb-1">{s.label}</p>
+                        <p className={`text-xl font-black tabular-nums ${s.text}`}>{fmt(s.value)}</p>
+                        <p className="text-[10px] text-slate-500 mt-1">{s.sub}</p>
+                        <p className="text-[10px] text-slate-400 mt-1">{s.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+
+                <div className="flex justify-end">
+                  <button onClick={() => setShowExposure(false)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+                    <RefreshCw className="w-3.5 h-3.5" /> Reset & Recalculate
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 2 — INCOME TAX ENGINE
+            ══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "income" && (
+          <div className="grid lg:grid-cols-2 gap-6">
+            <Card>
+              <SectionTitle>Income Tax Calculator — All Entities</SectionTitle>
+              <div className="space-y-4">
+                <SelectField label="Taxpayer Category" value={salaryType} onChange={setSalaryType} options={[
+                  { value: "salaried",        label: "Individual — Salaried (75%+ from salary)" },
+                  { value: "business",        label: "Individual — Business / AOP" },
+                  { value: "company",         label: "Private / Listed Company (29%)" },
+                  { value: "company_small",   label: "Small Company (21%)" },
+                  { value: "company_banking", label: "Banking Company (39%)" },
+                ]} />
+                <InputField label="Annual Taxable Income (Rs)" value={salaryIncome} onChange={setSalaryIncome} />
+                {(salaryType === "company" || salaryType === "company_small" || salaryType === "company_banking") && (
+                  <InputField label="Annual Turnover / Revenue (Rs)" value={turnoverIT} onChange={setTurnoverIT} hint="Used for Minimum Tax (Sec 113) calculation" />
+                )}
+                <InputField label="Advance Tax Paid — Sec 147 (Rs)" value={advancePaid} onChange={setAdvancePaid} />
+                <InputField label="WHT Credits Adjustable (Rs)" value={whtCredits} onChange={setWhtCredits} />
+
+                {/* Results */}
+                <div className="space-y-2 mt-2 border-t border-slate-100 pt-4">
+                  <TaxRow label="Base Income Tax" amount={incomeResult.tax}
+                    sub={salaryType === "company" ? "29% corporate rate" : salaryType === "company_small" ? "21% small company rate" : salaryType === "company_banking" ? "39% banking rate (35% + 4%)" : "Progressive slab rates"} />
+                  {incomeResult.corporate && (
+                    <TaxRow label="Minimum Tax (Sec 113)" amount={incomeResult.minTaxAmt}
+                      sub={`1.25% of turnover Rs ${fmt(n(turnoverIT))} — ${incomeResult.minTaxAmt > incomeResult.tax ? "⚠ APPLIES" : "Not applicable"}`} />
+                  )}
+                  {incomeResult.corporate && (
+                    <TaxRow label="Super Tax (Sec 4C)" amount={incomeResult.superTaxAmt}
+                      sub={incomeResult.superTaxAmt > 0 ? `Applicable — income exceeds Rs 150M` : "Not applicable (income below Rs 150M)"} />
+                  )}
+                  <TaxRow label="Effective Tax Liability" amount={incomeResult.effectiveTax} highlight />
+                  <TaxRow label="Less: Credits & Advance Tax" amount={-Math.min(incomeResult.effectiveTax, incomeResult.effectiveTax - incomeResult.net)} sub="Advance tax + WHT credits" />
+                  <div className={`flex items-center justify-between px-3 py-3 rounded-xl border ${incomeResult.net > 0 ? "bg-red-50 border-red-200" : "bg-emerald-50 border-emerald-200"}`}>
+                    <p className={`text-xs font-bold ${incomeResult.net > 0 ? "text-red-700" : "text-emerald-700"}`}>{incomeResult.net > 0 ? "Net Tax Payable" : "Refundable Amount"}</p>
+                    <p className={`text-lg font-black tabular-nums ${incomeResult.net > 0 ? "text-red-700" : "text-emerald-700"}`}>{fmt(Math.abs(incomeResult.net))}</p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <div className="space-y-5">
+              {/* Super Tax Table */}
+              <Card>
+                <SectionTitle>Super Tax (Sec 4C) — Rate Slabs</SectionTitle>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="text-left py-2 px-2 text-slate-500">Income Slab (Rs)</th>
+                      <th className="text-right py-2 px-2 text-blue-600">Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { range: "Up to 150,000,000", rate: "Nil" },
+                      { range: "150M – 200M",        rate: "1%" },
+                      { range: "200M – 250M",         rate: "2%" },
+                      { range: "250M – 300M",         rate: "3%" },
+                      { range: "300M – 350M",         rate: "4%" },
+                      { range: "350M – 400M",         rate: "6%" },
+                      { range: "400M – 500M",         rate: "8%" },
+                      { range: "Above 500M",          rate: "10%" },
+                    ].map((r) => {
+                      const inc = n(salaryIncome);
+                      const isActive = (() => {
+                        const map: Record<string, [number, number]> = {
+                          "Up to 150,000,000": [0, 150000000],
+                          "150M – 200M": [150000001, 200000000],
+                          "200M – 250M": [200000001, 250000000],
+                          "250M – 300M": [250000001, 300000000],
+                          "300M – 350M": [300000001, 350000000],
+                          "350M – 400M": [350000001, 400000000],
+                          "400M – 500M": [400000001, 500000000],
+                          "Above 500M": [500000001, Infinity],
+                        };
+                        const [lo, hi] = map[r.range] ?? [0, 0];
+                        return inc >= lo && inc <= hi;
+                      })();
+                      return (
+                        <tr key={r.range} className={`border-b border-slate-50 ${isActive ? "bg-blue-50" : ""}`}>
+                          <td className="py-2 px-2 text-slate-700">{r.range}</td>
+                          <td className={`py-2 px-2 text-right font-bold ${r.rate === "Nil" ? "text-emerald-600" : "text-red-600"}`}>{r.rate}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <AlertBox type="info">Super Tax is a surcharge on the taxable income — not on the tax payable. Banking companies pay 10% if income exceeds Rs 300M.</AlertBox>
+              </Card>
+
+              {/* Quarterly Schedule */}
+              <Card>
+                <SectionTitle>Quarterly Advance Tax (Sec 147)</SectionTitle>
+                <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 mb-3">
+                  <p className="text-[10px] font-semibold text-blue-500 uppercase mb-1">Per Quarter (25% of annual tax)</p>
+                  <p className="text-2xl font-black text-blue-700">{fmt(incomeResult.quarterly)}</p>
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { q: "Q1 — 15 September",  paid: false },
+                    { q: "Q2 — 15 December",   paid: false },
+                    { q: "Q3 — 15 March",       paid: false },
+                    { q: "Q4 — 15 June",        paid: false },
+                  ].map(({ q }) => (
+                    <div key={q} className="flex items-center justify-between text-xs p-2.5 rounded-lg border border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
+                        <span className="text-slate-700 font-medium">{q}</span>
+                      </div>
+                      <span className="font-bold text-slate-800">{fmt(incomeResult.quarterly)}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 3 — WHT CALCULATOR
+            ══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "wht" && (
+          <div className="grid lg:grid-cols-2 gap-6">
+            <Card>
+              <SectionTitle>Withholding Tax Calculator (All Sections)</SectionTitle>
+              <div className="space-y-4">
+                <SelectField label="WHT Section / Transaction Type" value={whtType} onChange={setWhtType}
+                  options={Object.entries(WHT_RATES).map(([k, v]) => ({ value: k, label: `Sec ${v.section} — ${v.label}` }))}
+                />
+                <InputField label="Transaction Amount (Rs)" value={whtAmount} onChange={setWhtAmount} placeholder="Enter gross amount" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-blue-50 border border-blue-100">
+                    <p className="text-[10px] font-semibold text-blue-500 uppercase">ATL Rate</p>
+                    <p className="text-2xl font-black text-blue-700">{pct(WHT_RATES[whtType]?.atl ?? 0)}</p>
+                    <p className="text-[10px] text-blue-400 mt-1">Tax: {fmt((WHT_RATES[whtType]?.atl ?? 0) * n(whtAmount))}</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-red-50 border border-red-100">
+                    <p className="text-[10px] font-semibold text-red-500 uppercase">Non-ATL Rate</p>
+                    <p className="text-2xl font-black text-red-700">{pct(WHT_RATES[whtType]?.nonatl ?? 0)}</p>
+                    <p className="text-[10px] text-red-400 mt-1">Tax: {fmt((WHT_RATES[whtType]?.nonatl ?? 0) * n(whtAmount))}</p>
+                  </div>
+                </div>
+                <div className={`p-4 rounded-xl border ${filerStatus === "atl" ? "bg-blue-50 border-blue-200" : "bg-red-50 border-red-200"}`}>
+                  <p className={`text-[10px] font-semibold uppercase ${filerStatus === "atl" ? "text-blue-500" : "text-red-500"}`}>
+                    Your WHT Liability ({filerStatus === "atl" ? "ATL" : "Non-ATL"})
+                  </p>
+                  <p className={`text-3xl font-black tabular-nums ${filerStatus === "atl" ? "text-blue-700" : "text-red-700"}`}>
+                    {fmt(whtResult.tax)}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-1">Section {WHT_RATES[whtType]?.section} — {whtResult.label}</p>
+                </div>
+                {WHT_RATES[whtType]?.atl !== WHT_RATES[whtType]?.nonatl && (
+                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                    <p className="text-[10px] font-semibold text-emerald-600">ATL Saving on this Transaction</p>
+                    <p className="text-lg font-bold text-emerald-700">
+                      {fmt(n(whtAmount) * ((WHT_RATES[whtType]?.nonatl ?? 0) - (WHT_RATES[whtType]?.atl ?? 0)))}
+                    </p>
+                    <p className="text-[10px] text-emerald-500">You save this by being on the Active Taxpayer List</p>
+                  </div>
+                )}
+              </div>
+            </Card>
+            <Card>
+              <SectionTitle>WHT Nature & Compliance Notes</SectionTitle>
+              <div className="space-y-3">
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <p className="text-xs font-bold text-slate-700 mb-2">About Sec {WHT_RATES[whtType]?.section}</p>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">{whtType.startsWith("import") ? "Collected at the time of clearance of goods from customs. Acts as minimum tax for importers unless they can claim as advance tax." : whtType.startsWith("supply") ? "Deducted by the withholding agent (payer) at time of payment for goods. Adjustable against annual income tax liability." : whtType.startsWith("services") ? "Deducted by the payer when making payment for services. Rate varies based on service type and taxpayer status." : whtType.startsWith("contract") ? "Deducted on payments under a contract. Rate applies to the gross contract amount." : whtType.startsWith("dividend") ? "Deducted at source by the company paying dividend. Acts as final tax for most non-company recipients." : whtType.startsWith("profit") ? "Deducted by financial institution / payer on profit on debt instruments." : "WHT collected under specific provisions of the Income Tax Ordinance, 2001."}</p>
+                </div>
+                <AlertBox type="info">
+                  WHT must be deposited by the 15th of the following month via CPR. Failure to deduct or deposit attracts penalties under Sec 182 and default surcharge under Sec 205.
+                </AlertBox>
+                <AlertBox type="warn">
+                  Non-ATL rates are generally double the ATL rates. Verify taxpayer's ATL status on FBR's Active Taxpayer List before applying any rate.
+                </AlertBox>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 4 — SALES TAX ENGINE
+            ══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "salestax" && (
+          <div className="grid lg:grid-cols-2 gap-6">
+            <div className="space-y-5">
+              <Card>
+                <SectionTitle>Sales Tax on Goods (Federal — STA 1990)</SectionTitle>
+                <div className="space-y-4">
+                  <SelectField label="Output Sales Tax Rate" value={stRate} onChange={setStRate} options={[
+                    { value: "0.18", label: "18% — Standard Rate" },
+                    { value: "0.17", label: "17% — Specified Goods" },
+                    { value: "0.25", label: "25% — Luxury / Specified" },
+                    { value: "0.10", label: "10% — Reduced Rate" },
+                    { value: "0.05", label: "5% — Specified Category" },
+                    { value: "0.00", label: "0% — Zero-rated / Exempt" },
+                  ]} />
+                  <InputField label="Taxable Sales (Rs)" value={outputSales} onChange={setOutputSales} hint="Value of taxable supplies made" />
+                  <InputField label="Taxable Purchases / Inputs (Rs)" value={inputPurchases} onChange={setInputPurchases} hint="Value of purchases on which input tax paid" />
+                  <SelectField label="Input Tax Rate" value={inputTaxRate} onChange={setInputTaxRate} options={[
+                    { value: "0.18", label: "18% Standard" },
+                    { value: "0.17", label: "17%" },
+                    { value: "0.10", label: "10%" },
+                    { value: "0.05", label: "5%" },
+                  ]} />
+                  <InputField label="Disallowed Input Tax (%)" value={disallowedPct} onChange={setDisallowedPct} hint="Sec 8 restrictions — non-business / blocked items" />
+                </div>
+              </Card>
+
+              <Card>
+                <SectionTitle>Provincial Services Tax (PST)</SectionTitle>
+                <div className="space-y-4">
+                  <SelectField label="Province / Authority" value={stProvince} onChange={setStProvince} options={[
+                    { value: "punjab",  label: "Punjab Revenue Authority (PRA) — 16%" },
+                    { value: "sindh",   label: "Sindh Revenue Board (SRB) — 13-15%" },
+                    { value: "ict",     label: "ICT (Islamabad) — 15%" },
+                    { value: "kpk",     label: "KPK Revenue Authority (KPKRA) — 15%" },
+                    { value: "baloch",  label: "Balochistan (BRA) — 15%" },
+                  ]} />
+                  <SelectField label="PST Rate" value={pstRate} onChange={setPstRate} options={[
+                    { value: "0.16", label: "16% — Punjab (PRA)" },
+                    { value: "0.15", label: "15% — KPK / ICT / Balochistan" },
+                    { value: "0.13", label: "13% — Sindh (SRB) Standard" },
+                    { value: "0.05", label: "5% — Reduced Rate Services" },
+                  ]} />
+                  <InputField label="Service Value (Rs)" value={serviceAmt} onChange={setServiceAmt} hint="Gross service value provided" />
+                </div>
+              </Card>
+            </div>
+
+            <div className="space-y-5">
+              <Card>
+                <SectionTitle>Sales Tax Computation</SectionTitle>
+                <div className="space-y-2">
+                  <TaxRow label="Output Sales Tax" amount={salesTaxResult.outputTax}
+                    sub={`${pct(n(stRate))} × ${fmt(n(outputSales))}`} />
+                  <TaxRow label="Gross Input Tax" amount={salesTaxResult.allowedInput + salesTaxResult.disallowedInput}
+                    sub={`${pct(n(inputTaxRate))} × ${fmt(n(inputPurchases))}`} />
+                  <TaxRow label="Disallowed Input Tax (Sec 8)" amount={-salesTaxResult.disallowedInput}
+                    sub={`${n(disallowedPct).toFixed(0)}% of gross input restricted`} />
+                  <TaxRow label="Allowable Input Tax Credit" amount={salesTaxResult.allowedInput}
+                    sub="Net adjustable input tax" />
+                  <div className="border-t border-slate-100 mt-2 pt-2">
+                    {salesTaxResult.netPayable > 0 ? (
+                      <TaxRow label="Net Sales Tax Payable" amount={salesTaxResult.netPayable} highlight />
+                    ) : (
+                      <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                        <p className="text-xs font-bold text-emerald-700">Refund / Carry Forward</p>
+                        <p className="text-lg font-black text-emerald-700">{fmt(salesTaxResult.refundable)}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-5 border-t border-slate-100 pt-4">
+                  <p className="text-xs font-bold text-slate-700 mb-3">Provincial Services Tax (PST)</p>
+                  <TaxRow label={`PST — ${stProvince.toUpperCase()}`} amount={salesTaxResult.pstAmt}
+                    sub={`${pct(n(pstRate))} × ${fmt(n(serviceAmt))}`} />
+                </div>
+
+                <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-slate-800 to-slate-900 text-white">
+                  <p className="text-[10px] text-slate-300 font-semibold uppercase mb-1">Total Indirect Tax Obligation</p>
+                  <p className="text-2xl font-black tabular-nums">{fmt(salesTaxResult.netPayable + salesTaxResult.pstAmt)}</p>
+                  <p className="text-[10px] text-slate-400 mt-1">Federal Sales Tax + PST combined</p>
+                </div>
+              </Card>
+
+              <Card>
+                <SectionTitle>Compliance Notes</SectionTitle>
+                <div className="space-y-2.5">
+                  <AlertBox type="info">Sales Tax returns are due by the 15th of the following month for monthly filers. Late filing attracts Rs 10,000 per return penalty (Sec 33).</AlertBox>
+                  <AlertBox type="warn">Input tax on electricity, gas for non-business use; vehicles (not for sale); food, beverages, and telephone are restricted under Sec 8(1) of the STA.</AlertBox>
+                  <AlertBox type="info">Zero-rated supplies include exports, supplies to EPZs, and goods listed in Fifth Schedule. No output tax charged but input tax is refundable.</AlertBox>
+                </div>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 5 — PROPERTY TAX
+            ══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "property" && (
+          <div className="grid lg:grid-cols-2 gap-6">
+            <Card>
+              <SectionTitle>Property Tax Calculator (Sec 236C / 236K)</SectionTitle>
+              <div className="space-y-4">
+                <SelectField label="Transaction Type" value={propType} onChange={setPropType} options={[
+                  { value: "transfer", label: "Transfer of Property (Seller) — Sec 236C" },
+                  { value: "purchase", label: "Purchase of Property (Buyer) — Sec 236K" },
+                ]} />
+                <InputField label="Property Value / Consideration (Rs)" value={propValue} onChange={setPropValue} />
+                <SelectField label="Filer Status" value={propFiler} onChange={setPropFiler} options={[
+                  { value: "atl",    label: "ATL — Active Taxpayer" },
+                  { value: "nonatl", label: "Non-ATL / Non-Filer" },
+                  { value: "late",   label: "Late Filer" },
+                ]} />
+                <div className="p-4 rounded-xl bg-blue-50 border border-blue-100">
+                  <p className="text-[10px] text-blue-500 font-semibold uppercase mb-1">Advance Tax on Property</p>
+                  <p className="text-2xl font-black text-blue-700">{fmt(propResult.tax)}</p>
+                  <p className="text-[11px] text-slate-500 mt-1">Rate: {pct(propResult.rate)} on {fmt(n(propValue))}</p>
+                </div>
+              </div>
+            </Card>
+            <Card>
+              <SectionTitle>Property Tax Rate Table</SectionTitle>
+              <div className="space-y-4">
+                {[
+                  { title: "236C — Transfer (Seller)", rows: [
+                    { slab: "Up to 50M",    atl: "4.5%", nonatl: "11.5%", late: "7.5%" },
+                    { slab: "50M – 100M",   atl: "5.0%", nonatl: "11.5%", late: "8.5%" },
+                    { slab: "Above 100M",   atl: "5.5%", nonatl: "11.5%", late: "9.5%" },
+                  ]},
+                  { title: "236K — Purchase (Buyer)", rows: [
+                    { slab: "Up to 50M",    atl: "1.5%", nonatl: "10.5%", late: "4.5%" },
+                    { slab: "50M – 100M",   atl: "2.0%", nonatl: "14.5%", late: "5.5%" },
+                    { slab: "Above 100M",   atl: "2.5%", nonatl: "18.5%", late: "6.5%" },
+                  ]},
+                ].map((tbl) => (
+                  <div key={tbl.title}>
+                    <p className="text-xs font-bold text-slate-700 mb-2">{tbl.title}</p>
+                    <table className="w-full text-xs">
+                      <thead><tr className="border-b border-slate-100">
+                        <th className="text-left py-1.5 px-2 text-slate-500">Slab</th>
+                        <th className="text-right py-1.5 px-2 text-blue-600">ATL</th>
+                        <th className="text-right py-1.5 px-2 text-red-600">Non-ATL</th>
+                        <th className="text-right py-1.5 px-2 text-amber-600">Late</th>
+                      </tr></thead>
+                      <tbody>{tbl.rows.map((r) => (
+                        <tr key={r.slab} className="border-b border-slate-50">
+                          <td className="py-1.5 px-2 text-slate-700">{r.slab}</td>
+                          <td className="py-1.5 px-2 text-right font-semibold text-blue-700">{r.atl}</td>
+                          <td className="py-1.5 px-2 text-right font-semibold text-red-600">{r.nonatl}</td>
+                          <td className="py-1.5 px-2 text-right font-semibold text-amber-600">{r.late}</td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                ))}
+                <AlertBox type="info">Tax deducted under Sec 236C/236K is adjustable against the seller's/buyer's annual income tax liability (not a final tax for ATL filers).</AlertBox>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 6 — VEHICLE TAX
+            ══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "vehicle" && (
+          <div className="grid lg:grid-cols-2 gap-6">
+            <Card>
+              <SectionTitle>Motor Vehicle Tax (Sec 231B / 234)</SectionTitle>
+              <div className="space-y-4">
+                <SelectField label="Engine Capacity (cc)" value={vehicleCC} onChange={setVehicleCC}
+                  options={Object.entries(VEHICLE_FIXED_RATES).map(([k, v]) => ({ value: k, label: v.label }))} />
+                {vehicleCC === "above3000" && (
+                  <InputField label="Vehicle Value (Rs) — for percentage-based component" value={vehicleValue} onChange={setVehicleValue} />
+                )}
+                <div className="space-y-2">
+                  <TaxRow label="Registration Tax (Sec 231B)" amount={vehicleResult.registration} />
+                  {vehicleCC === "above3000" && (
+                    <TaxRow label="% of Value Component" amount={vehicleResult.percentBased}
+                      sub={`${filerStatus === "atl" ? "12%" : "36%"} of Rs ${fmt(n(vehicleValue))}`} />
+                  )}
+                  <TaxRow label="Total Registration Tax" amount={vehicleResult.total} highlight />
+                  <div className="mt-2 p-3 rounded-xl bg-amber-50 border border-amber-100">
+                    <p className="text-[10px] font-semibold text-amber-600 uppercase mb-1">Annual Token Tax (Sec 234)</p>
+                    <p className="text-xl font-bold text-amber-700">{fmt(vehicleResult.annual)}</p>
+                    <p className="text-[10px] text-amber-500 mt-0.5">Payable annually at token renewal</p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+            <Card>
+              <SectionTitle>Registration Tax Schedule</SectionTitle>
+              <table className="w-full text-xs">
+                <thead><tr className="border-b border-slate-100">
+                  <th className="text-left py-2 px-2 text-slate-500">Engine CC</th>
+                  <th className="text-right py-2 px-2 text-blue-600">ATL (Rs)</th>
+                  <th className="text-right py-2 px-2 text-red-600">Non-ATL (Rs)</th>
+                </tr></thead>
+                <tbody>{Object.entries(VEHICLE_FIXED_RATES).map(([k, v]) => (
+                  <tr key={k} className={`border-b border-slate-50 ${vehicleCC === k ? "bg-blue-50" : ""}`}>
+                    <td className="py-2 px-2 text-slate-700">{v.label}</td>
+                    <td className="py-2 px-2 text-right font-semibold text-blue-700">{fmt(v.atl)}</td>
+                    <td className="py-2 px-2 text-right font-semibold text-red-600">{fmt(v.nonatl)}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+              <AlertBox type="info">For vehicles above 3000cc: additional 12% (ATL) or 36% (Non-ATL) of vehicle value applies under Sec 231B(1). Reduces by 10% per year from first registration.</AlertBox>
+            </Card>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 7 — INVESTMENT INCOME
+            ══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "investment" && (
+          <div className="grid lg:grid-cols-2 gap-6">
+            <Card>
+              <SectionTitle>Investment Income Tax (Sec 150 / 151)</SectionTitle>
+              <div className="space-y-4">
+                <SelectField label="Investment / Income Type" value={investType} onChange={setInvestType}
+                  options={[
+                    { value: "dividend_ipp",         label: "Dividend — IPPs" },
+                    { value: "dividend_reit",         label: "Dividend — REIT / General" },
+                    { value: "dividend_mutual_debt",  label: "Dividend — Mutual Fund (Debt >50%)" },
+                    { value: "dividend_mutual_equity", label: "Dividend — Mutual Fund (Equity)" },
+                    { value: "dividend_spv_reit",     label: "Dividend — REIT from SPV (Exempt)" },
+                    { value: "dividend_spv_other",    label: "Dividend — Others from SPV" },
+                    { value: "profit_bank",           label: "Profit on Debt — Bank Deposit" },
+                    { value: "profit_govt",           label: "Profit — Govt Securities" },
+                    { value: "profit_other",          label: "Profit on Debt — Other" },
+                    { value: "profit_sukuk_company",  label: "Sukuk — Company Holder" },
+                    { value: "profit_sukuk_ind_high", label: "Sukuk — Individual (>1M)" },
+                    { value: "profit_sukuk_ind_low",  label: "Sukuk — Individual (<1M)" },
+                  ]}
+                />
+                <InputField label="Income Amount (Rs)" value={investAmount} onChange={setInvestAmount} />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-blue-50 border border-blue-100 text-center">
+                    <p className="text-[10px] font-semibold text-blue-500 uppercase">ATL Rate</p>
+                    <p className="text-xl font-black text-blue-700">{pct(WHT_RATES[investType]?.atl ?? 0)}</p>
+                    <p className="text-[10px] text-blue-400">{fmt((WHT_RATES[investType]?.atl ?? 0) * n(investAmount))}</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-red-50 border border-red-100 text-center">
+                    <p className="text-[10px] font-semibold text-red-500 uppercase">Non-ATL Rate</p>
+                    <p className="text-xl font-black text-red-700">{pct(WHT_RATES[investType]?.nonatl ?? 0)}</p>
+                    <p className="text-[10px] text-red-400">{fmt((WHT_RATES[investType]?.nonatl ?? 0) * n(investAmount))}</p>
+                  </div>
+                </div>
+                <div className={`p-4 rounded-xl border ${filerStatus === "atl" ? "bg-blue-50 border-blue-200" : "bg-red-50 border-red-200"}`}>
+                  <p className="text-[10px] font-semibold uppercase text-slate-500">Your Investment Tax ({filerStatus === "atl" ? "ATL" : "Non-ATL"})</p>
+                  <p className={`text-2xl font-black tabular-nums ${filerStatus === "atl" ? "text-blue-700" : "text-red-700"}`}>
+                    {fmt((filerStatus === "atl" ? WHT_RATES[investType]?.atl : WHT_RATES[investType]?.nonatl ?? 0) * n(investAmount))}
+                  </p>
+                </div>
+              </div>
+            </Card>
+            <Card>
+              <SectionTitle>Investment Tax Rate Reference</SectionTitle>
+              <div className="space-y-1.5">
+                {["dividend_ipp","dividend_reit","dividend_mutual_debt","dividend_mutual_equity","profit_bank","profit_govt","profit_other","profit_sukuk_company","profit_sukuk_ind_high","profit_sukuk_ind_low"].map((key) => {
+                  const r = WHT_RATES[key];
+                  if (!r) return null;
+                  return (
+                    <div key={key} className={`flex items-center justify-between p-2.5 rounded-lg border ${investType === key ? "bg-blue-50 border-blue-200" : "bg-white border-slate-100"}`}>
+                      <div>
+                        <p className="text-[11px] text-slate-700 font-medium">{r.label}</p>
+                        <p className="text-[10px] text-slate-400">Sec {r.section}</p>
+                      </div>
+                      <div className="flex gap-3 text-right">
+                        <div><p className="text-[10px] text-blue-400">ATL</p><p className="text-xs font-bold text-blue-700">{pct(r.atl)}</p></div>
+                        <div><p className="text-[10px] text-red-400">Non-ATL</p><p className="text-xs font-bold text-red-600">{pct(r.nonatl)}</p></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 8 — RENTAL INCOME
+            ══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "rental" && (
+          <div className="grid lg:grid-cols-2 gap-6">
+            <Card>
+              <SectionTitle>Rental Income Tax (Sec 155)</SectionTitle>
+              <div className="space-y-4">
+                <SelectField label="Entity Type" value={rentEntity} onChange={setRentEntity} options={[
+                  { value: "individual", label: "Individual / AOP" },
+                  { value: "company",    label: "Company" },
+                ]} />
+                <InputField label="Annual Rent Received (Rs)" value={rentAmount} onChange={setRentAmount} />
+                {(() => {
+                  const amt = n(rentAmount);
+                  let tax = 0;
+                  if (rentEntity === "company") {
+                    tax = amt * (filerStatus === "atl" ? 0.15 : 0.30);
+                  } else {
+                    if (amt > 2000000)      tax = 15000 + 140000 + (amt - 2000000) * 0.15;
+                    else if (amt > 600000)  tax = 15000 + (amt - 600000) * 0.10;
+                    else if (amt > 300000)  tax = (amt - 300000) * 0.05;
+                    if (filerStatus === "nonatl") tax *= 2;
+                  }
+                  return (
+                    <div className="p-4 rounded-xl bg-blue-50 border border-blue-100">
+                      <p className="text-[10px] font-semibold text-blue-500 uppercase">Rental Income Tax (Sec 155)</p>
+                      <p className="text-2xl font-black text-blue-700">{fmt(tax)}</p>
+                      <p className="text-[11px] text-slate-500 mt-1">{rentEntity === "company" ? `Flat ${filerStatus === "atl" ? "15%" : "30%"} — Company` : `Progressive slabs — Individual${filerStatus === "nonatl" ? " (2x for Non-ATL)" : ""}`}</p>
+                    </div>
+                  );
+                })()}
+              </div>
+            </Card>
+            <Card>
+              <SectionTitle>Rental Tax Slabs — Individual</SectionTitle>
+              <table className="w-full text-xs mb-4">
+                <thead><tr className="border-b border-slate-100">
+                  <th className="text-left py-2 px-2 text-slate-500">Annual Rent</th>
+                  <th className="text-right py-2 px-2 text-blue-600">ATL Rate</th>
+                  <th className="text-right py-2 px-2 text-red-600">Non-ATL</th>
+                </tr></thead>
+                <tbody>
+                  {[
+                    { range: "Up to 300,000",         atl: "0%",  nonatl: "0%" },
+                    { range: "300,001 – 600,000",      atl: "5%",  nonatl: "10%" },
+                    { range: "600,001 – 2,000,000",    atl: "10%", nonatl: "20%" },
+                    { range: "Above 2,000,000",        atl: "15%", nonatl: "30%" },
+                  ].map((r) => (
+                    <tr key={r.range} className="border-b border-slate-50">
+                      <td className="py-2 px-2 text-slate-700">{r.range}</td>
+                      <td className="py-2 px-2 text-right font-semibold text-blue-700">{r.atl}</td>
+                      <td className="py-2 px-2 text-right font-semibold text-red-600">{r.nonatl}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <AlertBox type="info">Companies pay flat 15% (ATL) or 30% (Non-ATL). For individuals, tax deducted by tenant under Sec 155 is adjustable in annual return. Rental income from sub-letting is taxable as business income.</AlertBox>
+            </Card>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 9 — RATE TABLES
+            ══════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "rates" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <div className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${filerStatus === "atl" ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"}`}>
+                {filerStatus === "atl" ? "✅ Active Taxpayer (ATL)" : "❌ Non-Active Taxpayer"}
+              </div>
+              <p className="text-[11px] text-slate-500">Toggle ATL status in the top-right to see rates for both.</p>
+            </div>
+
             {RATE_TABLE_SECTIONS.map((section) => (
               <div key={section.title} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
                 <button
                   onClick={() => setExpandedSection(expandedSection === section.title ? null : section.title)}
-                  className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors"
-                >
+                  className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors">
                   <h3 className="text-sm font-bold text-slate-800">{section.title}</h3>
                   {expandedSection === section.title ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                 </button>
                 {expandedSection === section.title && (
-                  <div className="px-5 pb-4">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b border-slate-100">
-                            <th className="text-left py-2 px-2 text-slate-500 font-semibold">Description</th>
-                            <th className="text-right py-2 px-2 text-blue-600 font-semibold">ATL Rate</th>
-                            <th className="text-right py-2 px-2 text-red-600 font-semibold">Non-ATL Rate</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {section.rows.map((key) => {
-                            const r = WHT_RATES[key];
-                            if (!r) return null;
-                            return (
-                              <tr key={key} className="border-b border-slate-50 hover:bg-slate-50/50">
-                                <td className="py-2 px-2 text-slate-700">{r.label}</td>
-                                <td className="py-2 px-2 text-right font-semibold text-blue-700">{(r.atl * 100).toFixed(2)}%</td>
-                                <td className="py-2 px-2 text-right font-semibold text-red-600">{(r.nonatl * 100).toFixed(2)}%</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                  <div className="px-5 pb-4 overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead><tr className="border-b border-slate-100">
+                        <th className="text-left py-2 px-2 text-slate-500">Description</th>
+                        <th className="text-center py-2 px-2 text-slate-400">Section</th>
+                        <th className="text-right py-2 px-2 text-blue-600">ATL Rate</th>
+                        <th className="text-right py-2 px-2 text-red-600">Non-ATL Rate</th>
+                      </tr></thead>
+                      <tbody>
+                        {section.rows.map((key) => {
+                          const r = WHT_RATES[key];
+                          if (!r) return null;
+                          return (
+                            <tr key={key} className="border-b border-slate-50 hover:bg-slate-50/50">
+                              <td className="py-2 px-2 text-slate-700">{r.label}</td>
+                              <td className="py-2 px-2 text-center text-slate-400 text-[10px]">Sec {r.section}</td>
+                              <td className="py-2 px-2 text-right font-semibold text-blue-700">{pct(r.atl)}</td>
+                              <td className="py-2 px-2 text-right font-semibold text-red-600">{pct(r.nonatl)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>
             ))}
 
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-              <button
-                onClick={() => setExpandedSection(expandedSection === "salary_slabs" ? null : "salary_slabs")}
-                className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors"
-              >
-                <h3 className="text-sm font-bold text-slate-800">Income Tax Slabs (Sec 149) — Individual / AOP</h3>
-                {expandedSection === "salary_slabs" ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-              </button>
-              {expandedSection === "salary_slabs" && (
-                <div className="px-5 pb-4">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-100">
-                        <th className="text-left py-2 px-2 text-slate-500 font-semibold">Taxable Income (Rs)</th>
-                        <th className="text-left py-2 px-2 text-blue-600 font-semibold">Tax Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-b border-slate-50"><td className="py-2 px-2 text-slate-700">Up to 600,000</td><td className="py-2 px-2 font-semibold text-emerald-600">0%</td></tr>
-                      <tr className="border-b border-slate-50"><td className="py-2 px-2 text-slate-700">600,001 – 1,200,000</td><td className="py-2 px-2 font-semibold text-blue-700">1% of amount exceeding 600,000</td></tr>
-                      <tr className="border-b border-slate-50"><td className="py-2 px-2 text-slate-700">1,200,001 – 2,200,000</td><td className="py-2 px-2 font-semibold text-blue-700">Rs 6,000 + 11% exceeding 1.2M</td></tr>
-                      <tr className="border-b border-slate-50"><td className="py-2 px-2 text-slate-700">2,200,001 – 3,200,000</td><td className="py-2 px-2 font-semibold text-blue-700">Rs 116,000 + 23% exceeding 2.2M</td></tr>
-                      <tr className="border-b border-slate-50"><td className="py-2 px-2 text-slate-700">3,200,001 – 4,100,000</td><td className="py-2 px-2 font-semibold text-blue-700">Rs 346,000 + 30% exceeding 3.2M</td></tr>
-                      <tr><td className="py-2 px-2 text-slate-700">Above 4,100,000</td><td className="py-2 px-2 font-semibold text-blue-700">Rs 616,000 + 35% exceeding 4.1M + surcharge 9% if &gt;10M</td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {activeTab === "wht" && (
-          <div className="grid lg:grid-cols-2 gap-6">
-            <SectionCard title="Calculate Withholding Tax on Transaction">
-              <div className="space-y-4">
-                <SelectField
-                  label="Transaction Type"
-                  value={whtType}
-                  onChange={setWhtType}
-                  options={[
-                    { value: "supply_company", label: "Supply of Goods — Company" },
-                    { value: "supply_noncompany", label: "Supply of Goods — Non-Company" },
-                    { value: "supply_rice_cotton", label: "Supply Rice/Cotton Seed/Edible Oils" },
-                    { value: "supply_toll_company", label: "Toll Manufacturing — Company" },
-                    { value: "services_it", label: "Services — IT/IT Enabled" },
-                    { value: "services_general", label: "Services — General" },
-                    { value: "contract_company", label: "Contract — Company" },
-                    { value: "contract_noncompany", label: "Contract — Non-Company" },
-                    { value: "contract_sportsperson", label: "Contract — Sports Persons" },
-                    { value: "rent_company", label: "Rent — Company" },
-                    { value: "import_part1", label: "Import — Part I Goods" },
-                    { value: "import_part2", label: "Import — Part II Goods" },
-                    { value: "import_part2_commercial", label: "Import — Part II (Commercial)" },
-                    { value: "import_part3", label: "Import — Part III Goods" },
-                    { value: "import_pharma", label: "Import — Pharma Products" },
-                    { value: "sale_retailer", label: "Sale to Retailer (236H)" },
-                    { value: "sale_distributor", label: "Sale to Distributor — Fertilizer" },
-                    { value: "function_gathering", label: "Functions & Gatherings (236CB)" },
-                    { value: "remittance_abroad", label: "Remittance Abroad (236Y)" },
-                    { value: "bonus_shares", label: "Bonus Shares (236Z)" },
-                    { value: "cash_withdrawal", label: "Cash Withdrawal (231AB)" },
-                    { value: "ecommerce_digital", label: "E-Commerce — Digital Payment" },
-                    { value: "ecommerce_cod", label: "E-Commerce — Cash on Delivery" },
-                    { value: "auction_goods", label: "Public Auction — Goods" },
-                    { value: "auction_property", label: "Public Auction — Property" },
-                    { value: "export_goods", label: "Export of Goods (Sec 154)" },
-                    { value: "export_services_pseb", label: "Export IT Services (PSEB)" },
-                  ]}
-                />
-                <InputField label="Transaction Amount (Rs)" value={whtAmount} onChange={setWhtAmount} placeholder="Enter amount" />
-                <ResultBox
-                  label="WHT Liability"
-                  value={formatPKR(whtResult.tax)}
-                  breakdown={`Rate: ${(whtResult.rateUsed * 100).toFixed(2)}% (${filerStatus === "atl" ? "ATL" : "Non-ATL"}) on ${formatPKR(parseFloat(whtAmount || "0"))}`}
-                />
-              </div>
-            </SectionCard>
-            <SectionCard title="Rate Reference">
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
-                <p className="text-sm font-semibold text-slate-700 mb-2">{whtResult.label}</p>
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                  <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
-                    <p className="text-[10px] font-semibold text-blue-500 uppercase">ATL Rate</p>
-                    <p className="text-lg font-bold text-blue-700">{(WHT_RATES[whtType]?.atl * 100 || 0).toFixed(2)}%</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-red-50 border border-red-100">
-                    <p className="text-[10px] font-semibold text-red-500 uppercase">Non-ATL Rate</p>
-                    <p className="text-lg font-bold text-red-600">{(WHT_RATES[whtType]?.nonatl * 100 || 0).toFixed(2)}%</p>
-                  </div>
-                </div>
-                <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-100">
-                  <div className="flex items-start gap-2">
-                    <Info className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-amber-700 leading-relaxed">
-                      Non-ATL taxpayers pay double the ATL rate in most cases. Get listed on the Active Taxpayer List (ATL) to reduce your withholding tax burden.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-100">
-                <p className="text-[11px] text-emerald-700 font-semibold">Savings as ATL</p>
-                <p className="text-lg font-bold text-emerald-700">
-                  {formatPKR(parseFloat(whtAmount || "0") * (WHT_RATES[whtType]?.nonatl - WHT_RATES[whtType]?.atl || 0))}
-                </p>
-                <p className="text-[10px] text-emerald-600">You save this amount by being an Active Taxpayer</p>
-              </div>
-            </SectionCard>
-          </div>
-        )}
-
-        {activeTab === "salary" && (
-          <div className="grid lg:grid-cols-2 gap-6">
-            <SectionCard title="Income Tax Calculator (Sec 149)">
-              <div className="space-y-4">
-                <SelectField
-                  label="Taxpayer Category"
-                  value={salaryType}
-                  onChange={setSalaryType}
-                  options={[
-                    { value: "salaried", label: "Individual (Salaried — 75%+ income from salary)" },
-                    { value: "business", label: "Business Individual / AOP" },
-                    { value: "company", label: "Company" },
-                  ]}
-                />
-                <InputField label="Annual Taxable Income (Rs)" value={salaryIncome} onChange={setSalaryIncome} />
-                <InputField label="Advance Tax Paid (Rs)" value={advancePaid} onChange={setAdvancePaid} />
-                <InputField label="WHT Credits (Rs)" value={whtCredits} onChange={setWhtCredits} />
-                <ResultBox
-                  label="Annual Income Tax"
-                  value={formatPKR(salaryResult.tax)}
-                  breakdown={salaryType === "company" ? "Corporate tax @ 29% flat rate" : salaryType === "salaried" ? `Salaried individual — progressive slab rates (Div-I, Part-I, First Schedule)${parseFloat(salaryIncome || "0") > 10000000 ? " + 9% surcharge" : ""}` : `Business individual/AOP — progressive slab rates${parseFloat(salaryIncome || "0") > 10000000 ? " + 9% surcharge" : ""}`}
-                />
-                <div className={`p-4 rounded-xl border ${salaryResult.net > 0 ? "bg-red-50 border-red-100" : "bg-emerald-50 border-emerald-100"}`}>
-                  <p className="text-xs font-semibold text-slate-600 mb-1">{salaryResult.net > 0 ? "Net Tax Payable" : "Refundable Amount"}</p>
-                  <p className={`text-xl font-bold ${salaryResult.net > 0 ? "text-red-700" : "text-emerald-700"}`}>{formatPKR(Math.abs(salaryResult.net))}</p>
-                </div>
-              </div>
-            </SectionCard>
-            <SectionCard title="Quarterly Advance Tax Estimate">
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 mb-4">
-                <p className="text-sm font-semibold text-slate-700 mb-2">Estimated Quarterly Installment</p>
-                <p className="text-2xl font-bold text-blue-700">{formatPKR(salaryResult.quarterly)}</p>
-                <p className="text-[11px] text-slate-500 mt-2">Each quarter: 25% of estimated annual tax</p>
-              </div>
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-600 mb-2">Due Dates</p>
-                {["Sep 15 — Q1", "Dec 15 — Q2", "Mar 15 — Q3", "Jun 15 — Q4"].map((d) => (
-                  <div key={d} className="flex items-center gap-2 text-xs text-slate-600 p-2 rounded-lg bg-white border border-slate-100">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                    <span>{d} — {formatPKR(salaryResult.quarterly)}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <h4 className="text-xs font-bold text-slate-700 mb-2">Tax Slab Applied</h4>
-                {salaryType === "company" ? (
-                  <p className="text-xs text-slate-600">Flat corporate rate: 29%</p>
-                ) : (
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-slate-400 mb-1.5">{salaryType === "salaried" ? "Salaried Individual (75%+ from salary) — Div-I, Part-I" : "Business Individual / AOP — Div-I, Part-I"}</p>
-                    {SALARY_SLABS.map((slab, i) => {
-                      const income = parseFloat(salaryIncome || "0");
-                      const isActive = income >= slab.min && (income <= slab.max || slab.max === Infinity);
-                      return (
-                        <div key={i} className={`text-[11px] px-2 py-1 rounded ${isActive ? "bg-blue-100 text-blue-800 font-semibold" : "text-slate-500"}`}>
-                          {slab.max === Infinity ? `Above ${formatPKR(slab.min)}` : `${formatPKR(slab.min)} – ${formatPKR(slab.max)}`}: {(slab.rate * 100).toFixed(0)}%
-                        </div>
-                      );
-                    })}
+            {/* Income Tax Slabs */}
+            {[
+              { key: "salaried_slabs", title: "Income Tax Slabs — Salaried Individual (Div-I, Part-I, First Schedule)", slabs: SALARY_SLABS },
+              { key: "business_slabs", title: "Income Tax Slabs — Business Individual / AOP (Div-I, Part-I)", slabs: BUSINESS_IND_SLABS },
+            ].map(({ key, title, slabs }) => (
+              <div key={key} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                <button
+                  onClick={() => setExpandedSection(expandedSection === key ? null : key)}
+                  className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors">
+                  <h3 className="text-sm font-bold text-slate-800">{title}</h3>
+                  {expandedSection === key ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                </button>
+                {expandedSection === key && (
+                  <div className="px-5 pb-4">
+                    <table className="w-full text-xs">
+                      <thead><tr className="border-b border-slate-100">
+                        <th className="text-left py-2 px-2 text-slate-500">Taxable Income (Rs)</th>
+                        <th className="text-right py-2 px-2 text-slate-500">Base Tax (Rs)</th>
+                        <th className="text-right py-2 px-2 text-blue-600">Rate on Excess</th>
+                      </tr></thead>
+                      <tbody>
+                        {slabs.map((s, i) => (
+                          <tr key={i} className="border-b border-slate-50">
+                            <td className="py-2 px-2 text-slate-700">
+                              {s.max === Infinity ? `Above ${fmt(s.min - 1)}` : `${fmt(s.min)} – ${fmt(s.max)}`}
+                            </td>
+                            <td className="py-2 px-2 text-right text-slate-700">{fmt(s.base ?? 0)}</td>
+                            <td className="py-2 px-2 text-right font-semibold text-blue-700">{pct(s.rate)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>
-            </SectionCard>
+            ))}
           </div>
         )}
-
-        {activeTab === "property" && (
-          <div className="grid lg:grid-cols-2 gap-6">
-            <SectionCard title="Property Tax Calculator (Sec 236C / 236K)">
-              <div className="space-y-4">
-                <SelectField
-                  label="Transaction Type"
-                  value={propType}
-                  onChange={setPropType}
-                  options={[
-                    { value: "transfer", label: "Transfer of Property (Seller) — Sec 236C" },
-                    { value: "purchase", label: "Purchase of Property (Buyer) — Sec 236K" },
-                  ]}
-                />
-                <InputField label="Property Value / Consideration (Rs)" value={propValue} onChange={setPropValue} />
-                <SelectField
-                  label="Filer Status"
-                  value={propFiler}
-                  onChange={setPropFiler}
-                  options={[
-                    { value: "atl", label: "ATL (Active Taxpayer)" },
-                    { value: "nonatl", label: "Non-ATL" },
-                    { value: "late", label: "Late Filer" },
-                  ]}
-                />
-                <ResultBox
-                  label="Advance Tax on Property"
-                  value={formatPKR(propResult.tax)}
-                  breakdown={`Rate: ${(propResult.rate * 100).toFixed(2)}% on ${formatPKR(parseFloat(propValue || "0"))}`}
-                />
-              </div>
-            </SectionCard>
-            <SectionCard title="Property Tax Rate Slabs">
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-xs font-bold text-slate-700 mb-2">236C — Transfer (Seller)</h4>
-                  <table className="w-full text-xs">
-                    <thead><tr className="border-b border-slate-100"><th className="text-left py-1.5 px-2 text-slate-500">Slab</th><th className="text-right py-1.5 px-2 text-blue-600">ATL</th><th className="text-right py-1.5 px-2 text-red-600">Non-ATL</th><th className="text-right py-1.5 px-2 text-amber-600">Late</th></tr></thead>
-                    <tbody>
-                      <tr className="border-b border-slate-50"><td className="py-1.5 px-2">Up to 50M</td><td className="py-1.5 px-2 text-right font-semibold text-blue-700">4.5%</td><td className="py-1.5 px-2 text-right font-semibold text-red-600">11.5%</td><td className="py-1.5 px-2 text-right font-semibold text-amber-600">7.5%</td></tr>
-                      <tr className="border-b border-slate-50"><td className="py-1.5 px-2">50M – 100M</td><td className="py-1.5 px-2 text-right font-semibold text-blue-700">5.0%</td><td className="py-1.5 px-2 text-right font-semibold text-red-600">11.5%</td><td className="py-1.5 px-2 text-right font-semibold text-amber-600">8.5%</td></tr>
-                      <tr><td className="py-1.5 px-2">Above 100M</td><td className="py-1.5 px-2 text-right font-semibold text-blue-700">5.5%</td><td className="py-1.5 px-2 text-right font-semibold text-red-600">11.5%</td><td className="py-1.5 px-2 text-right font-semibold text-amber-600">9.5%</td></tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-700 mb-2">236K — Purchase (Buyer)</h4>
-                  <table className="w-full text-xs">
-                    <thead><tr className="border-b border-slate-100"><th className="text-left py-1.5 px-2 text-slate-500">Slab</th><th className="text-right py-1.5 px-2 text-blue-600">ATL</th><th className="text-right py-1.5 px-2 text-red-600">Non-ATL</th><th className="text-right py-1.5 px-2 text-amber-600">Late</th></tr></thead>
-                    <tbody>
-                      <tr className="border-b border-slate-50"><td className="py-1.5 px-2">Up to 50M</td><td className="py-1.5 px-2 text-right font-semibold text-blue-700">1.5%</td><td className="py-1.5 px-2 text-right font-semibold text-red-600">10.5%</td><td className="py-1.5 px-2 text-right font-semibold text-amber-600">4.5%</td></tr>
-                      <tr className="border-b border-slate-50"><td className="py-1.5 px-2">50M – 100M</td><td className="py-1.5 px-2 text-right font-semibold text-blue-700">2.0%</td><td className="py-1.5 px-2 text-right font-semibold text-red-600">14.5%</td><td className="py-1.5 px-2 text-right font-semibold text-amber-600">5.5%</td></tr>
-                      <tr><td className="py-1.5 px-2">Above 100M</td><td className="py-1.5 px-2 text-right font-semibold text-blue-700">2.5%</td><td className="py-1.5 px-2 text-right font-semibold text-red-600">18.5%</td><td className="py-1.5 px-2 text-right font-semibold text-amber-600">6.5%</td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </SectionCard>
-          </div>
-        )}
-
-        {activeTab === "vehicle" && (
-          <div className="grid lg:grid-cols-2 gap-6">
-            <SectionCard title="Motor Vehicle Tax (Sec 231B / 234)">
-              <div className="space-y-4">
-                <SelectField
-                  label="Engine Capacity (cc)"
-                  value={vehicleCC}
-                  onChange={setVehicleCC}
-                  options={Object.entries(VEHICLE_FIXED_RATES).map(([k, v]) => ({ value: k, label: v.label }))}
-                />
-                {vehicleCC === "above3000" && (
-                  <InputField label="Vehicle Value (Rs) — for % based rate" value={vehicleValue} onChange={setVehicleValue} />
-                )}
-                <ResultBox
-                  label="Registration Tax (Sec 231B)"
-                  value={formatPKR(vehicleResult.total)}
-                  breakdown={vehicleCC === "above3000"
-                    ? `Fixed: ${formatPKR(vehicleResult.registration)} + ${filerStatus === "atl" ? "12%" : "36%"} of value: ${formatPKR(vehicleResult.percentBased)}`
-                    : `Fixed rate for ${vehicleResult.label} (${filerStatus === "atl" ? "ATL" : "Non-ATL"})`
-                  }
-                />
-                <div className="p-4 rounded-xl bg-amber-50 border border-amber-100">
-                  <p className="text-xs font-semibold text-amber-700 mb-1">Annual Motor Vehicle Tax (Sec 234)</p>
-                  <p className="text-lg font-bold text-amber-700">{formatPKR(vehicleResult.annual)}</p>
-                  <p className="text-[10px] text-amber-600 mt-1">Payable annually at time of token renewal</p>
-                </div>
-              </div>
-            </SectionCard>
-            <SectionCard title="Registration Tax Schedule (Sec 231B(2))">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-100">
-                      <th className="text-left py-2 px-2 text-slate-500">Engine CC</th>
-                      <th className="text-right py-2 px-2 text-blue-600">ATL</th>
-                      <th className="text-right py-2 px-2 text-red-600">Non-ATL</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(VEHICLE_FIXED_RATES).map(([k, v]) => (
-                      <tr key={k} className={`border-b border-slate-50 ${vehicleCC === k ? "bg-blue-50" : ""}`}>
-                        <td className="py-2 px-2 text-slate-700">{v.label}</td>
-                        <td className="py-2 px-2 text-right font-semibold text-blue-700">{formatPKR(v.atl)}</td>
-                        <td className="py-2 px-2 text-right font-semibold text-red-600">{formatPKR(v.nonatl)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-4 p-3 rounded-lg bg-slate-50 border border-slate-100">
-                <div className="flex items-start gap-2">
-                  <Info className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
-                  <p className="text-[11px] text-slate-600">For vehicles above 3000cc, an additional 12% (ATL) / 36% (Non-ATL) of vehicle value applies under Sec 231B(1). Tax reduces by 10% per year from date of registration.</p>
-                </div>
-              </div>
-            </SectionCard>
-          </div>
-        )}
-
-        {activeTab === "investment" && (
-          <div className="grid lg:grid-cols-2 gap-6">
-            <SectionCard title="Investment Income Tax (Sec 150 / 151)">
-              <div className="space-y-4">
-                <SelectField
-                  label="Investment Type"
-                  value={investType}
-                  onChange={setInvestType}
-                  options={[
-                    { value: "dividend_ipp", label: "Dividend — IPPs" },
-                    { value: "dividend_reit", label: "Dividend — REIT / General" },
-                    { value: "dividend_mutual_debt", label: "Dividend — Mutual Fund (Debt >50%)" },
-                    { value: "dividend_mutual_equity", label: "Dividend — Mutual Fund (Equity)" },
-                    { value: "dividend_spv_reit", label: "Dividend — REIT from SPV (Exempt)" },
-                    { value: "dividend_spv_other", label: "Dividend — Others from SPV" },
-                    { value: "profit_bank", label: "Profit on Debt — Bank Deposit" },
-                    { value: "profit_govt", label: "Profit — Govt Securities" },
-                    { value: "profit_other", label: "Profit on Debt — Other" },
-                    { value: "profit_sukuk_company", label: "Sukuk — Company Holder" },
-                    { value: "profit_sukuk_ind_high", label: "Sukuk — Individual (Return >1M)" },
-                    { value: "profit_sukuk_ind_low", label: "Sukuk — Individual (Return <1M)" },
-                  ]}
-                />
-                <InputField label="Investment Amount / Income (Rs)" value={investAmount} onChange={setInvestAmount} />
-                <ResultBox
-                  label="Withholding Tax on Investment"
-                  value={formatPKR(investResult.tax)}
-                  breakdown={`Rate: ${(investResult.rateUsed * 100).toFixed(2)}% (${filerStatus === "atl" ? "ATL" : "Non-ATL"}) — ${investResult.label}`}
-                />
-              </div>
-            </SectionCard>
-            <SectionCard title="Investment Tax Rate Reference">
-              <div className="space-y-3">
-                {["dividend_ipp", "dividend_reit", "dividend_mutual_debt", "dividend_mutual_equity", "profit_bank", "profit_govt", "profit_other", "profit_sukuk_company", "profit_sukuk_ind_high", "profit_sukuk_ind_low"].map((key) => {
-                  const r = WHT_RATES[key];
-                  if (!r) return null;
-                  return (
-                    <div key={key} className={`flex items-center justify-between p-2.5 rounded-lg border ${investType === key ? "bg-blue-50 border-blue-200" : "bg-white border-slate-100"}`}>
-                      <span className="text-[11px] text-slate-700 font-medium">{r.label}</span>
-                      <div className="flex gap-3">
-                        <span className="text-[11px] font-bold text-blue-600">{(r.atl * 100).toFixed(1)}%</span>
-                        <span className="text-[11px] font-bold text-red-500">{(r.nonatl * 100).toFixed(1)}%</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </SectionCard>
-          </div>
-        )}
-
-        {activeTab === "rental" && (
-          <div className="grid lg:grid-cols-2 gap-6">
-            <SectionCard title="Rental Income Tax (Sec 155)">
-              <div className="space-y-4">
-                <SelectField
-                  label="Entity Type"
-                  value={rentEntity}
-                  onChange={setRentEntity}
-                  options={[
-                    { value: "individual", label: "Individual / AOP" },
-                    { value: "company", label: "Company" },
-                  ]}
-                />
-                <InputField label="Annual Rent Amount (Rs)" value={rentAmount} onChange={setRentAmount} />
-                <ResultBox
-                  label="Rental Income Tax"
-                  value={formatPKR(
-                    rentEntity === "company"
-                      ? parseFloat(rentAmount || "0") * (filerStatus === "atl" ? 0.15 : 0.30)
-                      : (() => {
-                          const amt = parseFloat(rentAmount || "0");
-                          let tax = 0;
-                          if (amt > 2000000) {
-                            tax = (300000 * 0) + (300000 * 0.05) + (1400000 * 0.10) + ((amt - 2000000) * 0.15);
-                          } else if (amt > 600000) {
-                            tax = (300000 * 0) + (300000 * 0.05) + ((amt - 600000) * 0.10);
-                          } else if (amt > 300000) {
-                            tax = (300000 * 0) + ((amt - 300000) * 0.05);
-                          }
-                          if (filerStatus === "nonatl") tax *= 2;
-                          return tax;
-                        })()
-                  )}
-                  breakdown={rentEntity === "company" ? `Flat rate: ${filerStatus === "atl" ? "15%" : "30%"} (${filerStatus === "atl" ? "ATL" : "Non-ATL"})` : "Progressive slab rates for individuals"}
-                />
-              </div>
-            </SectionCard>
-            <SectionCard title="Individual Rent Tax Slabs">
-              <table className="w-full text-xs">
-                <thead><tr className="border-b border-slate-100"><th className="text-left py-2 px-2 text-slate-500">Annual Rent</th><th className="text-right py-2 px-2 text-blue-600">ATL Rate</th></tr></thead>
-                <tbody>
-                  <tr className="border-b border-slate-50"><td className="py-2 px-2">Up to 300,000</td><td className="py-2 px-2 text-right font-semibold text-emerald-600">0%</td></tr>
-                  <tr className="border-b border-slate-50"><td className="py-2 px-2">300,001 – 600,000</td><td className="py-2 px-2 text-right font-semibold text-blue-700">5%</td></tr>
-                  <tr className="border-b border-slate-50"><td className="py-2 px-2">600,001 – 2,000,000</td><td className="py-2 px-2 text-right font-semibold text-blue-700">10%</td></tr>
-                  <tr><td className="py-2 px-2">Above 2,000,000</td><td className="py-2 px-2 text-right font-semibold text-blue-700">15%</td></tr>
-                </tbody>
-              </table>
-              <div className="mt-4 p-3 rounded-lg bg-slate-50 border border-slate-100">
-                <p className="text-[11px] text-slate-600">Companies: Flat 15% (ATL) / 30% (Non-ATL). Individuals use progressive slabs. Non-ATL individuals pay double the ATL slab rates.</p>
-              </div>
-            </SectionCard>
-          </div>
-        )}
-
-        {activeTab === "misc" && (
-          <div className="grid lg:grid-cols-2 gap-6">
-            <SectionCard title="Other WHT Sections">
-              <div className="space-y-4">
-                <SelectField
-                  label="Section / Category"
-                  value={miscType}
-                  onChange={setMiscType}
-                  options={[
-                    { value: "function_gathering", label: "Functions & Gatherings (236CB)" },
-                    { value: "remittance_abroad", label: "Remittance Abroad (236Y)" },
-                    { value: "bonus_shares", label: "Bonus Shares (236Z)" },
-                    { value: "cash_withdrawal", label: "Cash Withdrawal (231AB)" },
-                    { value: "prize_bond", label: "Prize Bond / Lottery" },
-                    { value: "prize_quiz", label: "Quiz / Promotion Prize" },
-                    { value: "petroleum", label: "Petroleum Products (156A)" },
-                    { value: "brokerage_advertising", label: "Commission — Advertising Agent" },
-                    { value: "brokerage_life_insurance", label: "Commission — Life Insurance" },
-                    { value: "brokerage_general", label: "Commission — General (Sec 233)" },
-                    { value: "sale_distributor", label: "Sale to Distributor — Fertilizer" },
-                    { value: "sale_distributor_other", label: "Sale to Distributor — Other" },
-                    { value: "sale_retailer", label: "Sale to Retailer (236H)" },
-                    { value: "auction_goods", label: "Public Auction — Goods (236A)" },
-                    { value: "auction_property", label: "Public Auction — Property" },
-                    { value: "nonresident_general", label: "Non-Resident — General (152(1))" },
-                    { value: "nonresident_1aa", label: "Non-Resident — IT Services" },
-                    { value: "export_goods", label: "Export of Goods (154)" },
-                    { value: "export_services_pseb", label: "Export IT Services — PSEB" },
-                    { value: "ecommerce_digital", label: "E-Commerce Digital Payment" },
-                    { value: "ecommerce_cod", label: "E-Commerce COD" },
-                  ]}
-                />
-                <InputField label="Amount (Rs)" value={miscAmount} onChange={setMiscAmount} />
-                <ResultBox
-                  label="Tax Liability"
-                  value={formatPKR(miscResult.tax)}
-                  breakdown={`Rate: ${(miscResult.rateUsed * 100).toFixed(2)}% (${filerStatus === "atl" ? "ATL" : "Non-ATL"}) — ${miscResult.label}`}
-                />
-              </div>
-            </SectionCard>
-            <SectionCard title="Quick Reference — Miscellaneous Rates">
-              <div className="space-y-2">
-                {[
-                  "function_gathering", "remittance_abroad", "bonus_shares", "cash_withdrawal",
-                  "prize_bond", "prize_quiz", "petroleum", "brokerage_general",
-                  "sale_retailer", "auction_goods", "nonresident_general",
-                ].map((key) => {
-                  const r = WHT_RATES[key];
-                  if (!r) return null;
-                  return (
-                    <div key={key} className={`flex items-center justify-between p-2 rounded-lg border ${miscType === key ? "bg-blue-50 border-blue-200" : "bg-white border-slate-100"}`}>
-                      <span className="text-[11px] text-slate-700">{r.label}</span>
-                      <div className="flex gap-3">
-                        <span className="text-[10px] font-bold text-blue-600">{(r.atl * 100).toFixed(1)}%</span>
-                        <span className="text-[10px] font-bold text-red-500">{(r.nonatl * 100).toFixed(1)}%</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </SectionCard>
-          </div>
-        )}
-
-        <div className="mt-8 text-center py-4 border-t border-slate-200">
-          <p className="text-[11px] text-slate-400">
-            Based on Finance Act 2025 (FBR Rate Card). For statutory accuracy, refer to the Income Tax Ordinance, 2001. Rates subject to change.
-          </p>
-          <p className="text-[10px] text-slate-400 mt-1">
-            Powered by Alam &amp; Aulakh, Chartered Accountants — <a href="https://www.ana-ca.com" className="text-blue-500 hover:underline">www.ana-ca.com</a>
-          </p>
-        </div>
       </div>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-100 mt-10 py-5 text-center">
+        <p className="text-[11px] text-slate-400">
+          Finance Act 2025 • Income Tax Ordinance 2001 • Sales Tax Act 1990 • For CA Professional Use
+        </p>
+        <p className="text-[10px] text-slate-300 mt-1">
+          Alam & Aulakh — Chartered Accountants • Rates are for reference only; verify with applicable legislation
+        </p>
+      </footer>
     </div>
   );
 }
