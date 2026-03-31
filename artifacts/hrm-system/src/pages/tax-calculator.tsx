@@ -276,7 +276,7 @@ const RATE_TABLE_SECTIONS = [
 type TabKey = "docanalyzer" | "exposure" | "income" | "wht" | "salestax" | "property" | "vehicle" | "investment" | "rental" | "rates";
 
 const TABS: { key: TabKey; label: string; icon: any; badge?: string }[] = [
-  { key: "docanalyzer", label: "AI Analyzer", icon: FileSearch, badge: "AI" },
+  { key: "docanalyzer", label: "Intelligent Analyzer", icon: FileSearch, badge: "IA" },
   { key: "exposure",  label: "Tax Exposure",  icon: Target },
   { key: "income",    label: "Income Tax",    icon: Banknote },
   { key: "wht",       label: "WHT Calc",      icon: Calculator },
@@ -353,7 +353,7 @@ export default function TaxCalculator() {
       const contentType = resp.headers.get("content-type") || "";
       if (!contentType.includes("application/json")) {
         throw new Error(
-          resp.status === 502 || resp.status === 503 ? "AI service temporarily unavailable. Please try again." :
+          resp.status === 502 || resp.status === 503 ? "Intelligent analysis service temporarily unavailable. Please try again." :
           resp.status === 429 ? "Rate limit reached. Please wait and try again." :
           `Server returned an unexpected response (HTTP ${resp.status}).`
         );
@@ -385,7 +385,7 @@ export default function TaxCalculator() {
       if (!contentType.includes("application/json")) {
         throw new Error(
           resp.status === 413 ? "File too large. Please reduce file size and try again." :
-          resp.status === 502 || resp.status === 503 ? "AI service temporarily unavailable. Please try again in a few seconds." :
+          resp.status === 502 || resp.status === 503 ? "Intelligent analysis service temporarily unavailable. Please try again in a few seconds." :
           resp.status === 429 ? "Rate limit reached. Please wait a moment and try again." :
           `Server returned an unexpected response (HTTP ${resp.status}). Please try again.`
         );
@@ -687,7 +687,7 @@ export default function TaxCalculator() {
                 <Icon className="w-3.5 h-3.5" /> {label}
                 {badge && (
                   <span className={`absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-md text-[8px] font-black leading-none shadow-sm ${
-                    badge === "AI" ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white" : "bg-emerald-500 text-white"
+                    badge === "IA" ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white" : "bg-emerald-500 text-white"
                   }`}>{badge}</span>
                 )}
               </button>
@@ -699,7 +699,7 @@ export default function TaxCalculator() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
 
         {/* ══════════════════════════════════════════════════════════════════════
-            TAB 0 — AI DOCUMENT TAX ANALYZER
+            TAB 0 — INTELLIGENT DOCUMENT TAX ANALYZER
             ══════════════════════════════════════════════════════════════════════ */}
         {activeTab === "docanalyzer" && (
           <div className="space-y-6">
@@ -709,11 +709,11 @@ export default function TaxCalculator() {
               <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="px-2 py-0.5 rounded-md bg-white/15 text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">Law-Integrated AI Engine</span>
+                    <span className="px-2 py-0.5 rounded-md bg-white/15 text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">Law-Integrated Intelligent Engine</span>
                     <span className="px-2 py-0.5 rounded-md bg-emerald-400/20 text-emerald-200 text-[10px] font-bold uppercase tracking-wider">GPT-4o + OCR</span>
                   </div>
-                  <h2 className="text-xl sm:text-2xl font-bold mb-2 tracking-tight">AI Tax Analysis Engine</h2>
-                  <p className="text-indigo-100 text-sm leading-relaxed max-w-xl">Upload a document or describe any transaction. Our AI scans against ITO 2001, Sales Tax Act 1990, Provincial ST, FED Act 2005 & Finance Act 2025 — returning section-wise, rate-wise, condition-based tax analysis with legal citations.</p>
+                  <h2 className="text-xl sm:text-2xl font-bold mb-2 tracking-tight">Intelligent Tax Analysis Engine</h2>
+                  <p className="text-indigo-100 text-sm leading-relaxed max-w-xl">Upload a document or describe any transaction. Our Intelligent engine scans against ITO 2001, Sales Tax Act 1990, Provincial ST, FED Act 2005 & Finance Act 2025 — returning section-wise, rate-wise, condition-based tax analysis with legal citations.</p>
                 </div>
                 <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/20 shadow-inner shrink-0">
                   <FileSearch className="w-8 h-8 text-white" />
@@ -757,7 +757,7 @@ export default function TaxCalculator() {
                         </div>
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-indigo-700">AI is analyzing your document…</p>
+                        <p className="text-sm font-bold text-indigo-700">Intelligent engine is analyzing your document…</p>
                         <p className="text-[11px] text-slate-500 mt-1">Extracting data • Mapping to tax laws • Computing exposure</p>
                       </div>
                       <div className="flex justify-center gap-1.5">
@@ -888,7 +888,7 @@ export default function TaxCalculator() {
                     <Shield className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                     <div>
                       <p className="text-[11px] font-bold text-amber-800">Professional Advisory</p>
-                      <p className="text-[10px] text-amber-600 mt-0.5 leading-relaxed">AI analysis is for reference only. Always verify with applicable legislation and consult your tax advisor.</p>
+                      <p className="text-[10px] text-amber-600 mt-0.5 leading-relaxed">Intelligent analysis is for reference only. Always verify with applicable legislation and consult your tax advisor.</p>
                     </div>
                   </div>
                 </div>
@@ -1163,7 +1163,7 @@ export default function TaxCalculator() {
 
                     {/* Modal Footer */}
                     <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200/60 bg-white rounded-b-2xl">
-                      <p className="text-[10px] text-slate-400">Law-integrated AI analysis — always verify with applicable legislation</p>
+                      <p className="text-[10px] text-slate-400">Law-integrated Intelligent analysis — always verify with applicable legislation</p>
                       <div className="flex gap-3">
                         <button
                           onClick={() => { setDocResult(null); setDocFile(null); setDocError(null); }}
