@@ -41,9 +41,10 @@ services:
       - default
       - auditwise_auditwise
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5000/api/health || exit 1"]
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\""]
       interval: 30s
       timeout: 10s
+      start_period: 15s
       retries: 3
 
 networks:
