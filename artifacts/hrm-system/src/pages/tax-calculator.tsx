@@ -724,6 +724,25 @@ export default function TaxCalculator() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Input Area */}
               <div className="lg:col-span-2 space-y-4">
+                {/* Text Input Area */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <textarea
+                    value={docTextInput}
+                    onChange={e => setDocTextInput(e.target.value)}
+                    placeholder={"Describe the transaction or scenario...\n\nExamples:\n• Company ABC (NTN 1234567) received IT consulting services worth PKR 500,000 from XYZ Ltd in Punjab\n• Imported raw materials worth PKR 2,000,000 via Karachi port\n• Paid rent PKR 150,000/month for office in Lahore to an individual landlord\n• Construction contract of PKR 5,000,000 awarded to a non-ATL contractor"}
+                    className="w-full h-36 resize-none rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-sm text-slate-700 placeholder:text-slate-400 placeholder:text-[11px] focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all"
+                    disabled={docTextAnalyzing || docAnalyzing}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-2">{docTextInput.length} characters</p>
+                </div>
+
+                {/* Divider */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-slate-200" />
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">and / or</span>
+                  <div className="flex-1 h-px bg-slate-200" />
+                </div>
+
                 {/* File Upload Area */}
                 <div
                   onDragOver={e => { e.preventDefault(); setDocDragOver(true); }}
@@ -790,25 +809,6 @@ export default function TaxCalculator() {
                       )}
                     </div>
                   )}
-                </div>
-
-                {/* Divider */}
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-px bg-slate-200" />
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">and / or</span>
-                  <div className="flex-1 h-px bg-slate-200" />
-                </div>
-
-                {/* Text Input Area */}
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <textarea
-                    value={docTextInput}
-                    onChange={e => setDocTextInput(e.target.value)}
-                    placeholder={"Describe the transaction or scenario...\n\nExamples:\n• Company ABC (NTN 1234567) received IT consulting services worth PKR 500,000 from XYZ Ltd in Punjab\n• Imported raw materials worth PKR 2,000,000 via Karachi port\n• Paid rent PKR 150,000/month for office in Lahore to an individual landlord\n• Construction contract of PKR 5,000,000 awarded to a non-ATL contractor"}
-                    className="w-full h-36 resize-none rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-sm text-slate-700 placeholder:text-slate-400 placeholder:text-[11px] focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all"
-                    disabled={docTextAnalyzing || docAnalyzing}
-                  />
-                  <p className="text-[10px] text-slate-400 mt-2">{docTextInput.length} characters</p>
                 </div>
 
                 {/* Unified Analyze Button */}
