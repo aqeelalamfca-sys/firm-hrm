@@ -304,6 +304,7 @@ export default function TaxCalculator() {
   const [docTextInput, setDocTextInput] = useState("");
   const [docTextAnalyzing, setDocTextAnalyzing] = useState(false);
   const [docInputMode, setDocInputMode] = useState<"file" | "text">("file");
+  const [calcModalTab, setCalcModalTab] = useState<string | null>(null);
 
   const handleTextAnalyze = useCallback(async () => {
     if (docTextInput.trim().length < 10) {
@@ -1164,279 +1165,76 @@ export default function TaxCalculator() {
             TAB 1 — TAX EXPOSURE CALCULATOR
             ══════════════════════════════════════════════════════════════════════ */}
         {activeTab === "exposure" && (
-          <div className="space-y-6">
-            {/* Hero Banner */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 p-5 text-white shadow-lg">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-base font-bold mb-1">Total Tax Exposure Calculator</h2>
-                  <p className="text-blue-100 text-xs">Covers all major tax heads: Income Tax, WHT, Sales Tax, Super Tax, Minimum Tax (Sec 113 & 4C)</p>
-                </div>
-                <Shield className="w-10 h-10 text-blue-300 shrink-0" />
+          <div className="space-y-5">
+            <Card>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">1</div>
+                <SectionTitle>Entity Profile</SectionTitle>
               </div>
-            </div>
-
-            <div className="grid lg:grid-cols-3 gap-6">
-              {/* LEFT: Inputs */}
-              <div className="lg:col-span-2 space-y-5">
-
-                {/* PHASE 1: Entity Profile */}
-                <Card>
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">1</div>
-                    <SectionTitle>Entity Profile</SectionTitle>
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <SelectField label="Entity Type" value={entityType} onChange={setEntityType} options={[
-                      { value: "individual_salaried",  label: "Individual — Salaried (75%+ salary)" },
-                      { value: "individual_business",  label: "Individual — Business / AOP" },
-                      { value: "company_private",      label: "Private Company (29%)" },
-                      { value: "company_small",        label: "Small Company (21%)" },
-                      { value: "company_listed",       label: "Listed Company (29%)" },
-                      { value: "company_banking",      label: "Banking Company (39%)" },
-                      { value: "npo",                  label: "NPO / Trust" },
-                    ]} />
-                    <SelectField label="Sector" value={sector} onChange={setSector} options={[
-                      { value: "services",       label: "Services" },
-                      { value: "manufacturing",  label: "Manufacturing" },
-                      { value: "trading",        label: "Trading / Wholesale" },
-                      { value: "banking",        label: "Banking & Finance" },
-                      { value: "it",             label: "IT / IT-Enabled" },
-                      { value: "construction",   label: "Construction" },
-                      { value: "export",         label: "Export" },
-                      { value: "npo",            label: "NPO / Charity" },
-                    ]} />
-                    <SelectField label="ATL / Filer Status" value={atlStatus} onChange={setAtlStatus} options={[
-                      { value: "atl",     label: "✅ ATL — Active Taxpayer" },
-                      { value: "late",    label: "⏰ Late Filer" },
-                      { value: "nonatl",  label: "❌ Non-Filer / Non-ATL" },
-                    ]} />
-                    <SelectField label="Sales Tax / PST Registration" value={pstReg} onChange={setPstReg} options={[
-                      { value: "none",    label: "Not Registered" },
-                      { value: "federal", label: "Federal — Sales Tax (FBR)" },
-                      { value: "punjab",  label: "Punjab Revenue Authority (PRA)" },
-                      { value: "sindh",   label: "Sindh Revenue Board (SRB)" },
-                      { value: "ict",     label: "ICT (Islamabad)" },
-                    ]} />
-                  </div>
-                </Card>
-
-                {/* PHASE 2: Financial Data */}
-                <Card>
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">2</div>
-                    <SectionTitle>Financial Data (Annual)</SectionTitle>
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <InputField label="Total Revenue / Turnover (Rs)" value={revenue} onChange={setRevenue} hint="Gross sales / receipts for the year" />
-                    <InputField label="Cost of Goods Sold (Rs)" value={cogs} onChange={setCogs} hint="Direct costs / cost of sales" />
-                    <InputField label="Operating Expenses (Rs)" value={expenses} onChange={setExpenses} hint="Overheads, admin, marketing etc." />
-                    <InputField label="Salaries & Payroll (Rs)" value={salaryPayroll} onChange={setSalaryPayroll} hint="Total employee salaries paid" />
-                    <InputField label="Import Value (Rs)" value={importValue} onChange={setImportValue} hint="CIF value of goods imported (Sec 148)" />
-                    <InputField label="Contracts Received (Rs)" value={contractsRcvd} onChange={setContractsRcvd} hint="Value of contracts on which WHT deducted (Sec 153)" />
-                    <InputField label="Services Rendered (Rs)" value={servicesRcvd} onChange={setServicesRcvd} hint="Service receipts on which WHT deducted" />
-                  </div>
-                </Card>
-
-                {/* PHASE 3: Credits & Adjustments */}
-                <Card>
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-6 h-6 rounded-full bg-emerald-600 flex items-center justify-center text-white text-[10px] font-bold">3</div>
-                    <SectionTitle>Taxes Already Paid / Adjustable Credits</SectionTitle>
-                  </div>
-                  <div className="grid sm:grid-cols-3 gap-4">
-                    <InputField label="Advance Tax Paid (Rs)" value={advancePaidExp} onChange={setAdvancePaidExp} hint="Sec 147 quarterly installments" />
-                    <InputField label="WHT Credits (Rs)" value={whtCreditsExp} onChange={setWhtCreditsExp} hint="Tax deducted at source on income" />
-                    <InputField label="Input Sales Tax (Rs)" value={inputTaxPaid} onChange={setInputTaxPaid} hint="Paid on purchases (if registered)" />
-                  </div>
-                </Card>
-
-                <button
-                  onClick={() => setShowExposure(true)}
-                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:from-blue-700 hover:to-blue-800 transition-all flex items-center justify-center gap-2">
-                  <Zap className="w-5 h-5" /> Calculate Total Tax Exposure
-                </button>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <SelectField label="Entity Type" value={entityType} onChange={setEntityType} options={[
+                  { value: "individual_salaried",  label: "Individual — Salaried (75%+ salary)" },
+                  { value: "individual_business",  label: "Individual — Business / AOP" },
+                  { value: "company_private",      label: "Private Company (29%)" },
+                  { value: "company_small",        label: "Small Company (21%)" },
+                  { value: "company_listed",       label: "Listed Company (29%)" },
+                  { value: "company_banking",      label: "Banking Company (39%)" },
+                  { value: "npo",                  label: "NPO / Trust" },
+                ]} />
+                <SelectField label="Sector" value={sector} onChange={setSector} options={[
+                  { value: "services",       label: "Services" },
+                  { value: "manufacturing",  label: "Manufacturing" },
+                  { value: "trading",        label: "Trading / Wholesale" },
+                  { value: "banking",        label: "Banking & Finance" },
+                  { value: "it",             label: "IT / IT-Enabled" },
+                  { value: "construction",   label: "Construction" },
+                  { value: "export",         label: "Export" },
+                  { value: "npo",            label: "NPO / Charity" },
+                ]} />
+                <SelectField label="ATL / Filer Status" value={atlStatus} onChange={setAtlStatus} options={[
+                  { value: "atl",     label: "ATL — Active Taxpayer" },
+                  { value: "late",    label: "Late Filer" },
+                  { value: "nonatl",  label: "Non-Filer / Non-ATL" },
+                ]} />
+                <SelectField label="Sales Tax / PST Registration" value={pstReg} onChange={setPstReg} options={[
+                  { value: "none",    label: "Not Registered" },
+                  { value: "federal", label: "Federal — Sales Tax (FBR)" },
+                  { value: "punjab",  label: "Punjab Revenue Authority (PRA)" },
+                  { value: "sindh",   label: "Sindh Revenue Board (SRB)" },
+                  { value: "ict",     label: "ICT (Islamabad)" },
+                ]} />
               </div>
-
-              {/* RIGHT: Quick Reference */}
-              <div className="space-y-4">
-                <Card>
-                  <SectionTitle>How It Works</SectionTitle>
-                  <div className="space-y-3">
-                    {[
-                      { icon: "1️⃣", label: "Enter Entity Profile", sub: "Type, sector, ATL status" },
-                      { icon: "2️⃣", label: "Enter Financial Data", sub: "Revenue, costs, payroll" },
-                      { icon: "3️⃣", label: "Enter Credits Paid", sub: "Advance tax, WHT credits" },
-                      { icon: "⚡", label: "Click Calculate", sub: "Instant exposure result" },
-                    ].map((s) => (
-                      <div key={s.label} className="flex items-start gap-2.5">
-                        <span className="text-base">{s.icon}</span>
-                        <div>
-                          <p className="text-xs font-semibold text-slate-700">{s.label}</p>
-                          <p className="text-[10px] text-slate-400">{s.sub}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-                <Card>
-                  <SectionTitle>Tax Heads Covered</SectionTitle>
-                  <div className="space-y-1.5">
-                    {[
-                      "Income Tax (Ordinance 2001)",
-                      "Super Tax (Sec 4C)",
-                      "Minimum Tax (Sec 113)",
-                      "WHT on Imports (Sec 148)",
-                      "WHT on Contracts (Sec 153)",
-                      "WHT on Services (Sec 153)",
-                      "Sales Tax (Act 1990)",
-                      "Provincial Services Tax",
-                    ].map((t) => (
-                      <div key={t} className="flex items-center gap-2">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                        <span className="text-[11px] text-slate-600">{t}</span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
+            </Card>
+            <Card>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">2</div>
+                <SectionTitle>Financial Data (Annual)</SectionTitle>
               </div>
-            </div>
-
-            {/* ── EXPOSURE RESULTS ── */}
-            {showExposure && (
-              <div className="space-y-5 mt-2">
-                {/* Summary Cards */}
-                <div className="grid sm:grid-cols-4 gap-4">
-                  {[
-                    { label: "Total Tax Liability",  value: exposureResult.totalLiability,  color: "text-slate-800", bg: "bg-white" },
-                    { label: "Credits & Paid",        value: exposureResult.totalCredits,    color: "text-emerald-700", bg: "bg-emerald-50" },
-                    { label: "Net Tax Exposure",      value: exposureResult.netExposure,     color: "text-red-700", bg: "bg-red-50" },
-                    { label: "Taxable Income",        value: exposureResult.taxableIncome,   color: "text-blue-700", bg: "bg-blue-50" },
-                  ].map((c) => (
-                    <div key={c.label} className={`rounded-2xl border border-slate-200/80 shadow-sm p-4 ${c.bg}`}>
-                      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">{c.label}</p>
-                      <p className={`text-xl font-black tabular-nums ${c.color}`}>{fmt(c.value)}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Risk Classification */}
-                <Card>
-                  <div className="flex items-center justify-between mb-4">
-                    <SectionTitle>Risk Classification & Exposure Breakdown</SectionTitle>
-                    <RiskBadge level={exposureResult.risk} />
-                  </div>
-                  <div className="space-y-1">
-                    <TaxRow label="Income Tax" amount={exposureResult.incomeTax}
-                      sub={`Progressive slabs / corporate rate — Taxable income: ${fmt(exposureResult.taxableIncome)}`} />
-                    <TaxRow label="Minimum Tax (Sec 113)" amount={exposureResult.minTax}
-                      sub={`${entityType.startsWith("company") ? "1.25%" : "1%"} of turnover — ${exposureResult.minTax > exposureResult.incomeTax ? "⚠ APPLIES (higher than income tax)" : "Not applicable"}`} />
-                    <TaxRow label="Super Tax (Sec 4C)" amount={exposureResult.superTax}
-                      sub={exposureResult.superTax > 0 ? `Applicable on income above Rs 150M` : "Not applicable (income below Rs 150M)"} />
-                    <TaxRow label="WHT on Imports (Sec 148)" amount={exposureResult.importWHT}
-                      sub={`Rate: ${pct(atlStatus === "atl" ? 0.02 : 0.04)} on ${fmt(n(importValue))}`} />
-                    <TaxRow label="WHT on Contracts (Sec 153)" amount={exposureResult.contractWHT}
-                      sub={`Rate: ${pct(atlStatus === "atl" ? 0.075 : 0.15)} on contracts received`} />
-                    <TaxRow label="WHT on Services (Sec 153)" amount={exposureResult.serviceWHT}
-                      sub={`Rate: ${pct(atlStatus === "atl" ? 0.06 : 0.12)} on services rendered`} />
-                    <TaxRow label="Net Sales Tax Payable" amount={exposureResult.netSalesTax}
-                      sub={pstReg === "none" ? "Not registered for Sales Tax" : `Output tax minus allowed input tax (18% standard rate)`} />
-                    <div className="mt-2 border-t border-slate-100 pt-2">
-                      <TaxRow label="Total Gross Liability" amount={exposureResult.totalLiability} highlight />
-                      <TaxRow label="Less: Credits & Tax Paid" amount={-exposureResult.totalCredits}
-                        sub="Advance tax + WHT credits" />
-                      <TaxRow label="Net Exposure (Unpaid)" amount={exposureResult.netExposure} highlight />
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Penalty Simulation */}
-                {exposureResult.netExposure > 0 && (
-                  <Card>
-                    <SectionTitle>Penalty & Default Surcharge Simulation</SectionTitle>
-                    <div className="grid sm:grid-cols-3 gap-4">
-                      <div className="p-3 rounded-xl bg-red-50 border border-red-100">
-                        <p className="text-[10px] font-semibold text-red-500 uppercase">Late Filing Penalty</p>
-                        <p className="text-lg font-bold text-red-700">{fmt(exposureResult.lateFilingPenalty)}</p>
-                        <p className="text-[10px] text-red-500 mt-0.5">Sec 182 — higher of Rs 40,000 or 0.25% of tax</p>
-                      </div>
-                      <div className="p-3 rounded-xl bg-amber-50 border border-amber-100">
-                        <p className="text-[10px] font-semibold text-amber-500 uppercase">Default Surcharge (12% p.a.)</p>
-                        <p className="text-lg font-bold text-amber-700">{fmt(exposureResult.defaultSurcharge)}</p>
-                        <p className="text-[10px] text-amber-500 mt-0.5">Sec 205 — KIBOR-linked, approx. for 1 month</p>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                        <p className="text-[10px] font-semibold text-slate-500 uppercase">Total Worst Case</p>
-                        <p className="text-lg font-bold text-slate-800">{fmt(exposureResult.netExposure + exposureResult.lateFilingPenalty + exposureResult.defaultSurcharge)}</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Exposure + penalties if unpaid</p>
-                      </div>
-                    </div>
-                  </Card>
-                )}
-
-                {/* AI-Style Suggestions */}
-                {exposureResult.suggestions.length > 0 && (
-                  <Card>
-                    <div className="flex items-center gap-2 mb-4">
-                      <Zap className="w-4 h-4 text-blue-600" />
-                      <SectionTitle>Tax Advisory — Automated Findings</SectionTitle>
-                    </div>
-                    <div className="space-y-2.5">
-                      {exposureResult.suggestions.map((s, i) => (
-                        <AlertBox key={i} type={s.type}>{s.text}</AlertBox>
-                      ))}
-                    </div>
-                  </Card>
-                )}
-
-                {/* Scenario Comparison */}
-                <Card>
-                  <SectionTitle>Scenario Comparison</SectionTitle>
-                  <div className="grid sm:grid-cols-3 gap-4">
-                    {[
-                      {
-                        label: "🟢 Best Case (Tax Optimized)",
-                        desc: "Proper tax planning, all credits utilized, ATL status maintained",
-                        value: Math.max(0, exposureResult.totalLiability * 0.75 - exposureResult.totalCredits),
-                        sub: "Assumes 25% reduction via planning",
-                        bg: "bg-emerald-50 border-emerald-200",
-                        text: "text-emerald-700",
-                      },
-                      {
-                        label: "🟡 Recommended Position",
-                        desc: "Compliant filing, all taxes paid, no penalties",
-                        value: Math.max(0, exposureResult.netExposure),
-                        sub: "Net exposure to be paid",
-                        bg: "bg-blue-50 border-blue-200",
-                        text: "text-blue-700",
-                      },
-                      {
-                        label: "🔴 Worst Case (FBR Audit)",
-                        desc: "Disallowances, penalties, default surcharge, AAAR proceedings",
-                        value: exposureResult.netExposure * 1.5 + exposureResult.lateFilingPenalty + exposureResult.defaultSurcharge,
-                        sub: "Includes 50% additional demand + penalties",
-                        bg: "bg-red-50 border-red-200",
-                        text: "text-red-700",
-                      },
-                    ].map((s) => (
-                      <div key={s.label} className={`p-4 rounded-xl border ${s.bg}`}>
-                        <p className="text-xs font-bold text-slate-700 mb-1">{s.label}</p>
-                        <p className={`text-xl font-black tabular-nums ${s.text}`}>{fmt(s.value)}</p>
-                        <p className="text-[10px] text-slate-500 mt-1">{s.sub}</p>
-                        <p className="text-[10px] text-slate-400 mt-1">{s.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-
-                <div className="flex justify-end">
-                  <button onClick={() => setShowExposure(false)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
-                    <RefreshCw className="w-3.5 h-3.5" /> Reset & Recalculate
-                  </button>
-                </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <InputField label="Total Revenue / Turnover (Rs)" value={revenue} onChange={setRevenue} />
+                <InputField label="Cost of Goods Sold (Rs)" value={cogs} onChange={setCogs} />
+                <InputField label="Operating Expenses (Rs)" value={expenses} onChange={setExpenses} />
+                <InputField label="Salaries & Payroll (Rs)" value={salaryPayroll} onChange={setSalaryPayroll} />
+                <InputField label="Import Value (Rs)" value={importValue} onChange={setImportValue} />
+                <InputField label="Contracts Received (Rs)" value={contractsRcvd} onChange={setContractsRcvd} />
+                <InputField label="Services Rendered (Rs)" value={servicesRcvd} onChange={setServicesRcvd} />
               </div>
-            )}
+            </Card>
+            <Card>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-6 h-6 rounded-full bg-emerald-600 flex items-center justify-center text-white text-[10px] font-bold">3</div>
+                <SectionTitle>Taxes Already Paid / Adjustable Credits</SectionTitle>
+              </div>
+              <div className="grid sm:grid-cols-3 gap-4">
+                <InputField label="Advance Tax Paid (Rs)" value={advancePaidExp} onChange={setAdvancePaidExp} />
+                <InputField label="WHT Credits (Rs)" value={whtCreditsExp} onChange={setWhtCreditsExp} />
+                <InputField label="Input Sales Tax (Rs)" value={inputTaxPaid} onChange={setInputTaxPaid} />
+              </div>
+            </Card>
+            <button onClick={() => { setShowExposure(true); setCalcModalTab("exposure"); }}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:from-blue-700 hover:to-blue-800 transition-all flex items-center justify-center gap-2">
+              <Calculator className="w-5 h-5" /> Calculate
+            </button>
           </div>
         )}
 
@@ -1444,9 +1242,9 @@ export default function TaxCalculator() {
             TAB 2 — INCOME TAX ENGINE
             ══════════════════════════════════════════════════════════════════════ */}
         {activeTab === "income" && (
-          <div className="grid lg:grid-cols-2 gap-6">
+          <div className="space-y-5">
             <Card>
-              <SectionTitle>Income Tax Calculator — All Entities</SectionTitle>
+              <SectionTitle>Income Tax Calculator</SectionTitle>
               <div className="space-y-4">
                 <SelectField label="Taxpayer Category" value={salaryType} onChange={setSalaryType} options={[
                   { value: "salaried",        label: "Individual — Salaried (75%+ from salary)" },
@@ -1457,107 +1255,16 @@ export default function TaxCalculator() {
                 ]} />
                 <InputField label="Annual Taxable Income (Rs)" value={salaryIncome} onChange={setSalaryIncome} />
                 {(salaryType === "company" || salaryType === "company_small" || salaryType === "company_banking") && (
-                  <InputField label="Annual Turnover / Revenue (Rs)" value={turnoverIT} onChange={setTurnoverIT} hint="Used for Minimum Tax (Sec 113) calculation" />
+                  <InputField label="Annual Turnover / Revenue (Rs)" value={turnoverIT} onChange={setTurnoverIT} />
                 )}
                 <InputField label="Advance Tax Paid — Sec 147 (Rs)" value={advancePaid} onChange={setAdvancePaid} />
                 <InputField label="WHT Credits Adjustable (Rs)" value={whtCredits} onChange={setWhtCredits} />
-
-                {/* Results */}
-                <div className="space-y-2 mt-2 border-t border-slate-100 pt-4">
-                  <TaxRow label="Base Income Tax" amount={incomeResult.tax}
-                    sub={salaryType === "company" ? "29% corporate rate" : salaryType === "company_small" ? "21% small company rate" : salaryType === "company_banking" ? "39% banking rate (35% + 4%)" : "Progressive slab rates"} />
-                  {incomeResult.corporate && (
-                    <TaxRow label="Minimum Tax (Sec 113)" amount={incomeResult.minTaxAmt}
-                      sub={`1.25% of turnover Rs ${fmt(n(turnoverIT))} — ${incomeResult.minTaxAmt > incomeResult.tax ? "⚠ APPLIES" : "Not applicable"}`} />
-                  )}
-                  {incomeResult.corporate && (
-                    <TaxRow label="Super Tax (Sec 4C)" amount={incomeResult.superTaxAmt}
-                      sub={incomeResult.superTaxAmt > 0 ? `Applicable — income exceeds Rs 150M` : "Not applicable (income below Rs 150M)"} />
-                  )}
-                  <TaxRow label="Effective Tax Liability" amount={incomeResult.effectiveTax} highlight />
-                  <TaxRow label="Less: Credits & Advance Tax" amount={-Math.min(incomeResult.effectiveTax, incomeResult.effectiveTax - incomeResult.net)} sub="Advance tax + WHT credits" />
-                  <div className={`flex items-center justify-between px-3 py-3 rounded-xl border ${incomeResult.net > 0 ? "bg-red-50 border-red-200" : "bg-emerald-50 border-emerald-200"}`}>
-                    <p className={`text-xs font-bold ${incomeResult.net > 0 ? "text-red-700" : "text-emerald-700"}`}>{incomeResult.net > 0 ? "Net Tax Payable" : "Refundable Amount"}</p>
-                    <p className={`text-lg font-black tabular-nums ${incomeResult.net > 0 ? "text-red-700" : "text-emerald-700"}`}>{fmt(Math.abs(incomeResult.net))}</p>
-                  </div>
-                </div>
               </div>
             </Card>
-
-            <div className="space-y-5">
-              {/* Super Tax Table */}
-              <Card>
-                <SectionTitle>Super Tax (Sec 4C) — Rate Slabs</SectionTitle>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-100">
-                      <th className="text-left py-2 px-2 text-slate-500">Income Slab (Rs)</th>
-                      <th className="text-right py-2 px-2 text-blue-600">Rate</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      { range: "Up to 150,000,000", rate: "Nil" },
-                      { range: "150M – 200M",        rate: "1%" },
-                      { range: "200M – 250M",         rate: "2%" },
-                      { range: "250M – 300M",         rate: "3%" },
-                      { range: "300M – 350M",         rate: "4%" },
-                      { range: "350M – 400M",         rate: "6%" },
-                      { range: "400M – 500M",         rate: "8%" },
-                      { range: "Above 500M",          rate: "10%" },
-                    ].map((r) => {
-                      const inc = n(salaryIncome);
-                      const isActive = (() => {
-                        const map: Record<string, [number, number]> = {
-                          "Up to 150,000,000": [0, 150000000],
-                          "150M – 200M": [150000001, 200000000],
-                          "200M – 250M": [200000001, 250000000],
-                          "250M – 300M": [250000001, 300000000],
-                          "300M – 350M": [300000001, 350000000],
-                          "350M – 400M": [350000001, 400000000],
-                          "400M – 500M": [400000001, 500000000],
-                          "Above 500M": [500000001, Infinity],
-                        };
-                        const [lo, hi] = map[r.range] ?? [0, 0];
-                        return inc >= lo && inc <= hi;
-                      })();
-                      return (
-                        <tr key={r.range} className={`border-b border-slate-50 ${isActive ? "bg-blue-50" : ""}`}>
-                          <td className="py-2 px-2 text-slate-700">{r.range}</td>
-                          <td className={`py-2 px-2 text-right font-bold ${r.rate === "Nil" ? "text-emerald-600" : "text-red-600"}`}>{r.rate}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                <AlertBox type="info">Super Tax is a surcharge on the taxable income — not on the tax payable. Banking companies pay 10% if income exceeds Rs 300M.</AlertBox>
-              </Card>
-
-              {/* Quarterly Schedule */}
-              <Card>
-                <SectionTitle>Quarterly Advance Tax (Sec 147)</SectionTitle>
-                <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 mb-3">
-                  <p className="text-[10px] font-semibold text-blue-500 uppercase mb-1">Per Quarter (25% of annual tax)</p>
-                  <p className="text-2xl font-black text-blue-700">{fmt(incomeResult.quarterly)}</p>
-                </div>
-                <div className="space-y-2">
-                  {[
-                    { q: "Q1 — 15 September",  paid: false },
-                    { q: "Q2 — 15 December",   paid: false },
-                    { q: "Q3 — 15 March",       paid: false },
-                    { q: "Q4 — 15 June",        paid: false },
-                  ].map(({ q }) => (
-                    <div key={q} className="flex items-center justify-between text-xs p-2.5 rounded-lg border border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
-                        <span className="text-slate-700 font-medium">{q}</span>
-                      </div>
-                      <span className="font-bold text-slate-800">{fmt(incomeResult.quarterly)}</span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </div>
+            <button onClick={() => setCalcModalTab("income")}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:from-blue-700 hover:to-blue-800 transition-all flex items-center justify-center gap-2">
+              <Calculator className="w-5 h-5" /> Calculate
+            </button>
           </div>
         )}
 
@@ -1565,61 +1272,20 @@ export default function TaxCalculator() {
             TAB 3 — WHT CALCULATOR
             ══════════════════════════════════════════════════════════════════════ */}
         {activeTab === "wht" && (
-          <div className="grid lg:grid-cols-2 gap-6">
+          <div className="space-y-5">
             <Card>
-              <SectionTitle>Withholding Tax Calculator (All Sections)</SectionTitle>
+              <SectionTitle>Withholding Tax Calculator</SectionTitle>
               <div className="space-y-4">
                 <SelectField label="WHT Section / Transaction Type" value={whtType} onChange={setWhtType}
                   options={Object.entries(WHT_RATES).map(([k, v]) => ({ value: k, label: `Sec ${v.section} — ${v.label}` }))}
                 />
                 <InputField label="Transaction Amount (Rs)" value={whtAmount} onChange={setWhtAmount} placeholder="Enter gross amount" />
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 rounded-xl bg-blue-50 border border-blue-100">
-                    <p className="text-[10px] font-semibold text-blue-500 uppercase">ATL Rate</p>
-                    <p className="text-2xl font-black text-blue-700">{pct(WHT_RATES[whtType]?.atl ?? 0)}</p>
-                    <p className="text-[10px] text-blue-400 mt-1">Tax: {fmt((WHT_RATES[whtType]?.atl ?? 0) * n(whtAmount))}</p>
-                  </div>
-                  <div className="p-3 rounded-xl bg-red-50 border border-red-100">
-                    <p className="text-[10px] font-semibold text-red-500 uppercase">Non-ATL Rate</p>
-                    <p className="text-2xl font-black text-red-700">{pct(WHT_RATES[whtType]?.nonatl ?? 0)}</p>
-                    <p className="text-[10px] text-red-400 mt-1">Tax: {fmt((WHT_RATES[whtType]?.nonatl ?? 0) * n(whtAmount))}</p>
-                  </div>
-                </div>
-                <div className={`p-4 rounded-xl border ${filerStatus === "atl" ? "bg-blue-50 border-blue-200" : "bg-red-50 border-red-200"}`}>
-                  <p className={`text-[10px] font-semibold uppercase ${filerStatus === "atl" ? "text-blue-500" : "text-red-500"}`}>
-                    Your WHT Liability ({filerStatus === "atl" ? "ATL" : "Non-ATL"})
-                  </p>
-                  <p className={`text-3xl font-black tabular-nums ${filerStatus === "atl" ? "text-blue-700" : "text-red-700"}`}>
-                    {fmt(whtResult.tax)}
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-1">Section {WHT_RATES[whtType]?.section} — {whtResult.label}</p>
-                </div>
-                {WHT_RATES[whtType]?.atl !== WHT_RATES[whtType]?.nonatl && (
-                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
-                    <p className="text-[10px] font-semibold text-emerald-600">ATL Saving on this Transaction</p>
-                    <p className="text-lg font-bold text-emerald-700">
-                      {fmt(n(whtAmount) * ((WHT_RATES[whtType]?.nonatl ?? 0) - (WHT_RATES[whtType]?.atl ?? 0)))}
-                    </p>
-                    <p className="text-[10px] text-emerald-500">You save this by being on the Active Taxpayer List</p>
-                  </div>
-                )}
               </div>
             </Card>
-            <Card>
-              <SectionTitle>WHT Nature & Compliance Notes</SectionTitle>
-              <div className="space-y-3">
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                  <p className="text-xs font-bold text-slate-700 mb-2">About Sec {WHT_RATES[whtType]?.section}</p>
-                  <p className="text-[11px] text-slate-600 leading-relaxed">{whtType.startsWith("import") ? "Collected at the time of clearance of goods from customs. Acts as minimum tax for importers unless they can claim as advance tax." : whtType.startsWith("supply") ? "Deducted by the withholding agent (payer) at time of payment for goods. Adjustable against annual income tax liability." : whtType.startsWith("services") ? "Deducted by the payer when making payment for services. Rate varies based on service type and taxpayer status." : whtType.startsWith("contract") ? "Deducted on payments under a contract. Rate applies to the gross contract amount." : whtType.startsWith("dividend") ? "Deducted at source by the company paying dividend. Acts as final tax for most non-company recipients." : whtType.startsWith("profit") ? "Deducted by financial institution / payer on profit on debt instruments." : "WHT collected under specific provisions of the Income Tax Ordinance, 2001."}</p>
-                </div>
-                <AlertBox type="info">
-                  WHT must be deposited by the 15th of the following month via CPR. Failure to deduct or deposit attracts penalties under Sec 182 and default surcharge under Sec 205.
-                </AlertBox>
-                <AlertBox type="warn">
-                  Non-ATL rates are generally double the ATL rates. Verify taxpayer's ATL status on FBR's Active Taxpayer List before applying any rate.
-                </AlertBox>
-              </div>
-            </Card>
+            <button onClick={() => setCalcModalTab("wht")}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:from-blue-700 hover:to-blue-800 transition-all flex items-center justify-center gap-2">
+              <Calculator className="w-5 h-5" /> Calculate
+            </button>
           </div>
         )}
 
@@ -1627,98 +1293,52 @@ export default function TaxCalculator() {
             TAB 4 — SALES TAX ENGINE
             ══════════════════════════════════════════════════════════════════════ */}
         {activeTab === "salestax" && (
-          <div className="grid lg:grid-cols-2 gap-6">
-            <div className="space-y-5">
-              <Card>
-                <SectionTitle>Sales Tax on Goods (Federal — STA 1990)</SectionTitle>
-                <div className="space-y-4">
-                  <SelectField label="Output Sales Tax Rate" value={stRate} onChange={setStRate} options={[
-                    { value: "0.18", label: "18% — Standard Rate" },
-                    { value: "0.17", label: "17% — Specified Goods" },
-                    { value: "0.25", label: "25% — Luxury / Specified" },
-                    { value: "0.10", label: "10% — Reduced Rate" },
-                    { value: "0.05", label: "5% — Specified Category" },
-                    { value: "0.00", label: "0% — Zero-rated / Exempt" },
-                  ]} />
-                  <InputField label="Taxable Sales (Rs)" value={outputSales} onChange={setOutputSales} hint="Value of taxable supplies made" />
-                  <InputField label="Taxable Purchases / Inputs (Rs)" value={inputPurchases} onChange={setInputPurchases} hint="Value of purchases on which input tax paid" />
-                  <SelectField label="Input Tax Rate" value={inputTaxRate} onChange={setInputTaxRate} options={[
-                    { value: "0.18", label: "18% Standard" },
-                    { value: "0.17", label: "17%" },
-                    { value: "0.10", label: "10%" },
-                    { value: "0.05", label: "5%" },
-                  ]} />
-                  <InputField label="Disallowed Input Tax (%)" value={disallowedPct} onChange={setDisallowedPct} hint="Sec 8 restrictions — non-business / blocked items" />
-                </div>
-              </Card>
-
-              <Card>
-                <SectionTitle>Provincial Services Tax (PST)</SectionTitle>
-                <div className="space-y-4">
-                  <SelectField label="Province / Authority" value={stProvince} onChange={setStProvince} options={[
-                    { value: "punjab",  label: "Punjab Revenue Authority (PRA) — 16%" },
-                    { value: "sindh",   label: "Sindh Revenue Board (SRB) — 13-15%" },
-                    { value: "ict",     label: "ICT (Islamabad) — 15%" },
-                    { value: "kpk",     label: "KPK Revenue Authority (KPKRA) — 15%" },
-                    { value: "baloch",  label: "Balochistan (BRA) — 15%" },
-                  ]} />
-                  <SelectField label="PST Rate" value={pstRate} onChange={setPstRate} options={[
-                    { value: "0.16", label: "16% — Punjab (PRA)" },
-                    { value: "0.15", label: "15% — KPK / ICT / Balochistan" },
-                    { value: "0.13", label: "13% — Sindh (SRB) Standard" },
-                    { value: "0.05", label: "5% — Reduced Rate Services" },
-                  ]} />
-                  <InputField label="Service Value (Rs)" value={serviceAmt} onChange={setServiceAmt} hint="Gross service value provided" />
-                </div>
-              </Card>
-            </div>
-
-            <div className="space-y-5">
-              <Card>
-                <SectionTitle>Sales Tax Computation</SectionTitle>
-                <div className="space-y-2">
-                  <TaxRow label="Output Sales Tax" amount={salesTaxResult.outputTax}
-                    sub={`${pct(n(stRate))} × ${fmt(n(outputSales))}`} />
-                  <TaxRow label="Gross Input Tax" amount={salesTaxResult.allowedInput + salesTaxResult.disallowedInput}
-                    sub={`${pct(n(inputTaxRate))} × ${fmt(n(inputPurchases))}`} />
-                  <TaxRow label="Disallowed Input Tax (Sec 8)" amount={-salesTaxResult.disallowedInput}
-                    sub={`${n(disallowedPct).toFixed(0)}% of gross input restricted`} />
-                  <TaxRow label="Allowable Input Tax Credit" amount={salesTaxResult.allowedInput}
-                    sub="Net adjustable input tax" />
-                  <div className="border-t border-slate-100 mt-2 pt-2">
-                    {salesTaxResult.netPayable > 0 ? (
-                      <TaxRow label="Net Sales Tax Payable" amount={salesTaxResult.netPayable} highlight />
-                    ) : (
-                      <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
-                        <p className="text-xs font-bold text-emerald-700">Refund / Carry Forward</p>
-                        <p className="text-lg font-black text-emerald-700">{fmt(salesTaxResult.refundable)}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-5 border-t border-slate-100 pt-4">
-                  <p className="text-xs font-bold text-slate-700 mb-3">Provincial Services Tax (PST)</p>
-                  <TaxRow label={`PST — ${stProvince.toUpperCase()}`} amount={salesTaxResult.pstAmt}
-                    sub={`${pct(n(pstRate))} × ${fmt(n(serviceAmt))}`} />
-                </div>
-
-                <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-slate-800 to-slate-900 text-white">
-                  <p className="text-[10px] text-slate-300 font-semibold uppercase mb-1">Total Indirect Tax Obligation</p>
-                  <p className="text-2xl font-black tabular-nums">{fmt(salesTaxResult.netPayable + salesTaxResult.pstAmt)}</p>
-                  <p className="text-[10px] text-slate-400 mt-1">Federal Sales Tax + PST combined</p>
-                </div>
-              </Card>
-
-              <Card>
-                <SectionTitle>Compliance Notes</SectionTitle>
-                <div className="space-y-2.5">
-                  <AlertBox type="info">Sales Tax returns are due by the 15th of the following month for monthly filers. Late filing attracts Rs 10,000 per return penalty (Sec 33).</AlertBox>
-                  <AlertBox type="warn">Input tax on electricity, gas for non-business use; vehicles (not for sale); food, beverages, and telephone are restricted under Sec 8(1) of the STA.</AlertBox>
-                  <AlertBox type="info">Zero-rated supplies include exports, supplies to EPZs, and goods listed in Fifth Schedule. No output tax charged but input tax is refundable.</AlertBox>
-                </div>
-              </Card>
-            </div>
+          <div className="space-y-5">
+            <Card>
+              <SectionTitle>Sales Tax on Goods (Federal — STA 1990)</SectionTitle>
+              <div className="space-y-4">
+                <SelectField label="Output Sales Tax Rate" value={stRate} onChange={setStRate} options={[
+                  { value: "0.18", label: "18% — Standard Rate" },
+                  { value: "0.17", label: "17% — Specified Goods" },
+                  { value: "0.25", label: "25% — Luxury / Specified" },
+                  { value: "0.10", label: "10% — Reduced Rate" },
+                  { value: "0.05", label: "5% — Specified Category" },
+                  { value: "0.00", label: "0% — Zero-rated / Exempt" },
+                ]} />
+                <InputField label="Taxable Sales (Rs)" value={outputSales} onChange={setOutputSales} />
+                <InputField label="Taxable Purchases / Inputs (Rs)" value={inputPurchases} onChange={setInputPurchases} />
+                <SelectField label="Input Tax Rate" value={inputTaxRate} onChange={setInputTaxRate} options={[
+                  { value: "0.18", label: "18% Standard" },
+                  { value: "0.17", label: "17%" },
+                  { value: "0.10", label: "10%" },
+                  { value: "0.05", label: "5%" },
+                ]} />
+                <InputField label="Disallowed Input Tax (%)" value={disallowedPct} onChange={setDisallowedPct} />
+              </div>
+            </Card>
+            <Card>
+              <SectionTitle>Provincial Services Tax (PST)</SectionTitle>
+              <div className="space-y-4">
+                <SelectField label="Province / Authority" value={stProvince} onChange={setStProvince} options={[
+                  { value: "punjab",  label: "Punjab Revenue Authority (PRA) — 16%" },
+                  { value: "sindh",   label: "Sindh Revenue Board (SRB) — 13-15%" },
+                  { value: "ict",     label: "ICT (Islamabad) — 15%" },
+                  { value: "kpk",     label: "KPK Revenue Authority (KPKRA) — 15%" },
+                  { value: "baloch",  label: "Balochistan (BRA) — 15%" },
+                ]} />
+                <SelectField label="PST Rate" value={pstRate} onChange={setPstRate} options={[
+                  { value: "0.16", label: "16% — Punjab (PRA)" },
+                  { value: "0.15", label: "15% — KPK / ICT / Balochistan" },
+                  { value: "0.13", label: "13% — Sindh (SRB) Standard" },
+                  { value: "0.05", label: "5% — Reduced Rate Services" },
+                ]} />
+                <InputField label="Service Value (Rs)" value={serviceAmt} onChange={setServiceAmt} />
+              </div>
+            </Card>
+            <button onClick={() => setCalcModalTab("salestax")}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:from-blue-700 hover:to-blue-800 transition-all flex items-center justify-center gap-2">
+              <Calculator className="w-5 h-5" /> Calculate
+            </button>
           </div>
         )}
 
@@ -1726,7 +1346,7 @@ export default function TaxCalculator() {
             TAB 5 — PROPERTY TAX
             ══════════════════════════════════════════════════════════════════════ */}
         {activeTab === "property" && (
-          <div className="grid lg:grid-cols-2 gap-6">
+          <div className="space-y-5">
             <Card>
               <SectionTitle>Property Tax Calculator (Sec 236C / 236K)</SectionTitle>
               <div className="space-y-4">
@@ -1740,51 +1360,12 @@ export default function TaxCalculator() {
                   { value: "nonatl", label: "Non-ATL / Non-Filer" },
                   { value: "late",   label: "Late Filer" },
                 ]} />
-                <div className="p-4 rounded-xl bg-blue-50 border border-blue-100">
-                  <p className="text-[10px] text-blue-500 font-semibold uppercase mb-1">Advance Tax on Property</p>
-                  <p className="text-2xl font-black text-blue-700">{fmt(propResult.tax)}</p>
-                  <p className="text-[11px] text-slate-500 mt-1">Rate: {pct(propResult.rate)} on {fmt(n(propValue))}</p>
-                </div>
               </div>
             </Card>
-            <Card>
-              <SectionTitle>Property Tax Rate Table</SectionTitle>
-              <div className="space-y-4">
-                {[
-                  { title: "236C — Transfer (Seller)", rows: [
-                    { slab: "Up to 50M",    atl: "4.5%", nonatl: "11.5%", late: "7.5%" },
-                    { slab: "50M – 100M",   atl: "5.0%", nonatl: "11.5%", late: "8.5%" },
-                    { slab: "Above 100M",   atl: "5.5%", nonatl: "11.5%", late: "9.5%" },
-                  ]},
-                  { title: "236K — Purchase (Buyer)", rows: [
-                    { slab: "Up to 50M",    atl: "1.5%", nonatl: "10.5%", late: "4.5%" },
-                    { slab: "50M – 100M",   atl: "2.0%", nonatl: "14.5%", late: "5.5%" },
-                    { slab: "Above 100M",   atl: "2.5%", nonatl: "18.5%", late: "6.5%" },
-                  ]},
-                ].map((tbl) => (
-                  <div key={tbl.title}>
-                    <p className="text-xs font-bold text-slate-700 mb-2">{tbl.title}</p>
-                    <table className="w-full text-xs">
-                      <thead><tr className="border-b border-slate-100">
-                        <th className="text-left py-1.5 px-2 text-slate-500">Slab</th>
-                        <th className="text-right py-1.5 px-2 text-blue-600">ATL</th>
-                        <th className="text-right py-1.5 px-2 text-red-600">Non-ATL</th>
-                        <th className="text-right py-1.5 px-2 text-amber-600">Late</th>
-                      </tr></thead>
-                      <tbody>{tbl.rows.map((r) => (
-                        <tr key={r.slab} className="border-b border-slate-50">
-                          <td className="py-1.5 px-2 text-slate-700">{r.slab}</td>
-                          <td className="py-1.5 px-2 text-right font-semibold text-blue-700">{r.atl}</td>
-                          <td className="py-1.5 px-2 text-right font-semibold text-red-600">{r.nonatl}</td>
-                          <td className="py-1.5 px-2 text-right font-semibold text-amber-600">{r.late}</td>
-                        </tr>
-                      ))}</tbody>
-                    </table>
-                  </div>
-                ))}
-                <AlertBox type="info">Tax deducted under Sec 236C/236K is adjustable against the seller's/buyer's annual income tax liability (not a final tax for ATL filers).</AlertBox>
-              </div>
-            </Card>
+            <button onClick={() => setCalcModalTab("property")}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:from-blue-700 hover:to-blue-800 transition-all flex items-center justify-center gap-2">
+              <Calculator className="w-5 h-5" /> Calculate
+            </button>
           </div>
         )}
 
@@ -1792,48 +1373,21 @@ export default function TaxCalculator() {
             TAB 6 — VEHICLE TAX
             ══════════════════════════════════════════════════════════════════════ */}
         {activeTab === "vehicle" && (
-          <div className="grid lg:grid-cols-2 gap-6">
+          <div className="space-y-5">
             <Card>
               <SectionTitle>Motor Vehicle Tax (Sec 231B / 234)</SectionTitle>
               <div className="space-y-4">
                 <SelectField label="Engine Capacity (cc)" value={vehicleCC} onChange={setVehicleCC}
                   options={Object.entries(VEHICLE_FIXED_RATES).map(([k, v]) => ({ value: k, label: v.label }))} />
                 {vehicleCC === "above3000" && (
-                  <InputField label="Vehicle Value (Rs) — for percentage-based component" value={vehicleValue} onChange={setVehicleValue} />
+                  <InputField label="Vehicle Value (Rs)" value={vehicleValue} onChange={setVehicleValue} />
                 )}
-                <div className="space-y-2">
-                  <TaxRow label="Registration Tax (Sec 231B)" amount={vehicleResult.registration} />
-                  {vehicleCC === "above3000" && (
-                    <TaxRow label="% of Value Component" amount={vehicleResult.percentBased}
-                      sub={`${filerStatus === "atl" ? "12%" : "36%"} of Rs ${fmt(n(vehicleValue))}`} />
-                  )}
-                  <TaxRow label="Total Registration Tax" amount={vehicleResult.total} highlight />
-                  <div className="mt-2 p-3 rounded-xl bg-amber-50 border border-amber-100">
-                    <p className="text-[10px] font-semibold text-amber-600 uppercase mb-1">Annual Token Tax (Sec 234)</p>
-                    <p className="text-xl font-bold text-amber-700">{fmt(vehicleResult.annual)}</p>
-                    <p className="text-[10px] text-amber-500 mt-0.5">Payable annually at token renewal</p>
-                  </div>
-                </div>
               </div>
             </Card>
-            <Card>
-              <SectionTitle>Registration Tax Schedule</SectionTitle>
-              <table className="w-full text-xs">
-                <thead><tr className="border-b border-slate-100">
-                  <th className="text-left py-2 px-2 text-slate-500">Engine CC</th>
-                  <th className="text-right py-2 px-2 text-blue-600">ATL (Rs)</th>
-                  <th className="text-right py-2 px-2 text-red-600">Non-ATL (Rs)</th>
-                </tr></thead>
-                <tbody>{Object.entries(VEHICLE_FIXED_RATES).map(([k, v]) => (
-                  <tr key={k} className={`border-b border-slate-50 ${vehicleCC === k ? "bg-blue-50" : ""}`}>
-                    <td className="py-2 px-2 text-slate-700">{v.label}</td>
-                    <td className="py-2 px-2 text-right font-semibold text-blue-700">{fmt(v.atl)}</td>
-                    <td className="py-2 px-2 text-right font-semibold text-red-600">{fmt(v.nonatl)}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-              <AlertBox type="info">For vehicles above 3000cc: additional 12% (ATL) or 36% (Non-ATL) of vehicle value applies under Sec 231B(1). Reduces by 10% per year from first registration.</AlertBox>
-            </Card>
+            <button onClick={() => setCalcModalTab("vehicle")}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:from-blue-700 hover:to-blue-800 transition-all flex items-center justify-center gap-2">
+              <Calculator className="w-5 h-5" /> Calculate
+            </button>
           </div>
         )}
 
@@ -1841,7 +1395,7 @@ export default function TaxCalculator() {
             TAB 7 — INVESTMENT INCOME
             ══════════════════════════════════════════════════════════════════════ */}
         {activeTab === "investment" && (
-          <div className="grid lg:grid-cols-2 gap-6">
+          <div className="space-y-5">
             <Card>
               <SectionTitle>Investment Income Tax (Sec 150 / 151)</SectionTitle>
               <div className="space-y-4">
@@ -1862,47 +1416,12 @@ export default function TaxCalculator() {
                   ]}
                 />
                 <InputField label="Income Amount (Rs)" value={investAmount} onChange={setInvestAmount} />
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 rounded-xl bg-blue-50 border border-blue-100 text-center">
-                    <p className="text-[10px] font-semibold text-blue-500 uppercase">ATL Rate</p>
-                    <p className="text-xl font-black text-blue-700">{pct(WHT_RATES[investType]?.atl ?? 0)}</p>
-                    <p className="text-[10px] text-blue-400">{fmt((WHT_RATES[investType]?.atl ?? 0) * n(investAmount))}</p>
-                  </div>
-                  <div className="p-3 rounded-xl bg-red-50 border border-red-100 text-center">
-                    <p className="text-[10px] font-semibold text-red-500 uppercase">Non-ATL Rate</p>
-                    <p className="text-xl font-black text-red-700">{pct(WHT_RATES[investType]?.nonatl ?? 0)}</p>
-                    <p className="text-[10px] text-red-400">{fmt((WHT_RATES[investType]?.nonatl ?? 0) * n(investAmount))}</p>
-                  </div>
-                </div>
-                <div className={`p-4 rounded-xl border ${filerStatus === "atl" ? "bg-blue-50 border-blue-200" : "bg-red-50 border-red-200"}`}>
-                  <p className="text-[10px] font-semibold uppercase text-slate-500">Your Investment Tax ({filerStatus === "atl" ? "ATL" : "Non-ATL"})</p>
-                  <p className={`text-2xl font-black tabular-nums ${filerStatus === "atl" ? "text-blue-700" : "text-red-700"}`}>
-                    {fmt((filerStatus === "atl" ? WHT_RATES[investType]?.atl : WHT_RATES[investType]?.nonatl ?? 0) * n(investAmount))}
-                  </p>
-                </div>
               </div>
             </Card>
-            <Card>
-              <SectionTitle>Investment Tax Rate Reference</SectionTitle>
-              <div className="space-y-1.5">
-                {["dividend_ipp","dividend_reit","dividend_mutual_debt","dividend_mutual_equity","profit_bank","profit_govt","profit_other","profit_sukuk_company","profit_sukuk_ind_high","profit_sukuk_ind_low"].map((key) => {
-                  const r = WHT_RATES[key];
-                  if (!r) return null;
-                  return (
-                    <div key={key} className={`flex items-center justify-between p-2.5 rounded-lg border ${investType === key ? "bg-blue-50 border-blue-200" : "bg-white border-slate-100"}`}>
-                      <div>
-                        <p className="text-[11px] text-slate-700 font-medium">{r.label}</p>
-                        <p className="text-[10px] text-slate-400">Sec {r.section}</p>
-                      </div>
-                      <div className="flex gap-3 text-right">
-                        <div><p className="text-[10px] text-blue-400">ATL</p><p className="text-xs font-bold text-blue-700">{pct(r.atl)}</p></div>
-                        <div><p className="text-[10px] text-red-400">Non-ATL</p><p className="text-xs font-bold text-red-600">{pct(r.nonatl)}</p></div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
+            <button onClick={() => setCalcModalTab("investment")}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:from-blue-700 hover:to-blue-800 transition-all flex items-center justify-center gap-2">
+              <Calculator className="w-5 h-5" /> Calculate
+            </button>
           </div>
         )}
 
@@ -1910,7 +1429,7 @@ export default function TaxCalculator() {
             TAB 8 — RENTAL INCOME
             ══════════════════════════════════════════════════════════════════════ */}
         {activeTab === "rental" && (
-          <div className="grid lg:grid-cols-2 gap-6">
+          <div className="space-y-5">
             <Card>
               <SectionTitle>Rental Income Tax (Sec 155)</SectionTitle>
               <div className="space-y-4">
@@ -1919,52 +1438,12 @@ export default function TaxCalculator() {
                   { value: "company",    label: "Company" },
                 ]} />
                 <InputField label="Annual Rent Received (Rs)" value={rentAmount} onChange={setRentAmount} />
-                {(() => {
-                  const amt = n(rentAmount);
-                  let tax = 0;
-                  if (rentEntity === "company") {
-                    tax = amt * (filerStatus === "atl" ? 0.15 : 0.30);
-                  } else {
-                    if (amt > 2000000)      tax = 15000 + 140000 + (amt - 2000000) * 0.15;
-                    else if (amt > 600000)  tax = 15000 + (amt - 600000) * 0.10;
-                    else if (amt > 300000)  tax = (amt - 300000) * 0.05;
-                    if (filerStatus === "nonatl") tax *= 2;
-                  }
-                  return (
-                    <div className="p-4 rounded-xl bg-blue-50 border border-blue-100">
-                      <p className="text-[10px] font-semibold text-blue-500 uppercase">Rental Income Tax (Sec 155)</p>
-                      <p className="text-2xl font-black text-blue-700">{fmt(tax)}</p>
-                      <p className="text-[11px] text-slate-500 mt-1">{rentEntity === "company" ? `Flat ${filerStatus === "atl" ? "15%" : "30%"} — Company` : `Progressive slabs — Individual${filerStatus === "nonatl" ? " (2x for Non-ATL)" : ""}`}</p>
-                    </div>
-                  );
-                })()}
               </div>
             </Card>
-            <Card>
-              <SectionTitle>Rental Tax Slabs — Individual</SectionTitle>
-              <table className="w-full text-xs mb-4">
-                <thead><tr className="border-b border-slate-100">
-                  <th className="text-left py-2 px-2 text-slate-500">Annual Rent</th>
-                  <th className="text-right py-2 px-2 text-blue-600">ATL Rate</th>
-                  <th className="text-right py-2 px-2 text-red-600">Non-ATL</th>
-                </tr></thead>
-                <tbody>
-                  {[
-                    { range: "Up to 300,000",         atl: "0%",  nonatl: "0%" },
-                    { range: "300,001 – 600,000",      atl: "5%",  nonatl: "10%" },
-                    { range: "600,001 – 2,000,000",    atl: "10%", nonatl: "20%" },
-                    { range: "Above 2,000,000",        atl: "15%", nonatl: "30%" },
-                  ].map((r) => (
-                    <tr key={r.range} className="border-b border-slate-50">
-                      <td className="py-2 px-2 text-slate-700">{r.range}</td>
-                      <td className="py-2 px-2 text-right font-semibold text-blue-700">{r.atl}</td>
-                      <td className="py-2 px-2 text-right font-semibold text-red-600">{r.nonatl}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <AlertBox type="info">Companies pay flat 15% (ATL) or 30% (Non-ATL). For individuals, tax deducted by tenant under Sec 155 is adjustable in annual return. Rental income from sub-letting is taxable as business income.</AlertBox>
-            </Card>
+            <button onClick={() => setCalcModalTab("rental")}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:from-blue-700 hover:to-blue-800 transition-all flex items-center justify-center gap-2">
+              <Calculator className="w-5 h-5" /> Calculate
+            </button>
           </div>
         )}
 
@@ -2164,6 +1643,458 @@ export default function TaxCalculator() {
           );
         })()}
       </div>
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            CALCULATOR RESULTS POPUP MODAL
+            ══════════════════════════════════════════════════════════════════════ */}
+        {calcModalTab && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm overflow-y-auto p-4 pt-12 pb-12">
+            <div className="w-full max-w-3xl">
+              <div className="bg-gradient-to-r from-blue-700 to-indigo-800 rounded-t-2xl px-6 py-4 flex items-center justify-between shadow-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center">
+                    <Calculator className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-white tracking-tight">
+                      {calcModalTab === "exposure" ? "Tax Exposure Results" :
+                       calcModalTab === "income" ? "Income Tax Results" :
+                       calcModalTab === "wht" ? "WHT Calculation Results" :
+                       calcModalTab === "salestax" ? "Sales Tax Results" :
+                       calcModalTab === "property" ? "Property Tax Results" :
+                       calcModalTab === "vehicle" ? "Vehicle Tax Results" :
+                       calcModalTab === "investment" ? "Investment Tax Results" :
+                       "Rental Tax Results"}
+                    </h2>
+                    <p className="text-[11px] text-blue-200">Finance Act 2025 • {filerStatus === "atl" ? "Active Taxpayer (ATL)" : "Non-Active Taxpayer"}</p>
+                  </div>
+                </div>
+                <button onClick={() => { setCalcModalTab(null); setShowExposure(false); }} className="w-9 h-9 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors">
+                  <X className="w-5 h-5 text-white" />
+                </button>
+              </div>
+
+              <div className="bg-[#f8f9fc] rounded-b-2xl shadow-2xl p-6 space-y-5">
+
+                {/* EXPOSURE RESULTS */}
+                {calcModalTab === "exposure" && (
+                  <>
+                    <div className="grid sm:grid-cols-4 gap-3">
+                      {[
+                        { label: "Total Liability", value: exposureResult.totalLiability, color: "text-slate-800", bg: "bg-white" },
+                        { label: "Credits & Paid", value: exposureResult.totalCredits, color: "text-emerald-700", bg: "bg-emerald-50" },
+                        { label: "Net Exposure", value: exposureResult.netExposure, color: "text-red-700", bg: "bg-red-50" },
+                        { label: "Taxable Income", value: exposureResult.taxableIncome, color: "text-blue-700", bg: "bg-blue-50" },
+                      ].map(c => (
+                        <div key={c.label} className={`rounded-xl border border-slate-200/80 shadow-sm p-3 ${c.bg}`}>
+                          <p className="text-[9px] font-semibold text-slate-500 uppercase tracking-wide mb-1">{c.label}</p>
+                          <p className={`text-lg font-black tabular-nums ${c.color}`}>{fmt(c.value)}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs font-bold text-slate-700">Exposure Breakdown</p>
+                        <RiskBadge level={exposureResult.risk} />
+                      </div>
+                      <div className="space-y-1">
+                        <TaxRow label="Income Tax" amount={exposureResult.incomeTax} sub={`Taxable income: ${fmt(exposureResult.taxableIncome)}`} />
+                        <TaxRow label="Minimum Tax (Sec 113)" amount={exposureResult.minTax} sub={`${entityType.startsWith("company") ? "1.25%" : "1%"} of turnover${exposureResult.minTax > exposureResult.incomeTax ? " — APPLIES" : ""}`} />
+                        <TaxRow label="Super Tax (Sec 4C)" amount={exposureResult.superTax} sub={exposureResult.superTax > 0 ? "Applicable on income above Rs 150M" : "Not applicable"} />
+                        <TaxRow label="WHT on Imports (Sec 148)" amount={exposureResult.importWHT} sub={`Rate: ${pct(atlStatus === "atl" ? 0.02 : 0.04)}`} />
+                        <TaxRow label="WHT on Contracts (Sec 153)" amount={exposureResult.contractWHT} sub={`Rate: ${pct(atlStatus === "atl" ? 0.075 : 0.15)}`} />
+                        <TaxRow label="WHT on Services (Sec 153)" amount={exposureResult.serviceWHT} sub={`Rate: ${pct(atlStatus === "atl" ? 0.06 : 0.12)}`} />
+                        <TaxRow label="Net Sales Tax" amount={exposureResult.netSalesTax} sub={pstReg === "none" ? "Not registered" : "18% standard rate"} />
+                        <div className="mt-2 border-t border-slate-100 pt-2">
+                          <TaxRow label="Total Gross Liability" amount={exposureResult.totalLiability} highlight />
+                          <TaxRow label="Less: Credits & Tax Paid" amount={-exposureResult.totalCredits} sub="Advance tax + WHT credits" />
+                          <TaxRow label="Net Exposure (Unpaid)" amount={exposureResult.netExposure} highlight />
+                        </div>
+                      </div>
+                    </div>
+                    {exposureResult.netExposure > 0 && (
+                      <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                        <p className="text-xs font-bold text-slate-700 mb-3">Penalty & Default Surcharge</p>
+                        <div className="grid sm:grid-cols-3 gap-3">
+                          <div className="p-3 rounded-xl bg-red-50 border border-red-100">
+                            <p className="text-[9px] font-semibold text-red-500 uppercase">Late Filing (Sec 182)</p>
+                            <p className="text-lg font-bold text-red-700">{fmt(exposureResult.lateFilingPenalty)}</p>
+                          </div>
+                          <div className="p-3 rounded-xl bg-amber-50 border border-amber-100">
+                            <p className="text-[9px] font-semibold text-amber-500 uppercase">Default Surcharge (Sec 205)</p>
+                            <p className="text-lg font-bold text-amber-700">{fmt(exposureResult.defaultSurcharge)}</p>
+                          </div>
+                          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                            <p className="text-[9px] font-semibold text-slate-500 uppercase">Total Worst Case</p>
+                            <p className="text-lg font-bold text-slate-800">{fmt(exposureResult.netExposure + exposureResult.lateFilingPenalty + exposureResult.defaultSurcharge)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {exposureResult.suggestions.length > 0 && (
+                      <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                        <p className="text-xs font-bold text-slate-700 mb-3">Tax Advisory</p>
+                        <div className="space-y-2">
+                          {exposureResult.suggestions.map((s, i) => (
+                            <AlertBox key={i} type={s.type}>{s.text}</AlertBox>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                      <p className="text-xs font-bold text-slate-700 mb-3">Scenario Comparison</p>
+                      <div className="grid sm:grid-cols-3 gap-3">
+                        {[
+                          { label: "Best Case", value: Math.max(0, exposureResult.totalLiability * 0.75 - exposureResult.totalCredits), sub: "Tax optimized, all credits utilized", bg: "bg-emerald-50 border-emerald-200", text: "text-emerald-700" },
+                          { label: "Recommended", value: Math.max(0, exposureResult.netExposure), sub: "Compliant filing, no penalties", bg: "bg-blue-50 border-blue-200", text: "text-blue-700" },
+                          { label: "Worst Case", value: exposureResult.netExposure * 1.5 + exposureResult.lateFilingPenalty + exposureResult.defaultSurcharge, sub: "FBR audit + penalties", bg: "bg-red-50 border-red-200", text: "text-red-700" },
+                        ].map(s => (
+                          <div key={s.label} className={`p-3 rounded-xl border ${s.bg}`}>
+                            <p className="text-[10px] font-bold text-slate-600 mb-1">{s.label}</p>
+                            <p className={`text-lg font-black tabular-nums ${s.text}`}>{fmt(s.value)}</p>
+                            <p className="text-[9px] text-slate-400 mt-1">{s.sub}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* INCOME TAX RESULTS */}
+                {calcModalTab === "income" && (
+                  <>
+                    <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                      <p className="text-xs font-bold text-slate-700 mb-3">Tax Computation</p>
+                      <div className="space-y-2">
+                        <TaxRow label="Base Income Tax" amount={incomeResult.tax}
+                          sub={salaryType === "company" ? "29% corporate rate" : salaryType === "company_small" ? "21% small company rate" : salaryType === "company_banking" ? "39% banking rate" : "Progressive slab rates"} />
+                        {incomeResult.corporate && (
+                          <TaxRow label="Minimum Tax (Sec 113)" amount={incomeResult.minTaxAmt}
+                            sub={`1.25% of turnover ${fmt(n(turnoverIT))} — ${incomeResult.minTaxAmt > incomeResult.tax ? "APPLIES" : "Not applicable"}`} />
+                        )}
+                        {incomeResult.corporate && (
+                          <TaxRow label="Super Tax (Sec 4C)" amount={incomeResult.superTaxAmt}
+                            sub={incomeResult.superTaxAmt > 0 ? "Income exceeds Rs 150M" : "Not applicable"} />
+                        )}
+                        <TaxRow label="Effective Tax Liability" amount={incomeResult.effectiveTax} highlight />
+                        <TaxRow label="Less: Credits & Advance Tax" amount={-Math.min(incomeResult.effectiveTax, incomeResult.effectiveTax - incomeResult.net)} sub="Advance tax + WHT credits" />
+                        <div className={`flex items-center justify-between px-3 py-3 rounded-xl border ${incomeResult.net > 0 ? "bg-red-50 border-red-200" : "bg-emerald-50 border-emerald-200"}`}>
+                          <p className={`text-xs font-bold ${incomeResult.net > 0 ? "text-red-700" : "text-emerald-700"}`}>{incomeResult.net > 0 ? "Net Tax Payable" : "Refundable Amount"}</p>
+                          <p className={`text-lg font-black tabular-nums ${incomeResult.net > 0 ? "text-red-700" : "text-emerald-700"}`}>{fmt(Math.abs(incomeResult.net))}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                      <p className="text-xs font-bold text-slate-700 mb-3">Quarterly Advance Tax (Sec 147)</p>
+                      <div className="p-3 rounded-xl bg-blue-50 border border-blue-100 mb-3">
+                        <p className="text-[10px] font-semibold text-blue-500 uppercase mb-1">Per Quarter (25% of annual tax)</p>
+                        <p className="text-2xl font-black text-blue-700">{fmt(incomeResult.quarterly)}</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        {["Q1 — 15 September", "Q2 — 15 December", "Q3 — 15 March", "Q4 — 15 June"].map(q => (
+                          <div key={q} className="flex items-center justify-between text-xs p-2 rounded-lg border border-slate-100">
+                            <span className="text-slate-600">{q}</span>
+                            <span className="font-bold text-slate-800">{fmt(incomeResult.quarterly)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                      <p className="text-xs font-bold text-slate-700 mb-3">Super Tax Slabs (Sec 4C)</p>
+                      <table className="w-full text-xs">
+                        <thead><tr className="border-b border-slate-100">
+                          <th className="text-left py-2 px-2 text-slate-500">Income Slab (Rs)</th>
+                          <th className="text-right py-2 px-2 text-blue-600">Rate</th>
+                        </tr></thead>
+                        <tbody>
+                          {[
+                            { range: "Up to 150M", rate: "Nil" }, { range: "150M – 200M", rate: "1%" }, { range: "200M – 250M", rate: "2%" },
+                            { range: "250M – 300M", rate: "3%" }, { range: "300M – 350M", rate: "4%" }, { range: "350M – 400M", rate: "6%" },
+                            { range: "400M – 500M", rate: "8%" }, { range: "Above 500M", rate: "10%" },
+                          ].map(r => (
+                            <tr key={r.range} className="border-b border-slate-50">
+                              <td className="py-1.5 px-2 text-slate-700">{r.range}</td>
+                              <td className={`py-1.5 px-2 text-right font-bold ${r.rate === "Nil" ? "text-emerald-600" : "text-red-600"}`}>{r.rate}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+
+                {/* WHT RESULTS */}
+                {calcModalTab === "wht" && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 text-center">
+                        <p className="text-[10px] font-semibold text-blue-500 uppercase">ATL Rate</p>
+                        <p className="text-2xl font-black text-blue-700">{pct(WHT_RATES[whtType]?.atl ?? 0)}</p>
+                        <p className="text-xs text-blue-600 font-bold mt-1">Tax: {fmt((WHT_RATES[whtType]?.atl ?? 0) * n(whtAmount))}</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-center">
+                        <p className="text-[10px] font-semibold text-red-500 uppercase">Non-ATL Rate</p>
+                        <p className="text-2xl font-black text-red-700">{pct(WHT_RATES[whtType]?.nonatl ?? 0)}</p>
+                        <p className="text-xs text-red-600 font-bold mt-1">Tax: {fmt((WHT_RATES[whtType]?.nonatl ?? 0) * n(whtAmount))}</p>
+                      </div>
+                    </div>
+                    <div className={`p-4 rounded-xl border ${filerStatus === "atl" ? "bg-blue-50 border-blue-200" : "bg-red-50 border-red-200"}`}>
+                      <p className={`text-[10px] font-semibold uppercase ${filerStatus === "atl" ? "text-blue-500" : "text-red-500"}`}>
+                        Your WHT Liability ({filerStatus === "atl" ? "ATL" : "Non-ATL"})
+                      </p>
+                      <p className={`text-3xl font-black tabular-nums ${filerStatus === "atl" ? "text-blue-700" : "text-red-700"}`}>
+                        {fmt(whtResult.tax)}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-1">Section {WHT_RATES[whtType]?.section} — {whtResult.label}</p>
+                    </div>
+                    {WHT_RATES[whtType]?.atl !== WHT_RATES[whtType]?.nonatl && (
+                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                        <p className="text-[10px] font-semibold text-emerald-600">ATL Saving on this Transaction</p>
+                        <p className="text-lg font-bold text-emerald-700">{fmt(n(whtAmount) * ((WHT_RATES[whtType]?.nonatl ?? 0) - (WHT_RATES[whtType]?.atl ?? 0)))}</p>
+                      </div>
+                    )}
+                    <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4 space-y-2.5">
+                      <p className="text-xs font-bold text-slate-700">Compliance Notes</p>
+                      <AlertBox type="info">WHT must be deposited by the 15th of the following month via CPR. Failure attracts penalties under Sec 182 and default surcharge under Sec 205.</AlertBox>
+                      <AlertBox type="warn">Non-ATL rates are generally double the ATL rates. Verify taxpayer's ATL status on FBR's Active Taxpayer List before applying any rate.</AlertBox>
+                    </div>
+                  </>
+                )}
+
+                {/* SALES TAX RESULTS */}
+                {calcModalTab === "salestax" && (
+                  <>
+                    <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                      <p className="text-xs font-bold text-slate-700 mb-3">Sales Tax Computation</p>
+                      <div className="space-y-2">
+                        <TaxRow label="Output Sales Tax" amount={salesTaxResult.outputTax} sub={`${pct(n(stRate))} on ${fmt(n(outputSales))}`} />
+                        <TaxRow label="Gross Input Tax" amount={salesTaxResult.allowedInput + salesTaxResult.disallowedInput} sub={`${pct(n(inputTaxRate))} on ${fmt(n(inputPurchases))}`} />
+                        <TaxRow label="Disallowed Input (Sec 8)" amount={-salesTaxResult.disallowedInput} sub={`${n(disallowedPct).toFixed(0)}% restricted`} />
+                        <TaxRow label="Allowable Input Credit" amount={salesTaxResult.allowedInput} />
+                        <div className="border-t border-slate-100 mt-2 pt-2">
+                          {salesTaxResult.netPayable > 0 ? (
+                            <TaxRow label="Net Sales Tax Payable" amount={salesTaxResult.netPayable} highlight />
+                          ) : (
+                            <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                              <p className="text-xs font-bold text-emerald-700">Refund / Carry Forward</p>
+                              <p className="text-lg font-black text-emerald-700">{fmt(salesTaxResult.refundable)}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                      <p className="text-xs font-bold text-slate-700 mb-3">Provincial Services Tax (PST)</p>
+                      <TaxRow label={`PST — ${stProvince.toUpperCase()}`} amount={salesTaxResult.pstAmt} sub={`${pct(n(pstRate))} on ${fmt(n(serviceAmt))}`} />
+                    </div>
+                    <div className="p-4 rounded-xl bg-gradient-to-r from-slate-800 to-slate-900 text-white">
+                      <p className="text-[10px] text-slate-300 font-semibold uppercase mb-1">Total Indirect Tax Obligation</p>
+                      <p className="text-2xl font-black tabular-nums">{fmt(salesTaxResult.netPayable + salesTaxResult.pstAmt)}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">Federal Sales Tax + PST combined</p>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4 space-y-2.5">
+                      <p className="text-xs font-bold text-slate-700">Compliance Notes</p>
+                      <AlertBox type="info">Returns due by 15th of following month. Late filing attracts Rs 10,000 per return penalty (Sec 33).</AlertBox>
+                      <AlertBox type="warn">Input tax on electricity, gas for non-business use; vehicles; food & beverages restricted under Sec 8(1).</AlertBox>
+                    </div>
+                  </>
+                )}
+
+                {/* PROPERTY TAX RESULTS */}
+                {calcModalTab === "property" && (
+                  <>
+                    <div className="p-5 rounded-xl bg-blue-50 border border-blue-100 text-center">
+                      <p className="text-[10px] font-semibold text-blue-500 uppercase mb-1">Advance Tax on Property</p>
+                      <p className="text-3xl font-black text-blue-700">{fmt(propResult.tax)}</p>
+                      <p className="text-sm text-slate-500 mt-2">Rate: {pct(propResult.rate)} on {fmt(n(propValue))}</p>
+                      <p className="text-xs text-slate-400 mt-1">Section {propType === "transfer" ? "236C (Seller)" : "236K (Buyer)"}</p>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                      <p className="text-xs font-bold text-slate-700 mb-3">Property Tax Rate Table</p>
+                      {[
+                        { title: "236C — Transfer (Seller)", rows: [
+                          { slab: "Up to 50M", atl: "4.5%", nonatl: "11.5%", late: "7.5%" },
+                          { slab: "50M – 100M", atl: "5.0%", nonatl: "11.5%", late: "8.5%" },
+                          { slab: "Above 100M", atl: "5.5%", nonatl: "11.5%", late: "9.5%" },
+                        ]},
+                        { title: "236K — Purchase (Buyer)", rows: [
+                          { slab: "Up to 50M", atl: "1.5%", nonatl: "10.5%", late: "4.5%" },
+                          { slab: "50M – 100M", atl: "2.0%", nonatl: "14.5%", late: "5.5%" },
+                          { slab: "Above 100M", atl: "2.5%", nonatl: "18.5%", late: "6.5%" },
+                        ]},
+                      ].map(tbl => (
+                        <div key={tbl.title} className="mb-4">
+                          <p className="text-[11px] font-bold text-slate-600 mb-2">{tbl.title}</p>
+                          <table className="w-full text-xs">
+                            <thead><tr className="border-b border-slate-100">
+                              <th className="text-left py-1.5 px-2 text-slate-500">Slab</th>
+                              <th className="text-right py-1.5 px-2 text-blue-600">ATL</th>
+                              <th className="text-right py-1.5 px-2 text-red-600">Non-ATL</th>
+                              <th className="text-right py-1.5 px-2 text-amber-600">Late</th>
+                            </tr></thead>
+                            <tbody>{tbl.rows.map(r => (
+                              <tr key={r.slab} className="border-b border-slate-50">
+                                <td className="py-1.5 px-2 text-slate-700">{r.slab}</td>
+                                <td className="py-1.5 px-2 text-right font-semibold text-blue-700">{r.atl}</td>
+                                <td className="py-1.5 px-2 text-right font-semibold text-red-600">{r.nonatl}</td>
+                                <td className="py-1.5 px-2 text-right font-semibold text-amber-600">{r.late}</td>
+                              </tr>
+                            ))}</tbody>
+                          </table>
+                        </div>
+                      ))}
+                      <AlertBox type="info">Tax under Sec 236C/236K is adjustable against annual income tax liability (not final tax for ATL filers).</AlertBox>
+                    </div>
+                  </>
+                )}
+
+                {/* VEHICLE TAX RESULTS */}
+                {calcModalTab === "vehicle" && (
+                  <>
+                    <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                      <p className="text-xs font-bold text-slate-700 mb-3">Vehicle Tax Computation</p>
+                      <div className="space-y-2">
+                        <TaxRow label="Registration Tax (Sec 231B)" amount={vehicleResult.registration} />
+                        {vehicleCC === "above3000" && (
+                          <TaxRow label="% of Value Component" amount={vehicleResult.percentBased} sub={`${filerStatus === "atl" ? "12%" : "36%"} of Rs ${fmt(n(vehicleValue))}`} />
+                        )}
+                        <TaxRow label="Total Registration Tax" amount={vehicleResult.total} highlight />
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-xl bg-amber-50 border border-amber-100">
+                      <p className="text-[10px] font-semibold text-amber-600 uppercase mb-1">Annual Token Tax (Sec 234)</p>
+                      <p className="text-2xl font-bold text-amber-700">{fmt(vehicleResult.annual)}</p>
+                      <p className="text-[10px] text-amber-500 mt-0.5">Payable annually at token renewal</p>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                      <p className="text-xs font-bold text-slate-700 mb-3">Registration Tax Schedule</p>
+                      <table className="w-full text-xs">
+                        <thead><tr className="border-b border-slate-100">
+                          <th className="text-left py-2 px-2 text-slate-500">Engine CC</th>
+                          <th className="text-right py-2 px-2 text-blue-600">ATL (Rs)</th>
+                          <th className="text-right py-2 px-2 text-red-600">Non-ATL (Rs)</th>
+                        </tr></thead>
+                        <tbody>{Object.entries(VEHICLE_FIXED_RATES).map(([k, v]) => (
+                          <tr key={k} className={`border-b border-slate-50 ${vehicleCC === k ? "bg-blue-50" : ""}`}>
+                            <td className="py-2 px-2 text-slate-700">{v.label}</td>
+                            <td className="py-2 px-2 text-right font-semibold text-blue-700">{fmt(v.atl)}</td>
+                            <td className="py-2 px-2 text-right font-semibold text-red-600">{fmt(v.nonatl)}</td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                      <div className="mt-3">
+                        <AlertBox type="info">Above 3000cc: additional 12% (ATL) or 36% (Non-ATL) of vehicle value under Sec 231B(1). Reduces 10% per year.</AlertBox>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* INVESTMENT TAX RESULTS */}
+                {calcModalTab === "investment" && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 text-center">
+                        <p className="text-[10px] font-semibold text-blue-500 uppercase">ATL Rate</p>
+                        <p className="text-2xl font-black text-blue-700">{pct(WHT_RATES[investType]?.atl ?? 0)}</p>
+                        <p className="text-xs text-blue-600 font-bold mt-1">Tax: {fmt((WHT_RATES[investType]?.atl ?? 0) * n(investAmount))}</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-center">
+                        <p className="text-[10px] font-semibold text-red-500 uppercase">Non-ATL Rate</p>
+                        <p className="text-2xl font-black text-red-700">{pct(WHT_RATES[investType]?.nonatl ?? 0)}</p>
+                        <p className="text-xs text-red-600 font-bold mt-1">Tax: {fmt((WHT_RATES[investType]?.nonatl ?? 0) * n(investAmount))}</p>
+                      </div>
+                    </div>
+                    <div className={`p-4 rounded-xl border ${filerStatus === "atl" ? "bg-blue-50 border-blue-200" : "bg-red-50 border-red-200"}`}>
+                      <p className="text-[10px] font-semibold uppercase text-slate-500">Your Investment Tax ({filerStatus === "atl" ? "ATL" : "Non-ATL"})</p>
+                      <p className={`text-2xl font-black tabular-nums ${filerStatus === "atl" ? "text-blue-700" : "text-red-700"}`}>
+                        {fmt(((filerStatus === "atl" ? WHT_RATES[investType]?.atl : WHT_RATES[investType]?.nonatl) ?? 0) * n(investAmount))}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-1">Section {WHT_RATES[investType]?.section} — {WHT_RATES[investType]?.label}</p>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                      <p className="text-xs font-bold text-slate-700 mb-3">Investment Tax Rate Reference</p>
+                      <div className="space-y-1.5">
+                        {["dividend_ipp","dividend_reit","dividend_mutual_debt","dividend_mutual_equity","profit_bank","profit_govt","profit_other","profit_sukuk_company","profit_sukuk_ind_high","profit_sukuk_ind_low"].map(key => {
+                          const r = WHT_RATES[key];
+                          if (!r) return null;
+                          return (
+                            <div key={key} className={`flex items-center justify-between p-2 rounded-lg border ${investType === key ? "bg-blue-50 border-blue-200" : "bg-white border-slate-100"}`}>
+                              <div>
+                                <p className="text-[11px] text-slate-700 font-medium">{r.label}</p>
+                                <p className="text-[10px] text-slate-400">Sec {r.section}</p>
+                              </div>
+                              <div className="flex gap-3 text-right">
+                                <div><p className="text-[9px] text-blue-400">ATL</p><p className="text-xs font-bold text-blue-700">{pct(r.atl)}</p></div>
+                                <div><p className="text-[9px] text-red-400">Non-ATL</p><p className="text-xs font-bold text-red-600">{pct(r.nonatl)}</p></div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* RENTAL TAX RESULTS */}
+                {calcModalTab === "rental" && (() => {
+                  const amt = n(rentAmount);
+                  let tax = 0;
+                  if (rentEntity === "company") {
+                    tax = amt * (filerStatus === "atl" ? 0.15 : 0.30);
+                  } else {
+                    if (amt > 2000000) tax = 15000 + 140000 + (amt - 2000000) * 0.15;
+                    else if (amt > 600000) tax = 15000 + (amt - 600000) * 0.10;
+                    else if (amt > 300000) tax = (amt - 300000) * 0.05;
+                    if (filerStatus === "nonatl") tax *= 2;
+                  }
+                  return (
+                    <>
+                      <div className="p-5 rounded-xl bg-blue-50 border border-blue-100 text-center">
+                        <p className="text-[10px] font-semibold text-blue-500 uppercase mb-1">Rental Income Tax (Sec 155)</p>
+                        <p className="text-3xl font-black text-blue-700">{fmt(tax)}</p>
+                        <p className="text-sm text-slate-500 mt-2">{rentEntity === "company" ? `Flat ${filerStatus === "atl" ? "15%" : "30%"} — Company` : `Progressive slabs — Individual${filerStatus === "nonatl" ? " (2x for Non-ATL)" : ""}`}</p>
+                      </div>
+                      <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                        <p className="text-xs font-bold text-slate-700 mb-3">Rental Tax Slabs — Individual</p>
+                        <table className="w-full text-xs mb-3">
+                          <thead><tr className="border-b border-slate-100">
+                            <th className="text-left py-2 px-2 text-slate-500">Annual Rent</th>
+                            <th className="text-right py-2 px-2 text-blue-600">ATL Rate</th>
+                            <th className="text-right py-2 px-2 text-red-600">Non-ATL</th>
+                          </tr></thead>
+                          <tbody>
+                            {[
+                              { range: "Up to 300,000", atl: "0%", nonatl: "0%" },
+                              { range: "300,001 – 600,000", atl: "5%", nonatl: "10%" },
+                              { range: "600,001 – 2,000,000", atl: "10%", nonatl: "20%" },
+                              { range: "Above 2,000,000", atl: "15%", nonatl: "30%" },
+                            ].map(r => (
+                              <tr key={r.range} className="border-b border-slate-50">
+                                <td className="py-2 px-2 text-slate-700">{r.range}</td>
+                                <td className="py-2 px-2 text-right font-semibold text-blue-700">{r.atl}</td>
+                                <td className="py-2 px-2 text-right font-semibold text-red-600">{r.nonatl}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <AlertBox type="info">Companies pay flat 15% (ATL) or 30% (Non-ATL). Individual tax under Sec 155 is adjustable in annual return.</AlertBox>
+                      </div>
+                    </>
+                  );
+                })()}
+
+                {/* Modal Footer */}
+                <div className="flex items-center justify-between pt-3 border-t border-slate-200/60">
+                  <p className="text-[10px] text-slate-400">Finance Act 2025 — Verify with applicable legislation</p>
+                  <button onClick={() => { setCalcModalTab(null); setShowExposure(false); }}
+                    className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl text-xs font-bold hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-2">
+                    <X className="w-3.5 h-3.5" /> Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
       {/* Footer */}
       <footer className="border-t border-slate-200/60 mt-12 py-6 bg-gradient-to-b from-transparent to-slate-50/50">
