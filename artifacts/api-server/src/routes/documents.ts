@@ -33,8 +33,8 @@ async function batchEnrich(docs: any[]) {
       : Promise.resolve([]),
   ]);
 
-  const userMap = new Map(users.map(u => [u.id, u.name]));
-  const clientMap = new Map(clients.map(c => [c.id, c.name]));
+  const userMap = new Map(users.map((u: any) => [u.id, u.name]));
+  const clientMap = new Map(clients.map((c: any) => [c.id, c.name]));
 
   return docs.map(doc => ({
     id: doc.id,
@@ -181,7 +181,7 @@ router.post("/:id/version", async (req: AuthenticatedRequest, res) => {
 
     const siblings = await db.select().from(documentsTable)
       .where(eq(documentsTable.parentDocumentId, parentId));
-    const maxVersion = Math.max(parent.version || 1, ...siblings.map(s => s.version || 1));
+    const maxVersion = Math.max(parent.version || 1, ...siblings.map((s: any) => s.version || 1));
 
     const { fileName, originalName, fileSize, mimeType, description, filePath: fp } = req.body;
 
@@ -235,7 +235,7 @@ router.get("/:id/versions", async (req: AuthenticatedRequest, res) => {
     const uploaderIds = [...new Set(allVersions.map(d => d.uploadedById))];
     const uploaders = await db.select({ id: usersTable.id, name: usersTable.name })
       .from(usersTable).where(inArray(usersTable.id, uploaderIds));
-    const uploaderMap = new Map(uploaders.map(u => [u.id, u.name]));
+    const uploaderMap = new Map(uploaders.map((u: any) => [u.id, u.name]));
 
     const enriched = allVersions.map(doc => ({
       id: doc.id,

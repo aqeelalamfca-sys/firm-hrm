@@ -10,7 +10,7 @@ const router = Router();
 router.get("/", async (req: AuthenticatedRequest, res) => {
   try {
     const settings = await db.select().from(systemSettingsTable);
-    const safe = settings.map(s => {
+    const safe = settings.map((s: any) => {
       const isSensitive = s.key.toLowerCase().includes("key") || s.key.toLowerCase().includes("secret");
       return {
         id: s.id,
@@ -84,7 +84,7 @@ router.post("/test-api-key", async (req: AuthenticatedRequest, res) => {
 router.get("/auto-gen-config", async (_req: AuthenticatedRequest, res) => {
   try {
     const settings = await db.select().from(systemSettingsTable);
-    const getVal = (key: string, fallback: string) => settings.find(s => s.key === key)?.value || fallback;
+    const getVal = (key: string, fallback: string) => settings.find((s: any) => s.key === key)?.value || fallback;
 
     res.json({
       enabled: getVal("auto_gen_enabled", "true") === "true",
@@ -132,7 +132,7 @@ router.put("/auto-gen-config", async (req: AuthenticatedRequest, res) => {
 
 router.put("/:key", async (req: AuthenticatedRequest, res) => {
   try {
-    const { key } = req.params;
+    const key = req.params.key as string;
     const { value, description } = req.body;
 
     if (!value) {
@@ -163,7 +163,7 @@ router.put("/:key", async (req: AuthenticatedRequest, res) => {
         .returning();
     }
 
-    const isSensitive = key.toLowerCase().includes("key") || key.toLowerCase().includes("secret");
+    const isSensitive = (key as string).toLowerCase().includes("key") || (key as string).toLowerCase().includes("secret");
     res.json({
       id: result.id,
       key: result.key,
@@ -180,7 +180,7 @@ router.put("/:key", async (req: AuthenticatedRequest, res) => {
 
 router.delete("/:key", async (req: AuthenticatedRequest, res) => {
   try {
-    const { key } = req.params;
+    const key = req.params.key as string;
     const [deleted] = await db
       .delete(systemSettingsTable)
       .where(eq(systemSettingsTable.key, key))

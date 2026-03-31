@@ -271,7 +271,7 @@ let intervalId: ReturnType<typeof setInterval> | null = null;
 async function getSchedulerConfig(): Promise<{ enabled: boolean; intervalHours: number }> {
   try {
     const settings = await db.select().from(systemSettingsTable);
-    const getVal = (key: string, fallback: string) => settings.find(s => s.key === key)?.value || fallback;
+    const getVal = (key: string, fallback: string) => settings.find((s: any) => s.key === key)?.value || fallback;
     return {
       enabled: getVal("auto_gen_enabled", "true") === "true",
       intervalHours: parseInt(getVal("auto_gen_interval_hours", "2"), 10) || 2,

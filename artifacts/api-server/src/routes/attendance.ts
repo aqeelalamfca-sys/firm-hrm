@@ -17,21 +17,21 @@ router.get("/summary", async (req, res) => {
   const employees = await db.select().from(employeesTable).where(eq(employeesTable.status, "active"));
 
   const summaries = await Promise.all(
-    employees.map(async (emp) => {
+    employees.map(async (emp: any) => {
       let records = await db.select().from(attendanceTable).where(eq(attendanceTable.employeeId, emp.id));
       if (month && year) {
-        records = records.filter(r => {
+        records = records.filter((r: any) => {
           const d = new Date(r.date);
           return d.getMonth() + 1 === parseInt(month as string) && d.getFullYear() === parseInt(year as string);
         });
       }
 
       const totalDays = records.length;
-      const presentDays = records.filter(r => r.status === "present").length;
-      const absentDays = records.filter(r => r.status === "absent").length;
-      const lateDays = records.filter(r => r.status === "late").length;
-      const halfDays = records.filter(r => r.status === "half_day").length;
-      const leaveDays = records.filter(r => r.status === "leave").length;
+      const presentDays = records.filter((r: any) => r.status === "present").length;
+      const absentDays = records.filter((r: any) => r.status === "absent").length;
+      const lateDays = records.filter((r: any) => r.status === "late").length;
+      const halfDays = records.filter((r: any) => r.status === "half_day").length;
+      const leaveDays = records.filter((r: any) => r.status === "leave").length;
       const attendancePercentage = totalDays > 0 ? Math.round((presentDays + lateDays) / totalDays * 100) : 0;
 
       return {
@@ -56,16 +56,16 @@ router.get("/", async (req, res) => {
   const { employeeId, month, year } = req.query;
 
   let records = await db.select().from(attendanceTable);
-  if (employeeId) records = records.filter(r => r.employeeId === parseInt(employeeId as string));
+  if (employeeId) records = records.filter((r: any) => r.employeeId === parseInt(employeeId as string));
   if (month && year) {
-    records = records.filter(r => {
+    records = records.filter((r: any) => {
       const d = new Date(r.date);
       return d.getMonth() + 1 === parseInt(month as string) && d.getFullYear() === parseInt(year as string);
     });
   }
 
   const result = await Promise.all(
-    records.map(async (r) => {
+    records.map(async (r: any) => {
       const { name, code } = await getEmployeeName(r.employeeId);
       return {
         id: r.id,
@@ -83,7 +83,7 @@ router.get("/", async (req, res) => {
     })
   );
 
-  res.json(result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+  res.json(result.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 });
 
 router.post("/", async (req: AuthenticatedRequest, res) => {

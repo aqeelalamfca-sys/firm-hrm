@@ -97,7 +97,7 @@ router.get("/role-stats", async (req: AuthenticatedRequest, res) => {
         pendingLeaves: Number(leaveStats.pending),
         todayPresent: Number(attendStats.present),
         todayAbsent: Number(empStats.active) - Number(attendStats.present),
-        departmentBreakdown: deptRows.map(r => ({ department: r.department || "Other", count: Number(r.count) })),
+        departmentBreakdown: deptRows.map((r: any) => ({ department: r.department || "Other", count: Number(r.count) })),
       });
     }
 
@@ -157,13 +157,13 @@ router.get("/stats", async (req, res) => {
       .orderBy(sql`created_at DESC`)
       .limit(5);
 
-    const leaveEmpIds = recentLeaveRows.map(l => l.employeeId);
+    const leaveEmpIds = recentLeaveRows.map((l: any) => l.employeeId);
     const leaveEmps = leaveEmpIds.length > 0
       ? await db.select().from(employeesTable).where(inArray(employeesTable.id, leaveEmpIds))
       : [];
-    const leaveEmpMap = new Map(leaveEmps.map(e => [e.id, `${e.firstName} ${e.lastName}`]));
+    const leaveEmpMap = new Map(leaveEmps.map((e: any) => [e.id, `${e.firstName} ${e.lastName}`]));
 
-    const recentLeaves = recentLeaveRows.map(l => ({
+    const recentLeaves = recentLeaveRows.map((l: any) => ({
       id: l.id,
       employeeId: l.employeeId,
       employeeName: leaveEmpMap.get(l.employeeId) ?? "Unknown",

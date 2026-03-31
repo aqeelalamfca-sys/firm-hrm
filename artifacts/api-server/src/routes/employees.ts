@@ -59,14 +59,14 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
       ? await db.select().from(employeesTable).where(and(...conditions))
       : await db.select().from(employeesTable);
 
-    const managerIds = [...new Set(employees.map(e => e.reportingManagerId).filter(Boolean))] as number[];
+    const managerIds = [...new Set(employees.map((e: any) => e.reportingManagerId).filter(Boolean))] as number[];
     const managersMap = new Map<number, string>();
     if (managerIds.length > 0) {
       const managers = await db.select().from(employeesTable).where(inArray(employeesTable.id, managerIds));
       for (const m of managers) managersMap.set(m.id, `${m.firstName} ${m.lastName}`);
     }
 
-    res.json(employees.map(emp => formatEmployee(emp, emp.reportingManagerId ? (managersMap.get(emp.reportingManagerId) ?? null) : null)));
+    res.json(employees.map((emp: any) => formatEmployee(emp, emp.reportingManagerId ? (managersMap.get(emp.reportingManagerId) ?? null) : null)));
   } catch (error) {
     console.error("Error fetching employees:", error);
     res.status(500).json({ error: "Failed to fetch employees" });

@@ -32,7 +32,7 @@ export function authMiddleware(
     db.select()
       .from(usersTable)
       .where(eq(usersTable.id, decoded.userId))
-      .then((users) => {
+      .then((users: any[]) => {
         const user = users[0];
         if (!user) return res.status(401).json({ error: "User not found" });
         if (user.status === "inactive")

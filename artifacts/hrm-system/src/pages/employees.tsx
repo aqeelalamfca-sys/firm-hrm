@@ -77,13 +77,13 @@ export default function Employees() {
   });
 
   const form = useForm<z.infer<typeof employeeSchema>>({
-    resolver: zodResolver(employeeSchema),
+    resolver: zodResolver(employeeSchema as any),
     defaultValues: {
       firstName: "", lastName: "", email: "", department: "", designation: "", joiningDate: new Date().toISOString().split('T')[0], salary: 0, icapRegistrationStatus: "", articlesEndingDate: "", articlesExtensionPeriod: ""
     }
   });
 
-  const filteredEmployees = employees.filter(e => 
+  const filteredEmployees = employees.filter((e: any) => 
     `${e.firstName} ${e.lastName} ${e.department}`.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -221,7 +221,7 @@ export default function Employees() {
                   </div>
                 </td></tr>
               ) : (
-                filteredEmployees.map((emp) => (
+                filteredEmployees.map((emp: any) => (
                   <tr key={emp.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">

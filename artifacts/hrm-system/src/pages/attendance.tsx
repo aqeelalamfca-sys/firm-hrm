@@ -43,15 +43,15 @@ export default function Attendance() {
   };
 
   const attendanceMap = new Map(attendance.map((a: any) => [a.employeeId, a]));
-  const list = employees.map(emp => ({
+  const list = employees.map((emp: any) => ({
     ...emp,
     attendance: attendanceMap.get(emp.id) as any
   }));
 
-  const presentCount = list.filter(e => e.attendance?.status === 'present').length;
-  const absentCount = list.filter(e => e.attendance?.status === 'absent').length;
-  const leaveCount = list.filter(e => e.attendance?.status === 'leave').length;
-  const unmarkedCount = list.filter(e => !e.attendance).length;
+  const presentCount = list.filter((e: any) => e.attendance?.status === 'present').length;
+  const absentCount = list.filter((e: any) => e.attendance?.status === 'absent').length;
+  const leaveCount = list.filter((e: any) => e.attendance?.status === 'leave').length;
+  const unmarkedCount = list.filter((e: any) => !e.attendance).length;
 
   const isLoading = attendanceLoading || empLoading;
 
@@ -114,7 +114,7 @@ export default function Attendance() {
                   </td>
                 </tr>
               ) : (
-                list.map((item) => (
+                list.map((item: any) => (
                   <tr key={item.id} className="hover:bg-muted/20 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">

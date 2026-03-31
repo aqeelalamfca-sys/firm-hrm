@@ -14,7 +14,7 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
     const credentials = await db.select().from(clientCredentialsTable)
       .where(eq(clientCredentialsTable.clientId, clientId));
 
-    const masked = credentials.map((c) => ({
+    const masked = credentials.map((c: any) => ({
       id: c.id,
       clientId: c.clientId,
       portalName: c.portalName,

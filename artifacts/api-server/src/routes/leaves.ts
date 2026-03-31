@@ -34,8 +34,8 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
 
     if (records.length === 0) return res.json([]);
 
-    const employeeIds = [...new Set(records.map(r => r.employeeId))];
-    const approverIds = [...new Set(records.map(r => r.approvedById).filter(Boolean))] as number[];
+    const employeeIds = [...new Set(records.map((r: any) => r.employeeId))];
+    const approverIds = [...new Set(records.map((r: any) => r.approvedById).filter(Boolean))] as number[];
 
     const [employees, users] = await Promise.all([
       db.select().from(employeesTable).where(inArray(employeesTable.id, employeeIds)),
@@ -44,10 +44,10 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
         : Promise.resolve([]),
     ]);
 
-    const empMap = new Map(employees.map(e => [e.id, `${e.firstName} ${e.lastName}`]));
-    const userMap = new Map(users.map(u => [u.id, u.name]));
+    const empMap = new Map(employees.map((e: any) => [e.id, `${e.firstName} ${e.lastName}`]));
+    const userMap = new Map(users.map((u: any) => [u.id, u.name]));
 
-    const result = records.map(r => ({
+    const result = records.map((r: any) => ({
       id: r.id,
       employeeId: r.employeeId,
       employeeName: empMap.get(r.employeeId) ?? "Unknown",
@@ -63,7 +63,7 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
       createdAt: r.createdAt,
     }));
 
-    res.json(result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    res.json(result.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
   } catch (error) {
     console.error("Error fetching leaves:", error);
     res.status(500).json({ error: "Failed to fetch leaves" });
@@ -138,7 +138,7 @@ router.put("/:id", requireRoles(...ADMIN_ROLES), async (req: AuthenticatedReques
     const [[emp], reviewer] = await Promise.all([
       db.select().from(employeesTable).where(eq(employeesTable.id, record.employeeId)),
       reviewerUserId
-        ? db.select().from(usersTable).where(eq(usersTable.id, reviewerUserId)).then(r => r[0])
+        ? db.select().from(usersTable).where(eq(usersTable.id, reviewerUserId)).then((r: any) => r[0])
         : Promise.resolve(null),
     ]);
 

@@ -13,19 +13,19 @@ async function generateClientCode(): Promise<string> {
 
 async function getClientFinancials(clientId: number) {
   const invoices = await db.select().from(invoicesTable).where(eq(invoicesTable.clientId, clientId));
-  const totalBilled = invoices.reduce((sum, i) => sum + Number(i.totalAmount), 0);
-  const totalPaid = invoices.reduce((sum, i) => sum + Number(i.paidAmount), 0);
+  const totalBilled = invoices.reduce((sum: number, i: any) => sum + Number(i.totalAmount), 0);
+  const totalPaid = invoices.reduce((sum: number, i: any) => sum + Number(i.paidAmount), 0);
   return { totalBilled, totalPaid, outstandingBalance: totalBilled - totalPaid };
 }
 
 router.get("/", async (req, res) => {
   const { status, departmentId } = req.query;
   let clients = await db.select().from(clientsTable);
-  if (status) clients = clients.filter(c => c.status === status);
-  if (departmentId) clients = clients.filter(c => c.departmentId === Number(departmentId));
+  if (status) clients = clients.filter((c: any) => c.status === status);
+  if (departmentId) clients = clients.filter((c: any) => c.departmentId === Number(departmentId));
 
   const result = await Promise.all(
-    clients.map(async (c) => {
+    clients.map(async (c: any) => {
       const financials = await getClientFinancials(c.id);
       return {
         id: c.id,

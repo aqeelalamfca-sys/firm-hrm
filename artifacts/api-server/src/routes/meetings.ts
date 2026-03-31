@@ -18,7 +18,7 @@ router.post("/public/book", async (req, res) => {
     }
 
     const existing = await db.select().from(meetingsTable).where(eq(meetingsTable.meetingDate, meetingDate));
-    const conflict = existing.find(m => m.partnerName === partnerName && m.meetingTime === meetingTime && m.status !== "cancelled");
+    const conflict = existing.find((m: any) => m.partnerName === partnerName && m.meetingTime === meetingTime && m.status !== "cancelled");
     if (conflict) {
       return res.status(409).json({ error: "This time slot is already booked for the selected partner. Please choose another time." });
     }
@@ -51,12 +51,12 @@ router.get("/public/slots", async (req, res) => {
     }
 
     const booked = await db.select().from(meetingsTable);
-    const bookedForDay = booked.filter(m =>
+    const bookedForDay = booked.filter((m: any) =>
       m.meetingDate === date &&
       m.partnerName === partner &&
       m.status !== "cancelled"
     );
-    const bookedTimes = bookedForDay.map(m => m.meetingTime);
+    const bookedTimes = bookedForDay.map((m: any) => m.meetingTime);
     res.json({ bookedTimes });
   } catch {
     res.json({ bookedTimes: [] });

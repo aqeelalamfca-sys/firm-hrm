@@ -96,17 +96,17 @@ router.get("/", async (req, res) => {
     ? await db.select().from(invoicesTable).where(and(...conditions))
     : await db.select().from(invoicesTable);
 
-  if (fromDate) invoices = invoices.filter(i => new Date(i.issueDate) >= new Date(fromDate as string));
-  if (toDate) invoices = invoices.filter(i => new Date(i.issueDate) <= new Date(toDate as string));
+  if (fromDate) invoices = invoices.filter((i: any) => new Date(i.issueDate) >= new Date(fromDate as string));
+  if (toDate) invoices = invoices.filter((i: any) => new Date(i.issueDate) <= new Date(toDate as string));
 
   if (invoices.length === 0) return res.json([]);
 
-  const clientIds = [...new Set(invoices.map(i => i.clientId))];
+  const clientIds = [...new Set(invoices.map((i: any) => i.clientId))];
   const clients = await db.select().from(clientsTable).where(inArray(clientsTable.id, clientIds));
-  const clientMap = new Map(clients.map(c => [c.id, c.name]));
+  const clientMap = new Map(clients.map((c: any) => [c.id, c.name]));
 
-  const result = invoices.map(inv => formatInvoice(inv, clientMap.get(inv.clientId) || "Unknown"));
-  res.json(result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+  const result = invoices.map((inv: any) => formatInvoice(inv, clientMap.get(inv.clientId) as string || "Unknown"));
+  res.json(result.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
 });
 
 router.get("/:id", async (req, res) => {

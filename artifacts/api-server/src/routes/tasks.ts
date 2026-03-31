@@ -124,7 +124,7 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
       .orderBy(desc(tasksTable.createdAt));
 
     const today = new Date().toISOString().split("T")[0];
-    const enriched = tasks.map((t) => ({
+    const enriched = tasks.map((t: any) => ({
       ...t,
       isOverdue: t.status !== "completed" && t.dueDate < today,
       status: t.status !== "completed" && t.dueDate < today ? "delayed" : t.status,
@@ -151,12 +151,12 @@ router.get("/stats", async (req: AuthenticatedRequest, res) => {
 
     const today = new Date().toISOString().split("T")[0];
     const total = allTasks.length;
-    const pending = allTasks.filter((t) => t.status === "pending").length;
-    const inProgress = allTasks.filter((t) => t.status === "in_progress").length;
-    const completed = allTasks.filter((t) => t.status === "completed").length;
-    const overdue = allTasks.filter((t) => t.status !== "completed" && t.dueDate < today).length;
-    const critical = allTasks.filter((t) => t.priority === "critical" && t.status !== "completed").length;
-    const dueToday = allTasks.filter((t) => t.dueDate === today && t.status !== "completed").length;
+    const pending = allTasks.filter((t: any) => t.status === "pending").length;
+    const inProgress = allTasks.filter((t: any) => t.status === "in_progress").length;
+    const completed = allTasks.filter((t: any) => t.status === "completed").length;
+    const overdue = allTasks.filter((t: any) => t.status !== "completed" && t.dueDate < today).length;
+    const critical = allTasks.filter((t: any) => t.priority === "critical" && t.status !== "completed").length;
+    const dueToday = allTasks.filter((t: any) => t.dueDate === today && t.status !== "completed").length;
 
     res.json({ total, pending, inProgress, completed, overdue, critical, dueToday });
   } catch (error) {
@@ -196,8 +196,8 @@ router.get("/eligible-users", async (req: AuthenticatedRequest, res) => {
     const currentUserJoining = currentUserEmp?.joiningDate || null;
 
     const eligible = allUsers
-      .filter((u) => u.id !== currentUser.id)
-      .map((u) => {
+      .filter((u: any) => u.id !== currentUser.id)
+      .map((u: any) => {
         const targetEmp = u.employeeId ? empMap.get(u.employeeId) : null;
         const targetJoining = targetEmp?.joiningDate || null;
         const check = canAssign(currentUser.role, u.role, currentUserJoining, targetJoining);

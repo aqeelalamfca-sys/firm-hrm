@@ -44,7 +44,7 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
       .where(whereClause)
       .orderBy(desc(engagementsTable.createdAt));
 
-    const enriched = await Promise.all(engagements.map(async (eng) => {
+    const enriched = await Promise.all(engagements.map(async (eng: any) => {
       const client = (await db.select({ name: clientsTable.name }).from(clientsTable).where(eq(clientsTable.id, eng.clientId)))[0];
       const assignmentCount = (await db.select({ count: sql<number>`count(*)::int` }).from(engagementAssignmentsTable).where(eq(engagementAssignmentsTable.engagementId, eng.id)))[0];
 
@@ -205,7 +205,7 @@ router.get("/:id/assignments", async (req: AuthenticatedRequest, res) => {
     const assignments = await db.select().from(engagementAssignmentsTable)
       .where(eq(engagementAssignmentsTable.engagementId, engagementId));
 
-    const enriched = await Promise.all(assignments.map(async (a) => {
+    const enriched = await Promise.all(assignments.map(async (a: any) => {
       const emp = (await db.select({ firstName: employeesTable.firstName, lastName: employeesTable.lastName }).from(employeesTable).where(eq(employeesTable.id, a.employeeId)))[0];
       return {
         ...a,

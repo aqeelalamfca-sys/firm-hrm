@@ -134,7 +134,7 @@ router.post("/bulk-upload", requireRoles("super_admin", "partner", "hr_admin"), 
 
     const validRoles = ["super_admin", "partner", "hr_admin", "finance_officer", "manager", "employee", "trainee"];
     const departments = await db.select().from(departmentsTable);
-    const deptMap = new Map(departments.map(d => [d.name.toLowerCase(), d.id]));
+    const deptMap = new Map(departments.map((d: any) => [d.name.toLowerCase(), d.id]));
 
     const results: { row: number; name: string; status: "created" | "skipped"; reason?: string }[] = [];
     let created = 0;
@@ -176,7 +176,7 @@ router.post("/bulk-upload", requireRoles("super_admin", "partner", "hr_admin"), 
           results.push({ row: i + 2, name, status: "skipped", reason: `Invalid department: ${row.department}` });
           continue;
         }
-        departmentId = found;
+        departmentId = found as number;
       }
 
       await db.insert(usersTable).values({

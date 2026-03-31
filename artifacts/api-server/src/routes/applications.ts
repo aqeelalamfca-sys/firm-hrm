@@ -356,7 +356,7 @@ router.get("/public/test/:crn", async (req, res) => {
 
     const finalQuestions = selected.sort(() => Math.random() - 0.5);
 
-    const questions = finalQuestions.map((q) => ({
+    const questions = finalQuestions.map((q: any) => ({
       id: q.id,
       question: q.question,
       optionA: q.optionA,
@@ -400,11 +400,11 @@ router.post("/public/test/:crn/submit", async (req, res) => {
     }
 
     const questions = await db.select().from(mcqQuestionsTable);
-    const questionMap = new Map(questions.map((q) => [q.id, q]));
+    const questionMap = new Map(questions.map((q: any) => [q.id, q]));
 
     let score = 0;
     for (const [qId, answer] of Object.entries(answers)) {
-      const question = questionMap.get(Number(qId));
+      const question = questionMap.get(Number(qId)) as any;
       if (question && question.correct === answer) {
         score++;
       }

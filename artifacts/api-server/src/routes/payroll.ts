@@ -19,11 +19,11 @@ function calculatePakistanTax(annualIncome: number): number {
 router.get("/", async (req, res) => {
   const { month, year } = req.query;
   let records = await db.select().from(payrollTable);
-  if (month) records = records.filter(r => r.month === month);
-  if (year) records = records.filter(r => r.year === parseInt(year as string));
+  if (month) records = records.filter((r: any) => r.month === month);
+  if (year) records = records.filter((r: any) => r.year === parseInt(year as string));
 
   const result = await Promise.all(
-    records.map(async (r) => {
+    records.map(async (r: any) => {
       const emps = await db.select().from(employeesTable).where(eq(employeesTable.id, r.employeeId));
       const emp = emps[0];
       return {
@@ -98,20 +98,20 @@ router.post("/", async (req, res) => {
   const workingDays = 26; // Standard working days per month
 
   const records = await Promise.all(
-    employees.map(async (emp) => {
+    employees.map(async (emp: any) => {
       const existingPayroll = await db.select().from(payrollTable)
         .where(and(eq(payrollTable.employeeId, emp.id), eq(payrollTable.month, month), eq(payrollTable.year, parseInt(year))));
       
       if (existingPayroll.length > 0) return null;
 
       const attRecords = await db.select().from(attendanceTable).where(eq(attendanceTable.employeeId, emp.id));
-      const monthAttendance = attRecords.filter(r => {
+      const monthAttendance = attRecords.filter((r: any) => {
         const d = new Date(r.date);
         const [mn, yr] = month.split("-");
         return d.getMonth() + 1 === parseInt(mn) && d.getFullYear() === parseInt(yr);
       });
 
-      const presentDays = monthAttendance.filter(r => r.status === "present" || r.status === "late").length;
+      const presentDays = monthAttendance.filter((r: any) => r.status === "present" || r.status === "late").length;
       const basicSalary = Number(emp.salary);
       const perDaySalary = basicSalary / workingDays;
       const grossSalary = presentDays > 0 ? (perDaySalary * presentDays) : basicSalary;
