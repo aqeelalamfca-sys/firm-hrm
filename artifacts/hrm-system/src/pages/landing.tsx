@@ -266,17 +266,6 @@ export default function Landing() {
               </div>
 
               <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
-                <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-3">Industries We Serve</h3>
-                <div className="flex flex-wrap gap-1.5">
-                  {["Financial Services", "Oil & Gas", "Manufacturing", "Technology", "Real Estate", "Government", "Pharmaceuticals", "Energy & Mining"].map(ind => (
-                    <span key={ind} className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-600">
-                      {ind}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
                 <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-3">Trust Signals</h3>
                 <div className="space-y-2.5">
                   {[
