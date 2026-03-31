@@ -324,9 +324,45 @@ ALWAYS respond with valid JSON matching this exact structure:
   },
   "total_tax_exposure": {
     "atl": 0,
-    "non_atl": 0
+    "non_atl": 0,
+    "income_tax_wht": {
+      "atl": 0,
+      "non_atl": 0,
+      "section": "e.g. Sec 153(1)(a)",
+      "nature": "e.g. WHT on Supply of Goods",
+      "adjustability": "Adjustable / Final / Minimum"
+    },
+    "sales_tax": {
+      "applicable_amount": 0,
+      "rate": "e.g. 18%",
+      "section": "e.g. Sec 3 Sales Tax Act 1990",
+      "type": "Federal / Provincial (PRA/SRB/KPRA/BRA)"
+    },
+    "sales_tax_wht": {
+      "amount": 0,
+      "rate": "e.g. 1/5th of Sales Tax",
+      "section": "e.g. SRO 1125(I)/2011",
+      "applicable": true
+    },
+    "other_taxes": [
+      {
+        "tax_type": "e.g. FED / Advance Tax / Super Tax / Minimum Tax",
+        "atl": 0,
+        "non_atl": 0,
+        "section": "e.g. Sec 113",
+        "note": "Brief explanation"
+      }
+    ]
   }
 }
+
+IMPORTANT RULES FOR total_tax_exposure:
+- income_tax_wht: Sum of ALL income tax withholding items from tax_analysis (WHT Income Tax entries). Show ATL and Non-ATL amounts separately.
+- sales_tax: The federal or provincial sales tax APPLICABLE on the transaction. Show the total amount, rate, and whether it is federal (18%) or provincial.
+- sales_tax_wht: If the buyer/recipient is a prescribed withholding agent, show the sales tax withholding amount (typically 1/5th of sales tax for goods, full amount for services). Set applicable=false if not applicable.
+- other_taxes: Any additional taxes like FED, Advance Tax, Super Tax, Minimum Tax.
+- atl and non_atl at the top level should be the GRAND TOTAL of all taxes combined.
+- If a tax type is not applicable, set its amounts to 0 but still include it with a note explaining why it does not apply.
 
 Be exhaustive. Identify ALL applicable taxes. A single transaction commonly triggers WHT Income Tax + Sales Tax + possibly FED simultaneously. Flag any non-compliance or missing deductions.`;
 

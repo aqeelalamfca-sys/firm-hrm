@@ -1002,29 +1002,165 @@ export default function TaxCalculator() {
 
                       {/* Total Exposure Summary - Top */}
                       {docResult.total_tax_exposure && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-5 text-white shadow-xl shadow-blue-500/15">
-                            <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full -translate-y-6 translate-x-6" />
-                            <div className="relative">
-                              <div className="flex items-center gap-2 mb-1.5">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-blue-200" />
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Total Tax — ATL</p>
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-5 text-white shadow-xl shadow-blue-500/15">
+                              <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full -translate-y-6 translate-x-6" />
+                              <div className="relative">
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-200" />
+                                  <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Total Tax — ATL</p>
+                                </div>
+                                <p className="text-2xl font-bold tabular-nums tracking-tight">{fmt(docResult.total_tax_exposure.atl ?? 0)}</p>
+                                <p className="text-[10px] text-blue-200/80 mt-0.5">Active Taxpayer List rate</p>
                               </div>
-                              <p className="text-2xl font-bold tabular-nums tracking-tight">{fmt(docResult.total_tax_exposure.atl ?? 0)}</p>
-                              <p className="text-[10px] text-blue-200/80 mt-0.5">Active Taxpayer List rate</p>
+                            </div>
+                            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-500 to-rose-700 p-5 text-white shadow-xl shadow-red-500/15">
+                              <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full -translate-y-6 translate-x-6" />
+                              <div className="relative">
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <AlertTriangle className="w-3.5 h-3.5 text-red-200" />
+                                  <p className="text-[10px] font-bold uppercase tracking-wider text-red-200">Total Tax — Non-ATL</p>
+                                </div>
+                                <p className="text-2xl font-bold tabular-nums tracking-tight">{fmt(docResult.total_tax_exposure.non_atl ?? 0)}</p>
+                                <p className="text-[10px] text-red-200/80 mt-0.5">Non-ATL higher withholding rate</p>
+                              </div>
                             </div>
                           </div>
-                          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-500 to-rose-700 p-5 text-white shadow-xl shadow-red-500/15">
-                            <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full -translate-y-6 translate-x-6" />
-                            <div className="relative">
-                              <div className="flex items-center gap-2 mb-1.5">
-                                <AlertTriangle className="w-3.5 h-3.5 text-red-200" />
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-red-200">Total Tax — Non-ATL</p>
+
+                          {/* Separate Tax Breakdown */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            {/* Income Tax WHT */}
+                            {docResult.total_tax_exposure.income_tax_wht && (
+                              <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                                <div className="flex items-center gap-2 mb-2.5">
+                                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-100 to-amber-50 flex items-center justify-center border border-amber-200/60">
+                                    <Landmark className="w-3.5 h-3.5 text-amber-600" />
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Income Tax WHT</p>
+                                    <p className="text-[9px] text-slate-400">{docResult.total_tax_exposure.income_tax_wht.section || ""}</p>
+                                  </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] text-slate-500">ATL</span>
+                                    <span className="text-sm font-bold text-slate-800 tabular-nums">{fmt(docResult.total_tax_exposure.income_tax_wht.atl ?? 0)}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] text-slate-500">Non-ATL</span>
+                                    <span className="text-sm font-bold text-red-600 tabular-nums">{fmt(docResult.total_tax_exposure.income_tax_wht.non_atl ?? 0)}</span>
+                                  </div>
+                                  {docResult.total_tax_exposure.income_tax_wht.adjustability && (
+                                    <div className="pt-1 border-t border-slate-100">
+                                      <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                                        docResult.total_tax_exposure.income_tax_wht.adjustability === "Final" ? "bg-red-50 text-red-600" :
+                                        docResult.total_tax_exposure.income_tax_wht.adjustability === "Adjustable" ? "bg-green-50 text-green-600" :
+                                        "bg-amber-50 text-amber-600"
+                                      }`}>{docResult.total_tax_exposure.income_tax_wht.adjustability}</span>
+                                    </div>
+                                  )}
+                                  {docResult.total_tax_exposure.income_tax_wht.nature && (
+                                    <p className="text-[9px] text-slate-400 leading-tight">{docResult.total_tax_exposure.income_tax_wht.nature}</p>
+                                  )}
+                                </div>
                               </div>
-                              <p className="text-2xl font-bold tabular-nums tracking-tight">{fmt(docResult.total_tax_exposure.non_atl ?? 0)}</p>
-                              <p className="text-[10px] text-red-200/80 mt-0.5">Non-ATL higher withholding rate</p>
-                            </div>
+                            )}
+
+                            {/* Sales Tax Applicable */}
+                            {docResult.total_tax_exposure.sales_tax && (
+                              <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                                <div className="flex items-center gap-2 mb-2.5">
+                                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-100 to-emerald-50 flex items-center justify-center border border-emerald-200/60">
+                                    <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Sales Tax</p>
+                                    <p className="text-[9px] text-slate-400">{docResult.total_tax_exposure.sales_tax.type || ""}</p>
+                                  </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] text-slate-500">Amount</span>
+                                    <span className="text-sm font-bold text-slate-800 tabular-nums">{fmt(docResult.total_tax_exposure.sales_tax.applicable_amount ?? 0)}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] text-slate-500">Rate</span>
+                                    <span className="text-[11px] font-semibold text-emerald-600">{docResult.total_tax_exposure.sales_tax.rate || "—"}</span>
+                                  </div>
+                                  {docResult.total_tax_exposure.sales_tax.section && (
+                                    <div className="pt-1 border-t border-slate-100">
+                                      <p className="text-[9px] text-slate-400">{docResult.total_tax_exposure.sales_tax.section}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Sales Tax WHT */}
+                            {docResult.total_tax_exposure.sales_tax_wht && (
+                              <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                                <div className="flex items-center gap-2 mb-2.5">
+                                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-100 to-violet-50 flex items-center justify-center border border-violet-200/60">
+                                    <CircleDollarSign className="w-3.5 h-3.5 text-violet-600" />
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Sales Tax WHT</p>
+                                    <p className="text-[9px] text-slate-400">{docResult.total_tax_exposure.sales_tax_wht.applicable ? "Applicable" : "Not Applicable"}</p>
+                                  </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] text-slate-500">Amount</span>
+                                    <span className="text-sm font-bold text-slate-800 tabular-nums">{fmt(docResult.total_tax_exposure.sales_tax_wht.amount ?? 0)}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] text-slate-500">Rate</span>
+                                    <span className="text-[11px] font-semibold text-violet-600">{docResult.total_tax_exposure.sales_tax_wht.rate || "—"}</span>
+                                  </div>
+                                  {docResult.total_tax_exposure.sales_tax_wht.section && (
+                                    <div className="pt-1 border-t border-slate-100">
+                                      <p className="text-[9px] text-slate-400">{docResult.total_tax_exposure.sales_tax_wht.section}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
+
+                          {/* Other Taxes */}
+                          {docResult.total_tax_exposure.other_taxes?.length > 0 && docResult.total_tax_exposure.other_taxes.some((t: any) => (t.atl ?? 0) > 0 || (t.non_atl ?? 0) > 0) && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {docResult.total_tax_exposure.other_taxes.filter((t: any) => (t.atl ?? 0) > 0 || (t.non_atl ?? 0) > 0).map((t: any, i: number) => (
+                                <div key={i} className="bg-white rounded-xl border border-slate-200/60 shadow-sm p-4">
+                                  <div className="flex items-center gap-2 mb-2.5">
+                                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center border border-slate-200/60">
+                                      <BarChart3 className="w-3.5 h-3.5 text-slate-600" />
+                                    </div>
+                                    <div>
+                                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{t.tax_type}</p>
+                                      <p className="text-[9px] text-slate-400">{t.section || ""}</p>
+                                    </div>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[10px] text-slate-500">ATL</span>
+                                      <span className="text-sm font-bold text-slate-800 tabular-nums">{fmt(t.atl ?? 0)}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[10px] text-slate-500">Non-ATL</span>
+                                      <span className="text-sm font-bold text-red-600 tabular-nums">{fmt(t.non_atl ?? 0)}</span>
+                                    </div>
+                                    {t.note && (
+                                      <div className="pt-1 border-t border-slate-100">
+                                        <p className="text-[9px] text-slate-400 leading-tight">{t.note}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
 
