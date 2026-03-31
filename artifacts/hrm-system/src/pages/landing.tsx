@@ -381,24 +381,6 @@ export default function Landing() {
               </div>
 
               <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 mb-3">Contact Us</h3>
-                <div className="space-y-2.5">
-                  <div className="flex items-center gap-2 text-[11px] text-slate-600">
-                    <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                    <span>Lahore &amp; Islamabad</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px] text-slate-600">
-                    <Mail className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                    <span>info@ana-ca.com</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px] text-slate-600">
-                    <Globe className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                    <span>ana-ca.com</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
                 <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 mb-3">Trust Signals</h3>
                 <div className="space-y-2">
                   {[
