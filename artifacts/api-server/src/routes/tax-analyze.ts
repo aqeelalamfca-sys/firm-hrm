@@ -1,6 +1,10 @@
 import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import { logger } from "../lib/logger";
+import { db } from "@workspace/db";
+import { systemSettingsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import OpenAI from "openai";
 
 const router = Router();
 const upload = multer({
@@ -146,15 +150,32 @@ router.post("/", (req: Request, res: Response, next: Function) => {
 
     const filerStatus = (req.query.filer as string) || "atl";
 
+    let openai: OpenAI | null = null;
+
     const baseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-    const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-    if (!baseUrl || !apiKey) {
-      res.status(500).json({ error: "AI integration not configured" });
-      return;
+    const envApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+    if (envApiKey) {
+      openai = new OpenAI(baseUrl ? { apiKey: envApiKey, baseURL: baseUrl } : { apiKey: envApiKey });
+    } else {
+      try {
+        const settings = await db
+          .select()
+          .from(systemSettingsTable)
+          .where(eq(systemSettingsTable.key, "chatgpt_api_key"))
+          .limit(1);
+        const storedKey = settings[0]?.value;
+        if (storedKey && storedKey.startsWith("sk-") && storedKey.length > 20) {
+          openai = new OpenAI({ apiKey: storedKey });
+        }
+      } catch (err) {
+        logger.error({ err }, "Failed to read API key from database");
+      }
     }
 
-    const OpenAI = (await import("openai")).default;
-    const openai = new OpenAI({ apiKey, baseURL: baseUrl });
+    if (!openai) {
+      res.status(500).json({ error: "AI not configured. Please set your ChatGPT API key in Admin Settings." });
+      return;
+    }
 
     let messages: any[] = [
       { role: "system", content: TAX_SYSTEM_PROMPT },
