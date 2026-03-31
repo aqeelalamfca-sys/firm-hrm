@@ -36,15 +36,21 @@ async function getOpenAIClient(): Promise<OpenAI | null> {
   return null;
 }
 
+function getTodayStr(): string {
+  const d = new Date();
+  return d.toLocaleDateString("en-PK", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+}
+
 const CATEGORY_SYSTEM_PROMPT: Record<string, string> = {
-  FBR: "You are a Pakistan Federal Board of Revenue (FBR) expert. Generate ONE short, professional, factual tax/regulatory update suitable for a Chartered Accountancy firm's website ticker. Keep it under 30 words. Do NOT use quotation marks.",
-  SECP: "You are a Pakistan SECP expert. Generate ONE short, professional regulatory update about corporate governance or compliance suitable for a CA firm's website ticker. Keep it under 30 words. Do NOT use quotation marks.",
-  PSX: "You are a Pakistan Stock Exchange analyst. Generate ONE short, professional market update showing specific stock movements with percentages, buy/sell recommendations, or sector performance. Use realistic stock names (OGDC, HBL, LUCK, ENGRO, PPL, PSO, FFC, HUBC, SYS, TRG, MARI) with realistic price movements. Example formats: 'OGDC surges 4.2% to PKR 128; analysts recommend BUY on strong quarterly earnings — cement sector rallies led by LUCK (+3.1%)' or 'KSE-100 gains 312 points; banking stocks lead with HBL up 2.8% — sector rotation favors oil & gas'. Keep under 35 words. Do NOT use quotation marks.",
-  SBP: "You are a State Bank of Pakistan financial analyst. Generate ONE short, professional update about KIBOR rates, currency exchange rates (USD/PKR, GBP/PKR, EUR/PKR, SAR/PKR, AED/PKR), SBP policy rate, government savings scheme profit rates, or foreign reserves. Use realistic numbers. Example formats: 'KIBOR 6-month settles at 12.48%; USD/PKR trades at 278.50 in interbank — SBP reserves stand at $9.2 billion' or 'SBP maintains policy rate at 22%; PKR stable at 278.25 against USD — Behbood certificates offer 15.04% annual return'. Keep under 35 words. Do NOT use quotation marks.",
+  FBR: "You are a Pakistan Federal Board of Revenue (FBR) expert. Generate ONE short, professional, factual tax/regulatory update suitable for a Chartered Accountancy firm's website ticker. The update must reflect the CURRENT DATE provided — do not reference past dates or outdated deadlines. Keep it under 30 words. Do NOT use quotation marks.",
+  SECP: "You are a Pakistan SECP expert. Generate ONE short, professional regulatory update about corporate governance or compliance suitable for a CA firm's website ticker. The update must be relevant to the CURRENT DATE provided — do not reference past events. Keep it under 30 words. Do NOT use quotation marks.",
+  PSX: "You are a Pakistan Stock Exchange analyst. Generate ONE short, professional market update showing specific stock movements with percentages, buy/sell recommendations, or sector performance for the CURRENT DATE provided. Use realistic stock names (OGDC, HBL, LUCK, ENGRO, PPL, PSO, FFC, HUBC, SYS, TRG, MARI) with realistic price movements. Keep under 35 words. Do NOT use quotation marks.",
+  SBP: "You are a State Bank of Pakistan financial analyst. Generate ONE short, professional update about KIBOR rates, currency exchange rates (USD/PKR, GBP/PKR, EUR/PKR, SAR/PKR, AED/PKR), SBP policy rate, government savings scheme profit rates, or foreign reserves for the CURRENT DATE provided. Use realistic numbers. Keep under 35 words. Do NOT use quotation marks.",
 };
 
 async function generateUpdate(openai: OpenAI, category: string): Promise<string> {
-  const systemPrompt = CATEGORY_SYSTEM_PROMPT[category] || `You are a Pakistan regulatory expert specializing in ${category}. Generate ONE short, professional, factual regulatory update suitable for a Chartered Accountancy firm's website. Keep it under 30 words. Do NOT use quotation marks.`;
+  const today = getTodayStr();
+  const systemPrompt = CATEGORY_SYSTEM_PROMPT[category] || `You are a Pakistan regulatory expert specializing in ${category}. Generate ONE short, professional, factual regulatory update for today. Keep it under 30 words. Do NOT use quotation marks.`;
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
@@ -54,7 +60,7 @@ async function generateUpdate(openai: OpenAI, category: string): Promise<string>
       },
       {
         role: "user",
-        content: `Generate a unique professional update for ${category}.\nFocus areas: ${CATEGORY_FOCUS[category]}\nTone: Authoritative advisory\nLength: Max 35 words\nFormat: Single concise statement without quotes`,
+        content: `Today is ${today}. Generate a unique professional update for ${category} relevant to today.\nFocus areas: ${CATEGORY_FOCUS[category]}\nTone: Authoritative advisory\nLength: Max 35 words\nFormat: Single concise statement without quotes\nIMPORTANT: The update must be for TODAY only — no past dates or expired deadlines.`,
       },
     ],
     temperature: 0.9,

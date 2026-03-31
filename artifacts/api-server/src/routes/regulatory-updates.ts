@@ -156,10 +156,11 @@ router.post("/generate-ai", authMiddleware, requireRoles("super_admin", "partner
 
     const systemPrompt = CATEGORY_SYSTEM[category] || "You are a Pakistan regulatory expert. Generate a short, professional update for a CA firm. Keep under 30 words. No quotation marks.";
     const focusAreas = CATEGORY_FOCUS[category] || "";
+    const today = new Date().toLocaleDateString("en-PK", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
     const prompt = topic
-      ? `Generate a professional update about: ${topic}\n\nCategory: ${category}\nTone: Authoritative advisory\nLength: Max 35 words\nFormat: Single concise statement`
-      : `Generate a unique professional update for ${category}.\nFocus areas: ${focusAreas}\nTone: Authoritative advisory\nLength: Max 35 words\nFormat: Single concise statement without quotes`;
+      ? `Today is ${today}. Generate a professional update about: ${topic}\n\nCategory: ${category}\nTone: Authoritative advisory\nLength: Max 35 words\nFormat: Single concise statement\nIMPORTANT: Must be relevant to today — no past dates.`
+      : `Today is ${today}. Generate a unique professional update for ${category} relevant to today.\nFocus areas: ${focusAreas}\nTone: Authoritative advisory\nLength: Max 35 words\nFormat: Single concise statement without quotes\nIMPORTANT: Must be for today — no past dates or expired deadlines.`;
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
