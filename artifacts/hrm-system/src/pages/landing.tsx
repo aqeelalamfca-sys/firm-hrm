@@ -271,9 +271,28 @@ export default function Landing() {
               </div>
             </div>
 
-            <p className="text-[11px] sm:text-sm text-slate-500 font-medium leading-relaxed max-w-2xl mx-auto mb-5 tracking-wide">
-              Statutory Audit &amp; Assurance for Listed Entities, Public Interest Entities (PIEs), Public Interest Companies (PICs), Corporates of All Sizes, and Not-for-Profit &amp; Trust Structures
-            </p>
+            <div className="max-w-2xl mx-auto mb-5 px-4 py-2.5 rounded-xl border border-blue-200/40 bg-gradient-to-r from-blue-50/60 via-white/80 to-blue-50/60 tagline-glow">
+              <p className="text-[11px] sm:text-[13px] text-slate-600 font-semibold leading-relaxed tracking-wide text-center">
+                Statutory Audit &amp; Assurance for{" "}
+                <span className="text-blue-700">Listed Entities</span>,{" "}
+                <span className="text-blue-700">Public Interest Entities (PIEs)</span>,{" "}
+                <span className="text-blue-700">Public Interest Companies (PICs)</span>,{" "}
+                Corporates of All Sizes, and{" "}
+                <span className="text-blue-700">Not-for-Profit &amp; Trust Structures</span>
+              </p>
+              <style>{`
+                @keyframes tagline-shimmer {
+                  0%, 100% { box-shadow: 0 0 8px rgba(59,130,246,0.08), 0 0 0 1px rgba(59,130,246,0.06); }
+                  50% { box-shadow: 0 0 20px rgba(59,130,246,0.18), 0 0 0 1px rgba(59,130,246,0.15); }
+                }
+                .tagline-glow {
+                  animation: tagline-shimmer 2.5s ease-in-out infinite;
+                }
+                @media (prefers-reduced-motion: reduce) {
+                  .tagline-glow { animation: none; }
+                }
+              `}</style>
+            </div>
 
             <div className="flex flex-wrap gap-2 justify-center mb-7">
               {[
