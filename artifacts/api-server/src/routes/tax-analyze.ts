@@ -149,6 +149,32 @@ You have internalized the following laws:
 7. FINANCE ACT 2025 (Latest Amendments)
    - Updated rate schedules, new SROs, threshold changes
 
+═══ CONTEXT-AWARE CLASSIFICATION ═══
+
+Use provided context fields to refine analysis:
+- entity_type: Determines corporate tax rate, WHT rate category, slab applicability
+  • "individual" → Progressive income tax slabs, Sec 155 slab-based rent WHT
+  • "aop" → AOP progressive slabs, treated as non-company for WHT
+  • "company_private" → 29% corporate tax, company WHT rates
+  • "company_public" → 29% corporate tax, company WHT rates
+  • "company_small" → 21% corporate tax (Small Company)
+  • "company_banking" → 39% corporate tax
+  • "npo" → Exempt on non-profit activities, taxable on commercial activities
+- sector: Determines Sales Tax treatment
+  • "goods" → Federal Sales Tax (Sec 3, 18%)
+  • "services" → Provincial Sales Tax (PRA/SRB/KPRA/BRA based on location)
+  • "mixed" → Both federal + provincial may apply
+  • "exempt" → Check against Sixth Schedule exemptions
+- location: Determines provincial tax jurisdiction
+  • "ict" → Federal jurisdiction (FBR), no provincial ST on services (use ICT Tax on Services Ordinance 2001)
+  • "punjab" → PRA 16%
+  • "sindh" → SRB 13%
+  • "kpk" → KPRA 15%
+  • "balochistan" → BRA 15%
+- residency: Determines non-resident provisions
+  • "resident" → Standard provisions
+  • "non_resident" → Sec 152 provisions, DTAA applicability, Final Tax regime
+
 ═══ TAX MAPPING ENGINE ═══
 
 For every transaction, you MUST apply this mapping logic:
@@ -184,6 +210,18 @@ FINAL vs ADJUSTABLE vs MINIMUM:
 - FINAL: Tax is complete liability, no further tax/refund (e.g., Sec 150 dividends, Sec 154 exports, Sec 152 non-resident royalties)
 - ADJUSTABLE: Can be adjusted against final tax liability in return (e.g., Sec 153 goods/services/contracts, Sec 148 imports)
 - MINIMUM: Tax paid is minimum, if normal tax is higher, difference payable (e.g., Sec 113)
+
+═══ VALIDATION ENGINE (Pre-Output Checks) ═══
+
+Before producing output, validate:
+1. Filer vs Non-Filer impact — ensure both ATL and Non-ATL amounts are computed
+2. Threshold exemptions — verify amounts exceed minimum thresholds before applying tax
+3. Industry-specific rates — check if sector has special reduced rates (IT/ITeS, exports, PSEB certified)
+4. Double taxation avoidance — check if DTAA applies for non-residents
+5. Final vs Minimum tax conflict — if a tax is FINAL, minimum tax (Sec 113) does NOT apply on that income
+6. Super Tax applicability — only for income exceeding PKR 150M threshold
+7. Registration checks — flag if entity should be but may not be registered (Sales Tax, PRA/SRB etc.)
+8. Missing deductions — identify taxes that should have been deducted/collected but appear missing
 
 ═══ CRITICAL RULES ═══
 
@@ -222,7 +260,7 @@ ALWAYS respond with valid JSON matching this exact structure:
   ],
   "tax_analysis": [
     {
-      "tax_type": "WHT Income Tax / WHT Sales Tax / Federal Sales Tax / Provincial Sales Tax / FED / Advance Tax / Income Tax",
+      "tax_type": "WHT Income Tax / WHT Sales Tax / Federal Sales Tax / Provincial Sales Tax / FED / Advance Tax / Income Tax / Super Tax / Minimum Tax / Corporate Tax",
       "applicable_law": "Income Tax Ordinance 2001 / Sales Tax Act 1990 / Punjab Revenue Authority Act / Federal Excise Act 2005",
       "section_reference": "Sec 153(1)(a) read with Division III Part I First Schedule",
       "nature_of_transaction": "Supply of Goods by Company",
@@ -245,6 +283,45 @@ ALWAYS respond with valid JSON matching this exact structure:
   "missing_tax_check": [
     "Description of any tax that should have been deducted but was not found in the document"
   ],
+  "penalty_exposure": [
+    {
+      "violation": "Description of non-compliance",
+      "penalty_section": "Sec X of relevant law",
+      "penalty_description": "e.g. 25% of tax due + default surcharge @ 12% p.a.",
+      "severity": "High / Medium / Low"
+    }
+  ],
+  "payment_instructions": {
+    "income_tax": {
+      "method": "FBR IRIS Portal → Generate PSID → Pay via bank/online",
+      "return_form": "e.g. Annual Return / Monthly Statement u/s 165",
+      "due_date": "e.g. Withholding: 7th of following month | Annual: 30 September"
+    },
+    "sales_tax": {
+      "method": "Monthly Sales Tax Return via FBR e-Filing",
+      "return_form": "STR-7 / relevant form",
+      "due_date": "15th of the following month"
+    },
+    "provincial_sales_tax": {
+      "method": "PRA / SRB / KPRA / BRA e-portal — whichever applies",
+      "return_form": "Provincial ST Return",
+      "due_date": "15th of the following month"
+    },
+    "fed": {
+      "method": "Filed along with Sales Tax Return via FBR",
+      "return_form": "FED Return",
+      "due_date": "15th of the following month"
+    }
+  },
+  "validation_summary": {
+    "filer_impact_verified": true,
+    "threshold_exemptions_checked": true,
+    "industry_specific_rates_checked": true,
+    "double_taxation_checked": true,
+    "final_vs_minimum_conflict_checked": true,
+    "registration_status_flagged": true,
+    "notes": ["Any additional validation observations"]
+  },
   "total_tax_exposure": {
     "atl": 0,
     "non_atl": 0
@@ -304,6 +381,10 @@ router.post("/", (req: Request, res: Response, next: Function) => {
     }
 
     const filerStatus = (req.query.filer as string) || "atl";
+    const entityType = (req.query.entity_type as string) || "";
+    const sector = (req.query.sector as string) || "";
+    const location = (req.query.location as string) || "";
+    const residency = (req.query.residency as string) || "";
 
     const ai = await getAIClient();
     if (!ai) {
@@ -311,6 +392,14 @@ router.post("/", (req: Request, res: Response, next: Function) => {
       return;
     }
     const { client: openai, model: aiModel } = ai;
+
+    const contextParts: string[] = [];
+    contextParts.push(`Taxpayer is ${filerStatus === "atl" ? "Active Taxpayer (ATL)" : "Non-Active Taxpayer (Non-ATL)"}`);
+    if (entityType) contextParts.push(`Entity Type: ${entityType}`);
+    if (sector) contextParts.push(`Sector: ${sector}`);
+    if (location) contextParts.push(`Location/Province: ${location}`);
+    if (residency) contextParts.push(`Residency: ${residency}`);
+    const contextStr = contextParts.join(". ");
 
     let messages: any[] = [
       { role: "system", content: TAX_SYSTEM_PROMPT },
@@ -327,7 +416,7 @@ router.post("/", (req: Request, res: Response, next: Function) => {
       messages.push({
         role: "user",
         content: [
-          { type: "text", text: `Analyze this document image for Pakistan tax implications. Taxpayer is ${filerStatus === "atl" ? "Active Taxpayer (ATL)" : "Non-Active Taxpayer (Non-ATL)"}. Extract ALL data and compute every applicable tax. Return ONLY valid JSON.` },
+          { type: "text", text: `Analyze this document image for Pakistan tax implications. ${contextStr}. Extract ALL data and compute every applicable tax. Include payment_instructions, penalty_exposure, and validation_summary. Return ONLY valid JSON.` },
           { type: "image_url", image_url: { url: `data:${mimeType};base64,${b64}` } },
         ],
       });
@@ -350,11 +439,11 @@ router.post("/", (req: Request, res: Response, next: Function) => {
 
       messages.push({
         role: "user",
-        content: `Analyze this document for Pakistan tax implications. Taxpayer is ${filerStatus === "atl" ? "Active Taxpayer (ATL)" : "Non-Active Taxpayer (Non-ATL)"}.\n\nExtracted document content:\n\`\`\`\n${extractedText.slice(0, 12000)}\n\`\`\`\n\nExtract ALL data and compute every applicable tax. Return ONLY valid JSON.`,
+        content: `Analyze this document for Pakistan tax implications. ${contextStr}.\n\nExtracted document content:\n\`\`\`\n${extractedText.slice(0, 12000)}\n\`\`\`\n\nExtract ALL data and compute every applicable tax. Include payment_instructions, penalty_exposure, and validation_summary. Return ONLY valid JSON.`,
       });
     }
 
-    logger.info({ filename: file.originalname, mimetype: file.mimetype, size: file.size, model: aiModel }, "Tax analyze request");
+    logger.info({ filename: file.originalname, mimetype: file.mimetype, size: file.size, entity_type: entityType, sector, location, residency, model: aiModel }, "Tax analyze request");
 
     let completion;
     try {
@@ -438,7 +527,7 @@ router.post("/", (req: Request, res: Response, next: Function) => {
 
 router.post("/text", async (req: Request, res: Response) => {
   try {
-    const { text, filer } = req.body;
+    const { text, filer, entity_type, sector, location, residency } = req.body;
     const filerStatus = filer || "atl";
 
     if (!text || typeof text !== "string" || text.trim().length < 10) {
@@ -453,13 +542,20 @@ router.post("/text", async (req: Request, res: Response) => {
     }
     const { client: openai, model: aiModel } = ai;
 
-    logger.info({ textLength: text.length, filer: filerStatus, model: aiModel }, "Tax text analyze request");
+    const contextParts: string[] = [];
+    contextParts.push(`Taxpayer is ${filerStatus === "atl" ? "Active Taxpayer (ATL)" : "Non-Active Taxpayer (Non-ATL)"}`);
+    if (entity_type) contextParts.push(`Entity Type: ${entity_type}`);
+    if (sector) contextParts.push(`Sector: ${sector}`);
+    if (location) contextParts.push(`Location/Province: ${location}`);
+    if (residency) contextParts.push(`Residency: ${residency}`);
+
+    logger.info({ textLength: text.length, filer: filerStatus, entity_type, sector, location, residency, model: aiModel }, "Tax text analyze request");
 
     const messages: any[] = [
       { role: "system", content: TAX_SYSTEM_PROMPT },
       {
         role: "user",
-        content: `Analyze the following transaction/scenario for Pakistan tax implications. Taxpayer is ${filerStatus === "atl" ? "Active Taxpayer (ATL)" : "Non-Active Taxpayer (Non-ATL)"}.\n\nTransaction/Scenario:\n\`\`\`\n${text.slice(0, 12000)}\n\`\`\`\n\nIdentify ALL applicable taxes, compute amounts where possible, and provide section-wise legal analysis. Return ONLY valid JSON.`,
+        content: `Analyze the following transaction/scenario for Pakistan tax implications.\n\nContext:\n${contextParts.join("\n")}\n\nTransaction/Scenario:\n\`\`\`\n${text.slice(0, 12000)}\n\`\`\`\n\nIdentify ALL applicable taxes, compute amounts where possible, and provide section-wise legal analysis. Include payment_instructions, penalty_exposure, and validation_summary in your response. Return ONLY valid JSON.`,
       },
     ];
 

@@ -6,7 +6,8 @@ import {
   CheckCircle2, AlertTriangle, Shield, TrendingUp, AlertCircle,
   Layers, Target, Zap, RefreshCw, Download, ClipboardList,
   ShoppingCart, Globe, CreditCard, Users, Upload, Loader2, FileSearch,
-  Eye, Search, X, BookOpen, ShieldAlert
+  Eye, Search, X, BookOpen, ShieldAlert, MapPin, Briefcase, Building, FileWarning,
+  CircleDollarSign, Landmark, ClipboardCheck
 } from "lucide-react";
 
 // ─── Formatters ────────────────────────────────────────────────────────────────
@@ -307,6 +308,10 @@ export default function TaxCalculator() {
   const [docTextInput, setDocTextInput] = useState("");
   const [docTextAnalyzing, setDocTextAnalyzing] = useState(false);
   const [docInputMode, setDocInputMode] = useState<"file" | "text">("file");
+  const [docEntityType, setDocEntityType] = useState("");
+  const [docSector, setDocSector] = useState("");
+  const [docLocation, setDocLocation] = useState("");
+  const [docResidency, setDocResidency] = useState("");
   const [calcModalTab, setCalcModalTab] = useState<string | null>(null);
 
   React.useEffect(() => {
@@ -348,7 +353,7 @@ export default function TaxCalculator() {
       const resp = await fetch(`${apiBase}/api/tax-analyze/text`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: docTextInput, filer: filerStatus }),
+        body: JSON.stringify({ text: docTextInput, filer: filerStatus, entity_type: docEntityType, sector: docSector, location: docLocation, residency: docResidency }),
       });
       const contentType = resp.headers.get("content-type") || "";
       if (!contentType.includes("application/json")) {
@@ -366,7 +371,7 @@ export default function TaxCalculator() {
     } finally {
       setDocTextAnalyzing(false);
     }
-  }, [docTextInput, filerStatus]);
+  }, [docTextInput, filerStatus, docEntityType, docSector, docLocation, docResidency]);
 
   const handleDocUpload = useCallback(async (file: File) => {
     setDocFile(file);
@@ -377,7 +382,12 @@ export default function TaxCalculator() {
       const formData = new FormData();
       formData.append("document", file);
       const apiBase = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
-      const resp = await fetch(`${apiBase}/api/tax-analyze?filer=${filerStatus}`, {
+      const qp = new URLSearchParams({ filer: filerStatus });
+      if (docEntityType) qp.set("entity_type", docEntityType);
+      if (docSector) qp.set("sector", docSector);
+      if (docLocation) qp.set("location", docLocation);
+      if (docResidency) qp.set("residency", docResidency);
+      const resp = await fetch(`${apiBase}/api/tax-analyze?${qp.toString()}`, {
         method: "POST",
         body: formData,
       });
@@ -398,7 +408,7 @@ export default function TaxCalculator() {
     } finally {
       setDocAnalyzing(false);
     }
-  }, [filerStatus]);
+  }, [filerStatus, docEntityType, docSector, docLocation, docResidency]);
 
   // ── Exposure Tab State ───────────────────────────────────────────────────────
   const [entityType,    setEntityType]    = useState("company_private");
@@ -722,6 +732,55 @@ export default function TaxCalculator() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Input Area */}
               <div className="lg:col-span-2 space-y-4">
+                {/* Context Fields */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Transaction Context <span className="font-normal text-slate-300">(optional — improves accuracy)</span></p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-500 mb-1 block">Entity Type</label>
+                      <select value={docEntityType} onChange={e => setDocEntityType(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-slate-50/50 px-2.5 py-2 text-[11px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400">
+                        <option value="">Auto-detect</option>
+                        <option value="individual">Individual</option>
+                        <option value="aop">AOP (Association of Persons)</option>
+                        <option value="company_private">Private Limited Company</option>
+                        <option value="company_public">Public Limited Company</option>
+                        <option value="company_small">Small Company</option>
+                        <option value="company_banking">Banking Company</option>
+                        <option value="npo">Non-Profit Organization</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-500 mb-1 block">Sector</label>
+                      <select value={docSector} onChange={e => setDocSector(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-slate-50/50 px-2.5 py-2 text-[11px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400">
+                        <option value="">Auto-detect</option>
+                        <option value="goods">Goods</option>
+                        <option value="services">Services</option>
+                        <option value="mixed">Mixed (Goods & Services)</option>
+                        <option value="exempt">Exempt</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-500 mb-1 block">Location</label>
+                      <select value={docLocation} onChange={e => setDocLocation(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-slate-50/50 px-2.5 py-2 text-[11px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400">
+                        <option value="">Auto-detect</option>
+                        <option value="ict">ICT (Islamabad)</option>
+                        <option value="punjab">Punjab</option>
+                        <option value="sindh">Sindh</option>
+                        <option value="kpk">Khyber Pakhtunkhwa</option>
+                        <option value="balochistan">Balochistan</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-500 mb-1 block">Residency</label>
+                      <select value={docResidency} onChange={e => setDocResidency(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-slate-50/50 px-2.5 py-2 text-[11px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400">
+                        <option value="">Auto-detect</option>
+                        <option value="resident">Resident</option>
+                        <option value="non_resident">Non-Resident</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Text Input Area */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <textarea
@@ -813,7 +872,7 @@ export default function TaxCalculator() {
                 <div className="flex justify-end gap-3">
                   {(docFile || docTextInput.trim().length > 0 || docResult || docError) && (
                     <button
-                      onClick={() => { setDocFile(null); setDocTextInput(""); setDocResult(null); setDocError(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                      onClick={() => { setDocFile(null); setDocTextInput(""); setDocResult(null); setDocError(null); setDocEntityType(""); setDocSector(""); setDocLocation(""); setDocResidency(""); if (fileInputRef.current) fileInputRef.current.value = ""; }}
                       disabled={docAnalyzing || docTextAnalyzing}
                       className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
@@ -1159,6 +1218,103 @@ export default function TaxCalculator() {
                               </div>
                             ))}
                           </div>
+                        </div>
+                      )}
+
+                      {/* Penalty Exposure */}
+                      {docResult.penalty_exposure?.length > 0 && (
+                        <div className="bg-white rounded-2xl border border-orange-200/60 shadow-sm p-5">
+                          <h3 className="text-[13px] font-bold text-slate-800 mb-3 flex items-center gap-2"><span className="w-1 h-4 rounded-full bg-gradient-to-b from-orange-500 to-red-500 inline-block" />Penalty Exposure</h3>
+                          <div className="space-y-2">
+                            {docResult.penalty_exposure.map((p: any, i: number) => (
+                              <div key={i} className={`p-3 rounded-xl border text-[11px] ${
+                                p.severity === "High" ? "bg-red-50 border-red-200/60 text-red-800" :
+                                p.severity === "Medium" ? "bg-amber-50 border-amber-200/60 text-amber-800" :
+                                "bg-slate-50 border-slate-200/60 text-slate-700"
+                              }`}>
+                                <div className="flex items-start gap-3">
+                                  <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
+                                    p.severity === "High" ? "bg-red-100" : p.severity === "Medium" ? "bg-amber-100" : "bg-slate-100"
+                                  }`}>
+                                    <FileWarning className={`w-2.5 h-2.5 ${
+                                      p.severity === "High" ? "text-red-600" : p.severity === "Medium" ? "text-amber-600" : "text-slate-500"
+                                    }`} />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold">{p.violation}</p>
+                                    {p.penalty_section && <p className="text-[10px] mt-0.5 opacity-80">Section: {p.penalty_section}</p>}
+                                    {p.penalty_description && <p className="text-[10px] mt-0.5 opacity-70">{p.penalty_description}</p>}
+                                  </div>
+                                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                                    p.severity === "High" ? "bg-red-100 text-red-700" :
+                                    p.severity === "Medium" ? "bg-amber-100 text-amber-700" :
+                                    "bg-green-100 text-green-700"
+                                  }`}>{p.severity}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Payment Instructions */}
+                      {docResult.payment_instructions && (
+                        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
+                          <h3 className="text-[13px] font-bold text-slate-800 mb-3 flex items-center gap-2"><span className="w-1 h-4 rounded-full bg-gradient-to-b from-emerald-500 to-teal-600 inline-block" />Payment Instructions & Due Dates</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {Object.entries(docResult.payment_instructions).map(([key, val]: [string, any]) => {
+                              if (!val || typeof val !== "object") return null;
+                              const label = key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+                              return (
+                                <div key={key} className="rounded-xl border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-3">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Landmark className="w-3.5 h-3.5 text-emerald-500" />
+                                    <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">{label}</p>
+                                  </div>
+                                  {val.method && <p className="text-[10px] text-slate-600 mb-1"><strong>Method:</strong> {val.method}</p>}
+                                  {val.return_form && <p className="text-[10px] text-slate-600 mb-1"><strong>Form:</strong> {val.return_form}</p>}
+                                  {val.due_date && <p className="text-[10px] text-emerald-700 font-semibold"><strong>Due:</strong> {val.due_date}</p>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Validation Summary */}
+                      {docResult.validation_summary && (
+                        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
+                          <h3 className="text-[13px] font-bold text-slate-800 mb-3 flex items-center gap-2"><span className="w-1 h-4 rounded-full bg-gradient-to-b from-blue-500 to-cyan-500 inline-block" />Validation Summary</h3>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {[
+                              { key: "filer_impact_verified", label: "Filer Impact Verified" },
+                              { key: "threshold_exemptions_checked", label: "Threshold Exemptions" },
+                              { key: "industry_specific_rates_checked", label: "Industry-Specific Rates" },
+                              { key: "double_taxation_checked", label: "Double Taxation Check" },
+                              { key: "final_vs_minimum_conflict_checked", label: "Final vs Minimum Conflict" },
+                              { key: "registration_status_flagged", label: "Registration Status" },
+                            ].map(item => {
+                              const checked = docResult.validation_summary[item.key];
+                              return (
+                                <div key={item.key} className={`flex items-center gap-2 p-2 rounded-lg text-[10px] font-medium ${
+                                  checked ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-400"
+                                }`}>
+                                  {checked ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> : <ClipboardCheck className="w-3.5 h-3.5 text-slate-300 shrink-0" />}
+                                  {item.label}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {docResult.validation_summary.notes?.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5">
+                              {docResult.validation_summary.notes.map((note: string, i: number) => (
+                                <p key={i} className="text-[10px] text-slate-600 flex items-start gap-2">
+                                  <Info className="w-3 h-3 text-blue-400 shrink-0 mt-0.5" />
+                                  {note}
+                                </p>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
