@@ -85,8 +85,8 @@ export default function RegulatoryLivePanel() {
   useEffect(() => {
     if (trackRef.current) {
       const w = trackRef.current.scrollWidth;
-      const speed = 60;
-      setDuration(Math.max(20, w / speed));
+      const speed = 30;
+      setDuration(Math.max(40, w / speed));
     }
   }, [updates]);
 
