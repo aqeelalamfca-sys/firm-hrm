@@ -254,21 +254,11 @@ export default function Landing() {
         <div className="relative max-w-7xl mx-auto px-6">
           <div className="text-center max-w-3xl mx-auto">
             <div className="flex justify-center mb-7">
-              <div className="inline-flex items-center gap-4 sm:gap-5">
-                <img
-                  src={`${import.meta.env.BASE_URL}images/hero-logo.jpg`}
-                  alt="Alam & Aulakh Chartered Accountants"
-                  className="h-16 sm:h-20 lg:h-24 w-auto object-contain rounded-xl"
-                />
-                <div className="text-left border-l-2 border-blue-500/30 pl-4 sm:pl-5">
-                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-wide text-slate-800 leading-tight">
-                    Alam <span className="text-blue-600">&amp;</span> Aulakh
-                  </h2>
-                  <p className="text-[10px] sm:text-xs font-semibold tracking-[0.25em] text-slate-500 uppercase mt-0.5">
-                    Chartered Accountants
-                  </p>
-                </div>
-              </div>
+              <img
+                src={`${import.meta.env.BASE_URL}images/hero-logo-horizontal.png`}
+                alt="Alam & Aulakh Chartered Accountants"
+                className="h-16 sm:h-20 lg:h-24 w-auto object-contain"
+              />
             </div>
 
             <div className="flex flex-wrap gap-2 justify-center mb-7">
