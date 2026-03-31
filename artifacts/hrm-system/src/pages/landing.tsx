@@ -225,17 +225,17 @@ export default function Landing() {
           </nav>
           <div className="flex items-center gap-2">
             <Link href="/book-meeting">
-              <Button size="sm" variant="outline" className="h-9 text-[13px] font-semibold gap-1.5 hidden sm:flex border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-400 transition-all duration-200">
+              <Button size="sm" variant="outline" className="h-9 text-[13px] font-semibold gap-1.5 hidden sm:flex border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-400 transition-all duration-200 cta-blink cta-blink-1">
                 <Video className="w-3.5 h-3.5" /> Book Meeting
               </Button>
             </Link>
             <Link href="/apply-training">
-              <Button size="sm" variant="outline" className="h-9 text-[13px] font-semibold gap-1.5 hidden sm:flex border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-400 transition-all duration-200">
+              <Button size="sm" variant="outline" className="h-9 text-[13px] font-semibold gap-1.5 hidden sm:flex border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-400 transition-all duration-200 cta-blink cta-blink-2">
                 <GraduationCap className="w-3.5 h-3.5" /> Apply for Training
               </Button>
             </Link>
             <Link href="/login">
-              <Button size="sm" className="h-9 text-[13px] font-semibold shadow-sm gap-1.5">
+              <Button size="sm" className="h-9 text-[13px] font-semibold shadow-sm gap-1.5 cta-blink cta-blink-3">
                 Staff Sign In <ArrowRight className="w-3.5 h-3.5" />
               </Button>
             </Link>
@@ -383,7 +383,7 @@ export default function Landing() {
                 <p className="text-[12px] text-slate-600 leading-relaxed mb-3">
                   Get expert advice from our partners with Big Four experience.
                 </p>
-                <button onClick={() => scrollTo("contact")} className="w-full h-9 text-xs font-semibold rounded-lg text-white flex items-center justify-center gap-1.5" style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' }}>
+                <button onClick={() => scrollTo("contact")} className="w-full h-9 text-xs font-semibold rounded-lg text-white flex items-center justify-center gap-1.5 cta-blink cta-blink-4" style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' }}>
                   <Phone className="w-3.5 h-3.5" /> Schedule Meeting
                 </button>
               </div>
@@ -396,7 +396,7 @@ export default function Landing() {
                 <p className="text-[12px] text-slate-600 leading-relaxed mb-3">
                   Our proprietary audit management platform for efficient engagements.
                 </p>
-                <span className="w-full h-8 text-[11px] font-semibold rounded-lg text-white flex items-center justify-center gap-1.5" style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)' }}>
+                <span className="w-full h-8 text-[11px] font-semibold rounded-lg text-white flex items-center justify-center gap-1.5 cta-blink cta-blink-5" style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)' }}>
                   <Monitor className="w-3.5 h-3.5" /> Launch AuditWise
                 </span>
               </a>
@@ -409,7 +409,7 @@ export default function Landing() {
                 <p className="text-[12px] text-slate-600 leading-relaxed mb-3">
                   Full tax exposure: Income Tax, Super Tax, WHT, Sales Tax &amp; more — Finance Act 2025.
                 </p>
-                <span className="w-full h-8 text-[11px] font-semibold rounded-lg text-white flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-blue-700">
+                <span className="w-full h-8 text-[11px] font-semibold rounded-lg text-white flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-blue-700 cta-blink cta-blink-6">
                   <Calculator className="w-3.5 h-3.5" /> Calculate Tax Exposure
                 </span>
               </Link>
@@ -423,7 +423,19 @@ export default function Landing() {
               50% { box-shadow: 0 0 20px rgba(59,130,246,0.18), 0 0 0 1px rgba(59,130,246,0.15); }
             }
             .tagline-glow { animation: tagline-shimmer 2.5s ease-in-out infinite; }
-            @media (prefers-reduced-motion: reduce) { .tagline-glow { animation: none; } }
+
+            @keyframes cta-glow {
+              0%, 8% { transform: scale(1); box-shadow: none; filter: brightness(1); }
+              4% { transform: scale(1.06); box-shadow: 0 0 18px rgba(59,130,246,0.5), 0 0 6px rgba(99,102,241,0.3); filter: brightness(1.15); }
+            }
+            .cta-blink { animation-name: cta-glow; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+            .cta-blink-1 { animation-duration: 9s; animation-delay: 0s; }
+            .cta-blink-2 { animation-duration: 9s; animation-delay: 1.5s; }
+            .cta-blink-3 { animation-duration: 9s; animation-delay: 3s; }
+            .cta-blink-4 { animation-duration: 9s; animation-delay: 4.5s; }
+            .cta-blink-5 { animation-duration: 9s; animation-delay: 6s; }
+            .cta-blink-6 { animation-duration: 9s; animation-delay: 7.5s; }
+            @media (prefers-reduced-motion: reduce) { .tagline-glow, .cta-blink { animation: none; } }
           `}</style>
 
           {/* Stats Bar */}
