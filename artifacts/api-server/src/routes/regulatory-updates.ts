@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { regulatoryUpdatesTable, systemSettingsTable, autoGenLogsTable } from "@workspace/db";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, inArray } from "drizzle-orm";
 import { authMiddleware, requireRoles } from "../middleware/auth";
 import type { AuthenticatedRequest } from "../middleware/auth";
 import OpenAI from "openai";
@@ -9,24 +9,52 @@ import { runAutoGeneration } from "../scheduler/auto-regulatory";
 
 const router = Router();
 
-async function getOpenAIClient(): Promise<OpenAI | null> {
-  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-  if (apiKey) {
-    return new OpenAI(baseURL ? { baseURL, apiKey } : { apiKey });
+const PROVIDER_BASE_URLS: Record<string, string> = {
+  openai: "https://api.openai.com/v1",
+  anthropic: "https://api.anthropic.com/v1",
+  google: "https://generativelanguage.googleapis.com/v1beta/openai",
+  deepseek: "https://api.deepseek.com/v1",
+};
+
+const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
+  openai: "gpt-4o",
+  anthropic: "claude-sonnet-4-20250514",
+  google: "gemini-2.0-flash",
+  deepseek: "deepseek-chat",
+};
+
+async function getOpenAIClient(): Promise<{ client: OpenAI; model: string } | null> {
+  const envBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+  const envApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+  if (envApiKey) {
+    return {
+      client: new OpenAI(envBaseUrl ? { baseURL: envBaseUrl, apiKey: envApiKey } : { apiKey: envApiKey }),
+      model: "gpt-4o",
+    };
   }
 
   try {
-    const settings = await db
+    const settingsKeys = ["chatgpt_api_key", "ai_provider", "ai_model", "ai_base_url"];
+    const rows = await db
       .select()
       .from(systemSettingsTable)
-      .where(eq(systemSettingsTable.key, "chatgpt_api_key"))
-      .limit(1);
+      .where(inArray(systemSettingsTable.key, settingsKeys));
 
-    const storedKey = settings[0]?.value;
-    if (storedKey && storedKey.startsWith("sk-") && storedKey.length > 20) {
-      return new OpenAI({ apiKey: storedKey });
-    }
+    const getVal = (key: string) => rows.find(r => r.key === key)?.value || "";
+    const apiKey = getVal("chatgpt_api_key");
+    const provider = getVal("ai_provider") || "openai";
+    const customModel = getVal("ai_model");
+    const customBaseUrl = getVal("ai_base_url");
+
+    if (!apiKey || apiKey.length < 10) return null;
+
+    const baseURL = provider === "custom"
+      ? customBaseUrl || "https://api.openai.com/v1"
+      : PROVIDER_BASE_URLS[provider] || "https://api.openai.com/v1";
+
+    const model = customModel || PROVIDER_DEFAULT_MODELS[provider] || "gpt-4o";
+
+    return { client: new OpenAI({ apiKey, baseURL }), model };
   } catch (err) {
     console.error("Failed to read API key from database:", err);
   }
@@ -135,26 +163,27 @@ router.post("/generate-ai", authMiddleware, requireRoles("super_admin", "partner
       return res.status(400).json({ error: "Category is required" });
     }
 
-    const openai = await getOpenAIClient();
-    if (!openai) {
-      return res.status(503).json({ error: "AI service not configured. Please add your OpenAI API key in Settings." });
+    const ai = await getOpenAIClient();
+    if (!ai) {
+      return res.status(503).json({ error: "AI service not configured. Please add your API key in Settings." });
     }
+    const { client: openai, model: aiModel } = ai;
 
     const CATEGORY_SYSTEM: Record<string, string> = {
-      FBR: "You are a Pakistan FBR expert. Generate ONE short, professional, factual tax/regulatory update for a CA firm's ticker. Keep under 30 words. No quotation marks.",
-      SECP: "You are a Pakistan SECP expert. Generate ONE short, professional corporate governance/compliance update for a CA firm's ticker. Keep under 30 words. No quotation marks.",
-      PSX: "You are a Pakistan Stock Exchange analyst. Generate ONE short market update with specific stock names (OGDC, HBL, LUCK, ENGRO, PPL, PSO, FFC, HUBC, SYS, TRG, MARI), percentage movements, and buy/sell recommendations. Keep under 35 words. No quotation marks.",
-      SBP: "You are a State Bank of Pakistan analyst. Generate ONE short update about KIBOR rates, currency exchange rates (USD/PKR, GBP/PKR, EUR/PKR, SAR/PKR, AED/PKR), SBP policy rate, savings scheme profit rates, or foreign reserves with realistic numbers. Keep under 35 words. No quotation marks.",
+      FBR: "You are a Pakistan FBR expert. Generate ONE short, professional, factual tax/regulatory update for a CA firm's ticker. Keep under 35 words. No quotation marks.",
+      SECP: "You are a Pakistan SECP expert. Generate ONE short, professional corporate governance/compliance update for a CA firm's ticker. Keep under 35 words. No quotation marks.",
+      PSX: "You are a Pakistan Stock Exchange analyst. Generate ONE short market update with specific stock names and percentage movements. Keep under 35 words. No quotation marks.",
+      SBP: "You are a State Bank of Pakistan analyst. Generate ONE short update about exchange rates, KIBOR rates, or SBP policy rate with real numbers. Keep under 35 words. No quotation marks.",
     };
 
     const CATEGORY_FOCUS: Record<string, string> = {
       FBR: "Tax deadlines, SROs, withholding tax, active taxpayer list, income tax returns, sales tax",
       SECP: "Company registration, annual returns, beneficial ownership, corporate governance, compliance",
-      PSX: "KSE-100 movement, top gaining/losing stocks with %, buy/sell recommendations, sector performance, trading volume, IPOs",
-      SBP: "Daily KIBOR rates, USD/PKR and major currency rates, policy rate, T-bill auctions, savings schemes (DSC, SSC, Behbood) profit rates, reserves",
+      PSX: "KSE-100 movement, top gaining/losing stocks with %, sector performance, trading volume",
+      SBP: "Daily KIBOR rates, USD/PKR and major currency rates, policy rate, T-bill auctions, reserves",
     };
 
-    const systemPrompt = CATEGORY_SYSTEM[category] || "You are a Pakistan regulatory expert. Generate a short, professional update for a CA firm. Keep under 30 words. No quotation marks.";
+    const systemPrompt = CATEGORY_SYSTEM[category] || "You are a Pakistan regulatory expert. Generate a short, professional update. Keep under 35 words.";
     const focusAreas = CATEGORY_FOCUS[category] || "";
     const today = new Date().toLocaleDateString("en-PK", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
@@ -163,12 +192,12 @@ router.post("/generate-ai", authMiddleware, requireRoles("super_admin", "partner
       : `Today is ${today}. Generate a unique professional update for ${category} relevant to today.\nFocus areas: ${focusAreas}\nTone: Authoritative advisory\nLength: Max 35 words\nFormat: Single concise statement without quotes\nIMPORTANT: Must be for today — no past dates or expired deadlines.`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: aiModel,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: prompt },
       ],
-      temperature: 0.9,
+      temperature: 0.7,
     });
 
     const generatedText = response.choices[0]?.message?.content?.trim();
@@ -203,17 +232,18 @@ router.post("/generate-ai-preview", authMiddleware, requireRoles("super_admin", 
       return res.status(400).json({ error: "Category is required" });
     }
 
-    const openai = await getOpenAIClient();
-    if (!openai) {
-      return res.status(503).json({ error: "AI service not configured. Please add your OpenAI API key in Settings." });
+    const ai = await getOpenAIClient();
+    if (!ai) {
+      return res.status(503).json({ error: "AI service not configured. Please add your API key in Settings." });
     }
+    const { client: openai, model: aiModel } = ai;
 
     const prompt = topic
-      ? `Generate a professional regulatory update about: ${topic}\n\nCategory: ${category}\nTone: Chartered Accountant advisory\nLength: Max 25 words\nFormat: Single concise statement`
-      : `Generate latest professional regulatory update in 1 line:\n\nCategory: ${category}\nFocus: ${category === "FBR" ? "Tax deadline / SRO / ATL" : category === "SECP" ? "Company registration / compliance" : category === "PSX" ? "Stock market / listing rules" : "Banking regulations / monetary policy"}\nTone: Chartered Accountant advisory\nLength: Max 25 words`;
+      ? `Generate a professional regulatory update about: ${topic}\n\nCategory: ${category}\nTone: Chartered Accountant advisory\nLength: Max 30 words\nFormat: Single concise statement`
+      : `Generate latest professional regulatory update in 1 line:\n\nCategory: ${category}\nFocus: ${category === "FBR" ? "Tax deadline / SRO / ATL" : category === "SECP" ? "Company registration / compliance" : category === "PSX" ? "Stock market / listing rules" : "Banking regulations / monetary policy"}\nTone: Chartered Accountant advisory\nLength: Max 30 words`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: aiModel,
       messages: [
         {
           role: "system",
