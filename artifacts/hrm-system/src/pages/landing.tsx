@@ -255,27 +255,6 @@ export default function Landing() {
             {/* LEFT COLUMN — Metrics & Expertise */}
             <div className="hidden lg:flex flex-col gap-4 pt-4">
               <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
-                <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-3">Proven Track Record</h3>
-                <div className="space-y-3">
-                  {[
-                    { val: "PKR 500B+", label: "Assets Audited", icon: BarChart3, color: "text-blue-600 bg-blue-50" },
-                    { val: "PKR 200B+", label: "Revenue Managed", icon: TrendingUp, color: "text-emerald-600 bg-emerald-50" },
-                    { val: "PKR 50B+", label: "Deal Value", icon: Briefcase, color: "text-violet-600 bg-violet-50" },
-                  ].map(m => (
-                    <div key={m.label} className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${m.color}`}>
-                        <m.icon className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-800">{m.val}</p>
-                        <p className="text-[10px] text-slate-500">{m.label}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
                 <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-3">Core Expertise</h3>
                 <div className="flex flex-wrap gap-1.5">
                   {["Audit & Assurance", "Tax Planning", "IFRS Compliance", "Corporate Advisory", "Forensic Accounting", "Business Valuation"].map(tag => (
