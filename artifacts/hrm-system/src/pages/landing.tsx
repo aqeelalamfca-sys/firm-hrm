@@ -253,9 +253,33 @@ export default function Landing() {
         <div className="absolute top-40 left-1/4 w-[300px] h-[300px] bg-emerald-500/[0.03] rounded-full blur-[80px]" />
         <div className="relative max-w-7xl mx-auto px-6">
           <div className="text-center max-w-3xl mx-auto">
-            <Badge className="mb-6 bg-primary/[0.06] text-primary border-primary/15 text-xs font-semibold px-4 py-1.5 rounded-full backdrop-blur-sm">
-              ICAP Approved Training Organization
-            </Badge>
+            <div className="flex justify-center mb-6">
+              <img
+                src={`${import.meta.env.BASE_URL}logo.png`}
+                alt="Alam & Aulakh Chartered Accountants"
+                className="h-20 sm:h-24 w-auto object-contain drop-shadow-lg"
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2 justify-center mb-7">
+              {[
+                { label: "QCR Rated", color: "bg-amber-500/10 text-amber-700 border-amber-200 ring-amber-300/30" },
+                { label: "ICAEW Authorized Employer", color: "bg-sky-500/10 text-sky-700 border-sky-200 ring-sky-300/30" },
+                { label: "ICAP Approved Training Organization", color: "bg-blue-500/10 text-blue-700 border-blue-200 ring-blue-300/30" },
+                { label: "AOB Registered", color: "bg-emerald-500/10 text-emerald-700 border-emerald-200 ring-emerald-300/30" },
+              ].map((cred) => (
+                <span
+                  key={cred.label}
+                  className={`inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-semibold px-3 py-1 rounded-full border ring-1 backdrop-blur-sm ${cred.color}`}
+                >
+                  <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {cred.label}
+                </span>
+              ))}
+            </div>
+
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.08] mb-6">
               Leading Chartered
               <br />
