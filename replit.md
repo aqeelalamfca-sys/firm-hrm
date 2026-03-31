@@ -26,6 +26,7 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - Built with Express 5, providing RESTful API endpoints.
 - Drizzle ORM interfaces with PostgreSQL, managing a comprehensive database schema that includes users, employees, attendance, leaves, payroll, clients, invoices, engagements, documents, tasks, and audit logs.
 - Features HMAC-SHA256 signed tokens for authentication and robust RBAC implemented via middleware on all API routes.
+- **Multi-Provider AI Integration**: Supports OpenAI, Anthropic (Claude), Google (Gemini), DeepSeek, and custom OpenAI-compatible APIs. All providers use the OpenAI SDK with custom base URLs. Provider/model/URL configured via `system_settings` table keys: `ai_provider`, `ai_model`, `ai_base_url`, `chatgpt_api_key`. Environment variables `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL` take priority when set. SSRF protection via `isValidBaseUrl()` in `system-settings.ts`.
 - Security enhancements include Helmet security headers, AES-256-CBC encryption for sensitive client credentials, rate limiting, and structured logging with Pino.
 - Performance is optimized through N+1 query elimination strategies (e.g., batched queries, SQL-level filtering), extensive database indexing, and frontend memoization.
 

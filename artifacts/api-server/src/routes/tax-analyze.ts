@@ -3,7 +3,7 @@ import multer from "multer";
 import { logger } from "../lib/logger";
 import { db } from "@workspace/db";
 import { systemSettingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import OpenAI from "openai";
 
 const router = Router();
@@ -22,6 +22,62 @@ const upload = multer({
     else cb(new Error("Unsupported file type. Use PDF, Image, Excel, or CSV."));
   },
 });
+
+const PROVIDER_BASE_URLS: Record<string, string> = {
+  openai: "https://api.openai.com/v1",
+  anthropic: "https://api.anthropic.com/v1",
+  google: "https://generativelanguage.googleapis.com/v1beta/openai",
+  deepseek: "https://api.deepseek.com/v1",
+};
+
+const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
+  openai: "gpt-4o",
+  anthropic: "claude-sonnet-4-20250514",
+  google: "gemini-2.0-flash",
+  deepseek: "deepseek-chat",
+};
+
+async function getAIClient(): Promise<{ client: OpenAI; model: string } | null> {
+  const envBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+  const envApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+
+  if (envApiKey) {
+    return {
+      client: new OpenAI(envBaseUrl ? { apiKey: envApiKey, baseURL: envBaseUrl } : { apiKey: envApiKey }),
+      model: "gpt-4o",
+    };
+  }
+
+  try {
+    const settingsKeys = ["chatgpt_api_key", "ai_provider", "ai_model", "ai_base_url"];
+    const rows = await db
+      .select()
+      .from(systemSettingsTable)
+      .where(inArray(systemSettingsTable.key, settingsKeys));
+
+    const getVal = (key: string) => rows.find(r => r.key === key)?.value || "";
+    const apiKey = getVal("chatgpt_api_key");
+    const provider = getVal("ai_provider") || "openai";
+    const customModel = getVal("ai_model");
+    const customBaseUrl = getVal("ai_base_url");
+
+    if (!apiKey || apiKey.length < 10) return null;
+
+    const baseURL = provider === "custom"
+      ? customBaseUrl || "https://api.openai.com/v1"
+      : PROVIDER_BASE_URLS[provider] || "https://api.openai.com/v1";
+
+    const model = customModel || PROVIDER_DEFAULT_MODELS[provider] || "gpt-4o";
+
+    return {
+      client: new OpenAI({ apiKey, baseURL }),
+      model,
+    };
+  } catch (err) {
+    logger.error({ err }, "Failed to initialize AI client from database settings");
+    return null;
+  }
+}
 
 const TAX_SYSTEM_PROMPT = `You are a Law-Integrated AI Tax Engine for Pakistan. You are a senior Chartered Accountant with deep expertise across ALL Pakistan tax legislation. You must analyze documents/transactions and provide LEGALLY-GROUNDED tax opinions with mandatory section references.
 
@@ -249,32 +305,12 @@ router.post("/", (req: Request, res: Response, next: Function) => {
 
     const filerStatus = (req.query.filer as string) || "atl";
 
-    let openai: OpenAI | null = null;
-
-    const baseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-    const envApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-    if (envApiKey) {
-      openai = new OpenAI(baseUrl ? { apiKey: envApiKey, baseURL: baseUrl } : { apiKey: envApiKey });
-    } else {
-      try {
-        const settings = await db
-          .select()
-          .from(systemSettingsTable)
-          .where(eq(systemSettingsTable.key, "chatgpt_api_key"))
-          .limit(1);
-        const storedKey = settings[0]?.value;
-        if (storedKey && storedKey.startsWith("sk-") && storedKey.length > 20) {
-          openai = new OpenAI({ apiKey: storedKey });
-        }
-      } catch (err) {
-        logger.error({ err }, "Failed to read API key from database");
-      }
-    }
-
-    if (!openai) {
-      res.status(500).json({ error: "AI not configured. Please set your ChatGPT API key in Admin Settings." });
+    const ai = await getAIClient();
+    if (!ai) {
+      res.status(500).json({ error: "AI not configured. Please set your API key in Admin Settings." });
       return;
     }
+    const { client: openai, model: aiModel } = ai;
 
     let messages: any[] = [
       { role: "system", content: TAX_SYSTEM_PROMPT },
@@ -318,12 +354,12 @@ router.post("/", (req: Request, res: Response, next: Function) => {
       });
     }
 
-    logger.info({ filename: file.originalname, mimetype: file.mimetype, size: file.size }, "Tax analyze request");
+    logger.info({ filename: file.originalname, mimetype: file.mimetype, size: file.size, model: aiModel }, "Tax analyze request");
 
     let completion;
     try {
       completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: aiModel,
         max_completion_tokens: 8192,
         messages,
         response_format: { type: "json_object" },
@@ -410,33 +446,14 @@ router.post("/text", async (req: Request, res: Response) => {
       return;
     }
 
-    let openai: OpenAI | null = null;
-    const baseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-    const envApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-    if (envApiKey) {
-      openai = new OpenAI(baseUrl ? { apiKey: envApiKey, baseURL: baseUrl } : { apiKey: envApiKey });
-    } else {
-      try {
-        const settings = await db
-          .select()
-          .from(systemSettingsTable)
-          .where(eq(systemSettingsTable.key, "chatgpt_api_key"))
-          .limit(1);
-        const storedKey = settings[0]?.value;
-        if (storedKey && storedKey.startsWith("sk-") && storedKey.length > 20) {
-          openai = new OpenAI({ apiKey: storedKey });
-        }
-      } catch (err) {
-        logger.error({ err }, "Failed to read API key from database");
-      }
-    }
-
-    if (!openai) {
-      res.status(500).json({ error: "AI not configured. Please set your ChatGPT API key in Admin Settings." });
+    const ai = await getAIClient();
+    if (!ai) {
+      res.status(500).json({ error: "AI not configured. Please set your API key in Admin Settings." });
       return;
     }
+    const { client: openai, model: aiModel } = ai;
 
-    logger.info({ textLength: text.length, filer: filerStatus }, "Tax text analyze request");
+    logger.info({ textLength: text.length, filer: filerStatus, model: aiModel }, "Tax text analyze request");
 
     const messages: any[] = [
       { role: "system", content: TAX_SYSTEM_PROMPT },
@@ -449,7 +466,7 @@ router.post("/text", async (req: Request, res: Response) => {
     let completion;
     try {
       completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: aiModel,
         max_completion_tokens: 8192,
         messages,
         response_format: { type: "json_object" },

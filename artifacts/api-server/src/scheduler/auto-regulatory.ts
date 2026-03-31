@@ -1,10 +1,24 @@
 import { db } from "@workspace/db";
 import { regulatoryUpdatesTable, systemSettingsTable, autoGenLogsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 import OpenAI from "openai";
 
 const CATEGORIES = ["FBR", "SECP", "PSX", "SBP"] as const;
 const INTERVAL_MS = 2 * 60 * 60 * 1000;
+
+const PROVIDER_BASE_URLS: Record<string, string> = {
+  openai: "https://api.openai.com/v1",
+  anthropic: "https://api.anthropic.com/v1",
+  google: "https://generativelanguage.googleapis.com/v1beta/openai",
+  deepseek: "https://api.deepseek.com/v1",
+};
+
+const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
+  openai: "gpt-4o",
+  anthropic: "claude-sonnet-4-20250514",
+  google: "gemini-2.0-flash",
+  deepseek: "deepseek-chat",
+};
 
 const CATEGORY_SEARCH_QUERIES: Record<string, string[]> = {
   FBR: [
@@ -27,25 +41,45 @@ const CATEGORY_SEARCH_QUERIES: Record<string, string[]> = {
 
 const PRIORITY_OPTIONS = ["high", "medium", "low"] as const;
 
-async function getOpenAIClient(): Promise<OpenAI | null> {
-  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-  if (baseURL && apiKey) {
-    return new OpenAI({ baseURL, apiKey });
+async function getOpenAIClient(): Promise<{ client: OpenAI; model: string } | null> {
+  const envBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+  const envApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+
+  if (envApiKey) {
+    return {
+      client: new OpenAI(envBaseUrl ? { apiKey: envApiKey, baseURL: envBaseUrl } : { apiKey: envApiKey }),
+      model: "gpt-4o",
+    };
   }
 
-  const settings = await db
-    .select()
-    .from(systemSettingsTable)
-    .where(eq(systemSettingsTable.key, "chatgpt_api_key"))
-    .limit(1);
+  try {
+    const settingsKeys = ["chatgpt_api_key", "ai_provider", "ai_model", "ai_base_url"];
+    const rows = await db
+      .select()
+      .from(systemSettingsTable)
+      .where(inArray(systemSettingsTable.key, settingsKeys));
 
-  const storedKey = settings[0]?.value;
-  if (storedKey && storedKey.startsWith("sk-") && storedKey.length > 20) {
-    return new OpenAI({ apiKey: storedKey });
+    const getVal = (key: string) => rows.find(r => r.key === key)?.value || "";
+    const apiKey = getVal("chatgpt_api_key");
+    const provider = getVal("ai_provider") || "openai";
+    const customModel = getVal("ai_model");
+    const customBaseUrl = getVal("ai_base_url");
+
+    if (!apiKey || apiKey.length < 10) return null;
+
+    const baseURL = provider === "custom"
+      ? customBaseUrl || "https://api.openai.com/v1"
+      : PROVIDER_BASE_URLS[provider] || "https://api.openai.com/v1";
+
+    const model = customModel || PROVIDER_DEFAULT_MODELS[provider] || "gpt-4o";
+
+    return {
+      client: new OpenAI({ apiKey, baseURL }),
+      model,
+    };
+  } catch {
+    return null;
   }
-
-  return null;
 }
 
 function getTodayStr(): string {
@@ -167,7 +201,7 @@ async function fetchRealTimeContext(category: string): Promise<string> {
   return parts.join("\n");
 }
 
-async function generateUpdate(openai: OpenAI, category: string): Promise<string> {
+async function generateUpdate(openai: OpenAI, aiModel: string, category: string): Promise<string> {
   const today = getTodayStr();
   const realTimeContext = await fetchRealTimeContext(category);
 
@@ -183,7 +217,7 @@ async function generateUpdate(openai: OpenAI, category: string): Promise<string>
   const systemPrompt = systemPrompts[category] || "You are a Pakistan regulatory expert. Summarize ONLY the real data provided. Never fabricate information. Keep under 35 words. No quotation marks.";
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: aiModel,
     messages: [
       {
         role: "system",
@@ -214,8 +248,8 @@ async function runAutoGeneration(): Promise<void> {
   try {
     console.log(`[Auto-Gen] Starting scheduled regulatory update generation at ${new Date().toISOString()}`);
 
-    const openai = await getOpenAIClient();
-    if (!openai) {
+    const ai = await getOpenAIClient();
+    if (!ai) {
       console.log("[Auto-Gen] No AI client available (no API key configured). Skipping.");
       for (const category of CATEGORIES) {
         await db.insert(autoGenLogsTable).values({
@@ -229,7 +263,7 @@ async function runAutoGeneration(): Promise<void> {
 
     for (const category of CATEGORIES) {
       try {
-        const text = await generateUpdate(openai, category);
+        const text = await generateUpdate(ai.client, ai.model, category);
         const priority = PRIORITY_OPTIONS[Math.floor(Math.random() * PRIORITY_OPTIONS.length)];
 
         await db.insert(regulatoryUpdatesTable).values({

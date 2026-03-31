@@ -40,6 +40,9 @@ export default function Settings() {
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
   const [apiTestResult, setApiTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [settings, setSettings] = useState<SystemSetting[]>([]);
+  const [aiProvider, setAiProvider] = useState("openai");
+  const [aiModel, setAiModel] = useState("");
+  const [aiBaseUrl, setAiBaseUrl] = useState("");
   const [autoGenEnabled, setAutoGenEnabled] = useState(true);
   const [autoGenInterval, setAutoGenInterval] = useState(2);
   const [autoGenSaving, setAutoGenSaving] = useState(false);
@@ -110,6 +113,12 @@ export default function Settings() {
           if (apiKeySetting?.configured) {
             setApiKeyConfigured(true);
           }
+          const providerSetting = data.settings?.find((s: any) => s.key === "ai_provider");
+          if (providerSetting?.value) setAiProvider(providerSetting.value);
+          const modelSetting = data.settings?.find((s: any) => s.key === "ai_model");
+          if (modelSetting?.value) setAiModel(modelSetting.value);
+          const baseUrlSetting = data.settings?.find((s: any) => s.key === "ai_base_url");
+          if (baseUrlSetting?.value) setAiBaseUrl(baseUrlSetting.value);
         }
       } catch {
       }
@@ -131,6 +140,15 @@ export default function Settings() {
     fetchAutoGenConfig();
   }, [getAuthHeaders]);
 
+  const saveSetting = async (key: string, value: string, description: string) => {
+    const res = await fetch(`/api/system-settings/${key}`, {
+      method: "PUT",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ value, description }),
+    });
+    return res;
+  };
+
   const handleSaveApiKey = async () => {
     if (!chatgptApiKey.trim()) {
       toast({ title: "Validation", description: "API key is required", variant: "destructive" });
@@ -139,19 +157,12 @@ export default function Settings() {
 
     setApiKeySaving(true);
     try {
-      const res = await fetch("/api/system-settings/chatgpt_api_key", {
-        method: "PUT",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          value: chatgptApiKey,
-          description: "ChatGPT API Key for AI Tax Analyzer and regulatory updates",
-        }),
-      });
+      const res = await saveSetting("chatgpt_api_key", chatgptApiKey, "API Key for AI Tax Analyzer and regulatory updates");
 
       if (res.ok) {
         setApiKeyConfigured(true);
         setChatgptApiKey("");
-        toast({ title: "Saved", description: "ChatGPT API key has been saved securely." });
+        toast({ title: "Saved", description: "API key has been saved securely." });
       } else if (res.status === 401 || res.status === 403) {
         toast({ title: "Session Expired", description: "Please log in again to save settings.", variant: "destructive" });
       } else {
@@ -160,6 +171,31 @@ export default function Settings() {
       }
     } catch {
       toast({ title: "Error", description: "Network error — check your connection and try again.", variant: "destructive" });
+    } finally {
+      setApiKeySaving(false);
+    }
+  };
+
+  const handleSaveAiConfig = async () => {
+    if (aiProvider === "custom" && aiBaseUrl && !aiBaseUrl.startsWith("https://")) {
+      toast({ title: "Validation", description: "Custom base URL must use HTTPS.", variant: "destructive" });
+      return;
+    }
+    setApiKeySaving(true);
+    try {
+      const results = await Promise.all([
+        saveSetting("ai_provider", aiProvider, "AI provider (openai, anthropic, google, deepseek, custom)"),
+        saveSetting("ai_model", aiModel || "", "AI model name override"),
+        saveSetting("ai_base_url", aiBaseUrl || "", "Custom AI API base URL"),
+      ]);
+      const allOk = results.every(r => r.ok);
+      if (allOk) {
+        toast({ title: "Saved", description: "AI configuration updated successfully." });
+      } else {
+        toast({ title: "Partial Error", description: "Some settings failed to save. Please try again.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to save AI configuration", variant: "destructive" });
     } finally {
       setApiKeySaving(false);
     }
@@ -292,7 +328,7 @@ export default function Settings() {
             <Sparkles className="w-5 h-5 text-violet-500" />
             AI Integration
           </CardTitle>
-          <p className="text-xs text-muted-foreground">Configure ChatGPT API for AI Tax Analyzer and regulatory update generation.</p>
+          <p className="text-xs text-muted-foreground">Configure the AI provider for Tax Analyzer and regulatory update generation.</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="border rounded-xl p-5 border-violet-200/60 bg-violet-50/30">
@@ -302,7 +338,7 @@ export default function Settings() {
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <h3 className="font-semibold text-sm">ChatGPT API</h3>
+                  <h3 className="font-semibold text-sm">AI Provider</h3>
                   {apiKeyConfigured ? (
                     <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50 text-[10px] gap-1">
                       <CheckCircle2 className="w-3 h-3" /> Configured
@@ -319,6 +355,21 @@ export default function Settings() {
 
                 <div className="space-y-3">
                   <div>
+                    <Label className="text-xs text-muted-foreground mb-1.5 block">Provider</Label>
+                    <select
+                      value={aiProvider}
+                      onChange={(e) => { setAiProvider(e.target.value); setAiModel(""); setAiBaseUrl(""); }}
+                      className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="openai">OpenAI (GPT-4o, GPT-4, etc.)</option>
+                      <option value="anthropic">Anthropic (Claude)</option>
+                      <option value="google">Google (Gemini)</option>
+                      <option value="deepseek">DeepSeek</option>
+                      <option value="custom">Custom (OpenAI-compatible API)</option>
+                    </select>
+                  </div>
+
+                  <div>
                     <Label className="text-xs text-muted-foreground mb-1.5 block">API Key</Label>
                     <div className="flex gap-2">
                       <div className="relative flex-1">
@@ -327,7 +378,7 @@ export default function Settings() {
                           type={showApiKey ? "text" : "password"}
                           value={chatgptApiKey}
                           onChange={(e) => setChatgptApiKey(e.target.value)}
-                          placeholder="sk-..."
+                          placeholder={aiProvider === "anthropic" ? "sk-ant-..." : aiProvider === "google" ? "AIza..." : "sk-..."}
                           className="h-9 text-xs pl-9 pr-9 font-mono"
                         />
                         <button
@@ -347,17 +398,60 @@ export default function Settings() {
                         {apiKeySaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                         Save Key
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleTestApiKey}
-                        disabled={apiKeyTesting}
-                        className="h-9 gap-1.5 text-xs"
-                      >
-                        {apiKeyTesting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <FlaskConical className="w-3.5 h-3.5" />}
-                        Test
-                      </Button>
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1.5 block">
+                        Model {aiProvider !== "custom" && <span className="text-muted-foreground/60">(optional override)</span>}
+                      </Label>
+                      <Input
+                        value={aiModel}
+                        onChange={(e) => setAiModel(e.target.value)}
+                        placeholder={
+                          aiProvider === "openai" ? "gpt-4o" :
+                          aiProvider === "anthropic" ? "claude-sonnet-4-20250514" :
+                          aiProvider === "google" ? "gemini-2.0-flash" :
+                          aiProvider === "deepseek" ? "deepseek-chat" :
+                          "model-name"
+                        }
+                        className="h-9 text-xs font-mono"
+                      />
+                    </div>
+                    {aiProvider === "custom" && (
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1.5 block">Base URL</Label>
+                        <Input
+                          value={aiBaseUrl}
+                          onChange={(e) => setAiBaseUrl(e.target.value)}
+                          placeholder="https://api.example.com/v1"
+                          className="h-9 text-xs font-mono"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={handleSaveAiConfig}
+                      disabled={apiKeySaving}
+                      className="h-9 gap-1.5 text-xs"
+                    >
+                      {apiKeySaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                      Save Configuration
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleTestApiKey}
+                      disabled={apiKeyTesting}
+                      className="h-9 gap-1.5 text-xs"
+                    >
+                      {apiKeyTesting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <FlaskConical className="w-3.5 h-3.5" />}
+                      Test Connection
+                    </Button>
                   </div>
 
                   {apiTestResult && (
@@ -377,7 +471,7 @@ export default function Settings() {
 
                   <div className="flex items-start gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-lg p-2.5">
                     <Shield className="w-3.5 h-3.5 mt-0.5 shrink-0 text-blue-500" />
-                    <p>Your API key is stored securely. It is used server-side for the AI Tax Analyzer and regulatory update generation.</p>
+                    <p>Your API key is stored securely. It is used server-side for the AI Tax Analyzer and regulatory update generation. All providers use the OpenAI-compatible API format.</p>
                   </div>
                 </div>
               </div>

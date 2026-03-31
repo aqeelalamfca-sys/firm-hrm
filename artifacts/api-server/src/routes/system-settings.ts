@@ -1,9 +1,37 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { systemSettingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { AuthenticatedRequest } from "../middleware/auth";
 import OpenAI from "openai";
+
+const PROVIDER_BASE_URLS: Record<string, string> = {
+  openai: "https://api.openai.com/v1",
+  anthropic: "https://api.anthropic.com/v1",
+  google: "https://generativelanguage.googleapis.com/v1beta/openai",
+  deepseek: "https://api.deepseek.com/v1",
+};
+
+const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
+  openai: "gpt-4o",
+  anthropic: "claude-sonnet-4-20250514",
+  google: "gemini-2.0-flash",
+  deepseek: "deepseek-chat",
+};
+
+function isValidBaseUrl(url: string): boolean {
+  if (!url) return true;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    const host = parsed.hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host === "::1") return false;
+    if (host.startsWith("10.") || host.startsWith("192.168.") || host.startsWith("172.") || host === "169.254.169.254") return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const router = Router();
 
@@ -30,31 +58,43 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
 
 router.post("/test-api-key", async (req: AuthenticatedRequest, res) => {
   try {
-    const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+    const envBaseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
     const envApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
 
     let openai: OpenAI;
     let source = "env";
+    let testModel = "gpt-4o";
 
-    if (baseURL && envApiKey) {
-      openai = new OpenAI({ baseURL, apiKey: envApiKey });
+    if (envApiKey) {
+      openai = new OpenAI(envBaseURL ? { baseURL: envBaseURL, apiKey: envApiKey } : { apiKey: envApiKey });
     } else {
-      const settings = await db
+      const settingsKeys = ["chatgpt_api_key", "ai_provider", "ai_model", "ai_base_url"];
+      const rows = await db
         .select()
         .from(systemSettingsTable)
-        .where(eq(systemSettingsTable.key, "chatgpt_api_key"))
-        .limit(1);
+        .where(inArray(systemSettingsTable.key, settingsKeys));
 
-      const storedKey = settings[0]?.value;
+      const getVal = (key: string) => rows.find(r => r.key === key)?.value || "";
+      const storedKey = getVal("chatgpt_api_key");
+      const provider = getVal("ai_provider") || "openai";
+      const customModel = getVal("ai_model");
+      const customBaseUrl = getVal("ai_base_url");
+
       if (!storedKey || storedKey.length < 10) {
         return res.status(400).json({ error: "No API key configured. Please save a valid API key first." });
       }
-      openai = new OpenAI({ apiKey: storedKey });
-      source = "database";
+
+      const baseURL = provider === "custom"
+        ? customBaseUrl || "https://api.openai.com/v1"
+        : PROVIDER_BASE_URLS[provider] || "https://api.openai.com/v1";
+
+      testModel = customModel || PROVIDER_DEFAULT_MODELS[provider] || "gpt-4o";
+      openai = new OpenAI({ apiKey: storedKey, baseURL });
+      source = `database (${provider})`;
     }
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: testModel,
       messages: [{ role: "user", content: "Reply with exactly: OK" }],
       max_tokens: 5,
     });
@@ -62,13 +102,13 @@ router.post("/test-api-key", async (req: AuthenticatedRequest, res) => {
     const reply = response.choices[0]?.message?.content?.trim();
     res.json({
       success: true,
-      message: `API key is working (source: ${source})`,
-      model: response.model,
+      message: `AI connection working — ${source}, model: ${response.model || testModel}`,
+      model: response.model || testModel,
       reply,
     });
   } catch (error: any) {
     const msg = error?.message || String(error);
-    if (msg.includes("401") || msg.includes("Incorrect API key")) {
+    if (msg.includes("401") || msg.includes("Incorrect API key") || msg.includes("invalid x-api-key") || msg.includes("API key not valid")) {
       return res.status(400).json({ error: "Invalid API key. Please check and try again." });
     }
     if (msg.includes("429")) {
@@ -76,6 +116,9 @@ router.post("/test-api-key", async (req: AuthenticatedRequest, res) => {
     }
     if (msg.includes("insufficient_quota")) {
       return res.status(400).json({ error: "API key has insufficient quota/credits." });
+    }
+    if (msg.includes("model") && (msg.includes("not found") || msg.includes("does not exist"))) {
+      return res.status(400).json({ error: `Model not found. Check the model name and try again. Details: ${msg.substring(0, 150)}` });
     }
     res.status(500).json({ error: `API test failed: ${msg.substring(0, 200)}` });
   }
@@ -135,8 +178,12 @@ router.put("/:key", async (req: AuthenticatedRequest, res) => {
     const key = req.params.key as string;
     const { value, description } = req.body;
 
-    if (!value) {
+    if (value === undefined || value === null) {
       return res.status(400).json({ error: "Value is required" });
+    }
+
+    if (key === "ai_base_url" && value && !isValidBaseUrl(value)) {
+      return res.status(400).json({ error: "Invalid base URL. Must be HTTPS and not point to private/internal networks." });
     }
 
     if (!req.user?.id) {
