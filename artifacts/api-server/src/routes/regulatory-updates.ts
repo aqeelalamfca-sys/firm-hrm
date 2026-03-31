@@ -9,11 +9,29 @@ import { runAutoGeneration } from "../scheduler/auto-regulatory";
 
 const router = Router();
 
-function getOpenAIClient(): OpenAI | null {
+async function getOpenAIClient(): Promise<OpenAI | null> {
   const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
   const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-  if (!baseURL || !apiKey) return null;
-  return new OpenAI({ baseURL, apiKey });
+  if (apiKey) {
+    return new OpenAI(baseURL ? { baseURL, apiKey } : { apiKey });
+  }
+
+  try {
+    const settings = await db
+      .select()
+      .from(systemSettingsTable)
+      .where(eq(systemSettingsTable.key, "chatgpt_api_key"))
+      .limit(1);
+
+    const storedKey = settings[0]?.value;
+    if (storedKey && storedKey.startsWith("sk-") && storedKey.length > 20) {
+      return new OpenAI({ apiKey: storedKey });
+    }
+  } catch (err) {
+    console.error("Failed to read API key from database:", err);
+  }
+
+  return null;
 }
 
 router.get("/", async (_req, res) => {
@@ -117,9 +135,9 @@ router.post("/generate-ai", authMiddleware, requireRoles("super_admin", "partner
       return res.status(400).json({ error: "Category is required" });
     }
 
-    const openai = getOpenAIClient();
+    const openai = await getOpenAIClient();
     if (!openai) {
-      return res.status(503).json({ error: "AI service not configured" });
+      return res.status(503).json({ error: "AI service not configured. Please add your OpenAI API key in Settings." });
     }
 
     const prompt = topic
@@ -172,9 +190,9 @@ router.post("/generate-ai-preview", authMiddleware, requireRoles("super_admin", 
       return res.status(400).json({ error: "Category is required" });
     }
 
-    const openai = getOpenAIClient();
+    const openai = await getOpenAIClient();
     if (!openai) {
-      return res.status(503).json({ error: "AI service not configured" });
+      return res.status(503).json({ error: "AI service not configured. Please add your OpenAI API key in Settings." });
     }
 
     const prompt = topic
