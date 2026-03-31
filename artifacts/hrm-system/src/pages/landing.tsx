@@ -253,39 +253,13 @@ export default function Landing() {
         <div className="absolute top-40 left-1/4 w-[300px] h-[300px] bg-emerald-500/[0.03] rounded-full blur-[80px]" />
         <div className="relative max-w-7xl mx-auto px-6">
           <div className="text-center max-w-3xl mx-auto">
-            <div className="flex justify-center mb-8">
-              <div className="flex flex-col items-center gap-3">
-                <div className="relative">
-                  <svg width="80" height="80" viewBox="0 0 100 100" className="sm:w-[96px] sm:h-[96px] drop-shadow-lg">
-                    <defs>
-                      <linearGradient id="logoGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#1e40af" />
-                        <stop offset="100%" stopColor="#3b82f6" />
-                      </linearGradient>
-                      <linearGradient id="logoGrad2" x1="0%" y1="100%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#1e3a5f" />
-                        <stop offset="100%" stopColor="#2563eb" />
-                      </linearGradient>
-                    </defs>
-                    <rect x="4" y="4" width="92" height="92" rx="20" fill="url(#logoGrad1)" />
-                    <rect x="8" y="8" width="84" height="84" rx="17" fill="none" stroke="white" strokeWidth="0.5" opacity="0.2" />
-                    <text x="50" y="58" textAnchor="middle" fontFamily="Georgia, 'Times New Roman', serif" fontSize="46" fontWeight="bold" fill="white" letterSpacing="-2">
-                      AA
-                    </text>
-                    <line x1="24" y1="68" x2="76" y2="68" stroke="white" strokeWidth="1" opacity="0.4" />
-                    <text x="50" y="80" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize="8" fill="white" opacity="0.85" letterSpacing="3">
-                      EST. 2016
-                    </text>
-                  </svg>
-                </div>
-                <div className="text-center">
-                  <h2 className="text-2xl sm:text-3xl font-bold tracking-wide text-slate-800">
-                    ALAM <span className="text-blue-600">&</span> AULAKH
-                  </h2>
-                  <p className="text-[11px] sm:text-xs font-semibold tracking-[0.3em] text-slate-500 uppercase mt-0.5">
-                    Chartered Accountants
-                  </p>
-                </div>
+            <div className="flex justify-center mb-6">
+              <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #f0f4f8 0%, #e8edf3 100%)' }}>
+                <img
+                  src={`${import.meta.env.BASE_URL}images/hero-logo.jpg`}
+                  alt="Alam & Aulakh Chartered Accountants"
+                  className="h-28 sm:h-36 w-auto object-contain mix-blend-multiply"
+                />
               </div>
             </div>
 
