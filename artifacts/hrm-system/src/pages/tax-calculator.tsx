@@ -6,7 +6,7 @@ import {
   CheckCircle2, AlertTriangle, Shield, TrendingUp, AlertCircle,
   Layers, Target, Zap, RefreshCw, Download, ClipboardList,
   ShoppingCart, Globe, CreditCard, Users, Upload, Loader2, FileSearch,
-  Eye, Search
+  Eye, Search, X
 } from "lucide-react";
 
 // ─── Formatters ────────────────────────────────────────────────────────────────
@@ -779,200 +779,232 @@ export default function TaxCalculator() {
               </div>
             </div>
 
-            {/* ── RESULTS ─────────────────────────────────────── */}
+            {/* ── RESULTS MODAL ─────────────────────────────── */}
             {docResult && (
-              <div className="space-y-6">
-                {/* Document Summary */}
-                {docResult.document_summary && (
-                  <Card>
-                    <SectionTitle>Document Summary</SectionTitle>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      {[
-                        { l: "Type", v: docResult.document_summary.document_type, icon: FileText, c: "from-blue-50 to-blue-100/50 border-blue-200/40" },
-                        { l: "Nature", v: docResult.document_summary.nature, icon: Layers, c: "from-violet-50 to-violet-100/50 border-violet-200/40" },
-                        { l: "Date", v: docResult.document_summary.date || "—", icon: ClipboardList, c: "from-slate-50 to-slate-100/50 border-slate-200/40" },
-                        { l: "Total Amount", v: docResult.document_summary.total_amount ? fmt(docResult.document_summary.total_amount) : "—", icon: Banknote, c: "from-emerald-50 to-emerald-100/50 border-emerald-200/40" },
-                      ].map(f => (
-                        <div key={f.l} className={`bg-gradient-to-br ${f.c} rounded-xl p-3.5 border`}>
-                          <div className="flex items-center gap-1.5 mb-1.5">
-                            <f.icon className="w-3 h-3 text-slate-400" />
-                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{f.l}</p>
-                          </div>
-                          <p className="text-[13px] font-bold text-slate-800">{f.v}</p>
-                        </div>
-                      ))}
+              <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto" onClick={() => setDocResult(null)}>
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+                <div className="relative w-full max-w-5xl mx-4 my-8 animate-in fade-in slide-in-from-bottom-4 duration-300" onClick={e => e.stopPropagation()}>
+                  {/* Modal Header */}
+                  <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-gradient-to-r from-[#312e81] via-[#4338ca] to-[#6366f1] rounded-t-2xl shadow-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur-sm ring-1 ring-white/20">
+                        <FileSearch className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-base font-bold text-white tracking-tight">Tax Analysis Report</h2>
+                        <p className="text-[11px] text-indigo-200">{docResult.filename} • {filerStatus === "atl" ? "Active Taxpayer" : "Non-Active Taxpayer"}</p>
+                      </div>
                     </div>
-                    {docResult.document_summary.parties?.length > 0 && (
-                      <div className="mt-4 pt-3 border-t border-slate-100">
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Involved Parties</p>
-                        <div className="flex flex-wrap gap-2">
-                          {docResult.document_summary.parties.map((p: any, i: number) => (
-                            <span key={i} className="text-[11px] bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-200/60 px-3 py-1.5 rounded-lg font-semibold shadow-sm">
-                              {p.name} {p.ntn_cnic ? `(${p.ntn_cnic})` : ""} — <span className="text-blue-500">{p.role}</span>
+                    <button onClick={() => setDocResult(null)} className="w-9 h-9 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors">
+                      <X className="w-5 h-5 text-white" />
+                    </button>
+                  </div>
+
+                  {/* Modal Body */}
+                  <div className="bg-[#f8f9fc] rounded-b-2xl shadow-2xl">
+                    <div className="p-6 space-y-5">
+
+                      {/* Total Exposure Summary - Top */}
+                      {docResult.total_tax_exposure && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-5 text-white shadow-xl shadow-blue-500/15">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full -translate-y-6 translate-x-6" />
+                            <div className="relative">
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-blue-200" />
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Total Tax — ATL</p>
+                              </div>
+                              <p className="text-2xl font-bold tabular-nums tracking-tight">{fmt(docResult.total_tax_exposure.atl ?? 0)}</p>
+                              <p className="text-[10px] text-blue-200/80 mt-0.5">Active Taxpayer List rate</p>
+                            </div>
+                          </div>
+                          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-500 to-rose-700 p-5 text-white shadow-xl shadow-red-500/15">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full -translate-y-6 translate-x-6" />
+                            <div className="relative">
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <AlertTriangle className="w-3.5 h-3.5 text-red-200" />
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-red-200">Total Tax — Non-ATL</p>
+                              </div>
+                              <p className="text-2xl font-bold tabular-nums tracking-tight">{fmt(docResult.total_tax_exposure.non_atl ?? 0)}</p>
+                              <p className="text-[10px] text-red-200/80 mt-0.5">Non-ATL higher withholding rate</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Document Summary */}
+                      {docResult.document_summary && (
+                        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
+                          <h3 className="text-[13px] font-bold text-slate-800 mb-3 flex items-center gap-2"><span className="w-1 h-4 rounded-full bg-gradient-to-b from-blue-500 to-indigo-600 inline-block" />Document Summary</h3>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            {[
+                              { l: "Type", v: docResult.document_summary.document_type, icon: FileText, c: "from-blue-50 to-blue-100/50 border-blue-200/40" },
+                              { l: "Nature", v: docResult.document_summary.nature, icon: Layers, c: "from-violet-50 to-violet-100/50 border-violet-200/40" },
+                              { l: "Date", v: docResult.document_summary.date || "—", icon: ClipboardList, c: "from-slate-50 to-slate-100/50 border-slate-200/40" },
+                              { l: "Total Amount", v: docResult.document_summary.total_amount ? fmt(docResult.document_summary.total_amount) : "—", icon: Banknote, c: "from-emerald-50 to-emerald-100/50 border-emerald-200/40" },
+                            ].map(f => (
+                              <div key={f.l} className={`bg-gradient-to-br ${f.c} rounded-xl p-3 border`}>
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  <f.icon className="w-3 h-3 text-slate-400" />
+                                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">{f.l}</p>
+                                </div>
+                                <p className="text-[12px] font-bold text-slate-800">{f.v}</p>
+                              </div>
+                            ))}
+                          </div>
+                          {docResult.document_summary.parties?.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-slate-100">
+                              <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1.5">Involved Parties</p>
+                              <div className="flex flex-wrap gap-2">
+                                {docResult.document_summary.parties.map((p: any, i: number) => (
+                                  <span key={i} className="text-[10px] bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-200/60 px-2.5 py-1 rounded-lg font-semibold">
+                                    {p.name} {p.ntn_cnic ? `(${p.ntn_cnic})` : ""} — <span className="text-blue-500">{p.role}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Extracted Line Items */}
+                      {docResult.extracted_items?.length > 0 && (
+                        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
+                          <h3 className="text-[13px] font-bold text-slate-800 mb-3 flex items-center gap-2"><span className="w-1 h-4 rounded-full bg-gradient-to-b from-blue-500 to-indigo-600 inline-block" />Extracted Items</h3>
+                          <div className="overflow-x-auto rounded-xl border border-slate-100">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="bg-slate-50/80">
+                                  <th className="text-left py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase">Description</th>
+                                  <th className="text-right py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase">Gross</th>
+                                  <th className="text-right py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase">Tax</th>
+                                  <th className="text-right py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase">Net</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {docResult.extracted_items.map((item: any, i: number) => (
+                                  <tr key={i} className="border-t border-slate-50 hover:bg-slate-50/50">
+                                    <td className="py-2 px-3 text-slate-700 font-medium">{item.description}</td>
+                                    <td className="py-2 px-3 text-right tabular-nums">{item.gross_amount ? fmt(item.gross_amount) : "—"}</td>
+                                    <td className="py-2 px-3 text-right tabular-nums text-red-600">{item.tax_amount ? fmt(item.tax_amount) : "—"}</td>
+                                    <td className="py-2 px-3 text-right tabular-nums font-semibold">{item.net_amount ? fmt(item.net_amount) : "—"}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Tax Analysis Table */}
+                      {docResult.tax_analysis?.length > 0 && (
+                        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+                          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+                            <h3 className="text-[13px] font-bold text-slate-800 flex items-center gap-2"><span className="w-1 h-4 rounded-full bg-gradient-to-b from-blue-500 to-indigo-600 inline-block" />Tax Exposure Analysis</h3>
+                            <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 px-2.5 py-1 rounded-lg">
+                              {docResult.tax_analysis.length} tax head{docResult.tax_analysis.length > 1 ? "s" : ""} identified
                             </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </Card>
-                )}
-
-                {/* Extracted Line Items */}
-                {docResult.extracted_items?.length > 0 && (
-                  <Card>
-                    <SectionTitle>Extracted Items</SectionTitle>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="bg-slate-50 border-b border-slate-200">
-                            <th className="text-left py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase">Description</th>
-                            <th className="text-right py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase">Gross</th>
-                            <th className="text-right py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase">Tax</th>
-                            <th className="text-right py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase">Net</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {docResult.extracted_items.map((item: any, i: number) => (
-                            <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50">
-                              <td className="py-2 px-3 text-slate-700 font-medium">{item.description}</td>
-                              <td className="py-2 px-3 text-right tabular-nums">{item.gross_amount ? fmt(item.gross_amount) : "—"}</td>
-                              <td className="py-2 px-3 text-right tabular-nums text-red-600">{item.tax_amount ? fmt(item.tax_amount) : "—"}</td>
-                              <td className="py-2 px-3 text-right tabular-nums font-semibold">{item.net_amount ? fmt(item.net_amount) : "—"}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </Card>
-                )}
-
-                {/* Tax Analysis Table */}
-                {docResult.tax_analysis?.length > 0 && (
-                  <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                    <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-                      <h3 className="text-sm font-bold text-slate-800">Tax Exposure Analysis</h3>
-                      <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 px-2.5 py-1 rounded-lg">
-                        {docResult.tax_analysis.length} tax head{docResult.tax_analysis.length > 1 ? "s" : ""} identified
-                      </span>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="bg-slate-50 border-b border-slate-200">
-                            <th className="text-left py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tax Type</th>
-                            <th className="text-left py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Section</th>
-                            <th className="text-left py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nature</th>
-                            <th className="text-right py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Rate</th>
-                            <th className="text-right py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tax Amount</th>
-                            <th className="text-center py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Adjust.</th>
-                            <th className="text-center py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Risk</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {docResult.tax_analysis.map((t: any, i: number) => {
-                            const isHigh = t.risk_flag?.toLowerCase() === "high";
-                            const isMed = t.risk_flag?.toLowerCase() === "medium";
-                            return (
-                              <tr key={i} className={`border-b border-slate-50 hover:bg-slate-50/50 ${isHigh ? "bg-red-50/40" : ""}`}>
-                                <td className="py-2.5 px-3 font-semibold text-slate-800">{t.tax_type}</td>
-                                <td className="py-2.5 px-3 text-slate-600">{t.section_reference}</td>
-                                <td className="py-2.5 px-3 text-slate-600 max-w-48 truncate" title={t.nature_of_transaction}>{t.nature_of_transaction}</td>
-                                <td className="py-2.5 px-3 text-right font-bold text-blue-700 tabular-nums">
-                                  {filerStatus === "atl" ? t.atl_rate : t.non_atl_rate}
-                                </td>
-                                <td className="py-2.5 px-3 text-right font-bold tabular-nums text-slate-800">
-                                  {fmt(filerStatus === "atl" ? (t.tax_amount_atl ?? 0) : (t.tax_amount_non_atl ?? 0))}
-                                </td>
-                                <td className="py-2.5 px-3 text-center">
-                                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                                    t.adjustability === "Final" ? "bg-red-100 text-red-700" :
-                                    t.adjustability === "Minimum" ? "bg-amber-100 text-amber-700" :
-                                    "bg-green-100 text-green-700"
-                                  }`}>{t.adjustability}</span>
-                                </td>
-                                <td className="py-2.5 px-3 text-center">
-                                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                                    isHigh ? "bg-red-100 text-red-700" :
-                                    isMed ? "bg-amber-100 text-amber-700" :
-                                    "bg-green-100 text-green-700"
-                                  }`}>{t.risk_flag}</span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Conditions / Notes per tax row */}
-                    <div className="px-5 py-3 border-t border-slate-100 space-y-2">
-                      {docResult.tax_analysis.filter((t: any) => t.conditions || t.risk_reason).map((t: any, i: number) => (
-                        <div key={i} className={`flex items-start gap-2 text-[10px] p-2 rounded-lg ${
-                          t.risk_flag?.toLowerCase() === "high" ? "bg-red-50 text-red-700" : "bg-slate-50 text-slate-600"
-                        }`}>
-                          <Info className="w-3 h-3 shrink-0 mt-0.5" />
-                          <span><strong>{t.tax_type}:</strong> {t.conditions}{t.risk_reason ? ` — ${t.risk_reason}` : ""}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Total Exposure Summary */}
-                {docResult.total_tax_exposure && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-6 text-white shadow-xl shadow-blue-500/15">
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -translate-y-8 translate-x-8" />
-                      <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/5 rounded-full translate-y-4 -translate-x-4" />
-                      <div className="relative">
-                        <div className="flex items-center gap-2 mb-2">
-                          <CheckCircle2 className="w-4 h-4 text-blue-200" />
-                          <p className="text-[11px] font-bold uppercase tracking-wider text-blue-200">Total Tax — ATL</p>
-                        </div>
-                        <p className="text-2xl font-bold tabular-nums tracking-tight">{fmt(docResult.total_tax_exposure.atl ?? 0)}</p>
-                        <p className="text-[11px] text-blue-200/80 mt-1">Active Taxpayer List rate</p>
-                      </div>
-                    </div>
-                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-500 to-rose-700 p-6 text-white shadow-xl shadow-red-500/15">
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -translate-y-8 translate-x-8" />
-                      <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/5 rounded-full translate-y-4 -translate-x-4" />
-                      <div className="relative">
-                        <div className="flex items-center gap-2 mb-2">
-                          <AlertTriangle className="w-4 h-4 text-red-200" />
-                          <p className="text-[11px] font-bold uppercase tracking-wider text-red-200">Total Tax — Non-ATL</p>
-                        </div>
-                        <p className="text-2xl font-bold tabular-nums tracking-tight">{fmt(docResult.total_tax_exposure.non_atl ?? 0)}</p>
-                        <p className="text-[11px] text-red-200/80 mt-1">Non-ATL higher withholding rate</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Compliance Notes */}
-                {docResult.compliance_notes?.length > 0 && (
-                  <Card>
-                    <SectionTitle>Compliance Notes & Advisory</SectionTitle>
-                    <div className="space-y-2.5">
-                      {docResult.compliance_notes.map((note: string, i: number) => (
-                        <div key={i} className="flex items-start gap-3 text-[11px] text-slate-700 p-3 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-200/50 shadow-sm">
-                          <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
-                            <AlertTriangle className="w-3 h-3 text-amber-600" />
                           </div>
-                          <span className="leading-relaxed">{note}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
-                )}
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="bg-slate-50/80">
+                                  <th className="text-left py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tax Type</th>
+                                  <th className="text-left py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Section</th>
+                                  <th className="text-left py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nature</th>
+                                  <th className="text-right py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Rate</th>
+                                  <th className="text-right py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tax Amount</th>
+                                  <th className="text-center py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Adjust.</th>
+                                  <th className="text-center py-2.5 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Risk</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {docResult.tax_analysis.map((t: any, i: number) => {
+                                  const isHigh = t.risk_flag?.toLowerCase() === "high";
+                                  const isMed = t.risk_flag?.toLowerCase() === "medium";
+                                  return (
+                                    <tr key={i} className={`border-t border-slate-50 hover:bg-slate-50/50 ${isHigh ? "bg-red-50/40" : ""}`}>
+                                      <td className="py-2.5 px-3 font-semibold text-slate-800">{t.tax_type}</td>
+                                      <td className="py-2.5 px-3 text-slate-600">{t.section_reference}</td>
+                                      <td className="py-2.5 px-3 text-slate-600 max-w-48 truncate" title={t.nature_of_transaction}>{t.nature_of_transaction}</td>
+                                      <td className="py-2.5 px-3 text-right font-bold text-blue-700 tabular-nums">
+                                        {filerStatus === "atl" ? t.atl_rate : t.non_atl_rate}
+                                      </td>
+                                      <td className="py-2.5 px-3 text-right font-bold tabular-nums text-slate-800">
+                                        {fmt(filerStatus === "atl" ? (t.tax_amount_atl ?? 0) : (t.tax_amount_non_atl ?? 0))}
+                                      </td>
+                                      <td className="py-2.5 px-3 text-center">
+                                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                                          t.adjustability === "Final" ? "bg-red-100 text-red-700" :
+                                          t.adjustability === "Minimum" ? "bg-amber-100 text-amber-700" :
+                                          "bg-green-100 text-green-700"
+                                        }`}>{t.adjustability}</span>
+                                      </td>
+                                      <td className="py-2.5 px-3 text-center">
+                                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                                          isHigh ? "bg-red-100 text-red-700" :
+                                          isMed ? "bg-amber-100 text-amber-700" :
+                                          "bg-green-100 text-green-700"
+                                        }`}>{t.risk_flag}</span>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
 
-                {/* Re-analyze Button */}
-                <div className="flex justify-center pt-2">
-                  <button
-                    onClick={() => { setDocResult(null); setDocFile(null); setDocError(null); }}
-                    className="px-8 py-3 bg-white text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all duration-200 flex items-center gap-2.5 shadow-md border border-slate-200/60 hover:shadow-lg"
-                  >
-                    <RefreshCw className="w-4 h-4" /> Analyze Another Document
-                  </button>
+                          {/* Conditions / Notes per tax row */}
+                          <div className="px-5 py-3 border-t border-slate-100 space-y-2">
+                            {docResult.tax_analysis.filter((t: any) => t.conditions || t.risk_reason).map((t: any, i: number) => (
+                              <div key={i} className={`flex items-start gap-2 text-[10px] p-2 rounded-lg ${
+                                t.risk_flag?.toLowerCase() === "high" ? "bg-red-50 text-red-700" : "bg-slate-50 text-slate-600"
+                              }`}>
+                                <Info className="w-3 h-3 shrink-0 mt-0.5" />
+                                <span><strong>{t.tax_type}:</strong> {t.conditions}{t.risk_reason ? ` — ${t.risk_reason}` : ""}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Compliance Notes */}
+                      {docResult.compliance_notes?.length > 0 && (
+                        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
+                          <h3 className="text-[13px] font-bold text-slate-800 mb-3 flex items-center gap-2"><span className="w-1 h-4 rounded-full bg-gradient-to-b from-amber-500 to-orange-600 inline-block" />Compliance Notes & Advisory</h3>
+                          <div className="space-y-2">
+                            {docResult.compliance_notes.map((note: string, i: number) => (
+                              <div key={i} className="flex items-start gap-3 text-[11px] text-slate-700 p-3 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-200/50">
+                                <div className="w-5 h-5 rounded-md bg-amber-100 flex items-center justify-center shrink-0">
+                                  <AlertTriangle className="w-2.5 h-2.5 text-amber-600" />
+                                </div>
+                                <span className="leading-relaxed">{note}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Modal Footer */}
+                    <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200/60 bg-white rounded-b-2xl">
+                      <p className="text-[10px] text-slate-400">AI analysis is for reference only — verify with applicable legislation</p>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => { setDocResult(null); setDocFile(null); setDocError(null); }}
+                          className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl text-xs font-bold hover:shadow-lg hover:shadow-indigo-500/25 transition-all duration-200 flex items-center gap-2"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" /> Analyze Another
+                        </button>
+                        <button
+                          onClick={() => setDocResult(null)}
+                          className="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors flex items-center gap-2"
+                        >
+                          <X className="w-3.5 h-3.5" /> Close
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
