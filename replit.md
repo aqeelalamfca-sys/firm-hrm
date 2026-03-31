@@ -19,6 +19,8 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - Utilizes Recharts for data visualization, React Hook Form with Zod for form management and validation, and Framer Motion for animations.
 - Wouter v3 is used for client-side routing.
 - UI/UX features include a global header filter for departments, color-coded badges, and role-specific dashboard views. The design emphasizes clarity and efficiency for administrative tasks.
+- **Typography**: Plus Jakarta Sans (display/headings) + Inter Variable (body) loaded from Google Fonts with optical sizing.
+- **Design System**: Professional animations (scroll-reveal via IntersectionObserver `RevealOnScroll` component in `landing.tsx`), glassmorphism effects (`.glass` CSS class), card hover effects (`.card-hover`), gradient text utilities (`.text-gradient`), button glow effects (`.btn-glow`), and floating orb background animations. All animation classes defined in `index.css` with `prefers-reduced-motion` fallbacks.
 
 **Backend:**
 - Built with Express 5, providing RESTful API endpoints.

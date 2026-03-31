@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -162,6 +162,23 @@ const TEAM = [
 
 const PARTNERS = TEAM.filter(t => t.role.includes("Partner"));
 
+function RevealOnScroll({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } }, { threshold: 0.1, rootMargin: "0px 0px -40px 0px" });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className={className} style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(28px)", transition: `opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms` }}>
+      {children}
+    </div>
+  );
+}
+
 const MILESTONES = [
   { year: "2016", title: "Foundation", desc: "Firm established as M/s. Aqeel Alam & Co. in Lahore" },
   { year: "2019", title: "AOB Registration", desc: "Registered with Audit Oversight Board (AOB)" },
@@ -191,7 +208,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Navigation */}
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? "bg-background/90 backdrop-blur-xl shadow-lg shadow-black/[0.03] border-b border-border/20" : "bg-transparent"}`}>
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? "glass shadow-lg shadow-black/[0.04] border-b border-border/20" : "bg-transparent"}`}>
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-primary/[0.06] flex items-center justify-center">
@@ -244,16 +261,17 @@ export default function Landing() {
 
       {/* Hero Section */}
       <section id="home" className="relative pt-28 pb-10 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.04] via-primary/[0.01] to-transparent" />
-        <div className="absolute top-10 right-0 w-[600px] h-[600px] bg-blue-500/[0.05] rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-violet-500/[0.04] rounded-full blur-[100px]" />
-        <div className="absolute top-40 left-1/4 w-[300px] h-[300px] bg-emerald-500/[0.03] rounded-full blur-[80px]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50/80 via-white to-violet-50/50" />
+        <div className="absolute top-10 right-0 w-[700px] h-[700px] bg-blue-500/[0.06] rounded-full blur-[140px] animate-float" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-violet-500/[0.05] rounded-full blur-[120px]" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-40 left-1/4 w-[400px] h-[400px] bg-emerald-500/[0.04] rounded-full blur-[100px] animate-float" style={{ animationDelay: '4s' }} />
+        <div className="absolute top-1/2 right-1/4 w-[200px] h-[200px] bg-amber-500/[0.03] rounded-full blur-[80px]" />
         <div className="relative max-w-7xl mx-auto px-6">
 
           <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_280px] gap-6 lg:gap-8 items-start">
 
             {/* LEFT COLUMN — Metrics & Expertise */}
-            <div className="hidden lg:flex flex-col gap-4 pt-4">
+            <div className="hidden lg:flex flex-col gap-4 pt-4 animate-slide-in-left delay-200">
               <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur-sm p-4 shadow-sm">
                 <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-3">Core Expertise</h3>
                 <div className="flex flex-wrap gap-1.5">
@@ -294,7 +312,7 @@ export default function Landing() {
             </div>
 
             {/* CENTER COLUMN — Logo, Tagline, Certifications, CTA */}
-            <div className="text-center">
+            <div className="text-center animate-fade-in-up">
               <div className="flex justify-center mb-5">
                 <div className="inline-flex items-center gap-4 sm:gap-5">
                   <img
@@ -359,7 +377,7 @@ export default function Landing() {
             </div>
 
             {/* RIGHT COLUMN — CTA Panel, Contact, Trust */}
-            <div className="hidden lg:flex flex-col gap-4 pt-4">
+            <div className="hidden lg:flex flex-col gap-4 pt-4 animate-slide-in-right delay-300">
               <div className="rounded-xl border border-blue-200/50 bg-gradient-to-br from-blue-50 to-white p-4 shadow-sm">
                 <h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-blue-600 mb-3">Book a Consultation</h3>
                 <p className="text-[12px] text-slate-600 leading-relaxed mb-3">
@@ -487,17 +505,18 @@ export default function Landing() {
       </section>
 
       {/* About Section with Tabs */}
-      <section id="about" className="py-20 bg-muted/20">
+      <section id="about" className="py-20 bg-gradient-to-b from-muted/30 to-muted/10">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-12">
+          <RevealOnScroll className="text-center mb-12">
             <Badge className="mb-3 bg-violet-500/[0.06] text-violet-600 border-violet-200/60 text-xs font-semibold px-4 py-1.5 rounded-full">About Us</Badge>
             <h2 className="text-3xl font-bold tracking-tight mb-3">Building Excellence in Chartered Accountancy</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-sm">
               From M/s. Aqeel Alam & Co. established in 2016 to Alam & Aulakh — our journey reflects
               continuous growth and commitment to professional excellence.
             </p>
-          </div>
+          </RevealOnScroll>
 
+          <RevealOnScroll delay={150}>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="max-w-4xl mx-auto">
             <TabsList className="grid grid-cols-4 bg-card border border-border/40 p-1 rounded-xl h-auto mb-8">
               {[
@@ -643,21 +662,24 @@ export default function Landing() {
               </Card>
             </TabsContent>
           </Tabs>
+          </RevealOnScroll>
         </div>
       </section>
 
       {/* Services Section */}
-      <section id="services" className="py-20">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-14">
+      <section id="services" className="py-20 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-white via-blue-50/20 to-white" />
+        <div className="relative max-w-7xl mx-auto px-6">
+          <RevealOnScroll className="text-center mb-14">
             <Badge className="mb-3 bg-emerald-500/[0.06] text-emerald-600 border-emerald-200/60 text-xs font-semibold px-4 py-1.5 rounded-full">Services</Badge>
             <h2 className="text-3xl font-bold tracking-tight mb-3">Comprehensive Service Portfolio</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-sm">
               Expert financial solutions for businesses operating locally and internationally — from
               traditional audit to cutting-edge corporate structuring.
             </p>
-          </div>
+          </RevealOnScroll>
 
+          <RevealOnScroll delay={100}>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {SERVICES.map(({ title, desc, icon: Icon, color, items }) => (
               <Card key={title} className="border-border/30 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group rounded-2xl overflow-hidden">
@@ -679,6 +701,7 @@ export default function Landing() {
               </Card>
             ))}
           </div>
+          </RevealOnScroll>
         </div>
       </section>
 
@@ -687,12 +710,13 @@ export default function Landing() {
         <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-[100px]" />
         <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-violet-500/8 rounded-full blur-[80px]" />
         <div className="relative max-w-7xl mx-auto px-6">
-          <div className="text-center mb-12">
+          <RevealOnScroll className="text-center mb-12">
             <h2 className="text-3xl font-bold tracking-tight mb-3">Proven Track Record</h2>
             <p className="text-white/60 max-w-2xl mx-auto text-sm">
               Delivering excellence across Pakistan and beyond since 2016.
             </p>
-          </div>
+          </RevealOnScroll>
+          <RevealOnScroll delay={150}>
           <div className="grid sm:grid-cols-3 gap-6">
             {[
               { value: "PKR 500B+", label: "Assets Audited", desc: "Led audit & assurance for companies with combined assets exceeding PKR 500 billion" },
@@ -719,19 +743,22 @@ export default function Landing() {
               </div>
             ))}
           </div>
+          </RevealOnScroll>
         </div>
       </section>
 
       {/* Industries Section */}
-      <section id="industries" className="py-20">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-12">
+      <section id="industries" className="py-20 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-white via-amber-50/10 to-white" />
+        <div className="relative max-w-7xl mx-auto px-6">
+          <RevealOnScroll className="text-center mb-12">
             <Badge className="mb-3 bg-amber-500/[0.06] text-amber-600 border-amber-200/60 text-xs font-semibold px-4 py-1.5 rounded-full">Industries</Badge>
             <h2 className="text-3xl font-bold tracking-tight mb-3">Industry Expertise</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-sm">
               Comprehensive coverage across diverse industries nationwide with deep domain expertise.
             </p>
-          </div>
+          </RevealOnScroll>
+          <RevealOnScroll delay={100}>
           <div className="flex flex-wrap gap-2.5 justify-center max-w-4xl mx-auto">
             {INDUSTRIES.map(ind => {
               const Icon = ind.icon;
@@ -791,21 +818,23 @@ export default function Landing() {
               })()}
             </DialogContent>
           </Dialog>
+          </RevealOnScroll>
         </div>
       </section>
 
       {/* Leadership Team */}
-      <section id="team" className="py-20 bg-muted/20">
+      <section id="team" className="py-20 bg-gradient-to-b from-muted/30 to-muted/10">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-12">
+          <RevealOnScroll className="text-center mb-12">
             <Badge className="mb-3 bg-rose-500/[0.06] text-rose-600 border-rose-200/60 text-xs font-semibold px-4 py-1.5 rounded-full">Leadership</Badge>
             <h2 className="text-3xl font-bold tracking-tight mb-3">Our Leadership Team</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-sm">
               Six partners bringing extensive Big Four experience — providing top-tier audit, tax,
               and strategic consulting from Lahore and Islamabad.
             </p>
-          </div>
+          </RevealOnScroll>
 
+          <RevealOnScroll delay={100}>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {TEAM.map((member, idx) => (
               <Card
@@ -921,30 +950,35 @@ export default function Landing() {
               )}
             </DialogContent>
           </Dialog>
+          </RevealOnScroll>
 
+          <RevealOnScroll delay={200}>
           <div className="mt-8 grid sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
-            <div className="text-center p-4 rounded-xl bg-card border border-border/40">
+            <div className="text-center p-4 rounded-xl bg-card border border-border/40 card-hover">
               <p className="text-2xl font-bold text-primary">6</p>
               <p className="text-[11px] text-muted-foreground font-medium">Expert Partners</p>
             </div>
-            <div className="text-center p-4 rounded-xl bg-card border border-border/40">
+            <div className="text-center p-4 rounded-xl bg-card border border-border/40 card-hover">
               <p className="text-2xl font-bold text-primary">10+</p>
               <p className="text-[11px] text-muted-foreground font-medium">Avg. Years Experience</p>
             </div>
-            <div className="text-center p-4 rounded-xl bg-card border border-border/40">
+            <div className="text-center p-4 rounded-xl bg-card border border-border/40 card-hover">
               <p className="text-2xl font-bold text-primary">2</p>
               <p className="text-[11px] text-muted-foreground font-medium">Strategic Locations</p>
             </div>
           </div>
+          </RevealOnScroll>
         </div>
       </section>
 
       {/* Memberships */}
-      <section className="py-16">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-8">
+      <section className="py-16 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-white via-violet-50/10 to-white" />
+        <div className="relative max-w-7xl mx-auto px-6">
+          <RevealOnScroll className="text-center mb-8">
             <h3 className="text-lg font-bold mb-2">Prestigious Professional Memberships</h3>
-          </div>
+          </RevealOnScroll>
+          <RevealOnScroll delay={100}>
           <div className="flex flex-wrap justify-center gap-4 max-w-3xl mx-auto">
             {[
               { abbr: "ICAP", name: "Institute of Chartered Accountants of Pakistan" },
@@ -964,22 +998,24 @@ export default function Landing() {
               </div>
             ))}
           </div>
+          </RevealOnScroll>
         </div>
       </section>
 
       {/* Contact Section */}
-      <section id="contact" className="py-20 bg-muted/20">
+      <section id="contact" className="py-20 bg-gradient-to-b from-muted/30 to-muted/10">
         <div className="max-w-7xl mx-auto px-6">
           <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
+            <RevealOnScroll className="text-center mb-12">
               <Badge className="mb-3 bg-primary/[0.06] text-primary border-primary/15 text-xs font-semibold px-4 py-1.5 rounded-full">Contact</Badge>
               <h2 className="text-3xl font-bold tracking-tight mb-3">Connect with Pakistan's Leading Chartered Accountants</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto text-sm">
                 Contact us for expert audit, tax, corporate, and strategic business advisory services.
                 Tailored financial solutions and robust accounting support for your business needs.
               </p>
-            </div>
+            </RevealOnScroll>
 
+            <RevealOnScroll delay={100}>
             <div className="grid sm:grid-cols-3 gap-5 mb-10">
               <Card className="border-border/30 shadow-sm text-center rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
                 <CardContent className="p-7">
@@ -1022,17 +1058,18 @@ export default function Landing() {
 
             <div className="text-center">
               <Link href="/login">
-                <Button size="lg" className="h-12 px-8 text-sm font-semibold gap-2 rounded-xl" style={{ background: 'linear-gradient(135deg, hsl(217 78% 51%) 0%, hsl(217 78% 42%) 100%)', boxShadow: '0 4px 16px rgba(59,130,246,0.3)' }}>
+                <Button size="lg" className="h-12 px-8 text-sm font-semibold gap-2 rounded-xl btn-glow" style={{ background: 'linear-gradient(135deg, hsl(217 78% 51%) 0%, hsl(217 78% 42%) 100%)', boxShadow: '0 4px 16px rgba(59,130,246,0.3)' }}>
                   Access Portal <ArrowRight className="w-4 h-4" />
                 </Button>
               </Link>
             </div>
+            </RevealOnScroll>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border/20" style={{ background: 'linear-gradient(180deg, hsl(220 20% 97%) 0%, hsl(220 20% 93%) 100%)' }}>
+      <footer className="border-t border-border/10" style={{ background: 'linear-gradient(180deg, hsl(220 25% 96%) 0%, hsl(220 30% 92%) 100%)' }}>
         <div className="max-w-7xl mx-auto px-6 py-10">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
             <div>

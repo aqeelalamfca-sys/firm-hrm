@@ -239,7 +239,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </motion.aside>
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-0">
-        <header className="h-14 bg-card/80 backdrop-blur-xl border-b border-border/40 flex items-center justify-between px-6 sticky top-0 z-10 hidden md:flex">
+        <header className="h-14 bg-card/80 backdrop-blur-xl border-b border-border/30 flex items-center justify-between px-6 sticky top-0 z-10 hidden md:flex shadow-sm shadow-black/[0.02]">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-muted-foreground hover:text-foreground h-8 w-8" aria-label="Toggle sidebar">
               <Menu className="w-4 h-4" />
