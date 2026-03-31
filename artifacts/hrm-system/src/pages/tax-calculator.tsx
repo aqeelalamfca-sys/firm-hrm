@@ -164,7 +164,7 @@ type TabKey = "rates" | "wht" | "salary" | "property" | "vehicle" | "investment"
 const TABS: { key: TabKey; label: string; icon: any }[] = [
   { key: "rates", label: "Rate Tables", icon: FileText },
   { key: "wht", label: "WHT Calculator", icon: Calculator },
-  { key: "salary", label: "Salary Tax", icon: Banknote },
+  { key: "salary", label: "Income Tax", icon: Banknote },
   { key: "property", label: "Property Tax", icon: HomeIcon },
   { key: "vehicle", label: "Vehicle Tax", icon: Car },
   { key: "investment", label: "Investment Income", icon: BarChart3 },
@@ -231,7 +231,7 @@ export default function TaxCalculator() {
   const [whtAmount, setWhtAmount] = useState("500000");
 
   const [salaryIncome, setSalaryIncome] = useState("3500000");
-  const [salaryType, setSalaryType] = useState("individual");
+  const [salaryType, setSalaryType] = useState("salaried");
   const [advancePaid, setAdvancePaid] = useState("0");
   const [whtCredits, setWhtCredits] = useState("0");
 
@@ -262,12 +262,13 @@ export default function TaxCalculator() {
 
   const salaryResult = useMemo(() => {
     const income = parseFloat(salaryIncome || "0");
+    const credits = parseFloat(advancePaid || "0") + parseFloat(whtCredits || "0");
     if (salaryType === "company") {
       const tax = income * 0.29;
-      return { tax, net: tax - parseFloat(advancePaid || "0") - parseFloat(whtCredits || "0"), quarterly: tax / 4 };
+      return { tax, net: tax - credits, quarterly: tax / 4 };
     }
     const tax = calcSalaryTax(income);
-    return { tax, net: tax - parseFloat(advancePaid || "0") - parseFloat(whtCredits || "0"), quarterly: tax / 4 };
+    return { tax, net: tax - credits, quarterly: tax / 4 };
   }, [salaryIncome, salaryType, advancePaid, whtCredits]);
 
   const propResult = useMemo(() => {
@@ -464,7 +465,7 @@ export default function TaxCalculator() {
                 onClick={() => setExpandedSection(expandedSection === "salary_slabs" ? null : "salary_slabs")}
                 className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors"
               >
-                <h3 className="text-sm font-bold text-slate-800">Salary Tax Slabs (Sec 149) — Individual / AOP</h3>
+                <h3 className="text-sm font-bold text-slate-800">Income Tax Slabs (Sec 149) — Individual / AOP</h3>
                 {expandedSection === "salary_slabs" ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
               </button>
               {expandedSection === "salary_slabs" && (
@@ -579,8 +580,9 @@ export default function TaxCalculator() {
                   value={salaryType}
                   onChange={setSalaryType}
                   options={[
-                    { value: "individual", label: "Individual / AOP (Salaried/Business)" },
-                    { value: "company", label: "Company (Corporate Tax @ 29%)" },
+                    { value: "salaried", label: "Individual (Salaried — 75%+ income from salary)" },
+                    { value: "business", label: "Business Individual / AOP" },
+                    { value: "company", label: "Company" },
                   ]}
                 />
                 <InputField label="Annual Taxable Income (Rs)" value={salaryIncome} onChange={setSalaryIncome} />
@@ -589,7 +591,7 @@ export default function TaxCalculator() {
                 <ResultBox
                   label="Annual Income Tax"
                   value={formatPKR(salaryResult.tax)}
-                  breakdown={salaryType === "company" ? "Corporate tax @ 29% flat rate" : `Progressive slab rates${parseFloat(salaryIncome || "0") > 10000000 ? " + 9% surcharge" : ""}`}
+                  breakdown={salaryType === "company" ? "Corporate tax @ 29% flat rate" : salaryType === "salaried" ? `Salaried individual — progressive slab rates (Div-I, Part-I, First Schedule)${parseFloat(salaryIncome || "0") > 10000000 ? " + 9% surcharge" : ""}` : `Business individual/AOP — progressive slab rates${parseFloat(salaryIncome || "0") > 10000000 ? " + 9% surcharge" : ""}`}
                 />
                 <div className={`p-4 rounded-xl border ${salaryResult.net > 0 ? "bg-red-50 border-red-100" : "bg-emerald-50 border-emerald-100"}`}>
                   <p className="text-xs font-semibold text-slate-600 mb-1">{salaryResult.net > 0 ? "Net Tax Payable" : "Refundable Amount"}</p>
@@ -614,8 +616,11 @@ export default function TaxCalculator() {
               </div>
               <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200">
                 <h4 className="text-xs font-bold text-slate-700 mb-2">Tax Slab Applied</h4>
-                {salaryType === "individual" ? (
+                {salaryType === "company" ? (
+                  <p className="text-xs text-slate-600">Flat corporate rate: 29%</p>
+                ) : (
                   <div className="space-y-1">
+                    <p className="text-[10px] text-slate-400 mb-1.5">{salaryType === "salaried" ? "Salaried Individual (75%+ from salary) — Div-I, Part-I" : "Business Individual / AOP — Div-I, Part-I"}</p>
                     {SALARY_SLABS.map((slab, i) => {
                       const income = parseFloat(salaryIncome || "0");
                       const isActive = income >= slab.min && (income <= slab.max || slab.max === Infinity);
@@ -626,8 +631,6 @@ export default function TaxCalculator() {
                       );
                     })}
                   </div>
-                ) : (
-                  <p className="text-xs text-slate-600">Flat corporate rate: 29%</p>
                 )}
               </div>
             </SectionCard>
