@@ -306,6 +306,15 @@ export default function TaxCalculator() {
   const [docInputMode, setDocInputMode] = useState<"file" | "text">("file");
   const [calcModalTab, setCalcModalTab] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (calcModalTab || docResult) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [calcModalTab, docResult]);
+
   const handleTextAnalyze = useCallback(async () => {
     if (docTextInput.trim().length < 10) {
       setDocError("Please enter at least 10 characters describing the transaction.");
@@ -1648,8 +1657,8 @@ export default function TaxCalculator() {
             CALCULATOR RESULTS POPUP MODAL
             ══════════════════════════════════════════════════════════════════════ */}
         {calcModalTab && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm overflow-y-auto p-4 pt-12 pb-12">
-            <div className="w-full max-w-3xl">
+          <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm overflow-y-auto p-4 pt-12 pb-12" onClick={() => { setCalcModalTab(null); setShowExposure(false); }}>
+            <div className="w-full max-w-3xl" onClick={e => e.stopPropagation()}>
               <div className="bg-gradient-to-r from-blue-700 to-indigo-800 rounded-t-2xl px-6 py-4 flex items-center justify-between shadow-2xl">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center">
