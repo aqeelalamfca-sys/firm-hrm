@@ -251,60 +251,6 @@ export default function Landing() {
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-violet-500/[0.04] rounded-full blur-[100px]" />
         <div className="absolute top-40 left-1/4 w-[300px] h-[300px] bg-emerald-500/[0.03] rounded-full blur-[80px]" />
         <div className="relative max-w-7xl mx-auto px-6">
-          <div className="space-y-5 mb-12">
-
-            <div className="rounded-2xl bg-white border border-slate-200/80 overflow-hidden shadow-lg shadow-slate-200/50">
-              <div className="relative px-6 py-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 overflow-hidden">
-                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyem0wLTMwVjBoLTJ2NEgwdjJoMzRWMGgyem0tMiAxNmgtNHYtNEgyNHY0aC00djRoNHY0aDR2LTRoNHYtNHptLTggOGgtNHYtNGgtNHY0aC00djRoNHY0aDR2LTRoNHYtNHoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-30" />
-                <div className="relative flex items-center justify-between">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/20">
-                      <Video className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-white font-bold text-[17px] tracking-tight">Book a Partner Meeting</h3>
-                      <p className="text-blue-100/60 text-[11px] font-medium mt-0.5">Choose your preferred partner for a one-on-one consultation</p>
-                    </div>
-                  </div>
-                  <div className="hidden sm:flex items-center gap-4 text-[10px] text-white/50 font-medium">
-                    <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" /> Free consultation</span>
-                    <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-blue-200" /> 30–60 min sessions</span>
-                  </div>
-                </div>
-              </div>
-              <div className="p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-                  {PARTNERS.map((p, idx) => {
-                    const colors = [
-                      "from-blue-500 to-blue-600",
-                      "from-indigo-500 to-indigo-600",
-                      "from-violet-500 to-violet-600",
-                      "from-purple-500 to-purple-600",
-                      "from-sky-500 to-sky-600",
-                      "from-blue-600 to-indigo-600",
-                    ];
-                    return (
-                      <div key={p.name} className="flex flex-col items-center text-center p-4 rounded-xl border border-slate-100/80 bg-white hover:bg-gradient-to-b hover:from-blue-50/40 hover:to-indigo-50/20 hover:border-blue-200/60 transition-all duration-300 cursor-pointer group hover:shadow-md">
-                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${colors[idx % colors.length]} flex items-center justify-center text-[13px] font-bold text-white shrink-0 shadow-sm transition-transform duration-300 group-hover:scale-110 mb-3`}>
-                          {p.initials}
-                        </div>
-                        <p className="text-[13px] font-semibold text-slate-800 group-hover:text-blue-700 transition-colors leading-tight">{p.name}</p>
-                        <p className="text-[10px] text-slate-400 font-medium mt-1 leading-tight">{p.focus}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="mt-4 flex justify-center">
-                  <Link href="/book-meeting">
-                    <Button className="gap-2.5 rounded-xl h-11 px-10 text-[13px] font-semibold bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-700 hover:via-indigo-700 hover:to-violet-700 shadow-lg shadow-blue-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/30 hover:-translate-y-0.5">
-                      <Calendar className="w-[18px] h-[18px]" /> Schedule a Meeting
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <div className="text-center max-w-3xl mx-auto">
             <Badge className="mb-6 bg-primary/[0.06] text-primary border-primary/15 text-xs font-semibold px-4 py-1.5 rounded-full backdrop-blur-sm">
               ICAP Approved Training Organization
@@ -344,6 +290,47 @@ export default function Landing() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Book a Partner Meeting — Compact */}
+          <div className="mt-8 rounded-2xl bg-white border border-slate-200/80 overflow-hidden shadow-sm">
+            <div className="flex items-center justify-between px-5 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700">
+              <div className="flex items-center gap-2.5">
+                <Video className="w-4 h-4 text-white/80" />
+                <span className="text-white font-semibold text-[13px]">Book a Partner Meeting</span>
+                <span className="text-blue-200/50 text-[11px] font-medium hidden sm:inline">— Free consultation · 30–60 min</span>
+              </div>
+              <Link href="/book-meeting">
+                <Button size="sm" className="h-7 px-4 text-[11px] font-semibold rounded-lg bg-white/15 hover:bg-white/25 text-white border-0 backdrop-blur-sm">
+                  <Calendar className="w-3 h-3 mr-1.5" /> Schedule
+                </Button>
+              </Link>
+            </div>
+            <div className="px-4 py-3">
+              <div className="flex items-center justify-between gap-2 overflow-x-auto">
+                {PARTNERS.map((p, idx) => {
+                  const colors = [
+                    "from-blue-500 to-blue-600",
+                    "from-indigo-500 to-indigo-600",
+                    "from-violet-500 to-violet-600",
+                    "from-purple-500 to-purple-600",
+                    "from-sky-500 to-sky-600",
+                    "from-blue-600 to-indigo-600",
+                  ];
+                  return (
+                    <div key={p.name} className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-slate-100 hover:border-blue-200/60 hover:bg-blue-50/30 transition-all cursor-pointer group min-w-0">
+                      <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${colors[idx % colors.length]} flex items-center justify-center text-[10px] font-bold text-white shrink-0 transition-transform group-hover:scale-110`}>
+                        {p.initials}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold text-slate-800 group-hover:text-blue-700 truncate">{p.name}</p>
+                        <p className="text-[9px] text-slate-400 font-medium truncate">{p.focus}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </section>
