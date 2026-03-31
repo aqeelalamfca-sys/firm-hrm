@@ -704,126 +704,113 @@ export default function TaxCalculator() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Input Area */}
               <div className="lg:col-span-2 space-y-4">
-                {/* Input Mode Toggle */}
-                <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
-                  <button
-                    onClick={() => { setDocInputMode("file"); setDocError(null); }}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 flex items-center gap-2 ${
-                      docInputMode === "file"
-                        ? "bg-white text-indigo-700 shadow-sm"
-                        : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    <Upload className="w-3.5 h-3.5" /> Upload Document
-                  </button>
-                  <button
-                    onClick={() => { setDocInputMode("text"); setDocError(null); }}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 flex items-center gap-2 ${
-                      docInputMode === "text"
-                        ? "bg-white text-indigo-700 shadow-sm"
-                        : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    <FileText className="w-3.5 h-3.5" /> Describe Transaction
-                  </button>
+                {/* File Upload Area */}
+                <div
+                  onDragOver={e => { e.preventDefault(); setDocDragOver(true); }}
+                  onDragLeave={() => setDocDragOver(false)}
+                  onDrop={e => {
+                    e.preventDefault(); setDocDragOver(false);
+                    const f = e.dataTransfer.files[0];
+                    if (f) { setDocFile(f); }
+                  }}
+                  onClick={() => !docAnalyzing && fileInputRef.current?.click()}
+                  className={`relative rounded-2xl border-2 border-dashed p-8 text-center cursor-pointer transition-all duration-300 group
+                    ${docDragOver
+                      ? "border-indigo-500 bg-indigo-50 scale-[1.01] shadow-xl shadow-indigo-500/10"
+                      : docFile
+                        ? "border-emerald-300 bg-gradient-to-b from-emerald-50/50 to-white"
+                        : "border-slate-200 bg-white hover:border-indigo-300 hover:bg-gradient-to-b hover:from-indigo-50/30 hover:to-white hover:shadow-lg hover:shadow-indigo-500/5"}`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.xlsx,.xls,.csv"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { setDocFile(f); } }}
+                  />
+                  {docAnalyzing ? (
+                    <div className="space-y-4 py-4">
+                      <div className="relative mx-auto w-16 h-16">
+                        <div className="absolute inset-0 rounded-full bg-indigo-100 animate-ping opacity-30" />
+                        <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center">
+                          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-indigo-700">AI is analyzing your document…</p>
+                        <p className="text-[11px] text-slate-500 mt-1">Extracting data • Mapping to tax laws • Computing exposure</p>
+                      </div>
+                      <div className="flex justify-center gap-1.5">
+                        {[0,1,2].map(i => (
+                          <div key={i} className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 py-1">
+                      <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center group-hover:from-indigo-100 group-hover:to-indigo-50 transition-all duration-300 ring-1 ring-slate-200/60 group-hover:ring-indigo-200/60">
+                        <Upload className="w-6 h-6 text-slate-400 group-hover:text-indigo-500 transition-colors duration-300" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-700 group-hover:text-indigo-700 transition-colors">{docFile ? docFile.name : "Drop document here or click to browse"}</p>
+                        <p className="text-[11px] text-slate-400 mt-1">Supports PDF, Images (JPG, PNG), Excel (.xlsx), CSV — up to 15MB</p>
+                      </div>
+                      <div className="flex justify-center gap-2">
+                        {["PDF", "JPG", "PNG", "XLSX", "CSV"].map(f => (
+                          <span key={f} className="px-2 py-0.5 rounded-md bg-slate-100 text-[9px] font-bold text-slate-500 tracking-wider">{f}</span>
+                        ))}
+                      </div>
+                      {docFile && (
+                        <button
+                          onClick={e => { e.stopPropagation(); setDocFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                          className="mt-1 px-4 py-1.5 bg-red-50 text-red-600 rounded-lg text-[10px] font-bold hover:bg-red-100 transition-colors"
+                        >
+                          Remove File
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* File Upload Mode */}
-                {docInputMode === "file" && (
-                  <div
-                    onDragOver={e => { e.preventDefault(); setDocDragOver(true); }}
-                    onDragLeave={() => setDocDragOver(false)}
-                    onDrop={e => {
-                      e.preventDefault(); setDocDragOver(false);
-                      const f = e.dataTransfer.files[0];
-                      if (f) handleDocUpload(f);
-                    }}
-                    onClick={() => !docAnalyzing && fileInputRef.current?.click()}
-                    className={`relative rounded-2xl border-2 border-dashed p-10 text-center cursor-pointer transition-all duration-300 group
-                      ${docDragOver
-                        ? "border-indigo-500 bg-indigo-50 scale-[1.01] shadow-xl shadow-indigo-500/10"
-                        : docFile
-                          ? "border-emerald-300 bg-gradient-to-b from-emerald-50/50 to-white"
-                          : "border-slate-200 bg-white hover:border-indigo-300 hover:bg-gradient-to-b hover:from-indigo-50/30 hover:to-white hover:shadow-lg hover:shadow-indigo-500/5"}`}
-                  >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.xlsx,.xls,.csv"
-                      onChange={e => { const f = e.target.files?.[0]; if (f) handleDocUpload(f); }}
-                    />
-                    {docAnalyzing ? (
-                      <div className="space-y-4 py-4">
-                        <div className="relative mx-auto w-16 h-16">
-                          <div className="absolute inset-0 rounded-full bg-indigo-100 animate-ping opacity-30" />
-                          <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center">
-                            <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-indigo-700">AI is analyzing your document…</p>
-                          <p className="text-[11px] text-slate-500 mt-1">Extracting data • Mapping to tax laws • Computing exposure</p>
-                        </div>
-                        <div className="flex justify-center gap-1.5">
-                          {[0,1,2].map(i => (
-                            <div key={i} className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-4 py-2">
-                        <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center group-hover:from-indigo-100 group-hover:to-indigo-50 transition-all duration-300 ring-1 ring-slate-200/60 group-hover:ring-indigo-200/60">
-                          <Upload className="w-7 h-7 text-slate-400 group-hover:text-indigo-500 transition-colors duration-300" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-slate-700 group-hover:text-indigo-700 transition-colors">{docFile ? docFile.name : "Drop document here or click to browse"}</p>
-                          <p className="text-[11px] text-slate-400 mt-1.5">Supports PDF, Images (JPG, PNG), Excel (.xlsx), CSV — up to 15MB</p>
-                        </div>
-                        <div className="flex justify-center gap-2 pt-1">
-                          {["PDF", "JPG", "PNG", "XLSX", "CSV"].map(f => (
-                            <span key={f} className="px-2 py-0.5 rounded-md bg-slate-100 text-[9px] font-bold text-slate-500 tracking-wider">{f}</span>
-                          ))}
-                        </div>
-                        {docFile && !docResult && (
-                          <button
-                            onClick={e => { e.stopPropagation(); handleDocUpload(docFile); }}
-                            className="mt-3 px-8 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl text-xs font-bold hover:shadow-lg hover:shadow-indigo-500/25 transition-all duration-200 shadow-md"
-                          >
-                            Analyze Document
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Divider */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-slate-200" />
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">and / or</span>
+                  <div className="flex-1 h-px bg-slate-200" />
+                </div>
 
-                {/* Text Input Mode */}
-                {docInputMode === "text" && (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <textarea
-                      value={docTextInput}
-                      onChange={e => setDocTextInput(e.target.value)}
-                      placeholder={"Describe the transaction or scenario...\n\nExamples:\n• Company ABC (NTN 1234567) received IT consulting services worth PKR 500,000 from XYZ Ltd in Punjab\n• Imported raw materials worth PKR 2,000,000 via Karachi port\n• Paid rent PKR 150,000/month for office in Lahore to an individual landlord\n• Construction contract of PKR 5,000,000 awarded to a non-ATL contractor"}
-                      className="w-full h-44 resize-none rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-sm text-slate-700 placeholder:text-slate-400 placeholder:text-[11px] focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all"
-                      disabled={docTextAnalyzing}
-                    />
-                    <div className="flex items-center justify-between mt-3">
-                      <p className="text-[10px] text-slate-400">{docTextInput.length} characters • Min 10 required</p>
-                      <button
-                        onClick={handleTextAnalyze}
-                        disabled={docTextAnalyzing || docTextInput.trim().length < 10}
-                        className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl text-xs font-bold hover:shadow-lg hover:shadow-indigo-500/25 transition-all duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                      >
-                        {docTextAnalyzing ? (
-                          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Analyzing…</>
-                        ) : (
-                          <><Search className="w-3.5 h-3.5" /> Analyze Transaction</>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                )}
+                {/* Text Input Area */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <textarea
+                    value={docTextInput}
+                    onChange={e => setDocTextInput(e.target.value)}
+                    placeholder={"Describe the transaction or scenario...\n\nExamples:\n• Company ABC (NTN 1234567) received IT consulting services worth PKR 500,000 from XYZ Ltd in Punjab\n• Imported raw materials worth PKR 2,000,000 via Karachi port\n• Paid rent PKR 150,000/month for office in Lahore to an individual landlord\n• Construction contract of PKR 5,000,000 awarded to a non-ATL contractor"}
+                    className="w-full h-36 resize-none rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-sm text-slate-700 placeholder:text-slate-400 placeholder:text-[11px] focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all"
+                    disabled={docTextAnalyzing || docAnalyzing}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-2">{docTextInput.length} characters</p>
+                </div>
+
+                {/* Unified Analyze Button */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => {
+                      if (docFile) {
+                        handleDocUpload(docFile);
+                      } else if (docTextInput.trim().length >= 10) {
+                        handleTextAnalyze();
+                      }
+                    }}
+                    disabled={docAnalyzing || docTextAnalyzing || (!docFile && docTextInput.trim().length < 10)}
+                    className="px-8 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl text-xs font-bold hover:shadow-lg hover:shadow-indigo-500/25 transition-all duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {(docAnalyzing || docTextAnalyzing) ? (
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Analyzing…</>
+                    ) : (
+                      <><Search className="w-3.5 h-3.5" /> Analyze Transaction</>
+                    )}
+                  </button>
+                </div>
 
                 {docError && (
                   <div className="flex items-start gap-3 p-4 rounded-xl border border-red-200 bg-gradient-to-r from-red-50 to-red-50/50 shadow-sm">
