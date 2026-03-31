@@ -276,7 +276,7 @@ const RATE_TABLE_SECTIONS = [
 type TabKey = "docanalyzer" | "exposure" | "income" | "wht" | "salestax" | "property" | "vehicle" | "investment" | "rental" | "rates";
 
 const TABS: { key: TabKey; label: string; icon: any; badge?: string }[] = [
-  { key: "docanalyzer", label: "Intelligent Analyzer", icon: FileSearch, badge: "IA" },
+  { key: "docanalyzer", label: "Intelligent Analyzer", icon: FileSearch },
   { key: "exposure",  label: "Tax Exposure",  icon: Target },
   { key: "income",    label: "Income Tax",    icon: Banknote },
   { key: "wht",       label: "WHT Calc",      icon: Calculator },
@@ -710,7 +710,6 @@ export default function TaxCalculator() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h2 className="text-base font-bold tracking-tight">Intelligent Tax Analysis Engine</h2>
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-400/20 text-emerald-200 text-[8px] font-bold uppercase tracking-wider shrink-0">GPT-4o + OCR</span>
                   </div>
                   <p className="text-indigo-200 text-[11px] leading-relaxed">Describe a transaction or upload a document — our engine maps it to ITO 2001, Sales Tax Act 1990, Provincial ST, FED Act 2005 & Finance Act 2025 with section-wise legal citations.</p>
                 </div>
