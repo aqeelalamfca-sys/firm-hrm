@@ -205,11 +205,11 @@ function SelectField({ label, value, onChange, options, hint }: {
 }
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 ${className}`}>{children}</div>;
+  return <div className={`bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] p-5 hover:shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_32px_rgba(0,0,0,0.05)] transition-shadow duration-300 ${className}`}>{children}</div>;
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-sm font-bold text-slate-800 mb-4">{children}</h3>;
+  return <h3 className="text-[13px] font-bold text-slate-800 mb-4 flex items-center gap-2"><span className="w-1 h-4 rounded-full bg-gradient-to-b from-blue-500 to-indigo-600 inline-block" />{children}</h3>;
 }
 
 function RiskBadge({ level }: { level: "high" | "medium" | "low" | "none" }) {
@@ -560,34 +560,36 @@ export default function TaxCalculator() {
       advancePaidExp, whtCreditsExp, inputTaxPaid, entityType, atlStatus, pstReg]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <div className="min-h-screen bg-[#f8f9fc]">
 
       {/* ── Header ── */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+      <header className="sticky top-0 z-50 bg-gradient-to-r from-[#1e293b] via-[#1e3a5f] to-[#1e293b] shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/landing">
-              <button className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600 transition-colors">
+              <button className="flex items-center gap-1.5 text-sm text-slate-300 hover:text-white transition-colors">
                 <ArrowLeft className="w-4 h-4" /> Back
               </button>
             </Link>
-            <div className="h-5 w-px bg-slate-200" />
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shadow-sm">
-                <Target className="w-4 h-4 text-white" />
+            <div className="h-6 w-px bg-white/20" />
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/30 ring-2 ring-white/10">
+                <Calculator className="w-4.5 h-4.5 text-white" />
               </div>
               <div>
-                <h1 className="text-sm font-bold text-slate-800 leading-tight">Tax Exposure Calculator</h1>
-                <p className="text-[10px] text-slate-400 font-medium">Pakistan — Finance Act 2025 • All Tax Heads</p>
+                <h1 className="text-[15px] font-bold text-white leading-tight tracking-tight">Pakistan Tax Calculator</h1>
+                <p className="text-[10px] text-blue-200/80 font-medium">Finance Act 2025 • All Tax Heads • Alam & Aulakh CA</p>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-medium text-slate-500 hidden sm:block">Default Status:</span>
-            <div className="flex rounded-lg border border-slate-200 overflow-hidden text-[11px] font-semibold">
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] font-medium text-blue-200/70 hidden sm:block">Filer Status:</span>
+            <div className="flex rounded-xl overflow-hidden text-[11px] font-bold ring-1 ring-white/20 shadow-inner">
               {[{ value: "atl", label: "ATL" }, { value: "nonatl", label: "Non-ATL" }].map((s) => (
                 <button key={s.value} onClick={() => setFilerStatus(s.value)}
-                  className={`px-3 py-1.5 transition-all ${filerStatus === s.value ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>
+                  className={`px-4 py-2 transition-all duration-200 ${filerStatus === s.value
+                    ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg"
+                    : "bg-white/10 text-slate-300 hover:bg-white/20"}`}>
                   {s.label}
                 </button>
               ))}
@@ -597,16 +599,22 @@ export default function TaxCalculator() {
       </header>
 
       {/* ── Tab Bar ── */}
-      <div className="bg-white border-b border-slate-200/60 sticky top-14 z-40">
+      <div className="bg-white/80 backdrop-blur-md border-b border-slate-200/60 sticky top-16 z-40 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex gap-1 overflow-x-auto py-2 scrollbar-hide">
+          <div className="flex gap-0.5 overflow-x-auto py-2.5 scrollbar-hide">
             {TABS.map(({ key, label, icon: Icon, badge }) => (
               <button key={key} onClick={() => setActiveTab(key)}
-                className={`relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
-                  activeTab === key ? "bg-blue-600 text-white shadow-md shadow-blue-500/20" : "text-slate-600 hover:bg-slate-100"
+                className={`relative flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+                  activeTab === key
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25 scale-[1.02]"
+                    : "text-slate-500 hover:text-slate-800 hover:bg-slate-100/80"
                 }`}>
                 <Icon className="w-3.5 h-3.5" /> {label}
-                {badge && <span className="absolute -top-1 -right-1 px-1 py-0.5 rounded text-[8px] font-black bg-emerald-500 text-white leading-none">{badge}</span>}
+                {badge && (
+                  <span className={`absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-md text-[8px] font-black leading-none shadow-sm ${
+                    badge === "AI" ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white" : "bg-emerald-500 text-white"
+                  }`}>{badge}</span>
+                )}
               </button>
             ))}
           </div>
@@ -619,22 +627,26 @@ export default function TaxCalculator() {
             TAB 0 — AI DOCUMENT TAX ANALYZER
             ══════════════════════════════════════════════════════════════════════ */}
         {activeTab === "docanalyzer" && (
-          <div className="space-y-5">
-            <div className="rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-700 p-5 text-white shadow-lg">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-base font-bold mb-1 flex items-center gap-2">
-                    <FileSearch className="w-5 h-5" /> AI Document Tax Analyzer
-                  </h2>
-                  <p className="text-violet-100 text-xs">Upload any invoice, receipt, or financial document — AI will identify every applicable tax under Pakistan law</p>
+          <div className="space-y-6">
+            {/* Hero Banner */}
+            <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-[#312e81] via-[#4338ca] to-[#6366f1] p-6 sm:p-8 text-white shadow-xl shadow-indigo-500/15">
+              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNCI+PHBhdGggZD0iTTM2IDM0aDR2MWgtNHYtMXptMC04aDR2MWgtNHYtMXptLTE2IDhoNHYxaC00di0xem0wLThoNHYxaC00di0xeiIvPjwvZz48L2c+PC9zdmc+')] opacity-60" />
+              <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="px-2 py-0.5 rounded-md bg-white/15 text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">Powered by GPT-4o</span>
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-400/20 text-emerald-200 text-[10px] font-bold uppercase tracking-wider">Vision + OCR</span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-bold mb-2 tracking-tight">AI Document Tax Analyzer</h2>
+                  <p className="text-indigo-100 text-sm leading-relaxed max-w-xl">Upload any invoice, receipt, or financial document and our AI will instantly identify every applicable tax under Pakistan law with section references, rates, and compliance notes.</p>
                 </div>
-                <div className="bg-white/20 rounded-full p-3">
-                  <Zap className="w-6 h-6 text-white" />
+                <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/20 shadow-inner shrink-0">
+                  <FileSearch className="w-8 h-8 text-white" />
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Upload Area */}
               <div className="lg:col-span-2">
                 <div
@@ -646,8 +658,12 @@ export default function TaxCalculator() {
                     if (f) handleDocUpload(f);
                   }}
                   onClick={() => !docAnalyzing && fileInputRef.current?.click()}
-                  className={`relative rounded-2xl border-2 border-dashed p-8 text-center cursor-pointer transition-all
-                    ${docDragOver ? "border-violet-500 bg-violet-50 scale-[1.01]" : docFile ? "border-green-300 bg-green-50/50" : "border-slate-200 bg-white hover:border-violet-300 hover:bg-violet-50/30"}`}
+                  className={`relative rounded-2xl border-2 border-dashed p-10 text-center cursor-pointer transition-all duration-300 group
+                    ${docDragOver
+                      ? "border-indigo-500 bg-indigo-50 scale-[1.01] shadow-xl shadow-indigo-500/10"
+                      : docFile
+                        ? "border-emerald-300 bg-gradient-to-b from-emerald-50/50 to-white"
+                        : "border-slate-200 bg-white hover:border-indigo-300 hover:bg-gradient-to-b hover:from-indigo-50/30 hover:to-white hover:shadow-lg hover:shadow-indigo-500/5"}`}
                 >
                   <input
                     ref={fileInputRef}
@@ -657,24 +673,43 @@ export default function TaxCalculator() {
                     onChange={e => { const f = e.target.files?.[0]; if (f) handleDocUpload(f); }}
                   />
                   {docAnalyzing ? (
-                    <div className="space-y-3">
-                      <Loader2 className="w-10 h-10 mx-auto text-violet-600 animate-spin" />
-                      <p className="text-sm font-semibold text-violet-700">AI is analyzing your document…</p>
-                      <p className="text-[10px] text-slate-500">Extracting data, identifying taxes, computing exposure</p>
+                    <div className="space-y-4 py-4">
+                      <div className="relative mx-auto w-16 h-16">
+                        <div className="absolute inset-0 rounded-full bg-indigo-100 animate-ping opacity-30" />
+                        <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center">
+                          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-indigo-700">AI is analyzing your document…</p>
+                        <p className="text-[11px] text-slate-500 mt-1">Extracting financial data • Identifying applicable taxes • Computing exposure</p>
+                      </div>
+                      <div className="flex justify-center gap-1.5">
+                        {[0,1,2].map(i => (
+                          <div key={i} className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+                        ))}
+                      </div>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      <Upload className="w-10 h-10 mx-auto text-slate-400" />
+                    <div className="space-y-4 py-2">
+                      <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center group-hover:from-indigo-100 group-hover:to-indigo-50 transition-all duration-300 ring-1 ring-slate-200/60 group-hover:ring-indigo-200/60">
+                        <Upload className="w-7 h-7 text-slate-400 group-hover:text-indigo-500 transition-colors duration-300" />
+                      </div>
                       <div>
-                        <p className="text-sm font-bold text-slate-700">{docFile ? docFile.name : "Drop document here or click to upload"}</p>
-                        <p className="text-[10px] text-slate-400 mt-1">PDF, Image (JPG/PNG), Excel, CSV — up to 15MB</p>
+                        <p className="text-sm font-bold text-slate-700 group-hover:text-indigo-700 transition-colors">{docFile ? docFile.name : "Drop document here or click to browse"}</p>
+                        <p className="text-[11px] text-slate-400 mt-1.5">Supports PDF, Images (JPG, PNG), Excel (.xlsx), CSV — up to 15MB</p>
+                      </div>
+                      <div className="flex justify-center gap-2 pt-1">
+                        {["PDF", "JPG", "PNG", "XLSX", "CSV"].map(fmt => (
+                          <span key={fmt} className="px-2 py-0.5 rounded-md bg-slate-100 text-[9px] font-bold text-slate-500 tracking-wider">{fmt}</span>
+                        ))}
                       </div>
                       {docFile && !docResult && (
                         <button
                           onClick={e => { e.stopPropagation(); handleDocUpload(docFile); }}
-                          className="mt-2 px-6 py-2.5 bg-violet-600 text-white rounded-xl text-xs font-bold hover:bg-violet-700 transition-colors shadow-md"
+                          className="mt-3 px-8 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl text-xs font-bold hover:shadow-lg hover:shadow-indigo-500/25 transition-all duration-200 shadow-md"
                         >
-                          Upload & Analyze
+                          Analyze Document
                         </button>
                       )}
                     </div>
@@ -682,29 +717,34 @@ export default function TaxCalculator() {
                 </div>
 
                 {docError && (
-                  <div className="mt-3 flex items-start gap-2 p-3 rounded-xl border border-red-200 bg-red-50">
-                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                    <p className="text-xs text-red-700">{docError}</p>
+                  <div className="mt-4 flex items-start gap-3 p-4 rounded-xl border border-red-200 bg-gradient-to-r from-red-50 to-red-50/50 shadow-sm">
+                    <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
+                      <AlertCircle className="w-4 h-4 text-red-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-red-800">Analysis Failed</p>
+                      <p className="text-[11px] text-red-600 mt-0.5">{docError}</p>
+                    </div>
                   </div>
                 )}
               </div>
 
               {/* Info Panel */}
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <Card>
                   <SectionTitle>How It Works</SectionTitle>
-                  <div className="space-y-3">
+                  <div className="space-y-3.5">
                     {[
-                      { n: "1", t: "Upload Document", d: "Invoice, receipt, contract, statement" },
-                      { n: "2", t: "AI Extracts Data", d: "OCR + parsing identifies all amounts" },
-                      { n: "3", t: "Tax Classification", d: "Auto-maps to sections & rates" },
-                      { n: "4", t: "Full Exposure Report", d: "Tax breakdown with risk flags" },
+                      { n: "1", t: "Upload Document", d: "Invoice, receipt, contract, or statement", c: "from-blue-500 to-blue-600" },
+                      { n: "2", t: "AI Extracts Data", d: "OCR + parsing identifies all amounts", c: "from-violet-500 to-violet-600" },
+                      { n: "3", t: "Tax Classification", d: "Auto-maps to sections & applicable rates", c: "from-indigo-500 to-indigo-600" },
+                      { n: "4", t: "Full Exposure Report", d: "Detailed tax breakdown with risk flags", c: "from-emerald-500 to-emerald-600" },
                     ].map(s => (
-                      <div key={s.n} className="flex items-start gap-2.5">
-                        <div className="w-6 h-6 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center text-[10px] font-bold shrink-0">{s.n}</div>
+                      <div key={s.n} className="flex items-start gap-3">
+                        <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${s.c} text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-sm`}>{s.n}</div>
                         <div>
                           <p className="text-xs font-bold text-slate-700">{s.t}</p>
-                          <p className="text-[10px] text-slate-400">{s.d}</p>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">{s.d}</p>
                         </div>
                       </div>
                     ))}
@@ -712,7 +752,7 @@ export default function TaxCalculator() {
                 </Card>
                 <Card>
                   <SectionTitle>Compliance Base</SectionTitle>
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     {[
                       "Income Tax Ordinance 2001",
                       "Sales Tax Act 1990",
@@ -720,43 +760,55 @@ export default function TaxCalculator() {
                       "Federal Excise Duty Act 2005",
                       "Finance Act 2025 (Latest Rates)",
                     ].map(l => (
-                      <div key={l} className="flex items-center gap-2 text-[11px] text-slate-600">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
-                        {l}
+                      <div key={l} className="flex items-center gap-2.5 text-[11px] text-slate-600 p-1.5 rounded-lg hover:bg-slate-50 transition-colors">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                        <span className="font-medium">{l}</span>
                       </div>
                     ))}
                   </div>
                 </Card>
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/60">
+                  <div className="flex items-start gap-2.5">
+                    <Shield className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-[11px] font-bold text-amber-800">Professional Advisory</p>
+                      <p className="text-[10px] text-amber-600 mt-0.5 leading-relaxed">AI analysis is for reference only. Always verify with applicable legislation and consult your tax advisor.</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* ── RESULTS ─────────────────────────────────────── */}
             {docResult && (
-              <div className="space-y-5">
+              <div className="space-y-6">
                 {/* Document Summary */}
                 {docResult.document_summary && (
                   <Card>
                     <SectionTitle>Document Summary</SectionTitle>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       {[
-                        { l: "Type", v: docResult.document_summary.document_type },
-                        { l: "Nature", v: docResult.document_summary.nature },
-                        { l: "Date", v: docResult.document_summary.date || "—" },
-                        { l: "Total Amount", v: docResult.document_summary.total_amount ? fmt(docResult.document_summary.total_amount) : "—" },
+                        { l: "Type", v: docResult.document_summary.document_type, icon: FileText, c: "from-blue-50 to-blue-100/50 border-blue-200/40" },
+                        { l: "Nature", v: docResult.document_summary.nature, icon: Layers, c: "from-violet-50 to-violet-100/50 border-violet-200/40" },
+                        { l: "Date", v: docResult.document_summary.date || "—", icon: ClipboardList, c: "from-slate-50 to-slate-100/50 border-slate-200/40" },
+                        { l: "Total Amount", v: docResult.document_summary.total_amount ? fmt(docResult.document_summary.total_amount) : "—", icon: Banknote, c: "from-emerald-50 to-emerald-100/50 border-emerald-200/40" },
                       ].map(f => (
-                        <div key={f.l} className="bg-slate-50 rounded-xl p-3">
-                          <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">{f.l}</p>
-                          <p className="text-xs font-bold text-slate-800 mt-1">{f.v}</p>
+                        <div key={f.l} className={`bg-gradient-to-br ${f.c} rounded-xl p-3.5 border`}>
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <f.icon className="w-3 h-3 text-slate-400" />
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{f.l}</p>
+                          </div>
+                          <p className="text-[13px] font-bold text-slate-800">{f.v}</p>
                         </div>
                       ))}
                     </div>
                     {docResult.document_summary.parties?.length > 0 && (
-                      <div className="mt-3">
-                        <p className="text-[10px] text-slate-500 font-semibold mb-1.5">Parties</p>
+                      <div className="mt-4 pt-3 border-t border-slate-100">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Involved Parties</p>
                         <div className="flex flex-wrap gap-2">
                           {docResult.document_summary.parties.map((p: any, i: number) => (
-                            <span key={i} className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg font-medium">
-                              {p.name} {p.ntn_cnic ? `(${p.ntn_cnic})` : ""} — {p.role}
+                            <span key={i} className="text-[11px] bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-200/60 px-3 py-1.5 rounded-lg font-semibold shadow-sm">
+                              {p.name} {p.ntn_cnic ? `(${p.ntn_cnic})` : ""} — <span className="text-blue-500">{p.role}</span>
                             </span>
                           ))}
                         </div>
@@ -868,16 +920,30 @@ export default function TaxCalculator() {
 
                 {/* Total Exposure Summary */}
                 {docResult.total_tax_exposure && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200 p-5">
-                      <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-1">Total Tax — ATL</p>
-                      <p className="text-xl font-bold text-blue-800 tabular-nums">{fmt(docResult.total_tax_exposure.atl ?? 0)}</p>
-                      <p className="text-[10px] text-blue-500 mt-1">Active Taxpayer List rate</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-6 text-white shadow-xl shadow-blue-500/15">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -translate-y-8 translate-x-8" />
+                      <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/5 rounded-full translate-y-4 -translate-x-4" />
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <CheckCircle2 className="w-4 h-4 text-blue-200" />
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-blue-200">Total Tax — ATL</p>
+                        </div>
+                        <p className="text-2xl font-bold tabular-nums tracking-tight">{fmt(docResult.total_tax_exposure.atl ?? 0)}</p>
+                        <p className="text-[11px] text-blue-200/80 mt-1">Active Taxpayer List rate</p>
+                      </div>
                     </div>
-                    <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-2xl border border-red-200 p-5">
-                      <p className="text-[10px] text-red-600 font-bold uppercase tracking-wider mb-1">Total Tax — Non-ATL</p>
-                      <p className="text-xl font-bold text-red-800 tabular-nums">{fmt(docResult.total_tax_exposure.non_atl ?? 0)}</p>
-                      <p className="text-[10px] text-red-500 mt-1">Non-ATL higher withholding rate</p>
+                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-500 to-rose-700 p-6 text-white shadow-xl shadow-red-500/15">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -translate-y-8 translate-x-8" />
+                      <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/5 rounded-full translate-y-4 -translate-x-4" />
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertTriangle className="w-4 h-4 text-red-200" />
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-red-200">Total Tax — Non-ATL</p>
+                        </div>
+                        <p className="text-2xl font-bold tabular-nums tracking-tight">{fmt(docResult.total_tax_exposure.non_atl ?? 0)}</p>
+                        <p className="text-[11px] text-red-200/80 mt-1">Non-ATL higher withholding rate</p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -886,11 +952,13 @@ export default function TaxCalculator() {
                 {docResult.compliance_notes?.length > 0 && (
                   <Card>
                     <SectionTitle>Compliance Notes & Advisory</SectionTitle>
-                    <div className="space-y-2">
+                    <div className="space-y-2.5">
                       {docResult.compliance_notes.map((note: string, i: number) => (
-                        <div key={i} className="flex items-start gap-2 text-[11px] text-slate-700 p-2 rounded-lg bg-amber-50/60 border border-amber-100">
-                          <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                          <span>{note}</span>
+                        <div key={i} className="flex items-start gap-3 text-[11px] text-slate-700 p-3 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-200/50 shadow-sm">
+                          <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                            <AlertTriangle className="w-3 h-3 text-amber-600" />
+                          </div>
+                          <span className="leading-relaxed">{note}</span>
                         </div>
                       ))}
                     </div>
@@ -898,12 +966,12 @@ export default function TaxCalculator() {
                 )}
 
                 {/* Re-analyze Button */}
-                <div className="flex justify-center">
+                <div className="flex justify-center pt-2">
                   <button
                     onClick={() => { setDocResult(null); setDocFile(null); setDocError(null); }}
-                    className="px-6 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors flex items-center gap-2"
+                    className="px-8 py-3 bg-white text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all duration-200 flex items-center gap-2.5 shadow-md border border-slate-200/60 hover:shadow-lg"
                   >
-                    <RefreshCw className="w-3.5 h-3.5" /> Analyze Another Document
+                    <RefreshCw className="w-4 h-4" /> Analyze Another Document
                   </button>
                 </div>
               </div>
@@ -1917,13 +1985,15 @@ export default function TaxCalculator() {
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-slate-100 mt-10 py-5 text-center">
-        <p className="text-[11px] text-slate-400">
-          Finance Act 2025 • Income Tax Ordinance 2001 • Sales Tax Act 1990 • For CA Professional Use
-        </p>
-        <p className="text-[10px] text-slate-300 mt-1">
-          Alam & Aulakh — Chartered Accountants • Rates are for reference only; verify with applicable legislation
-        </p>
+      <footer className="border-t border-slate-200/60 mt-12 py-6 bg-gradient-to-b from-transparent to-slate-50/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
+          <p className="text-[11px] text-slate-400 font-medium">
+            Finance Act 2025 • Income Tax Ordinance 2001 • Sales Tax Act 1990 • For CA Professional Use
+          </p>
+          <p className="text-[10px] text-slate-300 mt-1.5">
+            Alam & Aulakh — Chartered Accountants • Rates are for reference only; verify with applicable legislation
+          </p>
+        </div>
       </footer>
     </div>
   );
