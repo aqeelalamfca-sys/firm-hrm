@@ -271,6 +271,10 @@ export default function Landing() {
               </div>
             </div>
 
+            <p className="text-[11px] sm:text-sm text-slate-500 font-medium leading-relaxed max-w-2xl mx-auto mb-5 tracking-wide">
+              Statutory Audit &amp; Assurance for Listed Entities, Public Interest Entities (PIEs), Public Interest Companies (PICs), Corporates of All Sizes, and Not-for-Profit &amp; Trust Structures
+            </p>
+
             <div className="flex flex-wrap gap-2 justify-center mb-7">
               {[
                 { label: "QCR Rated", color: "bg-amber-500/10 text-amber-700 border-amber-200 ring-amber-300/30" },
