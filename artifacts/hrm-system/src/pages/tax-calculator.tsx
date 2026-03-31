@@ -900,23 +900,27 @@ export default function TaxCalculator() {
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
 
                 <div className="relative w-full max-w-5xl mx-4 my-6 sm:my-10 animate-in fade-in slide-in-from-bottom-4 duration-300" onClick={e => e.stopPropagation()}>
-                  {showScrollUp && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); resultScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }}
-                      className="absolute -right-1 bottom-24 z-20 w-9 h-9 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/30 flex items-center justify-center hover:scale-110 transition-transform animate-in fade-in duration-200"
-                      title="Scroll to top"
-                    >
-                      <ChevronUp className="w-4 h-4" />
-                    </button>
-                  )}
-                  {showScrollDown && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); resultScrollRef.current?.scrollTo({ top: resultScrollRef.current.scrollHeight, behavior: "smooth" }); }}
-                      className="absolute -right-1 bottom-12 z-20 w-9 h-9 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/30 flex items-center justify-center hover:scale-110 transition-transform animate-in fade-in duration-200"
-                      title="Scroll to bottom"
-                    >
-                      <ChevronDown className="w-4 h-4" />
-                    </button>
+                  {(showScrollUp || showScrollDown) && (
+                    <div className="fixed right-4 sm:right-8 top-1/2 -translate-y-1/2 z-[110] flex flex-col gap-2">
+                      {showScrollUp && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); resultScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }}
+                          className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/30 flex items-center justify-center hover:scale-110 transition-transform animate-in fade-in duration-200"
+                          title="Scroll to top"
+                        >
+                          <ChevronUp className="w-4 h-4" />
+                        </button>
+                      )}
+                      {showScrollDown && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); resultScrollRef.current?.scrollTo({ top: resultScrollRef.current.scrollHeight, behavior: "smooth" }); }}
+                          className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/30 flex items-center justify-center hover:scale-110 transition-transform animate-in fade-in duration-200"
+                          title="Scroll to bottom"
+                        >
+                          <ChevronDown className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   )}
                   {/* Modal Header */}
                   <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-gradient-to-r from-[#312e81] via-[#4338ca] to-[#6366f1] rounded-t-2xl shadow-lg shadow-indigo-900/30">
