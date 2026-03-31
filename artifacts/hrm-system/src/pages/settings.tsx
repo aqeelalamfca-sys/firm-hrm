@@ -144,7 +144,7 @@ export default function Settings() {
         headers: getAuthHeaders(),
         body: JSON.stringify({
           value: chatgptApiKey,
-          description: "ChatGPT API Key for regulatory update generation",
+          description: "ChatGPT API Key for AI Tax Analyzer and regulatory updates",
         }),
       });
 
@@ -292,7 +292,7 @@ export default function Settings() {
             <Sparkles className="w-5 h-5 text-violet-500" />
             AI Integration
           </CardTitle>
-          <p className="text-xs text-muted-foreground">Configure ChatGPT API for AI-powered regulatory update generation on the landing page.</p>
+          <p className="text-xs text-muted-foreground">Configure ChatGPT API for AI Tax Analyzer and regulatory update generation.</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="border rounded-xl p-5 border-violet-200/60 bg-violet-50/30">
@@ -314,7 +314,7 @@ export default function Settings() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed mb-3">
-                  Powers AI-generated regulatory updates for FBR, SECP, PSX, and SBP. Updates are displayed on the landing page to attract visitors.
+                  Powers the AI Tax Analysis Engine (document upload & text input) and regulatory updates for FBR, SECP, PSX, and SBP.
                 </p>
 
                 <div className="space-y-3">
@@ -377,7 +377,7 @@ export default function Settings() {
 
                   <div className="flex items-start gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-lg p-2.5">
                     <Shield className="w-3.5 h-3.5 mt-0.5 shrink-0 text-blue-500" />
-                    <p>Your API key is stored securely and encrypted. It is used server-side only for generating regulatory updates via the admin panel.</p>
+                    <p>Your API key is stored securely. It is used server-side for the AI Tax Analyzer and regulatory update generation.</p>
                   </div>
                 </div>
               </div>
