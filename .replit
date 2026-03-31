@@ -65,3 +65,11 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+GITHUB_REPO = "aqeelalamfca-sys/firm-hrm"
+VPS_HOST = "187.77.130.117"
+VPS_USERNAME = "root"
+VPS_PORT = "22"

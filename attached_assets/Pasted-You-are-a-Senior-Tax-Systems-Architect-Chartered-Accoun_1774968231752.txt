@@ -1,0 +1,266 @@
+You are a Senior Tax Systems Architect + Chartered Accountant (Pakistan) + Full Stack Engineer.
+
+Your task is to DESIGN, BUILD, and AUTO-OPTIMIZE a COMPLETE TAX EXPOSURE CALCULATOR system for Pakistan, covering ALL major tax heads:
+
+✔ Income Tax (Normal, Minimum, Final, Separate Blocks)
+✔ Advance Tax (Sections 147, 148, 236 series, etc.)
+✔ Withholding Tax (Income Tax + Sales Tax)
+✔ Sales Tax (Goods – Sales Tax Act 1990)
+✔ Provincial Sales Tax on Services (Punjab, Sindh, ICT, etc.)
+✔ Federal Excise Duty (FED Act 2005)
+✔ Super Tax (Section 4C)
+✔ Minimum Tax (Section 113)
+✔ Turnover Tax / Final Tax Regimes
+✔ Other applicable levies (CVT, Capital Gain, etc.)
+
+The system must be PRACTICAL, REAL-WORLD, CLIENT-READY, and 100% COMPLIANT.
+
+---
+
+## 🔷 PHASE 1 — SYSTEM ARCHITECTURE
+
+Build modular architecture:
+
+1. Tax Engine Core
+2. Rate Engine (dynamic, version-controlled)
+3. Entity Profiling Module
+4. Transaction Engine
+5. Exposure Calculator Engine
+6. Compliance & Filing Tracker
+7. Scenario Simulator (Best / Worst / Likely)
+8. Dashboard & Reporting Engine
+
+Ensure:
+✔ Multi-tenant (firm-wise segregation)
+✔ Role-based access (Partner, Manager, Associate)
+✔ Audit trail + logs
+
+---
+
+## 🔷 PHASE 2 — INPUT STRUCTURE (SMART FORMS)
+
+Design dynamic input forms:
+
+A. ENTITY PROFILE
+
+* Entity type (Individual / AOP / Company)
+* Sector (Manufacturing / Trading / Services / NPO)
+* ATL Status
+* Residency
+* Turnover
+* Registration status (FBR, PRA, SRB)
+
+B. FINANCIAL DATA
+
+* Revenue (segmented)
+* Cost of Sales
+* Expenses (tax allowable / disallowable tagging)
+* Capital transactions
+* Imports / Exports
+* Salary & payroll
+
+C. TRANSACTION LEVEL INPUTS
+
+* Imports (Sec 148)
+* Contracts (Sec 153)
+* Services
+* Rent
+* Banking transactions
+* Cash withdrawals
+* Property transactions
+
+D. TAX CREDITS / ADJUSTMENTS
+
+* Tax already deducted
+* Tax already paid
+* Carry forward losses
+* Tax credits (Sec 65, 65B, etc.)
+
+---
+
+## 🔷 PHASE 3 — TAX CALCULATION ENGINE
+
+Build separate engines:
+
+1. INCOME TAX ENGINE
+
+* Taxable Income (as per Income Tax Ordinance 2001) 
+* Apply slab rates
+* Apply:
+  • Minimum Tax (Sec 113)
+  • Super Tax (Sec 4C)
+  • Final tax regimes
+  • Separate block income
+
+2. WITHHOLDING TAX ENGINE
+
+* Auto-map transactions to sections:
+  • 148 (imports)
+  • 153 (contracts/services)
+  • 149 (salary)
+  • 236 series
+* Use rate cards dynamically 
+* ATL vs Non-ATL differentiation
+
+3. SALES TAX ENGINE (GOODS)
+
+* Output tax
+* Input tax
+* Adjustments & disallowances
+* Net payable/refundable
+* As per Sales Tax Act 1990 
+
+4. PROVINCIAL SALES TAX ENGINE
+
+* Punjab / Sindh / ICT logic
+* Service classification mapping
+* Rate auto-fetch from schedules 
+* Reverse charge handling
+
+5. FED ENGINE
+
+* Apply FED on applicable goods/services
+* Rate & valuation rules 
+
+6. ADVANCE TAX ENGINE
+
+* Quarterly installments (Sec 147)
+* Transaction-based advance taxes
+* Shortfall calculation
+
+---
+
+## 🔷 PHASE 4 — EXPOSURE CALCULATOR LOGIC
+
+Compute:
+
+1. Total Tax Liability (by tax head)
+
+2. Taxes Paid / Deducted
+
+3. Net Exposure:
+   Exposure = Liability – Paid – Adjustable Credits
+
+4. Risk Classification:
+
+* 🔴 High Risk (underpaid > threshold)
+* 🟠 Medium
+* 🟢 Low
+
+5. Penalty & Default Surcharge Simulation
+
+* Late filing
+* Short payment
+* Non-registration
+
+---
+
+## 🔷 PHASE 5 — AUTOMATION & INTELLIGENCE
+
+✔ Auto-map GL to tax heads
+✔ Auto-detect:
+
+* Missing taxes
+* Incorrect rates
+* Non-compliance
+
+✔ AI Suggestions:
+
+* “You are underpaying withholding tax under Sec 153”
+* “Input tax adjustment restricted under Section 8”
+
+✔ Scenario Simulation:
+
+* Best case (tax optimized)
+* Worst case (FBR audit)
+* Recommended position
+
+---
+
+## 🔷 PHASE 6 — DASHBOARD
+
+Create executive dashboard:
+
+1. Tax Exposure Summary
+2. Tax Head-wise Breakdown
+3. Compliance Status
+4. Upcoming Deadlines
+5. Risk Heatmap
+
+---
+
+## 🔷 PHASE 7 — REPORTING (CLIENT READY)
+
+Generate:
+
+✔ Tax Exposure Report (PDF)
+✔ Working Papers (audit-style)
+✔ Adjustment summary
+✔ Section-wise reconciliation
+
+Format:
+
+* Professional CA firm branding
+* Ready for client submission
+
+---
+
+## 🔷 PHASE 8 — DATABASE DESIGN
+
+Tables:
+
+* entities
+* financials
+* transactions
+* tax_rates
+* withholding_rules
+* tax_calculations
+* exposure_summary
+* audit_logs
+
+Ensure:
+✔ Versioning of tax rates (Finance Act wise)
+✔ Province-based mapping
+
+---
+
+## 🔷 PHASE 9 — API INTEGRATION
+
+Integrate:
+
+✔ FBR updates API (rates, SROs)
+✔ Manual override option
+✔ Excel import (WHT sheets, GL)
+
+---
+
+## 🔷 PHASE 10 — UX REQUIREMENTS
+
+✔ Minimal inputs, maximum automation
+✔ Dropdown-based selections
+✔ Color-coded outputs
+✔ One-click “Calculate Exposure”
+
+---
+
+## 🔷 FINAL OUTPUT REQUIREMENT
+
+System must:
+
+✔ Be usable by Chartered Accountants
+✔ Reduce manual tax computation by 80%
+✔ Be audit-compliant
+✔ Be scalable into SaaS
+
+---
+
+## 🔷 BONUS (ADVANCED)
+
+Add:
+
+✔ Multi-year comparison
+✔ Tax planning recommendations
+✔ Litigation risk flags
+✔ Integration with AuditWise
+
+END.
