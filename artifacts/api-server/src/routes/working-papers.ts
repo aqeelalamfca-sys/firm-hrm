@@ -694,4 +694,188 @@ router.post("/export-pdf", async (req: Request, res: Response) => {
   }
 });
 
+// ─── POST /api/working-papers/export-excel ────────────────────────────────
+router.post("/export-excel", async (req: Request, res: Response) => {
+  const { workingPapers, meta, analysis } = req.body;
+
+  if (!workingPapers || workingPapers.length === 0) {
+    return res.status(400).json({ error: "No working papers to export." });
+  }
+
+  try {
+    const wb = XLSX.utils.book_new();
+    const fin = analysis?.financials || {};
+    const mat = analysis?.materiality || {};
+    const risks = analysis?.risk_assessment || {};
+
+    const fmtN = (n: any) => (n || n === 0) ? Number(n).toLocaleString("en-PK") : "N/A";
+    const now = new Date().toLocaleDateString("en-PK", { day: "2-digit", month: "long", year: "numeric" });
+
+    // ── 1. COVER SHEET ─────────────────────────────────────────────────────
+    const coverData: any[][] = [
+      ["AUDIT WORKING PAPER FILE"],
+      [],
+      ["Entity / Client", meta?.entity || "—"],
+      ["Engagement Type", meta?.engagement_type || "Statutory Audit"],
+      ["Financial Year", meta?.financial_year || "—"],
+      ["Audit Firm", meta?.firm_name || "ANA & Co. Chartered Accountants"],
+      ["Generated On", now],
+      ["Total Working Papers", workingPapers.length],
+      ["Compliance", "ISA 200–720 | IFRS | Companies Act 2017 | FBR Compliant"],
+      ["Status", "DRAFT — CONFIDENTIAL"],
+      [],
+      ["FINANCIAL SUMMARY"],
+      ["Item", "Amount (PKR)", "Notes"],
+      ["Revenue", fmtN(fin.revenue), ""],
+      ["Gross Profit", fmtN(fin.gross_profit), ""],
+      ["Net Profit / (Loss)", fmtN(fin.net_profit), ""],
+      ["Total Assets", fmtN(fin.total_assets), ""],
+      ["Total Liabilities", fmtN(fin.total_liabilities), ""],
+      ["Equity", fmtN(fin.equity), ""],
+      ["Cash & Bank", fmtN(fin.cash_and_bank), ""],
+      ["Trade Receivables", fmtN(fin.trade_receivables), ""],
+      ["Trade Payables", fmtN(fin.trade_payables), ""],
+      ["Inventory", fmtN(fin.inventory), ""],
+      ["Fixed Assets", fmtN(fin.fixed_assets), ""],
+      [],
+      ["MATERIALITY (ISA 320)"],
+      ["Basis", mat.basis || "—", ""],
+      ["Percentage Used", mat.percentage_used ? `${mat.percentage_used}%` : "—", ""],
+      ["Overall Materiality", fmtN(mat.overall_materiality), mat.rationale || ""],
+      ["Performance Materiality", fmtN(mat.performance_materiality), "75% of overall materiality"],
+      [],
+      ["RISK ASSESSMENT"],
+      ["Overall Risk Level", risks.overall_risk || "Medium"],
+    ];
+    if (risks.inherent_risks?.length) {
+      coverData.push(["Inherent Risk Area", "Risk Description", "Level"]);
+      risks.inherent_risks.forEach((r: any) => {
+        coverData.push([r.area || "", r.risk || "", r.level || ""]);
+      });
+    }
+    if (analysis?.assumptions_made?.length) {
+      coverData.push([]);
+      coverData.push(["AUDITOR ASSUMPTIONS / ESTIMATED DATA"]);
+      analysis.assumptions_made.forEach((a: string, i: number) => {
+        coverData.push([`${i + 1}.`, a]);
+      });
+    }
+    const coverSheet = XLSX.utils.aoa_to_sheet(coverData);
+    coverSheet["!cols"] = [{ wch: 32 }, { wch: 30 }, { wch: 48 }];
+    XLSX.utils.book_append_sheet(wb, coverSheet, "Cover");
+
+    // ── 2. INDEX SHEET ─────────────────────────────────────────────────────
+    const indexHeader = ["WP Ref", "Title", "Section", "ISA References", "Status", "Preparer", "Reviewer", "Partner", "Date Prepared"];
+    const indexRows: any[][] = workingPapers.map((wp: any) => [
+      wp.ref || "",
+      wp.title || "",
+      wp.section_label || wp.section || "",
+      (wp.isa_references || []).join(", "),
+      wp.status || "Draft",
+      wp.preparer || "Audit Senior",
+      wp.reviewer || "Audit Manager",
+      wp.partner || "Partner",
+      wp.date_prepared || now,
+    ]);
+    const indexSheet = XLSX.utils.aoa_to_sheet([indexHeader, ...indexRows]);
+    indexSheet["!cols"] = [{ wch: 10 }, { wch: 38 }, { wch: 22 }, { wch: 32 }, { wch: 10 }, { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, indexSheet, "Index");
+
+    // ── 3. SECTION SHEETS ─────────────────────────────────────────────────
+    const sectionMap: Record<string, any[]> = {};
+    for (const wp of workingPapers) {
+      const sec = wp.section_label || wp.section || "General";
+      if (!sectionMap[sec]) sectionMap[sec] = [];
+      sectionMap[sec].push(wp);
+    }
+
+    for (const [secName, papers] of Object.entries(sectionMap)) {
+      const rows: any[][] = [];
+
+      for (const wp of papers) {
+        rows.push([`${wp.ref} — ${wp.title}`]);
+        rows.push(["ISA References:", (wp.isa_references || []).join(" | ")]);
+        rows.push(["Status:", wp.status || "Draft", "Preparer:", wp.preparer || "Audit Senior", "Reviewer:", wp.reviewer || "Audit Manager"]);
+        rows.push(["Date:", wp.date_prepared || now]);
+        rows.push([]);
+
+        if (wp.objective) {
+          rows.push(["OBJECTIVE"]);
+          rows.push([wp.objective]);
+          rows.push([]);
+        }
+
+        if (wp.scope) {
+          rows.push(["SCOPE"]);
+          rows.push([wp.scope]);
+          rows.push([]);
+        }
+
+        if (wp.procedures && wp.procedures.length > 0) {
+          rows.push(["AUDIT PROCEDURES"]);
+          rows.push(["Ref", "Procedure", "Finding / Evidence Obtained", "Conclusion"]);
+          wp.procedures.forEach((p: any, i: number) => {
+            rows.push([p.no || `${i + 1}`, p.procedure || "", p.finding || "", p.conclusion || ""]);
+          });
+          rows.push([]);
+        }
+
+        if (wp.summary_table && wp.summary_table.length > 0) {
+          rows.push(["SUMMARY SCHEDULE"]);
+          rows.push(["Item", "Amount / Value", "Comment"]);
+          wp.summary_table.forEach((r: any) => {
+            rows.push([r.item || "", r.value || "", r.comment || ""]);
+          });
+          rows.push([]);
+        }
+
+        if (wp.key_findings && wp.key_findings.length > 0) {
+          rows.push(["KEY FINDINGS"]);
+          wp.key_findings.forEach((f: string, i: number) => {
+            rows.push([`${i + 1}.`, f]);
+          });
+          rows.push([]);
+        }
+
+        if (wp.auditor_conclusion) {
+          rows.push(["AUDITOR'S CONCLUSION"]);
+          rows.push([wp.auditor_conclusion]);
+          rows.push([]);
+        }
+
+        if (wp.recommendations && wp.recommendations.length > 0) {
+          rows.push(["RECOMMENDATIONS"]);
+          wp.recommendations.forEach((r: string, i: number) => {
+            rows.push([`${i + 1}.`, r]);
+          });
+          rows.push([]);
+        }
+
+        rows.push(["Prepared By:", wp.preparer || "Audit Senior", "Reviewed By:", wp.reviewer || "Audit Manager", "Partner:", wp.partner || "Partner"]);
+        rows.push([]);
+        rows.push(["─".repeat(80)]);
+        rows.push([]);
+      }
+
+      const sheetName = secName.length > 31 ? secName.slice(0, 31) : secName;
+      const sheet = XLSX.utils.aoa_to_sheet(rows);
+      sheet["!cols"] = [{ wch: 10 }, { wch: 45 }, { wch: 38 }, { wch: 22 }];
+      XLSX.utils.book_append_sheet(wb, sheet, sheetName);
+    }
+
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    const filename = `AuditFile_${(meta?.entity || "Client").replace(/\s+/g, "_")}_${(meta?.financial_year || "2024").replace(/\s+/g, "_")}.xlsx`;
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", buf.length);
+    return res.send(buf);
+  } catch (err: any) {
+    logger.error({ err }, "Excel export failed");
+    if (!res.headersSent) {
+      return res.status(500).json({ error: err?.message || "Excel export failed" });
+    }
+  }
+});
+
 export default router;
