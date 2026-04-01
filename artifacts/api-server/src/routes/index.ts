@@ -22,6 +22,7 @@ import meetingsRouter from "./meetings";
 import regulatoryUpdatesRouter from "./regulatory-updates";
 import systemSettingsRouter from "./system-settings";
 import taxAnalyzeRouter from "./tax-analyze";
+import workingPapersRouter from "./working-papers";
 
 const router: IRouter = Router();
 
@@ -33,6 +34,8 @@ router.use("/regulatory-updates", regulatoryUpdatesRouter);
 router.use("/tax-analyze", taxAnalyzeRouter);
 
 router.use(authMiddleware);
+
+router.use("/working-papers", workingPapersRouter);
 
 router.use("/employees", employeesRouter);
 router.use("/attendance", attendanceRouter);

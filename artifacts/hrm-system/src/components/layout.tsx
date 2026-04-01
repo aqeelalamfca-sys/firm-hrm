@@ -28,6 +28,7 @@ import {
   Video,
   Settings,
   Zap,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -54,6 +55,7 @@ const navItems: NavItem[] = [
   { href: "/task-scheduler", label: "Task Scheduler", icon: Calendar, section: "work" },
   { href: "/engagements", label: "Engagements", icon: ClipboardList, section: "work" },
   { href: "/documents", label: "Documents", icon: FolderOpen, section: "work" },
+  { href: "/working-papers", label: "Working Papers", icon: BookOpen, section: "work" },
   { href: "/reports", label: "Reports", icon: BarChart3, section: "analytics", roles: ["super_admin", "partner", "hr_admin", "finance_officer", "manager"] },
   { href: "/applications", label: "Candidate Management", icon: GraduationCap, section: "admin", roles: ["super_admin", "partner", "hr_admin"] },
   { href: "/manage-meetings", label: "Meeting Management", icon: Video, section: "admin", roles: ["super_admin", "partner"] },
