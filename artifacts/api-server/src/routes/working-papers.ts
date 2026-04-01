@@ -9,6 +9,10 @@ import PDFDocument from "pdfkit";
 // @ts-ignore
 import pdfParse from "pdf-parse";
 import * as XLSX from "xlsx";
+import {
+  Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell,
+  WidthType, AlignmentType, BorderStyle, ShadingType, PageBreak,
+} from "docx";
 
 const router = Router();
 
@@ -157,12 +161,16 @@ router.post("/analyze", upload.array("files", 20), async (req: Request, res: Res
       `FILE: ${d.filename}\nTYPE: ${d.type}\n${d.isImage ? "[Scanned image - analyzed via vision]" : d.content.slice(0, 3000)}`
     ).join("\n\n---\n\n");
 
-    const systemPrompt = `You are AuditWise, a professional audit AI assistant specializing in Pakistan audit standards.
-You analyze financial documents and generate ISA-compliant working papers for audit engagements.
+    const systemPrompt = `You are AuditWise Engine v3, an enterprise-grade audit AI specializing in Pakistan audit & accounting standards.
+You analyze financial documents and generate ISA-compliant working papers with evidence-based cross-referencing.
 
-Standards compliance: ISA 200–720, ISQM 1 & 2, IFRS/IAS/IFRS for SMEs, ICAP Code of Ethics, Companies Act 2017 (Pakistan), SECP Regulations, FBR Laws.
+Standards compliance: ISA 200–720, ISQM 1 & 2, IFRS/IAS/IFRS for SMEs, ICAP Code of Ethics, Companies Act 2017 (Pakistan), SECP Regulations, FBR Laws (ITO 2001, STA 1990, FED Act).
 
-When data is missing, generate realistic, plausible estimated data clearly tagged as "Auditor Assumption / Estimated".`;
+RULES:
+- Never leave any field blank. Never generate placeholder or generic text.
+- When data is missing, generate realistic, plausible estimated data clearly tagged as "[Auditor Assumption / Estimated]"
+- Always use professional audit language: "We have performed...", "The audit procedures indicate..."
+- Evidence IDs follow format: A-100 (TB), B-200 (GL), C-300 (Bank), D-400 (FS), E-500 (Contracts), F-600 (Others)`;
 
     const userPrompt = `Analyze the following documents for a ${engagementType || "statutory audit"} engagement.
 
@@ -173,14 +181,17 @@ AUDITOR INSTRUCTIONS: ${instructions || "Generate complete audit working papers"
 UPLOADED DOCUMENTS:
 ${docSummary}
 
-Extract and return a structured JSON object with this exact format:
+Extract and return a structured JSON object with this EXACT format (all fields required):
 {
   "entity": {
     "name": string,
     "type": string,
     "industry": string,
     "financial_year": string,
-    "reporting_framework": string
+    "reporting_framework": string,
+    "registration_no": string,
+    "ntn": string,
+    "address": string
   },
   "financials": {
     "revenue": number,
@@ -194,26 +205,64 @@ Extract and return a structured JSON object with this exact format:
     "trade_payables": number,
     "inventory": number,
     "fixed_assets": number,
+    "prior_year_revenue": number,
+    "prior_year_net_profit": number,
+    "prior_year_total_assets": number,
     "currency": "PKR"
   },
   "materiality": {
     "overall_materiality": number,
     "performance_materiality": number,
+    "trivial_threshold": number,
     "basis": string,
     "percentage_used": number,
-    "rationale": string
+    "rationale": string,
+    "isa_ref": "ISA 320"
   },
   "risk_assessment": {
     "overall_risk": "Low" | "Medium" | "High",
-    "inherent_risks": [{ "area": string, "risk": string, "level": string, "isa_ref": string }],
-    "control_risks": [{ "area": string, "risk": string, "level": string }],
-    "fraud_indicators": [{ "indicator": string, "assessment": string }]
+    "inherent_risks": [{ "area": string, "risk": string, "level": "Low"|"Medium"|"High", "isa_ref": string, "assertions": [string] }],
+    "control_risks": [{ "area": string, "risk": string, "level": "Low"|"Medium"|"High", "implication": string }],
+    "fraud_indicators": [{ "indicator": string, "assessment": string, "isa_ref": "ISA 240" }]
   },
+  "analytical_procedures": {
+    "ratios": {
+      "current_ratio": number,
+      "quick_ratio": number,
+      "gross_margin_pct": number,
+      "net_margin_pct": number,
+      "return_on_assets_pct": number,
+      "debt_to_equity": number,
+      "asset_turnover": number,
+      "receivables_days": number,
+      "payables_days": number,
+      "inventory_days": number
+    },
+    "variance_analysis": [
+      { "item": string, "current_year": number, "prior_year": number, "variance_amount": number, "variance_pct": number, "assessment": string, "audit_response": string }
+    ],
+    "trend_analysis": string,
+    "analytical_conclusions": [string],
+    "isa_ref": "ISA 520"
+  },
+  "reconciliation": {
+    "tb_vs_fs": { "status": "Reconciled"|"Unreconciled"|"Not Available", "difference": number, "notes": string },
+    "tb_vs_gl": { "status": "Reconciled"|"Unreconciled"|"Not Available", "difference": number, "notes": string },
+    "opening_vs_prior_year": { "status": "Reconciled"|"Unreconciled"|"Not Available", "difference": number, "notes": string },
+    "bank_reconciliation": { "status": "Reconciled"|"Unreconciled"|"Not Available", "difference": number, "notes": string },
+    "flags": [string]
+  },
+  "internal_control_weaknesses": [
+    { "area": string, "weakness": string, "risk_level": "Low"|"Medium"|"High", "recommendation": string, "management_response": string }
+  ],
+  "evidence_items": [
+    { "id": string, "filename": string, "type": "TB"|"GL"|"Bank"|"FS"|"Contracts"|"Others", "description": string, "pages_or_sheets": string, "date_received": string }
+  ],
   "key_audit_areas": [
-    { "area": string, "assertion": string, "risk_level": string, "procedures": [string] }
+    { "area": string, "assertions": [string], "risk_level": string, "audit_approach": string, "procedures": [string], "evidence_refs": [string] }
   ],
   "documents_classified": [
-    { "filename": string, "classified_as": string, "data_extracted": string }
+    { "filename": string, "classified_as": string, "evidence_id": string, "data_extracted": string }
   ],
   "missing_data_flags": [string],
   "assumptions_made": [string]
@@ -325,18 +374,31 @@ router.post("/generate", async (req: Request, res: Response) => {
     "IN-100": { title: "Audit Opinion Draft", section: "Issuance", isa: "ISA 700, ISA 705, ISA 706", description: "Draft audit opinion and basis for opinion paragraph." },
   };
 
+  const ap = analysis.analytical_procedures || {};
+  const reconciliation = analysis.reconciliation || {};
+  const evidenceItems = analysis.evidence_items || [];
+  const icWeaknesses = analysis.internal_control_weaknesses || [];
+
+  const evidenceSummary = evidenceItems.length > 0
+    ? evidenceItems.map((e: any) => `  ${e.id}: ${e.filename} (${e.type}) — ${e.description}`).join("\n")
+    : "  A-100: Trial Balance [Auditor Assumption / Estimated]\n  B-200: General Ledger [Auditor Assumption / Estimated]\n  C-300: Bank Statements [Auditor Assumption / Estimated]";
+
+  const ratiosSummary = ap.ratios
+    ? `Gross Margin: ${ap.ratios.gross_margin_pct?.toFixed(1)}% | Net Margin: ${ap.ratios.net_margin_pct?.toFixed(1)}% | Current Ratio: ${ap.ratios.current_ratio?.toFixed(2)} | D/E: ${ap.ratios.debt_to_equity?.toFixed(2)}`
+    : "Ratios not computed";
+
   try {
-    const papersPrompt = `You are AuditWise, a professional audit AI. Generate detailed ISA-compliant audit working papers.
+    const papersPrompt = `You are AuditWise Engine v3, a professional audit AI. Generate detailed ISA-compliant audit working papers with full cross-referencing.
 
 ENTITY: ${entityName || entity.name || "Client Company"}
 FINANCIAL YEAR: ${financialYear || entity.financial_year || "Year ended June 30, 2024"}
 ENGAGEMENT TYPE: ${engagementType || "Statutory Audit"}
-FIRM: ${firmName || "ANA & Co. Chartered Accountants"}
+FIRM: ${firmName || "Alam & Aulakh Chartered Accountants"}
 
-FINANCIAL DATA:
+FINANCIAL DATA (Current Year):
 - Revenue: ${formatPKR(fin.revenue)}
-- Gross Profit: ${formatPKR(fin.gross_profit)}
-- Net Profit: ${formatPKR(fin.net_profit)}
+- Gross Profit: ${formatPKR(fin.gross_profit)} (${fin.revenue ? ((fin.gross_profit/fin.revenue)*100).toFixed(1) : 0}%)
+- Net Profit: ${formatPKR(fin.net_profit)} (${fin.revenue ? ((fin.net_profit/fin.revenue)*100).toFixed(1) : 0}%)
 - Total Assets: ${formatPKR(fin.total_assets)}
 - Total Liabilities: ${formatPKR(fin.total_liabilities)}
 - Equity: ${formatPKR(fin.equity)}
@@ -346,29 +408,59 @@ FINANCIAL DATA:
 - Inventory: ${formatPKR(fin.inventory)}
 - Fixed Assets: ${formatPKR(fin.fixed_assets)}
 
-MATERIALITY:
-- Overall Materiality: ${formatPKR(materiality.overall_materiality)} (${materiality.basis || "Net Profit"} × ${materiality.percentage_used || 5}%)
-- Performance Materiality: ${formatPKR(materiality.performance_materiality)}
+PRIOR YEAR:
+- Revenue: ${formatPKR(fin.prior_year_revenue || 0)}
+- Net Profit: ${formatPKR(fin.prior_year_net_profit || 0)}
+- Total Assets: ${formatPKR(fin.prior_year_total_assets || 0)}
+
+MATERIALITY (ISA 320):
+- Overall Materiality (OM): ${formatPKR(materiality.overall_materiality)} (${materiality.basis || "Net Profit"} × ${materiality.percentage_used || 5}%)
+- Performance Materiality (PM): ${formatPKR(materiality.performance_materiality)}
+- Trivial Threshold: ${formatPKR(materiality.trivial_threshold || materiality.overall_materiality * 0.05)}
 - Rationale: ${materiality.rationale || "Industry standard"}
 
 OVERALL RISK: ${risks.overall_risk || "Medium"}
 
+ANALYTICAL PROCEDURES (ISA 520):
+${ratiosSummary}
+
+RECONCILIATION STATUS:
+- TB vs FS: ${reconciliation.tb_vs_fs?.status || "Not Available"}
+- TB vs GL: ${reconciliation.tb_vs_gl?.status || "Not Available"}
+- Bank Reconciliation: ${reconciliation.bank_reconciliation?.status || "Not Available"}
+
+EVIDENCE INDEX:
+${evidenceSummary}
+
+INTERNAL CONTROL WEAKNESSES: ${icWeaknesses.length} identified
+
 Generate the following working papers: ${papersToGenerate.join(", ")}
 
-For EACH working paper, return this JSON structure:
+For EACH working paper, return this EXACT JSON structure (all fields mandatory — NO placeholders):
 {
   "ref": "PP-100",
   "title": string,
   "section": string,
   "isa_references": [string],
-  "objective": string,
+  "assertions": ["Existence","Completeness","Accuracy","Valuation","Rights & Obligations","Presentation & Disclosure"],
+  "objective": string (2-3 sentences, professional audit language),
   "scope": string,
-  "procedures": [{ "no": string, "procedure": string, "finding": string, "conclusion": string }],
+  "procedures": [
+    {
+      "no": string,
+      "procedure": string (specific, detailed audit procedure),
+      "finding": string (realistic finding referencing actual numbers),
+      "conclusion": string ("Satisfactory" | "Note Required" | "Matters Arising"),
+      "evidence_ref": string (e.g. "A-100", "C-300")
+    }
+  ],
   "summary_table": [{ "item": string, "value": string, "comment": string }] | null,
-  "key_findings": [string],
-  "auditor_conclusion": string,
+  "key_findings": [string] (minimum 2 specific findings with amounts),
+  "auditor_conclusion": string (professional 3-4 sentence conclusion),
   "risks_identified": [string],
   "recommendations": [string],
+  "evidence_refs": [string] (e.g. ["A-100", "B-200"]),
+  "cross_references": [string] (e.g. ["EX-100", "FH-100"]),
   "preparer": "Audit Senior",
   "reviewer": "Audit Manager",
   "partner": "Partner",
@@ -376,16 +468,24 @@ For EACH working paper, return this JSON structure:
   "status": "Draft"
 }
 
-Return a JSON object: { "working_papers": [ ... array of all working papers ... ] }
-Use professional audit language. Include realistic numbers based on financial data. Reference Pakistan tax laws (ITO 2001, STA 1990) where applicable.`;
+STRICT RULES:
+- Never use placeholder text like "XYZ" or "ABC". Use real numbers from financial data.
+- Each procedure must reference at least one evidence item.
+- Cross-reference related working papers.
+- Use ISA 230 compliant documentation language.
+- Assertions must be relevant to the specific WP area.
+- Pakistan-specific: Reference ITO 2001, STA 1990, Companies Act 2017 where applicable.
+
+Return a JSON object: { "working_papers": [ ... array of all working papers ... ], "evidence_index": [ { "ref": string, "description": string, "type": string, "wp_refs": [string] } ] }
+Use professional audit language throughout.`;
 
     const genResponse = await ai.client.chat.completions.create({
       model: ai.model,
       messages: [
-        { role: "system", content: "You are AuditWise, a professional Pakistan audit AI. Return only valid JSON." },
+        { role: "system", content: "You are AuditWise Engine v3, a professional Pakistan audit AI. Return only valid JSON. Never use placeholder text." },
         { role: "user", content: papersPrompt },
       ],
-      max_tokens: 8000,
+      max_tokens: 12000,
       temperature: 0.2,
       response_format: { type: "json_object" },
     });
@@ -395,26 +495,42 @@ Use professional audit language. Include realistic numbers based on financial da
     try {
       papersData = JSON.parse(raw);
     } catch {
-      papersData = { working_papers: [] };
+      papersData = { working_papers: [], evidence_index: [] };
     }
 
     const workingPapers = papersData.working_papers || [];
 
     const enrichedPapers = workingPapers.map((wp: any) => {
       const def = wpDefinitions[wp.ref] || {};
-      return { ...wp, section_label: def.section || wp.section, isa_references: wp.isa_references || [def.isa || "ISA 500"] };
+      return {
+        ...wp,
+        section_label: def.section || wp.section,
+        isa_references: wp.isa_references || [def.isa || "ISA 500"],
+        assertions: wp.assertions || [],
+        evidence_refs: wp.evidence_refs || [],
+        cross_references: wp.cross_references || [],
+      };
     });
+
+    const generatedEvidenceIndex = papersData.evidence_index || evidenceItems.map((e: any) => ({
+      ref: e.id,
+      description: e.description || e.filename,
+      type: e.type,
+      wp_refs: enrichedPapers.map((wp: any) => wp.ref).filter((_: any, i: number) => i % 3 === 0),
+    }));
 
     return res.json({
       success: true,
       working_papers: enrichedPapers,
+      evidence_index: generatedEvidenceIndex,
       meta: {
         entity: entityName || entity.name,
         financial_year: financialYear || entity.financial_year,
         engagement_type: engagementType,
-        firm_name: firmName,
+        firm_name: firmName || "Alam & Aulakh Chartered Accountants",
         generated_at: new Date().toISOString(),
         total_papers: enrichedPapers.length,
+        total_evidence: generatedEvidenceIndex.length,
       },
     });
   } catch (err: any) {
@@ -874,6 +990,495 @@ router.post("/export-excel", async (req: Request, res: Response) => {
     logger.error({ err }, "Excel export failed");
     if (!res.headersSent) {
       return res.status(500).json({ error: err?.message || "Excel export failed" });
+    }
+  }
+});
+
+// ─── POST /api/working-papers/export-docx ─────────────────────────────────
+router.post("/export-docx", async (req: Request, res: Response) => {
+  const { workingPapers, meta, analysis, evidenceIndex } = req.body;
+
+  if (!workingPapers || workingPapers.length === 0) {
+    return res.status(400).json({ error: "No working papers to export." });
+  }
+
+  try {
+    const firmName = meta?.firm_name || "Alam & Aulakh Chartered Accountants";
+    const entityName = meta?.entity || "Client Company";
+    const financialYear = meta?.financial_year || "Year ended June 30, 2024";
+    const fin = analysis?.financials || {};
+    const materiality = analysis?.materiality || {};
+    const formatPKR = (n: number) => `PKR ${(n || 0).toLocaleString("en-PK")}`;
+
+    const cellShading = { fill: "1B3A6B", type: ShadingType.CLEAR, color: "auto" };
+    const lightShading = { fill: "EBF0FA", type: ShadingType.CLEAR, color: "auto" };
+
+    const makeCell = (text: string, bold = false, dark = false, width = 2500) =>
+      new TableCell({
+        width: { size: width, type: WidthType.DXA },
+        shading: dark ? cellShading : undefined,
+        children: [new Paragraph({
+          children: [new TextRun({ text, bold, color: dark ? "FFFFFF" : "1B3A6B", size: 20 })],
+        })],
+      });
+
+    const children: any[] = [];
+
+    // ── Cover Page ──────────────────────────────────────────────────────────
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: firmName, bold: true, size: 48, color: "1B3A6B" })],
+        alignment: AlignmentType.CENTER,
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: "AUDIT WORKING PAPERS — CONFIDENTIAL", size: 28, color: "7F9DBF", italics: true })],
+        alignment: AlignmentType.CENTER,
+      }),
+      new Paragraph({ children: [new TextRun({ text: "", size: 24 })] }),
+      new Paragraph({
+        children: [new TextRun({ text: entityName, bold: true, size: 40, color: "1B3A6B" })],
+        alignment: AlignmentType.CENTER,
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: financialYear, size: 28, color: "333333" })],
+        alignment: AlignmentType.CENTER,
+      }),
+      new Paragraph({ children: [new TextRun({ text: "", size: 24 })] }),
+      new Paragraph({
+        children: [new TextRun({ text: `Engagement: ${meta?.engagement_type || "Statutory Audit"}`, size: 22, color: "555555" })],
+        alignment: AlignmentType.CENTER,
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: `Generated: ${new Date().toLocaleDateString("en-PK")} by AuditWise Engine v3`, size: 20, color: "888888", italics: true })],
+        alignment: AlignmentType.CENTER,
+      }),
+      new Paragraph({ children: [new PageBreak()] }),
+    );
+
+    // ── Table of Contents ────────────────────────────────────────────────────
+    children.push(
+      new Paragraph({ text: "TABLE OF CONTENTS", heading: HeadingLevel.HEADING_1 }),
+    );
+    const tocTable = new Table({
+      width: { size: 9000, type: WidthType.DXA },
+      rows: [
+        new TableRow({ children: [makeCell("WP Ref", true, true, 1500), makeCell("Title", true, true, 4000), makeCell("Section", true, true, 2000), makeCell("ISA", true, true, 1500)] }),
+        ...workingPapers.map((wp: any, i: number) =>
+          new TableRow({
+            children: [
+              makeCell(wp.ref, false, false, 1500),
+              makeCell(wp.title, false, false, 4000),
+              makeCell(wp.section_label || wp.section, false, false, 2000),
+              makeCell((wp.isa_references || []).join(", ").slice(0, 25), false, false, 1500),
+            ],
+            shading: i % 2 === 0 ? lightShading : undefined,
+          })
+        ),
+      ],
+    });
+    children.push(tocTable, new Paragraph({ children: [new PageBreak()] }));
+
+    // ── Financial Summary ────────────────────────────────────────────────────
+    if (fin.revenue) {
+      children.push(new Paragraph({ text: "FINANCIAL SUMMARY", heading: HeadingLevel.HEADING_1 }));
+      const finRows = [
+        ["Revenue", formatPKR(fin.revenue)],
+        ["Gross Profit", formatPKR(fin.gross_profit)],
+        ["Net Profit / (Loss)", formatPKR(fin.net_profit)],
+        ["Total Assets", formatPKR(fin.total_assets)],
+        ["Total Liabilities", formatPKR(fin.total_liabilities)],
+        ["Equity", formatPKR(fin.equity)],
+        ["Cash & Bank", formatPKR(fin.cash_and_bank)],
+        ["Overall Materiality", formatPKR(materiality.overall_materiality)],
+        ["Performance Materiality", formatPKR(materiality.performance_materiality)],
+      ];
+      const finTable = new Table({
+        width: { size: 9000, type: WidthType.DXA },
+        rows: [
+          new TableRow({ children: [makeCell("Item", true, true, 4500), makeCell("Amount (PKR)", true, true, 4500)] }),
+          ...finRows.map(([item, val], i) => new TableRow({
+            children: [makeCell(item, true, false, 4500), makeCell(val, false, false, 4500)],
+            shading: i % 2 === 0 ? lightShading : undefined,
+          })),
+        ],
+      });
+      children.push(finTable, new Paragraph({ children: [new PageBreak()] }));
+    }
+
+    // ── Evidence Index ───────────────────────────────────────────────────────
+    if (evidenceIndex && evidenceIndex.length > 0) {
+      children.push(new Paragraph({ text: "EVIDENCE INDEX", heading: HeadingLevel.HEADING_1 }));
+      const evTable = new Table({
+        width: { size: 9000, type: WidthType.DXA },
+        rows: [
+          new TableRow({ children: [makeCell("Ref", true, true, 1000), makeCell("Description", true, true, 4000), makeCell("Type", true, true, 1500), makeCell("WPs Referenced", true, true, 2500)] }),
+          ...evidenceIndex.map((e: any, i: number) => new TableRow({
+            children: [
+              makeCell(e.ref, true, false, 1000),
+              makeCell(e.description, false, false, 4000),
+              makeCell(e.type, false, false, 1500),
+              makeCell((e.wp_refs || []).join(", "), false, false, 2500),
+            ],
+            shading: i % 2 === 0 ? lightShading : undefined,
+          })),
+        ],
+      });
+      children.push(evTable, new Paragraph({ children: [new PageBreak()] }));
+    }
+
+    // ── Working Papers ───────────────────────────────────────────────────────
+    for (const wp of workingPapers) {
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: `${wp.ref} — ${wp.title}`, bold: true, size: 32, color: "1B3A6B" })],
+          heading: HeadingLevel.HEADING_1,
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({ text: `Section: `, bold: true }),
+            new TextRun({ text: wp.section_label || wp.section }),
+            new TextRun({ text: `   ISA: `, bold: true }),
+            new TextRun({ text: (wp.isa_references || []).join(", ") }),
+          ],
+        }),
+      );
+
+      if (wp.assertions && wp.assertions.length > 0) {
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: "Assertions: ", bold: true }),
+            new TextRun({ text: wp.assertions.join(" | "), italics: true, color: "1B3A6B" }),
+          ],
+        }));
+      }
+
+      if (wp.evidence_refs && wp.evidence_refs.length > 0) {
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: "Evidence: ", bold: true }),
+            new TextRun({ text: wp.evidence_refs.join(", "), color: "336633" }),
+          ],
+        }));
+      }
+
+      children.push(
+        new Paragraph({ children: [new TextRun({ text: "OBJECTIVE", bold: true, color: "1B3A6B" })] }),
+        new Paragraph({ text: wp.objective || "" }),
+        new Paragraph({ children: [new TextRun({ text: "SCOPE", bold: true, color: "1B3A6B" })] }),
+        new Paragraph({ text: wp.scope || "" }),
+      );
+
+      // Procedures table
+      if (wp.procedures && wp.procedures.length > 0) {
+        children.push(new Paragraph({ children: [new TextRun({ text: "AUDIT PROCEDURES PERFORMED", bold: true, color: "1B3A6B" })] }));
+        const procTable = new Table({
+          width: { size: 9000, type: WidthType.DXA },
+          rows: [
+            new TableRow({ children: [makeCell("No.", true, true, 600), makeCell("Procedure", true, true, 3200), makeCell("Finding", true, true, 2800), makeCell("Conclusion", true, true, 1400), makeCell("Ref", true, true, 1000)] }),
+            ...wp.procedures.map((p: any, i: number) => new TableRow({
+              children: [
+                makeCell(p.no || String(i + 1), false, false, 600),
+                makeCell(p.procedure, false, false, 3200),
+                makeCell(p.finding, false, false, 2800),
+                makeCell(p.conclusion, false, false, 1400),
+                makeCell(p.evidence_ref || "", false, false, 1000),
+              ],
+              shading: i % 2 === 0 ? lightShading : undefined,
+            })),
+          ],
+        });
+        children.push(procTable);
+      }
+
+      // Key findings
+      if (wp.key_findings && wp.key_findings.length > 0) {
+        children.push(new Paragraph({ children: [new TextRun({ text: "KEY FINDINGS", bold: true, color: "1B3A6B" })] }));
+        wp.key_findings.forEach((f: string, i: number) => {
+          children.push(new Paragraph({ text: `${i + 1}. ${f}` }));
+        });
+      }
+
+      // Auditor conclusion
+      children.push(
+        new Paragraph({ children: [new TextRun({ text: "AUDITOR'S CONCLUSION", bold: true, color: "1B3A6B" })] }),
+        new Paragraph({ text: wp.auditor_conclusion || "" }),
+      );
+
+      // Sign-off table
+      const signTable = new Table({
+        width: { size: 9000, type: WidthType.DXA },
+        rows: [
+          new TableRow({ children: [makeCell("Role", true, true, 2250), makeCell("Name", true, true, 2250), makeCell("Signature", true, true, 2250), makeCell("Date", true, true, 2250)] }),
+          new TableRow({ children: [makeCell("Preparer"), makeCell(wp.preparer || "Audit Senior"), makeCell(""), makeCell(wp.date_prepared || "")] }),
+          new TableRow({ children: [makeCell("Reviewer"), makeCell(wp.reviewer || "Audit Manager"), makeCell(""), makeCell("")] }),
+          new TableRow({ children: [makeCell("Partner"), makeCell(wp.partner || "Partner"), makeCell(""), makeCell("")] }),
+        ],
+      });
+      children.push(new Paragraph({ children: [new TextRun({ text: "SIGN-OFF", bold: true, color: "1B3A6B" })] }), signTable);
+      children.push(new Paragraph({ children: [new PageBreak()] }));
+    }
+
+    const doc = new Document({
+      creator: firmName,
+      title: `Audit Working Papers — ${entityName}`,
+      description: `AuditWise Engine v3 — ${financialYear}`,
+      sections: [{ children }],
+    });
+
+    const buffer = await Packer.toBuffer(doc);
+    const filename = `AuditFile_${entityName.replace(/\s+/g, "_")}_${financialYear.replace(/\s+/g, "_")}.docx`;
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", buffer.length);
+    return res.send(buffer);
+  } catch (err: any) {
+    logger.error({ err }, "DOCX export failed");
+    if (!res.headersSent) {
+      return res.status(500).json({ error: err?.message || "DOCX export failed" });
+    }
+  }
+});
+
+// ─── POST /api/working-papers/generate-confirmations ──────────────────────
+router.post("/generate-confirmations", async (req: Request, res: Response) => {
+  const { analysis, meta, types } = req.body;
+  const confirmationTypes: string[] = types || ["bank", "debtors", "creditors", "legal"];
+
+  try {
+    const firmName = meta?.firm_name || "Alam & Aulakh Chartered Accountants";
+    const entityName = meta?.entity || "Client Company";
+    const financialYear = meta?.financial_year || "Year ended June 30, 2024";
+    const fin = analysis?.financials || {};
+    const formatPKR = (n: number) => `PKR ${(n || 0).toLocaleString("en-PK")}`;
+    const today = new Date().toLocaleDateString("en-PK", { day: "2-digit", month: "long", year: "numeric" });
+
+    const doc = new PDFDocument({ size: "A4", margin: 72 });
+    const chunks: Buffer[] = [];
+    doc.on("data", (c: Buffer) => chunks.push(c));
+
+    const drawLetterhead = (title: string) => {
+      const pg = (doc as any).page;
+      const w = pg.width;
+      doc.rect(0, 0, w, 110).fill("#1B3A6B");
+      doc.fillColor("#FFFFFF").fontSize(18).font("Helvetica-Bold")
+        .text(firmName, 72, 22, { align: "center", width: w - 144 });
+      doc.fontSize(10).font("Helvetica")
+        .text("Chartered Accountants | Established 2010 | ICAP Registered Firm", 72, 48, { align: "center", width: w - 144 });
+      doc.fontSize(9)
+        .text("123 Business Hub, Blue Area, Islamabad | Tel: +92-51-1234567 | info@alamaulakh.com.pk", 72, 65, { align: "center", width: w - 144 });
+      doc.moveTo(72, 88).lineTo(w - 72, 88).strokeColor("#7FAACC").lineWidth(1).stroke();
+      doc.fillColor("#4A90D9").fontSize(13).font("Helvetica-Bold")
+        .text(title, 72, 94, { align: "center", width: w - 144 });
+      doc.fillColor("#333333").fontSize(10).font("Helvetica");
+      doc.y = 130;
+      doc.rect(0, (doc as any).page.height - 50, w, 50).fill("#F0F4FA");
+      doc.fillColor("#666666").fontSize(8).font("Helvetica-Oblique")
+        .text("STRICTLY CONFIDENTIAL — Generated by AuditWise Engine v3 — For Audit Purposes Only", 72, (doc as any).page.height - 35, { align: "center", width: w - 144 });
+      doc.fillColor("#333333").font("Helvetica").fontSize(10);
+    };
+
+    const drawStamp = (x: number, y: number, text: string) => {
+      doc.save();
+      doc.rotate(-30, { origin: [x, y] });
+      doc.roundedRect(x - 60, y - 20, 120, 40, 5).strokeColor("#CC0000").lineWidth(2).stroke();
+      doc.fillColor("#CC0000").fontSize(11).font("Helvetica-Bold")
+        .text(text, x - 55, y - 12, { width: 110, align: "center" });
+      doc.restore();
+      doc.fillColor("#333333").font("Helvetica").fontSize(10);
+    };
+
+    const section = (heading: string) => {
+      doc.moveDown(0.5);
+      doc.fillColor("#1B3A6B").fontSize(11).font("Helvetica-Bold").text(heading);
+      doc.moveTo(doc.x, doc.y + 2).lineTo(doc.x + 400, doc.y + 2).strokeColor("#7FAACC").lineWidth(0.5).stroke();
+      doc.fillColor("#333333").fontSize(10).font("Helvetica").moveDown(0.3);
+    };
+
+    const line = (label: string, value: string) => {
+      doc.text(`${label}: `, { continued: true }).font("Helvetica-Bold").text(value).font("Helvetica");
+    };
+
+    let first = true;
+
+    // ── Bank Confirmation ────────────────────────────────────────────────────
+    if (confirmationTypes.includes("bank")) {
+      if (!first) doc.addPage();
+      first = false;
+      drawLetterhead("BANK CONFIRMATION REQUEST — ISA 505");
+
+      doc.moveDown(0.5);
+      doc.text(today).moveDown(0.3);
+      doc.text("The Branch Manager,").text("MCB Bank Limited / UBL / HBL").text("(Client's Primary Banker)").moveDown(0.5);
+
+      doc.text(`Dear Sir / Madam,`).moveDown(0.3);
+      doc.text(`We are the external auditors of ${entityName} and are conducting the statutory audit for the financial year ${financialYear}. Pursuant to ISA 505 (External Confirmations) and our professional obligations, kindly confirm the following information directly to us by `).font("Helvetica-Bold").text(`${new Date(Date.now() + 14 * 86400000).toLocaleDateString("en-PK", { day: "2-digit", month: "long", year: "numeric" })}`, { continued: true }).font("Helvetica").text(`.`).moveDown(0.5);
+
+      section("A. BANK BALANCES");
+      doc.text("Please confirm the balance(s) held as at the year-end date:");
+      doc.moveDown(0.3);
+      const bankTable = [
+        ["Account Title", entityName],
+        ["Account No.", "________________"],
+        ["Balance per Bank Statement", formatPKR(fin.cash_and_bank || 0)],
+        ["Balance per Our Records", formatPKR(fin.cash_and_bank || 0)],
+        ["Confirmed Balance", "________________"],
+        ["Difference (if any)", "________________"],
+      ];
+      bankTable.forEach(([k, v]) => {
+        doc.text(`${k.padEnd(35)} `, { continued: true }).font("Helvetica-Bold").text(v).font("Helvetica");
+      });
+
+      section("B. LOANS & FACILITIES");
+      doc.text("Please confirm all credit facilities, overdrafts, and loan balances as at year-end:").moveDown(0.3);
+      ["Outstanding Loan Balance: ______________", "Overdraft Limit: ______________", "Overdraft Utilized: ______________", "Security / Collateral: ______________"].forEach(l => doc.text(l));
+
+      section("C. CONTINGENT LIABILITIES");
+      doc.text("Please confirm all guarantees, letters of credit, and other contingent liabilities:").text("____________________________________________________________________");
+
+      doc.moveDown(0.5);
+      doc.text("Please sign and stamp below and return directly to our firm.").moveDown(1);
+      doc.text("_______________________     _______________________     _______________________");
+      doc.text("Authorised Signature          Name & Designation               Bank Stamp & Date");
+
+      drawStamp(460, doc.y - 60, "BANK CONFIRM");
+      doc.moveDown();
+      doc.fillColor("#888888").fontSize(8).font("Helvetica-Oblique").text(`WP Ref: EX-102 | Evidence Ref: C-300 | AuditWise Engine v3`);
+      doc.fillColor("#333333").font("Helvetica").fontSize(10);
+    }
+
+    // ── Debtors Confirmation ─────────────────────────────────────────────────
+    if (confirmationTypes.includes("debtors")) {
+      doc.addPage();
+      drawLetterhead("DEBTORS (TRADE RECEIVABLES) CONFIRMATION — ISA 505");
+
+      doc.moveDown(0.5);
+      doc.text(today).moveDown(0.3);
+      doc.text("To the Customer / Debtor,").moveDown(0.5);
+
+      doc.text(`Dear Sir / Madam,`).moveDown(0.3);
+      doc.text(`We, the external auditors of ${entityName}, are conducting the statutory audit for ${financialYear}. In accordance with ISA 505, we kindly request you to confirm the following balance owed to our client as at the year-end directly to our firm.`).moveDown(0.5);
+
+      section("A. BALANCE CONFIRMATION");
+      [
+        ["Customer / Debtor Name", "________________"],
+        ["NTN / CNIC", "________________"],
+        ["Balance per Client Records", formatPKR(fin.trade_receivables || 0)],
+        ["Balance per Your Records", "________________"],
+        ["Confirmed Balance", "________________"],
+        ["Difference (if any)", "________________"],
+        ["Reason for Difference", "________________"],
+      ].forEach(([k, v]) => {
+        doc.text(`${k.padEnd(35)} `, { continued: true }).font("Helvetica-Bold").text(v).font("Helvetica");
+      });
+
+      section("B. DISPUTE / OUTSTANDING INVOICES");
+      doc.text("Please list any disputed amounts or invoices not yet received:").text("____________________________________________________________________");
+
+      doc.moveDown(0.5);
+      doc.text("Please confirm by signing below and returning directly to our firm within 14 days.").moveDown(1);
+      doc.text("_______________________     _______________________     _______________________");
+      doc.text("Customer Signature              Name & Designation                  Date");
+
+      drawStamp(460, doc.y - 60, "CONFIRMED");
+      doc.moveDown();
+      doc.fillColor("#888888").fontSize(8).font("Helvetica-Oblique").text(`WP Ref: EX-100 | Evidence Ref: A-100 | AuditWise Engine v3`);
+      doc.fillColor("#333333").font("Helvetica").fontSize(10);
+    }
+
+    // ── Creditors Confirmation ───────────────────────────────────────────────
+    if (confirmationTypes.includes("creditors")) {
+      doc.addPage();
+      drawLetterhead("CREDITORS (TRADE PAYABLES) CONFIRMATION — ISA 505");
+
+      doc.moveDown(0.5);
+      doc.text(today).moveDown(0.3);
+      doc.text("To the Supplier / Creditor,").moveDown(0.5);
+
+      doc.text(`Dear Sir / Madam,`).moveDown(0.3);
+      doc.text(`We, the external auditors of ${entityName}, are conducting the statutory audit for ${financialYear}. In accordance with ISA 505, we request you to confirm the balance owed by our client as at year-end directly to our firm.`).moveDown(0.5);
+
+      section("A. BALANCE CONFIRMATION");
+      [
+        ["Supplier / Creditor Name", "________________"],
+        ["NTN / STRN", "________________"],
+        ["Balance per Supplier Records", "________________"],
+        ["Balance per Client Records", formatPKR(fin.trade_payables || 0)],
+        ["Confirmed Balance", "________________"],
+        ["Difference (if any)", "________________"],
+        ["Reason for Difference", "________________"],
+      ].forEach(([k, v]) => {
+        doc.text(`${k.padEnd(35)} `, { continued: true }).font("Helvetica-Bold").text(v).font("Helvetica");
+      });
+
+      section("B. SECURITY / ADVANCES");
+      doc.text("Please confirm any advances, security deposits, or retention amounts:").text("____________________________________________________________________");
+
+      doc.moveDown(0.5);
+      doc.text("Please confirm by signing below and returning directly to our firm within 14 days.").moveDown(1);
+      doc.text("_______________________     _______________________     _______________________");
+      doc.text("Supplier Signature               Name & Designation                  Date");
+
+      drawStamp(460, doc.y - 60, "CONFIRMED");
+      doc.moveDown();
+      doc.fillColor("#888888").fontSize(8).font("Helvetica-Oblique").text(`WP Ref: EX-101 | Evidence Ref: B-200 | AuditWise Engine v3`);
+      doc.fillColor("#333333").font("Helvetica").fontSize(10);
+    }
+
+    // ── Legal Confirmation ───────────────────────────────────────────────────
+    if (confirmationTypes.includes("legal")) {
+      doc.addPage();
+      drawLetterhead("LEGAL CONFIRMATION — ISA 501");
+
+      doc.moveDown(0.5);
+      doc.text(today).moveDown(0.3);
+      doc.text("To the Legal Counsel / Attorney,").moveDown(0.5);
+
+      doc.text(`Dear Sir / Madam,`).moveDown(0.3);
+      doc.text(`We are the external auditors of ${entityName}. In accordance with ISA 501 and our audit obligations, we request you to confirm the following information regarding legal matters, litigation, and contingent liabilities as at ${financialYear}.`).moveDown(0.5);
+
+      section("A. PENDING LITIGATION");
+      [
+        ["Case Title / Reference", "________________"],
+        ["Court / Forum", "________________"],
+        ["Amount in Dispute", "________________"],
+        ["Likely Outcome", "Favorable / Unfavorable / Uncertain"],
+        ["Probability of Loss", "Remote / Possible / Probable"],
+        ["Estimated Financial Impact", "________________"],
+      ].forEach(([k, v]) => {
+        doc.text(`${k.padEnd(35)} `, { continued: true }).font("Helvetica-Bold").text(v).font("Helvetica");
+      });
+
+      section("B. CONTINGENT LIABILITIES");
+      doc.text("Please list all contingent liabilities, guarantees, and legal obligations not yet reflected:").text("____________________________________________________________________");
+
+      section("C. REGULATORY MATTERS");
+      doc.text("Please confirm any regulatory actions, FBR notices, SECP notices, or other government proceedings:").text("____________________________________________________________________");
+
+      doc.moveDown(0.5);
+      doc.text("Please sign and return directly to our firm. Your response is confidential and for audit purposes only.").moveDown(1);
+      doc.text("_______________________     _______________________     _______________________");
+      doc.text("Legal Counsel Signature         Name & Bar No.                       Date & Stamp");
+
+      drawStamp(460, doc.y - 60, "LEGAL CONF.");
+      doc.moveDown();
+      doc.fillColor("#888888").fontSize(8).font("Helvetica-Oblique").text(`WP Ref: FN-101 | Evidence Ref: E-500 | AuditWise Engine v3`);
+      doc.fillColor("#333333").font("Helvetica").fontSize(10);
+    }
+
+    doc.end();
+    await new Promise<void>(resolve => doc.on("end", resolve));
+
+    const pdf = Buffer.concat(chunks);
+    const filename = `Confirmations_${entityName.replace(/\s+/g, "_")}_${financialYear.replace(/\s+/g, "_")}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", pdf.length);
+    return res.send(pdf);
+  } catch (err: any) {
+    logger.error({ err }, "Confirmation generation failed");
+    if (!res.headersSent) {
+      return res.status(500).json({ error: err?.message || "Confirmation generation failed" });
     }
   }
 });
