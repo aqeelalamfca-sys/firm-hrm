@@ -11,7 +11,7 @@ COPY lib/api-client-react/package.json lib/api-client-react/
 COPY lib/integrations-openai-ai-server/package.json lib/integrations-openai-ai-server/
 COPY artifacts/api-server/package.json artifacts/api-server/
 COPY artifacts/hrm-system/package.json artifacts/hrm-system/
-RUN pnpm install --frozen-lockfile --prod=false
+RUN pnpm install --no-frozen-lockfile --prod=false
 
 FROM deps AS builder
 COPY . .
