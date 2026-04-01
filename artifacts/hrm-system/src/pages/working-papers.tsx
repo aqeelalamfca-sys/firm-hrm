@@ -7,7 +7,7 @@ import {
   ChevronDown, ChevronUp, BookOpen, Shield, AlertTriangle, TrendingUp,
   Building2, Calendar, Briefcase, X, Plus, Eye, RefreshCw,
   BarChart2, FileCheck, ClipboardCheck, Star, Info, Sparkles,
-  FileSearch, Scale, Target, Layers, FileOutput, Check,
+  FileSearch, Scale, Target, Layers, FileOutput, Check, Table,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -334,6 +334,7 @@ export default function WorkingPapers() {
   const [analyzing, setAnalyzing] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [workingPapers, setWorkingPapers] = useState<WorkingPaper[]>([]);
   const [generationMeta, setGenerationMeta] = useState<any>(null);
@@ -460,6 +461,31 @@ export default function WorkingPapers() {
       toast({ title: "Export failed", description: err.message, variant: "destructive" });
     } finally {
       setExporting(false);
+    }
+  };
+
+  // ── Export Excel ──────────────────────────────────────────────────────
+  const handleExportExcel = async () => {
+    setExportingExcel(true);
+    try {
+      const res = await fetch("/api/working-papers/export-excel", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ workingPapers, meta: generationMeta, analysis }),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `AuditFile_${(entityName || "Client").replace(/\s+/g, "_")}_${financialYear.replace(/\s+/g, "_")}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Excel Downloaded", description: "Audit working paper file exported to Excel successfully." });
+    } catch (err: any) {
+      toast({ title: "Excel export failed", description: err.message, variant: "destructive" });
+    } finally {
+      setExportingExcel(false);
     }
   };
 
@@ -724,15 +750,21 @@ export default function WorkingPapers() {
             <motion.div key="export" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} className="space-y-4">
               {/* Export header */}
               <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-5 text-white">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <div>
                     <h2 className="text-base font-bold flex items-center gap-2"><FileOutput className="w-5 h-5" /> Audit Working Paper File Ready</h2>
                     <p className="text-blue-200 text-sm mt-0.5">{entityName} · {financialYear} · {workingPapers.length} working papers</p>
                   </div>
-                  <Button onClick={handleExport} disabled={exporting} size="lg"
-                    className="bg-white text-blue-700 hover:bg-blue-50 font-bold shadow-lg">
-                    {exporting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Exporting...</> : <><Download className="w-4 h-4 mr-2" /> Download PDF</>}
-                  </Button>
+                  <div className="flex gap-2 shrink-0">
+                    <Button onClick={handleExportExcel} disabled={exportingExcel || exporting} size="lg"
+                      className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold shadow-lg border-0">
+                      {exportingExcel ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Exporting...</> : <><Table className="w-4 h-4 mr-2" /> Excel</>}
+                    </Button>
+                    <Button onClick={handleExport} disabled={exporting || exportingExcel} size="lg"
+                      className="bg-white text-blue-700 hover:bg-blue-50 font-bold shadow-lg">
+                      {exporting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Exporting...</> : <><Download className="w-4 h-4 mr-2" /> PDF</>}
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-4 gap-3 mt-4">
@@ -747,6 +779,28 @@ export default function WorkingPapers() {
                       <p className="text-white font-bold text-lg">{value}</p>
                     </div>
                   ))}
+                </div>
+
+                {/* Export format info */}
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <div className="bg-white/10 rounded-xl p-3 flex items-start gap-3">
+                    <div className="w-8 h-8 bg-emerald-400/30 rounded-lg flex items-center justify-center shrink-0">
+                      <Table className="w-4 h-4 text-emerald-200" />
+                    </div>
+                    <div>
+                      <p className="text-white font-semibold text-xs">Excel Workbook (.xlsx)</p>
+                      <p className="text-blue-200 text-xs mt-0.5">Cover sheet · Index · One tab per section with full procedures, findings & sign-off tables</p>
+                    </div>
+                  </div>
+                  <div className="bg-white/10 rounded-xl p-3 flex items-start gap-3">
+                    <div className="w-8 h-8 bg-red-400/30 rounded-lg flex items-center justify-center shrink-0">
+                      <FileText className="w-4 h-4 text-red-200" />
+                    </div>
+                    <div>
+                      <p className="text-white font-semibold text-xs">PDF Audit File (.pdf)</p>
+                      <p className="text-blue-200 text-xs mt-0.5">Formatted cover · TOC · Full working papers with CONFIDENTIAL watermark & sign-off strips</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -782,9 +836,15 @@ export default function WorkingPapers() {
                 <Button variant="outline" onClick={() => { setStep(0); setFiles([]); setAnalysis(null); setWorkingPapers([]); setEntityName(""); }}>
                   <RefreshCw className="w-4 h-4 mr-2" /> New Engagement
                 </Button>
-                <Button onClick={handleExport} disabled={exporting} className="bg-blue-600 hover:bg-blue-700">
-                  {exporting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Exporting...</> : <><Download className="w-4 h-4 mr-2" /> Download Audit File PDF</>}
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={handleExportExcel} disabled={exportingExcel || exporting}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                    {exportingExcel ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Exporting...</> : <><Table className="w-4 h-4 mr-2" /> Download Excel</>}
+                  </Button>
+                  <Button onClick={handleExport} disabled={exporting || exportingExcel} className="bg-blue-600 hover:bg-blue-700">
+                    {exporting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Exporting...</> : <><Download className="w-4 h-4 mr-2" /> Download PDF</>}
+                  </Button>
+                </div>
               </div>
             </motion.div>
           )}
