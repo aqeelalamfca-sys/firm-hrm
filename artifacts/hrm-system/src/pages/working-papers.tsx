@@ -486,6 +486,10 @@ export default function WorkingPapers() {
       .catch(() => {});
   }, [token]);
 
+  // Auto-extraction state
+  const [extracting, setExtracting] = useState(false);
+  const [autoFilled, setAutoFilled] = useState(false);
+
   // API/Processing state
   const [analyzing, setAnalyzing] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -508,6 +512,75 @@ export default function WorkingPapers() {
   }, []);
 
   const removeFile = useCallback((id: string) => setFiles(prev => prev.filter(f => f.id !== id)), []);
+
+  // ── Auto-extract entity + financials from uploaded docs ──────────────────
+  const fmtFS = (n: number | null | undefined) =>
+    n != null ? Number(n).toLocaleString("en-PK") : "";
+
+  const handleExtractAndNext = async () => {
+    setExtracting(true);
+    try {
+      const fd = new FormData();
+      files.forEach(f => fd.append("files", f.file));
+      const res = await fetch("/api/working-papers/extract-entity", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      if (res.ok) {
+        const d = await res.json();
+        // ── Entity fields ──
+        if (d.entity_name)        setEntityName(d.entity_name);
+        if (d.ntn)                setNtn(d.ntn);
+        if (d.secp)               setSecp(d.secp);
+        if (d.financial_year)     setFinancialYear(d.financial_year);
+        if (d.registered_address) setRegisteredAddress(d.registered_address);
+        if (d.engagement_type)    setEngagementType(d.engagement_type);
+
+        // ── Balance Sheet line items ──
+        const fn = d.financials || {};
+        const patchBS = (secId: string, lineId: string, cy: number | null, py?: number | null) => {
+          setBsData(prev => prev.map(s => s.id === secId ? {
+            ...s, lines: s.lines.map(l => l.id === lineId ? {
+              ...l,
+              ...(cy != null ? { cy: fmtFS(cy) } : {}),
+              ...(py != null ? { py: fmtFS(py) } : {}),
+            } : l)
+          } : s));
+        };
+        const patchPL = (secId: string, lineId: string, cy: number | null, py?: number | null) => {
+          setPlData(prev => prev.map(s => s.id === secId ? {
+            ...s, lines: s.lines.map(l => l.id === lineId ? {
+              ...l,
+              ...(cy != null ? { cy: fmtFS(cy) } : {}),
+              ...(py != null ? { py: fmtFS(py) } : {}),
+            } : l)
+          } : s));
+        };
+
+        patchBS("nca",  "ppe",    fn.fixed_assets,        null);
+        patchBS("ca",   "stock",  fn.inventory,            null);
+        patchBS("ca",   "td",     fn.trade_receivables,    null);
+        patchBS("ca",   "cash",   fn.cash_and_bank,        null);
+        patchBS("ta",   "ta_tot", fn.total_assets,         fn.prior_year_total_assets);
+        patchBS("eq",   "eq_tot", fn.equity,               null);
+        patchBS("cl",   "tp",     fn.trade_payables,       null);
+
+        patchPL("rev", "sales",  fn.revenue,              fn.prior_year_revenue);
+        patchPL("rev", "gp",     fn.gross_profit,         null);
+        patchPL("tax", "pat",    fn.net_profit,           fn.prior_year_net_profit);
+
+        // Mark fields as auto-filled only if we got something useful
+        const gotSomething = !!(d.entity_name || d.ntn || fn.revenue || fn.total_assets);
+        setAutoFilled(gotSomething);
+      }
+    } catch {
+      // silently fail — user can fill manually
+    } finally {
+      setExtracting(false);
+      setStep(1);
+    }
+  };
 
   const updateBsLine = (secId: string, lineId: string, field: "cy" | "py", val: string) => {
     setBsData(prev => prev.map(s => s.id === secId
@@ -876,8 +949,12 @@ export default function WorkingPapers() {
                     </div>
 
                     <div className="flex justify-end pt-4">
-                      <Button onClick={() => setStep(1)} disabled={files.length === 0} size="lg" className="h-12 px-8 bg-blue-600 hover:bg-blue-700 font-bold shadow-lg shadow-blue-200 rounded-xl group">
-                        Next: Configure <ChevronRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      <Button onClick={handleExtractAndNext} disabled={files.length === 0 || extracting} size="lg" className="h-12 px-8 bg-blue-600 hover:bg-blue-700 font-bold rounded-xl group">
+                        {extracting ? (
+                          <><Loader2 className="mr-2 w-4 h-4 animate-spin" /> Extracting fields…</>
+                        ) : (
+                          <>Next: Configure <ChevronRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" /></>
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -888,7 +965,13 @@ export default function WorkingPapers() {
                   <div className="space-y-8">
                     <div>
                       <h2 className="text-2xl font-bold text-slate-900">Configure Engagement</h2>
-                      <p className="text-slate-500 mt-2">Set entity particulars, define engagement timeline, assign the audit team, and populate Financial Statement data. The system uses this to drive materiality, risk assessment, and procedural selection across all phases.</p>
+                      <p className="text-sm text-slate-500 mt-1.5 leading-relaxed max-w-2xl">Set entity particulars, define engagement timeline, assign the audit team, and populate Financial Statement data. The system uses this to drive materiality, risk assessment, and procedural selection across all phases.</p>
+                      {autoFilled && (
+                        <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 w-fit">
+                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                          Fields auto-filled from uploaded documents — review and edit as needed
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

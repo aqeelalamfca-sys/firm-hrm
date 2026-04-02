@@ -131,6 +131,86 @@ function classifyDocument(file: Express.Multer.File, content: string): string {
   return "Supporting Document";
 }
 
+// ─── POST /api/working-papers/extract-entity ──────────────────────────────
+// Lightweight endpoint: extracts entity details + financials from uploaded docs
+router.post("/extract-entity", upload.array("files", 20), async (req: Request, res: Response) => {
+  const files = req.files as Express.Multer.File[] | undefined;
+  if (!files || files.length === 0) {
+    return res.status(400).json({ error: "No files uploaded" });
+  }
+
+  const ai = await getAIClient();
+  if (!ai) {
+    return res.status(200).json({ entity: {}, financials: {} });
+  }
+
+  try {
+    const imageFiles = files.filter(f => f.mimetype.startsWith("image/"));
+    const docs: string[] = [];
+    for (const file of files.slice(0, 8)) {
+      const content = await extractTextFromFile(file);
+      docs.push(`FILE: ${file.originalname}\n${content.slice(0, 4000)}`);
+    }
+    const docSummary = docs.join("\n\n---\n\n");
+
+    const userPrompt = `Extract entity and financial details from these documents.
+Return ONLY valid JSON — no markdown, no extra text:
+{
+  "entity_name": string or null,
+  "ntn": string or null,
+  "secp": string or null,
+  "financial_year": string or null,
+  "registered_address": string or null,
+  "engagement_type": "Statutory Audit"|"Tax Audit"|"Internal Audit"|"Special Purpose Audit"|"Review Engagement"|"Compilation" or null,
+  "financials": {
+    "revenue": number or null,
+    "gross_profit": number or null,
+    "net_profit": number or null,
+    "total_assets": number or null,
+    "total_liabilities": number or null,
+    "equity": number or null,
+    "cash_and_bank": number or null,
+    "trade_receivables": number or null,
+    "trade_payables": number or null,
+    "inventory": number or null,
+    "fixed_assets": number or null,
+    "prior_year_revenue": number or null,
+    "prior_year_net_profit": number or null,
+    "prior_year_total_assets": number or null
+  }
+}
+If a field cannot be found, use null.
+
+DOCUMENTS:
+${docSummary}`;
+
+    const messageContent: any[] = [{ type: "text", text: userPrompt }];
+    for (const imgFile of imageFiles.slice(0, 3)) {
+      const base64 = imgFile.buffer.toString("base64");
+      messageContent.push({ type: "image_url", image_url: { url: `data:${imgFile.mimetype};base64,${base64}`, detail: "high" } });
+    }
+
+    const response = await ai.client.chat.completions.create({
+      model: ai.model,
+      messages: [
+        { role: "system", content: "You are a document parser. Extract entity and financial details precisely from financial documents. Return only JSON." },
+        { role: "user", content: messageContent },
+      ],
+      max_tokens: 1000,
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+    });
+
+    const raw = response.choices[0]?.message?.content || "{}";
+    let data: any = {};
+    try { data = JSON.parse(raw); } catch { data = {}; }
+    return res.json(data);
+  } catch (err: any) {
+    logger.error({ err }, "extract-entity failed");
+    return res.status(200).json({ entity: {}, financials: {} });
+  }
+});
+
 // ─── POST /api/working-papers/analyze ─────────────────────────────────────
 router.post("/analyze", upload.array("files", 20), async (req: Request, res: Response) => {
   const files = req.files as Express.Multer.File[] | undefined;
