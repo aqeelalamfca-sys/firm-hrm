@@ -1482,73 +1482,6 @@ export default function WorkingPapers() {
                         </div>
                       </div>
 
-                      {/* ── Working Papers ──────────────────────────────── */}
-                      <div className="p-8 space-y-6">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
-                              <Layers className="w-3.5 h-3.5 text-violet-600" />
-                            </div>
-                            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Working Papers</h3>
-                            <span className="text-[10px] font-bold text-slate-400">{selectedPapers.length}/{ALL_WP_REFS.length} selected</span>
-                          </div>
-                          <button onClick={() => setSelectedPapers(selectedPapers.length === ALL_WP_REFS.length ? [] : ALL_WP_REFS)} className="text-[10px] font-bold text-blue-600 hover:text-blue-700 uppercase">
-                            {selectedPapers.length === ALL_WP_REFS.length ? "Deselect All" : "Select All"}
-                          </button>
-                        </div>
-                        
-                        <div className="space-y-3">
-                          {WP_GROUPS.map(g => {
-                            const allSelected = g.refs.every(r => selectedPapers.includes(r));
-                            const someSelected = g.refs.some(r => selectedPapers.includes(r));
-                            const selectedCount = g.refs.filter(r => selectedPapers.includes(r)).length;
-                            const isExpanded = expandedWPGroups.includes(g.prefix);
-                            return (
-                              <div key={g.prefix} className={`rounded-xl border transition-all ${someSelected ? 'border-blue-200' : 'border-slate-100'}`}>
-                                <div className="flex items-center justify-between p-3">
-                                  <button
-                                    onClick={() => setExpandedWPGroups(prev => prev.includes(g.prefix) ? prev.filter(x => x !== g.prefix) : [...prev, g.prefix])}
-                                    className="flex items-center gap-2 flex-1 text-left"
-                                  >
-                                    {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
-                                    <span className="text-[10px] font-black text-slate-400">{g.prefix}</span>
-                                    <span className={`text-xs font-bold ${someSelected ? 'text-slate-900' : 'text-slate-500'}`}>{g.label}</span>
-                                    <span className="text-[10px] text-slate-400 font-medium">{selectedCount}/{g.refs.length}</span>
-                                  </button>
-                                  <Switch 
-                                    checked={allSelected} 
-                                    onCheckedChange={() => toggleGroupSelection(g.refs)}
-                                    className="data-[state=checked]:bg-blue-600"
-                                  />
-                                </div>
-                                <AnimatePresence>
-                                  {isExpanded && (
-                                    <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
-                                      <div className="px-4 pb-3 space-y-0.5">
-                                        {g.refs.map(ref => {
-                                          const isSelected = selectedPapers.includes(ref);
-                                          return (
-                                            <label key={ref} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
-                                              <input
-                                                type="checkbox"
-                                                checked={isSelected}
-                                                onChange={() => setSelectedPapers(prev => prev.includes(ref) ? prev.filter(r => r !== ref) : [...prev, ref])}
-                                                className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
-                                              />
-                                              <span className="text-[10px] font-black text-slate-400 w-6">{ref}</span>
-                                              <span className={`text-xs ${isSelected ? 'text-slate-800 font-medium' : 'text-slate-500'}`}>{WP_PAPER_NAMES[ref] || ref}</span>
-                                            </label>
-                                          );
-                                        })}
-                                      </div>
-                                    </motion.div>
-                                  )}
-                                </AnimatePresence>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
                     </div>
 
                     {/* ── 121 Engagement Configuration Variables (flat) ── */}
@@ -1558,6 +1491,74 @@ export default function WorkingPapers() {
                         onChange={handleConfigChange}
                         users={users}
                       />
+                    </div>
+
+                    {/* ── Working Papers ──────────────────────────────── */}
+                    <div className="mt-8 bg-white rounded-xl border border-slate-200 shadow-sm p-8 space-y-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
+                            <Layers className="w-3.5 h-3.5 text-violet-600" />
+                          </div>
+                          <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Working Papers</h3>
+                          <span className="text-[10px] font-bold text-slate-400">{selectedPapers.length}/{ALL_WP_REFS.length} selected</span>
+                        </div>
+                        <button onClick={() => setSelectedPapers(selectedPapers.length === ALL_WP_REFS.length ? [] : ALL_WP_REFS)} className="text-[10px] font-bold text-blue-600 hover:text-blue-700 uppercase">
+                          {selectedPapers.length === ALL_WP_REFS.length ? "Deselect All" : "Select All"}
+                        </button>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {WP_GROUPS.map(g => {
+                          const allSelected = g.refs.every(r => selectedPapers.includes(r));
+                          const someSelected = g.refs.some(r => selectedPapers.includes(r));
+                          const selectedCount = g.refs.filter(r => selectedPapers.includes(r)).length;
+                          const isExpanded = expandedWPGroups.includes(g.prefix);
+                          return (
+                            <div key={g.prefix} className={`rounded-xl border transition-all ${someSelected ? 'border-blue-200' : 'border-slate-100'}`}>
+                              <div className="flex items-center justify-between p-3">
+                                <button
+                                  onClick={() => setExpandedWPGroups(prev => prev.includes(g.prefix) ? prev.filter(x => x !== g.prefix) : [...prev, g.prefix])}
+                                  className="flex items-center gap-2 flex-1 text-left"
+                                >
+                                  {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+                                  <span className="text-[10px] font-black text-slate-400">{g.prefix}</span>
+                                  <span className={`text-xs font-bold ${someSelected ? 'text-slate-900' : 'text-slate-500'}`}>{g.label}</span>
+                                  <span className="text-[10px] text-slate-400 font-medium">{selectedCount}/{g.refs.length}</span>
+                                </button>
+                                <Switch 
+                                  checked={allSelected} 
+                                  onCheckedChange={() => toggleGroupSelection(g.refs)}
+                                  className="data-[state=checked]:bg-blue-600"
+                                />
+                              </div>
+                              <AnimatePresence>
+                                {isExpanded && (
+                                  <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
+                                    <div className="px-4 pb-3 space-y-0.5">
+                                      {g.refs.map(ref => {
+                                        const isSelected = selectedPapers.includes(ref);
+                                        return (
+                                          <label key={ref} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
+                                            <input
+                                              type="checkbox"
+                                              checked={isSelected}
+                                              onChange={() => setSelectedPapers(prev => prev.includes(ref) ? prev.filter(r => r !== ref) : [...prev, ref])}
+                                              className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                                            />
+                                            <span className="text-[10px] font-black text-slate-400 w-6">{ref}</span>
+                                            <span className={`text-xs ${isSelected ? 'text-slate-800 font-medium' : 'text-slate-500'}`}>{WP_PAPER_NAMES[ref] || ref}</span>
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div className="flex justify-between pt-8 border-t border-slate-200">
