@@ -756,7 +756,7 @@ Return JSON: { "working_papers": [...] }`;
     const defaultEvidence = [
       { ref: "EV-1", description: "Trial Balance", type: "financial", wp_refs: enrichedPapers.map((wp: any) => wp.ref) },
       { ref: "EV-2", description: "General Ledger", type: "financial", wp_refs: enrichedPapers.map((wp: any) => wp.ref) },
-      { ref: "EV-3", description: "Bank Statements", type: "financial", wp_refs: enrichedPapers.filter((wp: any) => wp.ref === "E3").map((wp: any) => wp.ref) },
+      { ref: "EV-3", description: "Bank Statements", type: "financial", wp_refs: enrichedPapers.filter((wp: any) => wp.ref === "E1").map((wp: any) => wp.ref) },
     ];
     const uploadedEvidence = evidenceItems.map((e: any) => ({
       ref: e.id,
@@ -1322,11 +1322,11 @@ router.post("/export-excel", async (req: Request, res: Response) => {
       ["Area", "Current Year (PKR)", "Prior Year (PKR)", "Movement (PKR)", "Movement %", "WP Ref", "Materiality Flag"],
     ];
     const bsAreas = [
-      { area: "Cash & Bank", cy: fin.cash_and_bank, py: null, ref: "E3" },
-      { area: "Trade Receivables", cy: fin.trade_receivables, py: null, ref: "E1" },
-      { area: "Inventory", cy: fin.inventory, py: null, ref: "E4" },
-      { area: "Fixed Assets", cy: fin.fixed_assets, py: null, ref: "E5" },
-      { area: "Trade Payables", cy: fin.trade_payables, py: null, ref: "E2" },
+      { area: "Cash & Bank", cy: fin.cash_and_bank, py: null, ref: "E1" },
+      { area: "Trade Receivables", cy: fin.trade_receivables, py: null, ref: "E2" },
+      { area: "Inventory", cy: fin.inventory, py: null, ref: "E3" },
+      { area: "Fixed Assets", cy: fin.fixed_assets, py: null, ref: "E4" },
+      { area: "Trade Payables", cy: fin.trade_payables, py: null, ref: "E5" },
       { area: "Total Assets", cy: fin.total_assets, py: fin.prior_year_total_assets, ref: "—" },
       { area: "Total Liabilities", cy: fin.total_liabilities, py: null, ref: "—" },
       { area: "Equity", cy: fin.equity, py: null, ref: "—" },
@@ -1350,13 +1350,13 @@ router.post("/export-excel", async (req: Request, res: Response) => {
     ];
     const pmTotal = mat.performance_materiality || 0;
     const pmAreas = [
-      { item: "Revenue", amount: fin.revenue, ref: "E7", risk: "High" },
-      { item: "Trade Receivables", amount: fin.trade_receivables, ref: "E1", risk: "Medium" },
-      { item: "Inventory", amount: fin.inventory, ref: "E4", risk: "Medium" },
-      { item: "Fixed Assets", amount: fin.fixed_assets, ref: "E5", risk: "Low" },
-      { item: "Trade Payables", amount: fin.trade_payables, ref: "E2", risk: "Medium" },
-      { item: "Cash & Bank", amount: fin.cash_and_bank, ref: "E3", risk: "Low" },
-      { item: "Other Income/Expenses", amount: fin.net_profit, ref: "E8", risk: "Medium" },
+      { item: "Revenue", amount: fin.revenue, ref: "E6", risk: "High" },
+      { item: "Trade Receivables", amount: fin.trade_receivables, ref: "E2", risk: "Medium" },
+      { item: "Inventory", amount: fin.inventory, ref: "E3", risk: "Medium" },
+      { item: "Fixed Assets", amount: fin.fixed_assets, ref: "E4", risk: "Low" },
+      { item: "Trade Payables", amount: fin.trade_payables, ref: "E5", risk: "Medium" },
+      { item: "Cash & Bank", amount: fin.cash_and_bank, ref: "E1", risk: "Low" },
+      { item: "Expenses", amount: fin.net_profit, ref: "E7", risk: "Medium" },
     ];
     const totalCarrying = pmAreas.reduce((s, a) => s + (a.amount || 0), 0);
     for (const a of pmAreas) {
@@ -1374,14 +1374,14 @@ router.post("/export-excel", async (req: Request, res: Response) => {
       ["FINANCIAL STATEMENT ASSERTION MAPPING"],
       [],
       ["FS Line Item", "Existence", "Completeness", "Accuracy", "Valuation", "Rights & Obligations", "Cut-off", "Classification", "Presentation", "WP Ref"],
-      ["Revenue", "H", "H", "H", "M", "L", "H", "M", "M", "E7"],
-      ["Trade Receivables", "H", "H", "H", "H", "M", "H", "M", "M", "E1"],
-      ["Inventory", "H", "H", "M", "H", "M", "M", "M", "M", "E4"],
-      ["Fixed Assets", "M", "M", "L", "H", "M", "L", "M", "M", "E5"],
-      ["Trade Payables", "H", "H", "H", "M", "M", "H", "M", "M", "E2"],
-      ["Cash & Bank", "H", "H", "H", "L", "M", "M", "L", "L", "E3"],
-      ["Investments", "M", "M", "M", "H", "H", "L", "M", "M", "E6"],
-      ["Payroll / Staff Costs", "M", "H", "H", "L", "M", "H", "M", "M", "E8"],
+      ["Revenue", "H", "H", "H", "M", "L", "H", "M", "M", "E6"],
+      ["Trade Receivables", "H", "H", "H", "H", "M", "H", "M", "M", "E2"],
+      ["Inventory", "H", "H", "M", "H", "M", "M", "M", "M", "E3"],
+      ["Fixed Assets", "M", "M", "L", "H", "M", "L", "M", "M", "E4"],
+      ["Trade Payables", "H", "H", "H", "M", "M", "H", "M", "M", "E5"],
+      ["Cash & Bank", "H", "H", "H", "L", "M", "M", "L", "L", "E1"],
+      ["Provisions", "M", "M", "M", "H", "H", "L", "M", "M", "E10"],
+      ["Payroll / Staff Costs", "M", "H", "H", "L", "M", "H", "M", "M", "E7"],
       [],
       ["Legend: H = High Risk, M = Medium Risk, L = Low Risk"],
     ];
@@ -1394,13 +1394,13 @@ router.post("/export-excel", async (req: Request, res: Response) => {
       ["TESTS OF CONTROLS MATRIX — ISA 330"],
       [],
       ["Process / Cycle", "Control Description", "Assertion", "Test Procedure", "Sample Size", "Result", "WP Ref"],
-      ["Revenue Cycle", "Authorization of sales orders", "Occurrence", "Inspect approval signatures on sample", "25", "", "D2"],
+      ["Revenue Cycle", "Authorization of sales orders", "Occurrence", "Inspect approval signatures on sample", "25", "", "D3"],
       ["Revenue Cycle", "Segregation of duties — invoicing vs receipts", "Accuracy", "Walkthrough and observation", "N/A", "", "D2"],
       ["Procurement", "PO approval for purchases above threshold", "Completeness", "Sample POs and verify authorization", "25", "", "D3"],
       ["Procurement", "Three-way matching (PO/GRN/Invoice)", "Accuracy", "Re-perform matching on sample", "20", "", "D3"],
-      ["Payroll", "Authorization of payroll changes", "Occurrence", "Inspect HR approvals for new hires/terminations", "15", "", "D4"],
-      ["Cash & Bank", "Bank reconciliation review and approval", "Existence", "Inspect monthly bank reconciliations", "12", "", "D5"],
-      ["Fixed Assets", "Capital expenditure authorization", "Rights", "Inspect approval for additions > threshold", "10", "", "E5"],
+      ["Payroll", "Authorization of payroll changes", "Occurrence", "Inspect HR approvals for new hires/terminations", "15", "", "D3"],
+      ["Cash & Bank", "Bank reconciliation review and approval", "Existence", "Inspect monthly bank reconciliations", "12", "", "D1"],
+      ["Fixed Assets", "Capital expenditure authorization", "Rights", "Inspect approval for additions > threshold", "10", "", "E4"],
       ["IT General Controls", "Access controls — user provisioning", "Completeness", "Review user access logs", "N/A", "", "D4"],
     ];
     const tocSheet = XLSX.utils.aoa_to_sheet(tocRows);
@@ -1412,14 +1412,14 @@ router.post("/export-excel", async (req: Request, res: Response) => {
       ["TESTS OF DETAILS / SUBSTANTIVE TESTING MATRIX — ISA 330/500"],
       [],
       ["FS Area", "Assertion Tested", "Procedure", "Source of Evidence", "Sample Size Basis", "Expected Result", "WP Ref"],
-      ["Trade Receivables", "Existence, Valuation", "External confirmation (ISA 505)", "Direct bank/debtor confirmation", `${meta?.sampling_method || "Statistical"}`, "100% response or alternative", "E1"],
-      ["Trade Payables", "Completeness, Accuracy", "Supplier statement reconciliation", "Supplier statements", "Top 10 + random 15", "Differences < PM", "E2"],
-      ["Cash & Bank", "Existence, Completeness", "Bank confirmation + reconciliation", "Bank certificates", "All banks", "Fully reconciled", "E3"],
-      ["Inventory", "Existence, Valuation", "Physical count observation + NRV test", "Count sheets + market prices", "Value-weighted", "Variance < PM", "E4"],
-      ["Fixed Assets", "Existence, Valuation", "Physical verification + depreciation recalculation", "FAR + inspection", "Above PM threshold", "Within tolerance", "E5"],
-      ["Revenue", "Occurrence, Accuracy", "Vouching sales to invoices/contracts", "Sales invoices, contracts", meta?.sampling_method || "Statistical", "Agree to supporting docs", "E7"],
-      ["Payroll", "Occurrence, Accuracy", "Recalculate selected months + statutory deductions", "Payroll registers", "3 months", "Within tolerance", "E8"],
-      ["Investments", "Existence, Valuation", "Confirmation + fair value testing", "Custodian certificates", "All material", "Agree to market values", "E6"],
+      ["Cash & Bank", "Existence, Completeness", "Bank confirmation + reconciliation", "Bank certificates", "All banks", "Fully reconciled", "E1"],
+      ["Trade Receivables", "Existence, Valuation", "External confirmation (ISA 505)", "Direct debtor confirmation", `${meta?.sampling_method || "Statistical"}`, "100% response or alternative", "E2"],
+      ["Inventory", "Existence, Valuation", "Physical count observation + NRV test", "Count sheets + market prices", "Value-weighted", "Variance < PM", "E3"],
+      ["Fixed Assets", "Existence, Valuation", "Physical verification + depreciation recalculation", "FAR + inspection", "Above PM threshold", "Within tolerance", "E4"],
+      ["Trade Payables", "Completeness, Accuracy", "Supplier statement reconciliation", "Supplier statements", "Top 10 + random 15", "Differences < PM", "E5"],
+      ["Revenue", "Occurrence, Accuracy", "Vouching sales to invoices/contracts", "Sales invoices, contracts", meta?.sampling_method || "Statistical", "Agree to supporting docs", "E6"],
+      ["Expenses", "Occurrence, Accuracy", "Recalculate selected months + statutory deductions", "Payroll registers, invoices", "3 months", "Within tolerance", "E7"],
+      ["Provisions", "Existence, Valuation", "Review legal confirmations + management estimates", "Legal confirmations", "All material", "Agree to external evidence", "E10"],
     ];
     const todSheet = XLSX.utils.aoa_to_sheet(todRows);
     todSheet["!cols"] = [{ wch: 20 }, { wch: 22 }, { wch: 36 }, { wch: 28 }, { wch: 18 }, { wch: 24 }, { wch: 10 }];
@@ -1527,13 +1527,13 @@ router.post("/export-excel", async (req: Request, res: Response) => {
       ["WITHHOLDING TAX COMPLIANCE — Income Tax Ordinance 2001"],
       [],
       ["Section", "Nature of Payment", "Rate", "Threshold (PKR)", "Test Performed", "Exceptions Found", "WP Ref"],
-      ["149", "Salary", "As per rates", "—", "Recalculate monthly deductions", "", "J3"],
-      ["153(1)(a)", "Goods supplies", "4.5% / 6.5%", "75,000", "Verify deduction on sample payments", "", "J3"],
-      ["153(1)(b)", "Services", "8% / 14%", "30,000", "Verify deduction on sample invoices", "", "J3"],
-      ["153(1)(c)", "Contracts", "7.5% / 12%", "75,000", "Sample contract payments", "", "J3"],
-      ["155", "Income from property", "15%", "—", "Review rent payments", "", "J3"],
-      ["231A", "Cash withdrawal > 50K", "0.6%", "50,000", "Bank statement review", "", "J3"],
-      ["236", "Various advance tax", "Varies", "—", "Review applicability", "", "J3"],
+      ["149", "Salary", "As per rates", "—", "Recalculate monthly deductions", "", "J4"],
+      ["153(1)(a)", "Goods supplies", "4.5% / 6.5%", "75,000", "Verify deduction on sample payments", "", "J4"],
+      ["153(1)(b)", "Services", "8% / 14%", "30,000", "Verify deduction on sample invoices", "", "J4"],
+      ["153(1)(c)", "Contracts", "7.5% / 12%", "75,000", "Sample contract payments", "", "J4"],
+      ["155", "Income from property", "15%", "—", "Review rent payments", "", "J4"],
+      ["231A", "Cash withdrawal > 50K", "0.6%", "50,000", "Bank statement review", "", "J4"],
+      ["236", "Various advance tax", "Varies", "—", "Review applicability", "", "J4"],
     ];
     const whtSheet = XLSX.utils.aoa_to_sheet(whtRows);
     whtSheet["!cols"] = [{ wch: 12 }, { wch: 28 }, { wch: 14 }, { wch: 16 }, { wch: 36 }, { wch: 18 }, { wch: 10 }];
@@ -1552,7 +1552,7 @@ router.post("/export-excel", async (req: Request, res: Response) => {
       }
     } else {
       evRows.push(["EV-1", "Trial Balance", "Primary", "Client Accounts", "B1", "", "High"]);
-      evRows.push(["EV-2", "Bank Statements", "External", "Financial Institution", "E3", "", "High"]);
+      evRows.push(["EV-2", "Bank Statements", "External", "Financial Institution", "E1", "", "High"]);
       evRows.push(["EV-3", "Tax Returns / Assessments", "External", "FBR Portal", "J1", "", "High"]);
     }
     const evSheet = XLSX.utils.aoa_to_sheet(evRows);
@@ -1572,11 +1572,11 @@ router.post("/export-excel", async (req: Request, res: Response) => {
       [],
       ["SAMPLE SIZE DETERMINATION BY AREA"],
       ["FS Area", "Population Size", "Population Value (PKR)", "Sample Size", "Sample Value (PKR)", "Selection Method", "WP Ref"],
-      ["Trade Receivables", "—", fmtN(fin.trade_receivables), "—", "—", meta?.sampling_method || "Statistical", "E1"],
-      ["Trade Payables", "—", fmtN(fin.trade_payables), "—", "—", meta?.sampling_method || "Statistical", "E2"],
-      ["Revenue Transactions", "—", fmtN(fin.revenue), "—", "—", meta?.sampling_method || "Statistical", "E7"],
-      ["Payroll", "—", "—", "—", "—", meta?.sampling_method || "Statistical", "E8"],
-      ["Fixed Asset Additions", "—", "—", "—", "—", "Value-weighted", "E5"],
+      ["Trade Receivables", "—", fmtN(fin.trade_receivables), "—", "—", meta?.sampling_method || "Statistical", "E2"],
+      ["Trade Payables", "—", fmtN(fin.trade_payables), "—", "—", meta?.sampling_method || "Statistical", "E5"],
+      ["Revenue Transactions", "—", fmtN(fin.revenue), "—", "—", meta?.sampling_method || "Statistical", "E6"],
+      ["Expenses", "—", "—", "—", "—", meta?.sampling_method || "Statistical", "E7"],
+      ["Fixed Asset Additions", "—", "—", "—", "—", "Value-weighted", "E4"],
     ];
     const sampSheet = XLSX.utils.aoa_to_sheet(sampRows);
     sampSheet["!cols"] = [{ wch: 22 }, { wch: 18 }, { wch: 22 }, { wch: 14 }, { wch: 22 }, { wch: 18 }, { wch: 10 }];

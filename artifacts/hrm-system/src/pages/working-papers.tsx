@@ -1165,7 +1165,7 @@ export default function WorkingPapers() {
                               <span className="text-xs font-bold text-slate-700">Internal Audit Exists (ISA 610)</span>
                             </label>
                           </div>
-                          <div className="grid grid-cols-2 gap-6 pt-2">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
                             <div className="space-y-2">
                               <Label className="text-xs font-bold text-slate-600 ml-1">Currency</Label>
                               <Select value={currency} onValueChange={setCurrency}>
@@ -1181,6 +1181,15 @@ export default function WorkingPapers() {
                                 <SelectTrigger className="h-11 rounded-xl font-medium"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   {["Statistical", "Non-Statistical", "Judgmental", "Systematic", "Random"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Confidence Level</Label>
+                              <Select value={confidenceLevel} onValueChange={setConfidenceLevel}>
+                                <SelectTrigger className="h-11 rounded-xl font-medium"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {["90%", "95%", "99%"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                                 </SelectContent>
                               </Select>
                             </div>
