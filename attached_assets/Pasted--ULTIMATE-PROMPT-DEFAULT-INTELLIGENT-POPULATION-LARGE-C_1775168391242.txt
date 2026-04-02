@@ -1,0 +1,194 @@
+✅ ULTIMATE PROMPT — DEFAULT INTELLIGENT POPULATION (LARGE COMPANY – JUNE YEAR END)
+
+Prompt for Replit / AI Engine:
+
+Build a default intelligent response engine for Engagement Configuration.
+When user selects:
+
+Entity Size = Large
+Financial Year End = June 30, 202X
+
+THEN:
+
+1. EXCLUSION RULE (MANDATORY)
+
+Do NOT auto-fill:
+
+Company Name
+NTN
+SECP Registration
+Registered Address
+Audit Firm Name
+Engagement Team (Preparer/Reviewer/Approver)
+
+These must remain user input only (editable).
+
+🔷 2. DEFAULT PERIOD & TIMELINE LOGIC
+
+If not extracted from uploaded data:
+
+Financial Year: July 01, (X-1) → June 30, X
+Period Start Date: 01-07-(X-1)
+Period End Date: 30-06-X
+Key Deadlines (Auto-fill):
+Planning Date: 01-04-X
+Fieldwork Start: 15-05-X
+Fieldwork End: 31-07-X
+Reporting Date: 30-09-X
+Filing Deadline: 31-10-X
+Archive Date: +60 days from report date
+🔷 3. ENTITY & CLASSIFICATION (DEFAULT – LARGE COMPANY)
+Entity Legal Form → Company
+Company Category → Public Interest Company (if applicable) / Large Sized Company
+Entity Size → Large
+Ownership → Corporate / Mixed
+Operational Status → Going Concern
+Regulated Industry Flag → Yes (default for large)
+🔷 4. FINANCIAL REPORTING BASIS
+Financial Statements Type → General Purpose FS
+Framework → IFRS / IFRS for Companies (Pakistan)
+Basis → Accrual Basis
+Comparative → Prior Year Comparative Required
+🔷 5. PRIOR YEAR CONTEXT
+Prior FS Status → Audited
+Predecessor Auditor → Yes (if first year) / No (otherwise)
+Change in Policy → No (default)
+Restatement → No (default)
+🔷 6. MATERIALITY (AUTO-CALCULATED DEFAULTS)
+
+If FS not available:
+
+Benchmark → Profit before Tax (fallback: Revenue / Total Assets)
+Planning Materiality → 5% of PBT (or 1% Revenue fallback)
+Performance Materiality → 75% of Planning
+Clearly Trivial → 5% of Planning
+Specific Materiality → No
+🔷 7. RISK ASSESSMENT (LARGE ENTITY DEFAULT)
+Overall FS Risk → Medium to High
+Going Concern Risk → Low (unless indicators exist)
+Significant Risks → Yes
+Fraud Risk → Yes
+Management Override → Yes (mandatory ISA 240)
+NOCLAR → Yes
+Integrity Concern → No
+🔷 8. IT & CONTROL ENVIRONMENT
+Accounting System → ERP-Based (SAP/Oracle/Custom ERP)
+IT Complexity → High
+Service Organization → Yes
+IPE Used → Yes
+ITGC Testing → Yes
+Internal Audit Function → Yes
+🔷 9. BUSINESS CYCLES (AUTO SELECT ALL)
+
+Enable:
+
+Revenue
+Purchases
+Inventory
+Payroll
+Treasury
+Fixed Assets
+Financial Close
+Tax
+
+Control reliance:
+
+Partial reliance (default)
+🔷 10. SAMPLING & CONFIRMATIONS
+Sampling Approach → Statistical / Monetary Unit Sampling
+Selection → Random + Risk-based
+Confirmations Required:
+Banks → Yes
+Debtors → Yes
+Creditors → Yes
+Related Parties → Yes
+Substantive Analytics → Yes
+External Confirmations → Yes
+Stratification → Yes
+🔷 11. TAX & REGULATORY (PAKISTAN DEFAULT)
+ATL Status → Active
+Income Tax Registered → Yes
+Sales Tax Registered → Yes
+FED → No (unless industry-specific)
+Withholding Agent → Yes
+Deferred Tax → Yes
+SECP Filing → Yes
+Section 42 → No (default)
+🔷 12. SIGNIFICANT FS AREAS (AUTO FLAG)
+
+Mark YES for:
+
+Cash & Bank
+Receivables
+Inventory
+Fixed Assets
+Borrowings
+Revenue
+Related Parties
+
+Mark conditional YES:
+
+CWIP
+Provisions
+Intangibles
+
+Inventory count → Yes
+
+🔷 13. ETHICS & INDEPENDENCE
+Independence Threat → No
+Non-Audit Services → No
+Fee Dependency → No
+Partner Rotation → Applicable (if listed)
+🔷 14. GOVERNANCE
+TCWG Exists → Yes
+Audit Committee → Yes
+Board Minutes → Yes
+Legal Counsel → Yes
+Subsequent Events Review Date → Report Date + 15 days
+🔷 15. REPORTING DEFAULTS
+Opinion → Unmodified
+Language → English
+KAM → Yes (for large entities)
+EOM → No
+Going Concern Disclosure → No (default)
+🔷 16. SYSTEM CONTROLS
+FS Source → TB / GL Upload
+Version Control → Enabled
+Auto Regeneration → Enabled
+Finalization Gate → Enabled
+Archive Retention → 5–7 years (ISQM 1 compliant)
+🔷 17. SALES TAX DATA DEFAULT
+
+If not uploaded:
+
+Period: Monthly (Jul → Jun)
+Jurisdiction: FBR (Federal)
+Tax Type: Sales Tax
+Allow:
+Upload Excel
+Manual Add Row
+🔷 18. AI FALLBACK LOGIC (CRITICAL)
+
+If:
+
+No upload OR
+OCR fails OR
+Data incomplete
+
+THEN:
+
+Apply ALL above defaults
+Mark fields as:
+“System Generated – Requires Review”
+🔷 19. COMPLIANCE TAGGING
+
+Each default must store:
+
+Standard Reference (ISA / IFRS / Companies Act)
+Auto-justification log
+Editable override allowed with audit trail
+🔷 20. FINAL OUTPUT BEHAVIOR
+Trigger 100% working papers generation
+Link:
+Variables → Risks → Procedures → WPs
+Auto-select all relevant WPs as per configuration visible in system
