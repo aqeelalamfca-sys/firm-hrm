@@ -68,6 +68,51 @@ interface FSLine {
 }
 interface FSSection { id: string; title: string; color: string; lines: FSLine[]; }
 
+interface SalesTaxRow {
+  id: string;
+  periodFrom: string; periodTo: string;
+  invoiceDate: string; invoiceNo: string;
+  customerSupplier: string; ntnCnic: string; strn: string;
+  description: string; salesType: string;
+  taxableValue: string; salesTaxRate: string; salesTaxAmount: string;
+  furtherTaxRate: string; furtherTaxAmount: string;
+  fedRate: string; fedAmount: string;
+  jurisdiction: string; inputOutput: string;
+  adjustment: string; netTax: string;
+}
+
+const SALES_TAX_COLS: { key: keyof SalesTaxRow; label: string; width: string; type?: string }[] = [
+  { key: "periodFrom", label: "Period From", width: "110px", type: "date" },
+  { key: "periodTo", label: "Period To", width: "110px", type: "date" },
+  { key: "invoiceDate", label: "Invoice Date", width: "110px", type: "date" },
+  { key: "invoiceNo", label: "Invoice No.", width: "100px" },
+  { key: "customerSupplier", label: "Customer / Supplier", width: "180px" },
+  { key: "ntnCnic", label: "NTN / CNIC", width: "120px" },
+  { key: "strn", label: "STRN", width: "120px" },
+  { key: "description", label: "Description", width: "180px" },
+  { key: "salesType", label: "Sales Type", width: "110px" },
+  { key: "taxableValue", label: "Taxable Value", width: "120px" },
+  { key: "salesTaxRate", label: "ST Rate %", width: "90px" },
+  { key: "salesTaxAmount", label: "ST Amount", width: "110px" },
+  { key: "furtherTaxRate", label: "FT Rate %", width: "90px" },
+  { key: "furtherTaxAmount", label: "FT Amount", width: "110px" },
+  { key: "fedRate", label: "FED Rate %", width: "90px" },
+  { key: "fedAmount", label: "FED Amount", width: "110px" },
+  { key: "jurisdiction", label: "Province / Jurisdiction", width: "140px" },
+  { key: "inputOutput", label: "Input / Output", width: "110px" },
+  { key: "adjustment", label: "Adj / DN / CN", width: "120px" },
+  { key: "netTax", label: "Net Tax", width: "110px" },
+];
+
+const emptySalesTaxRow = (): SalesTaxRow => ({
+  id: `st_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+  periodFrom: "", periodTo: "", invoiceDate: "", invoiceNo: "",
+  customerSupplier: "", ntnCnic: "", strn: "", description: "", salesType: "",
+  taxableValue: "", salesTaxRate: "", salesTaxAmount: "",
+  furtherTaxRate: "", furtherTaxAmount: "", fedRate: "", fedAmount: "",
+  jurisdiction: "", inputOutput: "", adjustment: "", netTax: "",
+});
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 const ENGAGEMENT_TYPES = [
   "Statutory Audit", "Internal Audit", "Tax Audit", "Special Purpose Audit",
@@ -483,6 +528,15 @@ export default function WorkingPapers() {
   // ── Extended Variables (A-K System) ─────────────────────────────────────────
   const [strn, setStrn] = useState("");
   const [industry, setIndustry] = useState("");
+
+  const [stPeriodFrom, setStPeriodFrom] = useState("");
+  const [stPeriodTo, setStPeriodTo] = useState("");
+  const [stTaxType, setStTaxType] = useState("Sales Tax");
+  const [stJurisdiction, setStJurisdiction] = useState("FBR");
+  const [stReturnPeriod, setStReturnPeriod] = useState("Monthly");
+  const [salesTaxRows, setSalesTaxRows] = useState<SalesTaxRow[]>([]);
+  const [stUploading, setStUploading] = useState(false);
+  const stFileRef = useRef<HTMLInputElement>(null);
   const [entityType, setEntityType] = useState("Private Limited");
   const [framework, setFramework] = useState("IFRS");
   const [listedStatus, setListedStatus] = useState("Unlisted");
@@ -703,6 +757,71 @@ export default function WorkingPapers() {
       ? { ...s, lines: s.lines.map(l => l.id === lineId ? { ...l, [field]: val } : l) }
       : s
     ));
+  };
+
+  const updateSalesTaxRow = (rowId: string, field: keyof SalesTaxRow, val: string) => {
+    setSalesTaxRows(prev => prev.map(r => r.id === rowId ? { ...r, [field]: val } : r));
+  };
+
+  const handleSTDownloadTemplate = () => {
+    const headers = SALES_TAX_COLS.map(c => c.label);
+    const csvContent = headers.join(",") + "\n";
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sales_tax_template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSTUploadExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setStUploading(true);
+    try {
+      const text = await file.text();
+      const lines = text.split("\n").filter(l => l.trim());
+      if (lines.length < 2) { toast({ title: "Empty file", description: "The uploaded file contains no data rows.", variant: "destructive" }); return; }
+      const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
+      const colMap: Record<string, keyof SalesTaxRow> = {
+        "period from": "periodFrom", "period to": "periodTo",
+        "invoice date": "invoiceDate", "invoice no.": "invoiceNo", "invoice no": "invoiceNo",
+        "customer / supplier name": "customerSupplier", "customer / supplier": "customerSupplier",
+        "ntn / cnic": "ntnCnic", "strn": "strn", "description": "description",
+        "sales type": "salesType", "taxable value": "taxableValue",
+        "sales tax rate": "salesTaxRate", "st rate %": "salesTaxRate",
+        "sales tax amount": "salesTaxAmount", "st amount": "salesTaxAmount",
+        "further tax rate": "furtherTaxRate", "ft rate %": "furtherTaxRate",
+        "further tax amount": "furtherTaxAmount", "ft amount": "furtherTaxAmount",
+        "fed rate": "fedRate", "fed rate %": "fedRate",
+        "fed amount": "fedAmount",
+        "province / tax jurisdiction": "jurisdiction", "province / jurisdiction": "jurisdiction",
+        "input tax / output tax": "inputOutput", "input / output": "inputOutput",
+        "adjustment / debit note / credit note": "adjustment", "adj / dn / cn": "adjustment",
+        "net tax": "netTax",
+      };
+      const headerMap: (keyof SalesTaxRow | null)[] = headers.map(h => colMap[h] || null);
+      const rows: SalesTaxRow[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const vals = lines[i].split(",").map(v => v.trim());
+        const row = emptySalesTaxRow();
+        headerMap.forEach((field, idx) => { if (field && field !== "id" && vals[idx]) (row as any)[field] = vals[idx]; });
+        const hasData = Object.entries(row).some(([k, v]) => k !== "id" && v);
+        if (hasData) rows.push(row);
+      }
+      if (rows.length > 0) {
+        setSalesTaxRows(prev => [...prev, ...rows]);
+        toast({ title: "Sales Tax Data Imported", description: `${rows.length} row(s) loaded from "${file.name}".` });
+      } else {
+        toast({ title: "No data mapped", description: "Could not map any rows from the uploaded file. Check column headers.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Upload failed", description: "Could not parse the uploaded file.", variant: "destructive" });
+    } finally {
+      setStUploading(false);
+      if (stFileRef.current) stFileRef.current.value = "";
+    }
   };
 
   const addFsRow = (tab: "bs" | "pl", secId: string) => {
@@ -1491,6 +1610,138 @@ export default function WorkingPapers() {
                         onChange={handleConfigChange}
                         users={users}
                       />
+                    </div>
+
+                    {/* ── Sales Tax Data ──────────────────────────────── */}
+                    <div className="mt-8 bg-white rounded-xl border border-slate-200 shadow-sm p-8 space-y-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-amber-600" />
+                        </div>
+                        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Sales Tax Data for the Period</h3>
+                        {salesTaxRows.length > 0 && (
+                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5">{salesTaxRows.length} row(s)</span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Period From</Label>
+                          <Input type="date" value={stPeriodFrom} onChange={e => setStPeriodFrom(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-10 rounded-lg font-mono text-sm cursor-pointer" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Period To</Label>
+                          <Input type="date" value={stPeriodTo} onChange={e => setStPeriodTo(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-10 rounded-lg font-mono text-sm cursor-pointer" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Tax Type</Label>
+                          <Select value={stTaxType} onValueChange={setStTaxType}>
+                            <SelectTrigger className="h-10 rounded-lg text-sm font-medium"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Sales Tax">Sales Tax</SelectItem>
+                              <SelectItem value="FED">Federal Excise Duty (FED)</SelectItem>
+                              <SelectItem value="Further Tax">Further Tax</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Jurisdiction</Label>
+                          <Select value={stJurisdiction} onValueChange={setStJurisdiction}>
+                            <SelectTrigger className="h-10 rounded-lg text-sm font-medium"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="FBR">FBR (Federal)</SelectItem>
+                              <SelectItem value="PRA">PRA (Punjab)</SelectItem>
+                              <SelectItem value="SRB">SRB (Sindh)</SelectItem>
+                              <SelectItem value="KPRA">KPRA (KP)</SelectItem>
+                              <SelectItem value="BRA">BRA (Balochistan)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Return Period</Label>
+                          <Select value={stReturnPeriod} onValueChange={setStReturnPeriod}>
+                            <SelectTrigger className="h-10 rounded-lg text-sm font-medium"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Monthly">Monthly</SelectItem>
+                              <SelectItem value="Quarterly">Quarterly</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 pt-2">
+                        <input ref={stFileRef} type="file" accept=".csv,.xlsx,.xls" onChange={handleSTUploadExcel} className="hidden" />
+                        <Button variant="outline" size="sm" onClick={() => stFileRef.current?.click()} disabled={stUploading} className="rounded-lg font-bold text-xs gap-2">
+                          {stUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                          Upload Excel / CSV
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={handleSTDownloadTemplate} className="rounded-lg font-bold text-xs gap-2">
+                          <Download className="w-3.5 h-3.5" /> Download Standard Template
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setSalesTaxRows(prev => [...prev, emptySalesTaxRow()])} className="rounded-lg font-bold text-xs gap-2 text-blue-600 border-blue-200 hover:bg-blue-50">
+                          <Plus className="w-3.5 h-3.5" /> Add Row
+                        </Button>
+                      </div>
+
+                      {salesTaxRows.length > 0 && (
+                        <div className="border border-slate-200 rounded-xl overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="bg-slate-50 border-b border-slate-200">
+                                  <th className="px-2 py-2.5 text-left font-bold text-slate-500 uppercase tracking-wider text-[9px] w-8">#</th>
+                                  {SALES_TAX_COLS.map(col => (
+                                    <th key={col.key} className="px-2 py-2.5 text-left font-bold text-slate-500 uppercase tracking-wider text-[9px] whitespace-nowrap" style={{ minWidth: col.width }}>{col.label}</th>
+                                  ))}
+                                  <th className="px-2 py-2.5 w-8"></th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {salesTaxRows.map((row, idx) => (
+                                  <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                                    <td className="px-2 py-1 text-slate-400 font-mono">{idx + 1}</td>
+                                    {SALES_TAX_COLS.map(col => (
+                                      <td key={col.key} className="px-1 py-0.5">
+                                        <input
+                                          type={col.type || "text"}
+                                          value={(row as any)[col.key]}
+                                          onChange={e => updateSalesTaxRow(row.id, col.key, e.target.value)}
+                                          className="w-full px-1.5 py-1.5 text-xs border border-transparent hover:border-slate-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded outline-none bg-transparent font-medium"
+                                          style={{ minWidth: col.width }}
+                                        />
+                                      </td>
+                                    ))}
+                                    <td className="px-1 py-1">
+                                      <button onClick={() => setSalesTaxRows(prev => prev.filter(r => r.id !== row.id))} className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors">
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          <div className="bg-slate-50 border-t border-slate-200 px-4 py-2.5 flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-slate-500">{salesTaxRows.length} row(s) · {salesTaxRows.filter(r => r.netTax).length} with net tax</span>
+                            <div className="flex gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => setSalesTaxRows(prev => [...prev, emptySalesTaxRow()])} className="text-[10px] font-bold text-blue-600 h-7 px-2 gap-1">
+                                <Plus className="w-3 h-3" /> Add Row
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => { if (confirm("Clear all sales tax rows?")) setSalesTaxRows([]); }} className="text-[10px] font-bold text-red-500 h-7 px-2 gap-1">
+                                <Trash2 className="w-3 h-3" /> Clear All
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {salesTaxRows.length === 0 && (
+                        <div className="border border-dashed border-slate-200 rounded-xl p-8 text-center">
+                          <FileSpreadsheet className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+                          <p className="text-sm text-slate-400 font-medium">No sales tax data yet</p>
+                          <p className="text-[11px] text-slate-400 mt-1">Upload an Excel/CSV file or add rows manually</p>
+                        </div>
+                      )}
                     </div>
 
                     {/* ── Working Papers ──────────────────────────────── */}
