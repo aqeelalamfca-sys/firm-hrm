@@ -91,6 +91,21 @@ const STEPS = [
   { id: 4, label: "Export & Finalize", shortLabel: "Export", icon: FileOutput },
 ];
 
+const AUDIT_PHASES: { prefix: string; label: string; papers: number; description: string }[] = [
+  { prefix: "PP", label: "Pre-Planning", papers: 4, description: "Acceptance, continuance & independence checks" },
+  { prefix: "DI", label: "Discussion & Inquiry", papers: 2, description: "Engagement team briefing & client inquiry" },
+  { prefix: "IR", label: "Risk Assessment", papers: 3, description: "ISA 315 inherent, control & fraud risk mapping" },
+  { prefix: "OB", label: "Opening Balances", papers: 2, description: "ISA 510 verification of prior-period figures" },
+  { prefix: "PL", label: "Audit Planning", papers: 5, description: "Materiality, sampling plan & audit programme" },
+  { prefix: "EX", label: "Execution", papers: 8, description: "ToC, ToD & substantive procedures per FS head" },
+  { prefix: "FH", label: "Fieldwork", papers: 3, description: "Physical counts, confirmations & inspections" },
+  { prefix: "EV", label: "Evidence & Analytics", papers: 3, description: "ISA 500/520 analytical review & evidence vault" },
+  { prefix: "FN", label: "Finalisation", papers: 4, description: "Misstatements log, going concern & SEs" },
+  { prefix: "DL", label: "Deliverables", papers: 2, description: "Management letter & audit report drafts" },
+  { prefix: "QR", label: "EQCR", papers: 2, description: "ISQM 2 engagement quality control review" },
+  { prefix: "IN", label: "Audit Opinion", papers: 1, description: "ISA 700–720 signed opinion & archive" },
+];
+
 const INITIAL_BS: FSSection[] = [
   {
     id: "nca", title: "NON-CURRENT ASSETS", color: "bg-blue-600",
@@ -220,6 +235,27 @@ function fmtPKR(n: number | string | undefined | null) {
 function RiskBadge({ level }: { level: string }) {
   const map: Record<string, string> = { High: "bg-red-100 text-red-700", Medium: "bg-amber-100 text-amber-700", Low: "bg-green-100 text-green-700" };
   return <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tight ${map[level] || "bg-slate-100 text-slate-600"}`}>{level}</span>;
+}
+
+function classifyFile(filename: string): string {
+  const n = filename.toLowerCase();
+  if (n.includes("trial_balance") || n.includes("trial balance") || /\btb\b/.test(n)) return "Trial Balance";
+  if (n.includes("general_ledger") || n.includes("general ledger") || /\bgl\b/.test(n)) return "General Ledger";
+  if (n.includes("bank") || n.includes("statement") || n.includes("brs")) return "Bank Statement";
+  if (n.includes("financial") || n.includes("balance_sheet") || n.includes("balance sheet") || n.includes("pnl") || n.includes("income") || /\bfs\b/.test(n)) return "Financial Statements";
+  if (n.includes("contract") || n.includes("agreement") || n.includes("deed")) return "Contract";
+  if (n.includes("confirm") || n.includes("circularize") || n.includes("circular")) return "Confirmation";
+  if (n.includes("board") || n.includes("minutes") || n.includes("resolution")) return "Board Minutes";
+  if (n.includes("tax") || n.includes("fbr") || n.includes("return")) return "Tax Return";
+  if (n.includes("invoice") || n.includes("voucher")) return "Invoice / Voucher";
+  if (n.includes("payroll") || n.includes("salary")) return "Payroll";
+  if (n.includes("fixed_asset") || n.includes("fixed asset") || n.includes("ppe")) return "Fixed Asset Register";
+  const ext = filename.split(".").pop()?.toLowerCase() || "";
+  if (ext === "xlsx" || ext === "xls" || ext === "csv") return "Spreadsheet";
+  if (ext === "pdf") return "PDF Document";
+  if (ext === "docx" || ext === "doc") return "Word Document";
+  if (ext === "jpg" || ext === "jpeg" || ext === "png") return "Scanned Image";
+  return "Supporting Document";
 }
 
 function DropZone({ files, onAdd, onRemove }: { files: UploadedFile[]; onAdd: (f: FileList) => void; onRemove: (id: string) => void }) {
@@ -464,9 +500,11 @@ export default function WorkingPapers() {
   const [generationMeta, setGenerationMeta] = useState<any>(null);
   const [progress, setProgress] = useState(0);
   const [progressMsg, setProgressMsg] = useState("");
+  const [completedPhases, setCompletedPhases] = useState<string[]>([]);
+  const [activePhaseLabel, setActivePhaseLabel] = useState("");
 
   const addFiles = useCallback((fl: FileList) => {
-    const newFiles = Array.from(fl).map(f => ({ file: f, id: `${f.name}-${Date.now()}-${Math.random()}` }));
+    const newFiles = Array.from(fl).map(f => ({ file: f, id: `${f.name}-${Date.now()}-${Math.random()}`, classified: classifyFile(f.name) }));
     setFiles(prev => [...prev, ...newFiles]);
   }, []);
 
@@ -565,7 +603,23 @@ export default function WorkingPapers() {
     if (!analysis) return;
     setGenerating(true);
     setProgress(5);
-    setProgressMsg("Initializing WP generator...");
+    setProgressMsg("Initializing working paper generator...");
+    setCompletedPhases([]);
+    setActivePhaseLabel(AUDIT_PHASES[0].label);
+
+    // Drive phase-by-phase progress on the frontend while the API runs
+    let phaseIdx = 0;
+    const phaseInterval = setInterval(() => {
+      if (phaseIdx < AUDIT_PHASES.length) {
+        const done = AUDIT_PHASES[phaseIdx].prefix;
+        setCompletedPhases(prev => [...prev, done]);
+        const nextLabel = phaseIdx + 1 < AUDIT_PHASES.length ? AUDIT_PHASES[phaseIdx + 1].label : "Finalising...";
+        setActivePhaseLabel(nextLabel);
+        setProgress(5 + Math.round(((phaseIdx + 1) / AUDIT_PHASES.length) * 82));
+        setProgressMsg(`Generating ${AUDIT_PHASES[phaseIdx].label} papers...`);
+        phaseIdx++;
+      }
+    }, 2200);
 
     try {
       const res = await fetch("/api/working-papers/generate", {
@@ -593,32 +647,29 @@ export default function WorkingPapers() {
         }),
       });
 
+      clearInterval(phaseInterval);
+
       if (!res.ok) throw new Error(await res.text());
 
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("No reader");
+      // Backend returns plain JSON — read it directly (not SSE)
+      const data = await res.json();
+      const papers: WorkingPaper[] = data.working_papers ?? data.workingPapers ?? [];
+      const evidence: EvidenceItem[] = data.evidence_index ?? data.evidenceIndex ?? [];
 
-      let partial = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = new TextDecoder().decode(value);
-        const lines = (partial + chunk).split("\n");
-        partial = lines.pop() || "";
+      setWorkingPapers(papers);
+      setEvidenceIndex(evidence);
+      if (data.meta) setGenerationMeta(data.meta);
 
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = JSON.parse(line.slice(6));
-          if (data.progress) setProgress(data.progress);
-          if (data.message) setProgressMsg(data.message);
-          if (data.workingPapers) setWorkingPapers(data.workingPapers);
-          if (data.evidenceIndex) setEvidenceIndex(data.evidenceIndex);
-          if (data.meta) setGenerationMeta(data.meta);
-        }
-      }
+      // Mark all phases done
+      setCompletedPhases(AUDIT_PHASES.map(p => p.prefix));
+      setActivePhaseLabel("");
+      setProgress(100);
+      setProgressMsg("All working papers generated successfully.");
+
       setStep(3);
-      toast({ title: "Generation complete", description: `${workingPapers.length || selectedPapers.length} papers generated.` });
+      toast({ title: "Generation complete", description: `${papers.length} working papers generated across 12 audit phases.` });
     } catch (err: any) {
+      clearInterval(phaseInterval);
       toast({ title: "Generation failed", description: err.message, variant: "destructive" });
     } finally {
       setGenerating(false);
@@ -1459,18 +1510,74 @@ export default function WorkingPapers() {
                     </div>
 
                     {workingPapers.length === 0 ? (
-                      <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-sm text-center space-y-6">
-                        <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto">
-                          <FileText className="w-10 h-10 text-blue-600" />
+                      generating ? (
+                        /* ─── Phase-by-phase progress ───────────────────────────────────────── */
+                        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 space-y-8">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2.5">
+                                <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                                <span className="font-bold text-blue-700 text-sm">{progressMsg}</span>
+                              </div>
+                              <span className="text-2xl font-black text-slate-900">{progress}%</span>
+                            </div>
+                            <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                              <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-700 ease-out" style={{ width: `${progress}%` }} />
+                            </div>
+                            <p className="text-xs font-medium text-slate-400">
+                              {completedPhases.length} of {AUDIT_PHASES.length} phases complete
+                              {activePhaseLabel ? ` · Processing: ${activePhaseLabel}` : " · Finalising..."}
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                            {AUDIT_PHASES.map(phase => {
+                              const isDone    = completedPhases.includes(phase.prefix);
+                              const isActive  = activePhaseLabel === phase.label;
+                              return (
+                                <div key={phase.prefix}
+                                  className={`rounded-2xl p-4 border transition-all duration-500 ${
+                                    isDone   ? "bg-emerald-50 border-emerald-200 shadow-sm" :
+                                    isActive ? "bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-300" :
+                                               "bg-slate-50 border-slate-100"
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className={`text-[10px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${
+                                      isDone   ? "bg-emerald-100 text-emerald-700" :
+                                      isActive ? "bg-blue-100 text-blue-700" :
+                                                 "bg-slate-100 text-slate-400"
+                                    }`}>{phase.prefix}</span>
+                                    {isDone   ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> :
+                                     isActive ? <Loader2 className="w-4 h-4 text-blue-500 animate-spin" /> : null}
+                                  </div>
+                                  <p className={`text-xs font-bold leading-tight ${isDone ? "text-emerald-700" : isActive ? "text-blue-700" : "text-slate-400"}`}>{phase.label}</p>
+                                  <p className={`text-[10px] mt-1 leading-tight ${isDone ? "text-emerald-500" : "text-slate-300"}`}>{phase.description}</p>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                        <div className="max-w-md mx-auto">
-                          <h3 className="text-xl font-bold text-slate-800">Generate Working Papers</h3>
-                          <p className="text-slate-500 mt-2 font-medium">Click the button below to initialize the working paper generation process for {selectedPapers.length} audit sections.</p>
+                      ) : (
+                        /* ─── Idle: trigger generation ──────────────────────────────────────── */
+                        <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-sm text-center space-y-8">
+                          <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto">
+                            <Sparkles className="w-10 h-10 text-blue-600" />
+                          </div>
+                          <div className="max-w-lg mx-auto space-y-4">
+                            <h3 className="text-2xl font-extrabold text-slate-800">Ready to Generate {selectedPapers.length} Papers</h3>
+                            <p className="text-slate-500 font-medium leading-relaxed">The system will process all 12 audit phases — from Pre-Planning to Audit Opinion — generating fully cross-referenced, ISA-compliant working papers with prepared-by, reviewed-by, and partner sign-offs.</p>
+                            <div className="flex flex-wrap justify-center gap-2 pt-2">
+                              {AUDIT_PHASES.map(p => (
+                                <span key={p.prefix} className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-200 uppercase tracking-wide">{p.prefix}: {p.label}</span>
+                              ))}
+                            </div>
+                          </div>
+                          <Button onClick={handleGenerate} size="lg" className="h-14 px-10 bg-blue-600 hover:bg-blue-700 text-base font-bold shadow-xl shadow-blue-200 rounded-2xl group">
+                            <Sparkles className="w-5 h-5 mr-2 group-hover:rotate-12 transition-transform" /> Generate All Working Papers
+                          </Button>
                         </div>
-                        <Button onClick={handleGenerate} disabled={generating} size="lg" className="h-12 px-8 bg-blue-600 hover:bg-blue-700 font-bold shadow-lg shadow-blue-200 rounded-xl">
-                          {generating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4 mr-2" /> Generate Now</>}
-                        </Button>
-                      </div>
+                      )
                     ) : (
                       <>
                         <div className="bg-emerald-600 rounded-2xl p-4 text-white shadow-lg flex items-center justify-between">
@@ -1591,7 +1698,7 @@ export default function WorkingPapers() {
                   <div className="space-y-10">
                     <div>
                       <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Export & Finalize</h2>
-                      <p className="text-slate-500 mt-2 text-lg">Download your completed audit file in multiple formats.</p>
+                      <p className="text-slate-500 mt-2">Download the complete, inspection-ready audit file — all phases, all working papers, and all client-provided evidence combined into a single deliverable. Choose your format: editable Excel workbook, Word report, archived PDF, or the confirmation letters bundle.</p>
                     </div>
 
                     <div className="bg-[#0F172A] rounded-[2.5rem] p-10 text-white shadow-2xl relative overflow-hidden">
