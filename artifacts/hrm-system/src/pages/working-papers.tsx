@@ -1477,6 +1477,181 @@ export default function WorkingPapers() {
                         )}
                       </div>
 
+                      {/* ── Financial Statement (FS) Data ── */}
+                      <div className="p-0">
+                        <div className="p-6 border-b border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+                              <Table className="w-4 h-4" />
+                            </div>
+                            <h3 className="font-bold text-slate-800">Financial Statement (FS) Data</h3>
+                          </div>
+                          <div className="flex bg-white border border-slate-200 rounded-lg p-1">
+                            <button onClick={() => setActiveFsTab("bs")} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeFsTab === "bs" ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>Balance Sheet</button>
+                            <button onClick={() => setActiveFsTab("pl")} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeFsTab === "pl" ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>Profit & Loss</button>
+                          </div>
+                        </div>
+
+                        <div className="p-0 max-h-[600px] overflow-y-auto scrollbar-thin">
+                          {(activeFsTab === "bs" ? bsData : plData).map((sec) => (
+                            <div key={sec.id} className="border-b border-slate-100 last:border-0">
+                              <button 
+                                onClick={() => setExpandedFsSections(prev => prev.includes(sec.id) ? prev.filter(x => x !== sec.id) : [...prev, sec.id])}
+                                className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition-colors"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-1.5 h-6 rounded-full ${sec.color}`}></div>
+                                  <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{sec.title}</span>
+                                </div>
+                                {expandedFsSections.includes(sec.id) ? <ChevronUp className="w-4 h-4 text-slate-300" /> : <ChevronDown className="w-4 h-4 text-slate-300" />}
+                              </button>
+                              
+                              <AnimatePresence>
+                                {expandedFsSections.includes(sec.id) && (
+                                  <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
+                                    <div className="px-6 pb-4">
+                                      <table className="w-full text-xs">
+                                        <thead>
+                                          <tr className="text-slate-400 border-b border-slate-50">
+                                            <th className="font-bold text-left py-2 w-[45%]">Line Item</th>
+                                            <th className="font-bold text-right py-2 w-[22%]">Current Year</th>
+                                            <th className="font-bold text-right py-2 w-[22%]">Prior Year</th>
+                                            <th className="py-2 w-[11%]"></th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {sec.lines.map(line => (
+                                            <React.Fragment key={line.id}>
+                                              <tr className={`${line.bold ? 'font-bold bg-slate-50/50' : ''} group`}>
+                                                <td className={`py-2 px-1 ${line.indent ? 'pl-6' : ''}`}>
+                                                  {line.isCustom ? (
+                                                    <input
+                                                      value={line.label}
+                                                      onChange={e => updateFsLabel(activeFsTab, sec.id, line.id, e.target.value)}
+                                                      placeholder="Enter line item name..."
+                                                      className="w-full bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none text-xs placeholder:text-slate-300"
+                                                      autoFocus
+                                                    />
+                                                  ) : (
+                                                    <span className="flex items-center gap-1">
+                                                      {line.label}
+                                                      {(line.breakups && line.breakups.length > 0) && (
+                                                        <span className="text-[9px] text-blue-500 font-bold">({line.breakups.length})</span>
+                                                      )}
+                                                    </span>
+                                                  )}
+                                                </td>
+                                                <td className="py-2 px-1">
+                                                  <input 
+                                                    value={line.cy} 
+                                                    onChange={e => activeFsTab === "bs" ? updateBsLine(sec.id, line.id, "cy", e.target.value) : updatePlLine(sec.id, line.id, "cy", e.target.value)}
+                                                    className={`w-full text-right bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono ${line.bold ? 'font-bold' : ''}`}
+                                                  />
+                                                </td>
+                                                <td className="py-2 px-1">
+                                                  <input 
+                                                    value={line.py} 
+                                                    onChange={e => activeFsTab === "bs" ? updateBsLine(sec.id, line.id, "py", e.target.value) : updatePlLine(sec.id, line.id, "py", e.target.value)}
+                                                    className={`w-full text-right bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono ${line.bold ? 'font-bold' : ''}`}
+                                                  />
+                                                </td>
+                                                <td className="py-2 px-1">
+                                                  {!line.subtotal && (
+                                                    <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                      <button
+                                                        onClick={() => {
+                                                          addBreakup(activeFsTab, sec.id, line.id);
+                                                          if (!expandedBreakups.includes(line.id)) toggleBreakupExpand(line.id);
+                                                        }}
+                                                        title="Add breakup"
+                                                        className="p-1 rounded hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"
+                                                      >
+                                                        <SplitSquareVertical className="w-3 h-3" />
+                                                      </button>
+                                                      {(line.breakups && line.breakups.length > 0) && (
+                                                        <button
+                                                          onClick={() => toggleBreakupExpand(line.id)}
+                                                          title={expandedBreakups.includes(line.id) ? "Collapse breakups" : "Expand breakups"}
+                                                          className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                                                        >
+                                                          {expandedBreakups.includes(line.id) ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                                        </button>
+                                                      )}
+                                                      {line.isCustom && (
+                                                        <button
+                                                          onClick={() => removeFsRow(activeFsTab, sec.id, line.id)}
+                                                          title="Remove row"
+                                                          className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+                                                        >
+                                                          <Trash2 className="w-3 h-3" />
+                                                        </button>
+                                                      )}
+                                                    </div>
+                                                  )}
+                                                </td>
+                                              </tr>
+                                              {(line.breakups && line.breakups.length > 0 && expandedBreakups.includes(line.id)) && (
+                                                <>
+                                                  {line.breakups.map(brk => (
+                                                    <tr key={brk.id} className="bg-blue-50/30 group/brk">
+                                                      <td className="py-1.5 pl-8 pr-1">
+                                                        <div className="flex items-center gap-1">
+                                                          <span className="text-blue-400 text-[10px]">┗</span>
+                                                          <input
+                                                            value={brk.label}
+                                                            onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "label", e.target.value)}
+                                                            placeholder="Breakup description..."
+                                                            className="flex-1 bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none text-[11px] text-slate-600 placeholder:text-slate-300"
+                                                          />
+                                                        </div>
+                                                      </td>
+                                                      <td className="py-1.5 px-1">
+                                                        <input
+                                                          value={brk.cy}
+                                                          onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "cy", e.target.value)}
+                                                          placeholder="0"
+                                                          className="w-full text-right bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono text-[11px] text-slate-600 placeholder:text-slate-300"
+                                                        />
+                                                      </td>
+                                                      <td className="py-1.5 px-1">
+                                                        <input
+                                                          value={brk.py}
+                                                          onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "py", e.target.value)}
+                                                          placeholder="0"
+                                                          className="w-full text-right bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono text-[11px] text-slate-600 placeholder:text-slate-300"
+                                                        />
+                                                      </td>
+                                                      <td className="py-1.5 px-1">
+                                                        <button
+                                                          onClick={() => removeBreakup(activeFsTab, sec.id, line.id, brk.id)}
+                                                          className="p-1 rounded opacity-0 group-hover/brk:opacity-100 hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all"
+                                                        >
+                                                          <Trash2 className="w-3 h-3" />
+                                                        </button>
+                                                      </td>
+                                                    </tr>
+                                                  ))}
+                                                </>
+                                              )}
+                                            </React.Fragment>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                      <button
+                                        onClick={() => addFsRow(activeFsTab, sec.id)}
+                                        className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-blue-500 hover:text-blue-700 transition-colors px-1 py-1 rounded hover:bg-blue-50"
+                                      >
+                                        <Plus className="w-3 h-3" /> Add Row
+                                      </button>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
                       {/* ── WP Groups ──────────────────────────────── */}
                       <div className="p-8 space-y-6">
                         <div className="flex items-center justify-between">
@@ -1520,181 +1695,6 @@ export default function WorkingPapers() {
                         onChange={handleConfigChange}
                         users={users}
                       />
-                    </div>
-
-                    {/* ── Financial Statement (FS) Data — Untouched ── */}
-                    <div className="mt-8 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                      <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center">
-                            <Table className="w-4 h-4" />
-                          </div>
-                          <h3 className="font-bold text-slate-800">Financial Statement (FS) Data</h3>
-                        </div>
-                        <div className="flex bg-white border border-slate-200 rounded-lg p-1">
-                          <button onClick={() => setActiveFsTab("bs")} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeFsTab === "bs" ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>Balance Sheet</button>
-                          <button onClick={() => setActiveFsTab("pl")} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeFsTab === "pl" ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>Profit & Loss</button>
-                        </div>
-                      </div>
-
-                      <div className="p-0 max-h-[600px] overflow-y-auto scrollbar-thin">
-                        {(activeFsTab === "bs" ? bsData : plData).map((sec) => (
-                          <div key={sec.id} className="border-b border-slate-100 last:border-0">
-                            <button 
-                              onClick={() => setExpandedFsSections(prev => prev.includes(sec.id) ? prev.filter(x => x !== sec.id) : [...prev, sec.id])}
-                              className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition-colors"
-                            >
-                              <div className="flex items-center gap-2">
-                                <div className={`w-1.5 h-6 rounded-full ${sec.color}`}></div>
-                                <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{sec.title}</span>
-                              </div>
-                              {expandedFsSections.includes(sec.id) ? <ChevronUp className="w-4 h-4 text-slate-300" /> : <ChevronDown className="w-4 h-4 text-slate-300" />}
-                            </button>
-                            
-                            <AnimatePresence>
-                              {expandedFsSections.includes(sec.id) && (
-                                <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
-                                  <div className="px-6 pb-4">
-                                    <table className="w-full text-xs">
-                                      <thead>
-                                        <tr className="text-slate-400 border-b border-slate-50">
-                                          <th className="font-bold text-left py-2 w-[45%]">Line Item</th>
-                                          <th className="font-bold text-right py-2 w-[22%]">Current Year</th>
-                                          <th className="font-bold text-right py-2 w-[22%]">Prior Year</th>
-                                          <th className="py-2 w-[11%]"></th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {sec.lines.map(line => (
-                                          <React.Fragment key={line.id}>
-                                            <tr className={`${line.bold ? 'font-bold bg-slate-50/50' : ''} group`}>
-                                              <td className={`py-2 px-1 ${line.indent ? 'pl-6' : ''}`}>
-                                                {line.isCustom ? (
-                                                  <input
-                                                    value={line.label}
-                                                    onChange={e => updateFsLabel(activeFsTab, sec.id, line.id, e.target.value)}
-                                                    placeholder="Enter line item name..."
-                                                    className="w-full bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none text-xs placeholder:text-slate-300"
-                                                    autoFocus
-                                                  />
-                                                ) : (
-                                                  <span className="flex items-center gap-1">
-                                                    {line.label}
-                                                    {(line.breakups && line.breakups.length > 0) && (
-                                                      <span className="text-[9px] text-blue-500 font-bold">({line.breakups.length})</span>
-                                                    )}
-                                                  </span>
-                                                )}
-                                              </td>
-                                              <td className="py-2 px-1">
-                                                <input 
-                                                  value={line.cy} 
-                                                  onChange={e => activeFsTab === "bs" ? updateBsLine(sec.id, line.id, "cy", e.target.value) : updatePlLine(sec.id, line.id, "cy", e.target.value)}
-                                                  className={`w-full text-right bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono ${line.bold ? 'font-bold' : ''}`}
-                                                />
-                                              </td>
-                                              <td className="py-2 px-1">
-                                                <input 
-                                                  value={line.py} 
-                                                  onChange={e => activeFsTab === "bs" ? updateBsLine(sec.id, line.id, "py", e.target.value) : updatePlLine(sec.id, line.id, "py", e.target.value)}
-                                                  className={`w-full text-right bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono ${line.bold ? 'font-bold' : ''}`}
-                                                />
-                                              </td>
-                                              <td className="py-2 px-1">
-                                                {!line.subtotal && (
-                                                  <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button
-                                                      onClick={() => {
-                                                        addBreakup(activeFsTab, sec.id, line.id);
-                                                        if (!expandedBreakups.includes(line.id)) toggleBreakupExpand(line.id);
-                                                      }}
-                                                      title="Add breakup"
-                                                      className="p-1 rounded hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"
-                                                    >
-                                                      <SplitSquareVertical className="w-3 h-3" />
-                                                    </button>
-                                                    {(line.breakups && line.breakups.length > 0) && (
-                                                      <button
-                                                        onClick={() => toggleBreakupExpand(line.id)}
-                                                        title={expandedBreakups.includes(line.id) ? "Collapse breakups" : "Expand breakups"}
-                                                        className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                                                      >
-                                                        {expandedBreakups.includes(line.id) ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                                                      </button>
-                                                    )}
-                                                    {line.isCustom && (
-                                                      <button
-                                                        onClick={() => removeFsRow(activeFsTab, sec.id, line.id)}
-                                                        title="Remove row"
-                                                        className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-                                                      >
-                                                        <Trash2 className="w-3 h-3" />
-                                                      </button>
-                                                    )}
-                                                  </div>
-                                                )}
-                                              </td>
-                                            </tr>
-                                            {(line.breakups && line.breakups.length > 0 && expandedBreakups.includes(line.id)) && (
-                                              <>
-                                                {line.breakups.map(brk => (
-                                                  <tr key={brk.id} className="bg-blue-50/30 group/brk">
-                                                    <td className="py-1.5 pl-8 pr-1">
-                                                      <div className="flex items-center gap-1">
-                                                        <span className="text-blue-400 text-[10px]">┗</span>
-                                                        <input
-                                                          value={brk.label}
-                                                          onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "label", e.target.value)}
-                                                          placeholder="Breakup description..."
-                                                          className="flex-1 bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none text-[11px] text-slate-600 placeholder:text-slate-300"
-                                                        />
-                                                      </div>
-                                                    </td>
-                                                    <td className="py-1.5 px-1">
-                                                      <input
-                                                        value={brk.cy}
-                                                        onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "cy", e.target.value)}
-                                                        placeholder="0"
-                                                        className="w-full text-right bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono text-[11px] text-slate-600 placeholder:text-slate-300"
-                                                      />
-                                                    </td>
-                                                    <td className="py-1.5 px-1">
-                                                      <input
-                                                        value={brk.py}
-                                                        onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "py", e.target.value)}
-                                                        placeholder="0"
-                                                        className="w-full text-right bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono text-[11px] text-slate-600 placeholder:text-slate-300"
-                                                      />
-                                                    </td>
-                                                    <td className="py-1.5 px-1">
-                                                      <button
-                                                        onClick={() => removeBreakup(activeFsTab, sec.id, line.id, brk.id)}
-                                                        className="p-1 rounded opacity-0 group-hover/brk:opacity-100 hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all"
-                                                      >
-                                                        <Trash2 className="w-3 h-3" />
-                                                      </button>
-                                                    </td>
-                                                  </tr>
-                                                ))}
-                                              </>
-                                            )}
-                                          </React.Fragment>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                    <button
-                                      onClick={() => addFsRow(activeFsTab, sec.id)}
-                                      className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-blue-500 hover:text-blue-700 transition-colors px-1 py-1 rounded hover:bg-blue-50"
-                                    >
-                                      <Plus className="w-3 h-3" /> Add Row
-                                    </button>
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        ))}
-                      </div>
                     </div>
 
                     {/* ── Configuration Summary (sticky bottom bar) ── */}
