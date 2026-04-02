@@ -932,7 +932,7 @@ export default function WorkingPapers() {
       const res = await fetch("/api/working-papers/generate-confirmations", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ analysis, entityName, financialYear }),
+        body: JSON.stringify({ analysis, meta: { entity: entityName, financial_year: financialYear, firm_name: firmName, ...generationMeta } }),
       });
       if (!res.ok) throw new Error("Confirmations generation failed");
       const blob = await res.blob();
@@ -2050,7 +2050,7 @@ export default function WorkingPapers() {
                             { id: "excel", label: "Microsoft Excel File", ext: ".xlsx", desc: "Complete workbook with automated cross-references and section tabs.", icon: Table, color: "emerald", handler: handleExportExcel, loading: exportingExcel },
                             { id: "docx", label: "Microsoft Word File", ext: ".docx", desc: "Professional report format suitable for management deliverables.", icon: FileSpreadsheet, color: "sky", handler: handleExportDocx, loading: exportingDocx },
                             { id: "pdf", label: "Adobe PDF File", ext: ".pdf", desc: "Final archived copy with high-fidelity formatting and sign-offs.", icon: FileText, color: "rose", handler: handleExport, loading: exporting },
-                            { id: "confirmations", label: "Confirmations Bundle", ext: ".zip", desc: "Automated generation of bank, debtor, and creditor confirmation letters.", icon: Mail, color: "violet", handler: handleExportConfirmations, loading: exportingConfirmations },
+                            { id: "confirmations", label: "Confirmations Bundle", ext: ".pdf", desc: "Automated generation of bank, debtor, and creditor confirmation letters.", icon: Mail, color: "violet", handler: handleExportConfirmations, loading: exportingConfirmations },
                           ].map(card => (
                             <button
                               key={card.id}
