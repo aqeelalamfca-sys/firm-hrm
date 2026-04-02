@@ -764,10 +764,10 @@ export default function WorkingPapers() {
   const sectionPapers = (sec: string) => workingPapers.filter(wp => (wp.section || "Uncategorized") === sec);
 
   return (
-    <div className="flex h-screen overflow-hidden font-sans text-slate-900 bg-white">
+    <div className="flex min-h-screen font-sans text-slate-900 bg-white">
       
       {/* ── LEFT RAIL ─────────────────────────────────────────────────────── */}
-      <aside className="w-[220px] shrink-0 bg-[#0A1628] text-slate-100 flex flex-col h-full border-r border-white/5 z-10 relative">
+      <aside className="w-[220px] shrink-0 bg-[#0A1628] text-slate-100 flex flex-col sticky top-0 h-screen border-r border-white/5 z-10">
         {/* Header */}
         <div className="px-5 pt-5 pb-4 border-b border-white/[0.06]">
           <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Audit Working Papers</p>
@@ -848,9 +848,9 @@ export default function WorkingPapers() {
       </aside>
 
       {/* ── RIGHT CONTENT ─────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-[#F8FAFC]">
-        {/* Top bar */}
-        <header className="h-14 flex items-center justify-between px-8 bg-white border-b border-slate-200 shrink-0 z-20">
+      <div className="flex-1 flex flex-col bg-[#F8FAFC]">
+        {/* Top bar — sticky so it stays visible while scrolling */}
+        <header className="h-14 flex items-center justify-between px-8 bg-white border-b border-slate-200 sticky top-0 z-20">
           <div className="flex items-center gap-2 text-sm">
             <span className="font-medium text-slate-400">Working Papers</span>
             <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
@@ -861,7 +861,7 @@ export default function WorkingPapers() {
           </Button>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-10 py-8">
+        <div className="px-10 py-8">
           <div className="max-w-4xl mx-auto pb-28">
             <AnimatePresence mode="wait">
               <motion.div key={step} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.3 }}>
