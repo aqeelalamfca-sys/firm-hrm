@@ -1,17 +1,15 @@
-import React, { useMemo, useCallback, useState } from "react";
+import React, { useMemo } from "react";
 import {
   Building2, FileText, BookOpen, Target, AlertTriangle, Settings,
   Layers, BarChart2, Hash, TrendingUp, Scale, Briefcase, Calendar,
-  FileOutput, Shield, ChevronDown, ChevronUp, Info, CheckCircle2,
+  FileOutput, Shield, CheckCircle2,
   HelpCircle, Sparkles
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   SECTIONS, VARIABLE_DEFS, WP_CODE_MAP,
   getVariablesBySection, isVariableVisible, getSectionStatus,
@@ -268,16 +266,14 @@ function FieldTooltip({ v }: { v: VariableDef }) {
   );
 }
 
-const SectionCard = React.memo(function SectionCard({
-  section, variables, values, onChange, status, expanded, onToggle, users
+const SectionBlock = React.memo(function SectionBlock({
+  section, variables, values, onChange, status, users
 }: {
   section: SectionDef;
   variables: VariableDef[];
   values: Record<string, any>;
   onChange: (key: string, value: any) => void;
   status: SectionStatus;
-  expanded: boolean;
-  onToggle: () => void;
   users?: Array<{ id: number; name: string; role?: string }>;
 }) {
   const Icon = ICON_MAP[section.iconName] || Shield;
@@ -287,101 +283,78 @@ const SectionCard = React.memo(function SectionCard({
   const toggleVars = visibleVars.filter(v => v.fieldType === "toggle");
   const formVars = visibleVars.filter(v => v.fieldType !== "toggle");
 
+  if (visibleVars.length === 0) return null;
+
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50/50 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <div className={`w-8 h-8 rounded-lg ${colors.bg} flex items-center justify-center`}>
-            <Icon className={`w-4 h-4 ${colors.text}`} />
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 pt-2">
+        <div className={`w-7 h-7 rounded-lg ${colors.bg} flex items-center justify-center shrink-0`}>
+          <Icon className={`w-3.5 h-3.5 ${colors.text}`} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">{section.title}</h3>
+            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${statusStyle.bg} ${statusStyle.text}`}>
+              {statusStyle.label}
+            </span>
           </div>
-          <div className="text-left">
-            <h3 className="text-sm font-bold text-slate-800">{section.title}</h3>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-[10px] text-slate-400 font-medium">{visibleVars.length} fields</span>
-              {status.mandatory > 0 && (
-                <span className="text-[10px] text-slate-400 font-medium">· {status.mandatoryComplete}/{status.mandatory} mandatory</span>
-              )}
-            </div>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-[10px] text-slate-400 font-medium">{visibleVars.length} fields</span>
+            {status.mandatory > 0 && (
+              <span className="text-[10px] text-slate-400 font-medium">· {status.mandatoryComplete}/{status.mandatory} mandatory</span>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${statusStyle.bg} ${statusStyle.text}`}>
-            {statusStyle.label}
-          </span>
-          {expanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+      </div>
+
+      <div className="border-t border-slate-100" />
+
+      {formVars.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {formVars.map(v => (
+            <FieldRenderer
+              key={v.key}
+              v={v}
+              value={values[v.key]}
+              onChange={val => onChange(v.key, val)}
+              users={users}
+            />
+          ))}
         </div>
-      </button>
+      )}
 
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <div className="px-6 pb-6 space-y-4 border-t border-slate-100 pt-4">
-              {formVars.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {formVars.map(v => (
-                    <FieldRenderer
-                      key={v.key}
-                      v={v}
-                      value={values[v.key]}
-                      onChange={val => onChange(v.key, val)}
-                      users={users}
-                    />
-                  ))}
-                </div>
-              )}
+      {toggleVars.length > 0 && (
+        <div className="space-y-2">
+          {formVars.length > 0 && <div className="border-t border-slate-50 pt-2" />}
+          {toggleVars.map(v => (
+            <FieldRenderer
+              key={v.key}
+              v={v}
+              value={values[v.key]}
+              onChange={val => onChange(v.key, val)}
+              users={users}
+            />
+          ))}
+        </div>
+      )}
 
-              {toggleVars.length > 0 && (
-                <div className="space-y-2">
-                  {formVars.length > 0 && <div className="border-t border-slate-100 pt-3" />}
-                  {toggleVars.map(v => (
-                    <FieldRenderer
-                      key={v.key}
-                      v={v}
-                      value={values[v.key]}
-                      onChange={val => onChange(v.key, val)}
-                      users={users}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {status.triggeredWps.length > 0 && (
-                <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100">
-                  <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-2">Triggered Working Papers</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {status.triggeredWps.map(c => (
-                      <span key={c} className="text-[10px] font-mono font-bold text-blue-700 bg-white px-2 py-1 rounded-lg border border-blue-200" title={WP_CODE_MAP[c] || c}>
-                        {c}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {status.triggeredWps.length > 0 && (
+        <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100">
+          <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-2">Triggered Working Papers</p>
+          <div className="flex flex-wrap gap-1.5">
+            {status.triggeredWps.map(c => (
+              <span key={c} className="text-[10px] font-mono font-bold text-blue-700 bg-white px-2 py-1 rounded-lg border border-blue-200" title={WP_CODE_MAP[c] || c}>
+                {c}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 });
 
 export default function EngagementConfig({ values, onChange, users }: EngagementConfigProps) {
-  const [expandedSections, setExpandedSections] = useState<string[]>(["entity_legal"]);
-
-  const toggleSection = useCallback((id: string) => {
-    setExpandedSections(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
-  }, []);
-
   const sectionData = useMemo(() => {
     return SECTIONS.map(sec => ({
       section: sec,
@@ -405,7 +378,7 @@ export default function EngagementConfig({ values, onChange, users }: Engagement
   }, [sectionData]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <div className="bg-gradient-to-r from-slate-900 to-blue-900 rounded-xl p-5 text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-3xl" />
         <div className="relative z-10">
@@ -437,34 +410,14 @@ export default function EngagementConfig({ values, onChange, users }: Engagement
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mb-2">
-        <button
-          type="button"
-          onClick={() => setExpandedSections(SECTIONS.map(s => s.id))}
-          className="text-[10px] font-bold text-blue-600 hover:text-blue-700 uppercase"
-        >
-          Expand All
-        </button>
-        <span className="text-slate-300">·</span>
-        <button
-          type="button"
-          onClick={() => setExpandedSections([])}
-          className="text-[10px] font-bold text-blue-600 hover:text-blue-700 uppercase"
-        >
-          Collapse All
-        </button>
-      </div>
-
       {sectionData.map(({ section, variables, status }) => (
-        <SectionCard
+        <SectionBlock
           key={section.id}
           section={section}
           variables={variables}
           values={values}
           onChange={onChange}
           status={status}
-          expanded={expandedSections.includes(section.id)}
-          onToggle={() => toggleSection(section.id)}
           users={users}
         />
       ))}

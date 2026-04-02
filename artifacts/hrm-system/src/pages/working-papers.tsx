@@ -1090,8 +1090,8 @@ export default function WorkingPapers() {
 
                 {/* STEP 1: CONFIGURE Engagement */}
                 {step === 1 && (
-                  <div className="space-y-8">
-                    <div>
+                  <div className="space-y-0">
+                    <div className="mb-6">
                       <h2 className="text-2xl font-bold text-slate-900">Configure Engagement</h2>
                       <p className="text-sm text-slate-500 mt-1.5 leading-relaxed max-w-2xl">Set entity particulars, define engagement timeline, assign the audit team, and populate Financial Statement data. The system uses this to drive materiality, risk assessment, and procedural selection across all phases.</p>
                       {autoFilled && (
@@ -1102,457 +1102,471 @@ export default function WorkingPapers() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                      <div className="lg:col-span-2 space-y-6">
-                        <div className="bg-white rounded-xl p-8 border border-slate-200 shadow-sm space-y-6">
-                          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Building2 className="w-4 h-4" /> Entity & Firm Details</h3>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Company / Entity Name</Label>
-                              <Input value={entityName} onChange={e => setEntityName(e.target.value)} placeholder="e.g. Pak Textile Mills Ltd." className="h-11 rounded-xl font-medium" />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">NTN Number</Label>
-                              <Input value={ntn} onChange={e => setNtn(e.target.value)} placeholder="e.g. 1234567-8" className="h-11 rounded-xl font-mono" />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">SECP Registration #</Label>
-                              <Input value={secp} onChange={e => setSecp(e.target.value)} placeholder="e.g. K-123456" className="h-11 rounded-xl font-mono" />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Financial Year / Period</Label>
-                              <Input value={financialYear} onChange={e => { setFinancialYear(e.target.value); setPeriodSuggested(false); }} placeholder="Year ended June 30, 2024" className="h-11 rounded-xl font-medium" />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">
-                                Period Start Date
-                                {periodSuggested && periodStart && <span className="ml-1.5 text-[9px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5 align-middle">suggested</span>}
-                              </Label>
-                              <Input type="date" value={periodStart} onChange={e => { setPeriodStart(e.target.value); setPeriodSuggested(false); }} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">
-                                Period End Date
-                                {periodSuggested && periodEnd && <span className="ml-1.5 text-[9px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5 align-middle">suggested</span>}
-                              </Label>
-                              <Input type="date" value={periodEnd} onChange={e => { setPeriodEnd(e.target.value); setPeriodSuggested(false); }} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Engagement Type</Label>
-                              <Select value={engagementType} onValueChange={setEngagementType}>
-                                <SelectTrigger className="h-11 rounded-xl font-medium">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {ENGAGEMENT_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Audit Firm Name</Label>
-                              <Input value={firmName} onChange={e => setFirmName(e.target.value)} className="h-11 rounded-xl font-medium" />
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-2 pt-2">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">Registered Address</Label>
-                            <Input value={registeredAddress} onChange={e => setRegisteredAddress(e.target.value)} placeholder="Principal place of business..." className="h-11 rounded-xl font-medium" />
-                          </div>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm divide-y divide-slate-100">
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">STRN (Sales Tax Reg.)</Label>
-                              <Input value={strn} onChange={e => setStrn(e.target.value)} placeholder="e.g. 32-00-1234-567-89" className="h-11 rounded-xl font-mono" />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Industry / Sector</Label>
-                              <Input value={industry} onChange={e => setIndustry(e.target.value)} placeholder="e.g. Textile Manufacturing" className="h-11 rounded-xl font-medium" />
-                            </div>
+                      {/* ── Entity & Firm Details ──────────────────────────── */}
+                      <div className="p-8 space-y-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                            <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                          </div>
+                          <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Entity & Firm Details</h3>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">Company / Entity Name <span className="text-red-500">*</span></Label>
+                            <Input value={entityName} onChange={e => setEntityName(e.target.value)} placeholder="e.g. Pak Textile Mills Ltd." className="h-11 rounded-xl font-medium" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">NTN Number</Label>
+                            <Input value={ntn} onChange={e => setNtn(e.target.value)} placeholder="e.g. 1234567-8" className="h-11 rounded-xl font-mono" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">SECP Registration #</Label>
+                            <Input value={secp} onChange={e => setSecp(e.target.value)} placeholder="e.g. K-123456" className="h-11 rounded-xl font-mono" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">Financial Year / Period</Label>
+                            <Input value={financialYear} onChange={e => { setFinancialYear(e.target.value); setPeriodSuggested(false); }} placeholder="Year ended June 30, 2024" className="h-11 rounded-xl font-medium" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">
+                              Period Start Date
+                              {periodSuggested && periodStart && <span className="ml-1.5 text-[9px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5 align-middle">suggested</span>}
+                            </Label>
+                            <Input type="date" value={periodStart} onChange={e => { setPeriodStart(e.target.value); setPeriodSuggested(false); }} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">
+                              Period End Date
+                              {periodSuggested && periodEnd && <span className="ml-1.5 text-[9px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5 align-middle">suggested</span>}
+                            </Label>
+                            <Input type="date" value={periodEnd} onChange={e => { setPeriodEnd(e.target.value); setPeriodSuggested(false); }} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">Engagement Type</Label>
+                            <Select value={engagementType} onValueChange={setEngagementType}>
+                              <SelectTrigger className="h-11 rounded-xl font-medium">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ENGAGEMENT_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">Audit Firm Name</Label>
+                            <Input value={firmName} onChange={e => setFirmName(e.target.value)} className="h-11 rounded-xl font-medium" />
                           </div>
                         </div>
-
-                        <EngagementConfig
-                          values={configValues}
-                          onChange={handleConfigChange}
-                          users={users}
-                        />
-
-                        {/* ── Key Deadlines ─────────────────────────────────── */}
-                        <div className="bg-white rounded-xl p-8 border border-slate-200 shadow-sm space-y-6">
-                          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-emerald-500" /> Key Deadlines
-                            <span className="font-normal text-slate-400 normal-case tracking-normal">— Engagement timeline and milestone dates</span>
-                          </h3>
-
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-                            <div className="space-y-1.5">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Planning Deadline <span className="text-red-500">*</span></Label>
-                              <Input type="date" value={planningDeadline} onChange={e => setPlanningDeadline(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Fieldwork Start</Label>
-                              <Input type="date" value={fieldworkStart} onChange={e => setFieldworkStart(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Fieldwork End</Label>
-                              <Input type="date" value={fieldworkEnd} onChange={e => setFieldworkEnd(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Reporting Deadline <span className="text-red-500">*</span></Label>
-                              <Input type="date" value={reportingDeadline} onChange={e => setReportingDeadline(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
-                            <div className="space-y-1.5">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Report Date</Label>
-                              <Input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                              <p className="text-[10px] text-slate-400 ml-1">Date of auditor's report</p>
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Filing Deadline</Label>
-                              <Input type="date" value={filingDeadline} onChange={e => setFilingDeadline(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                              <p className="text-[10px] text-slate-400 ml-1">SECP / regulatory filing deadline</p>
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Archive Date</Label>
-                              <Input type="date" value={archiveDate} onChange={e => setArchiveDate(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                              <p className="text-[10px] text-slate-400 ml-1">ISA 230 — File assembly deadline (60 days post-report)</p>
-                            </div>
-                          </div>
-
-                          {planningDeadline && fieldworkStart && fieldworkEnd && reportingDeadline && (
-                            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2.5">
-                              <CheckCircle2 className="w-4 h-4" />
-                              Timeline set — working papers will receive phase-appropriate dates automatically
-                            </div>
-                          )}
+                        
+                        <div className="space-y-2 pt-2">
+                          <Label className="text-xs font-bold text-slate-600 ml-1">Registered Address</Label>
+                          <Input value={registeredAddress} onChange={e => setRegisteredAddress(e.target.value)} placeholder="Principal place of business..." className="h-11 rounded-xl font-medium" />
                         </div>
 
-                        {/* FS Panel */}
-                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center">
-                                <Table className="w-4 h-4" />
-                              </div>
-                              <h3 className="font-bold text-slate-800">Financial Statement (FS) Data</h3>
-                            </div>
-                            <div className="flex bg-white border border-slate-200 rounded-lg p-1">
-                              <button onClick={() => setActiveFsTab("bs")} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeFsTab === "bs" ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>Balance Sheet</button>
-                              <button onClick={() => setActiveFsTab("pl")} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeFsTab === "pl" ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>Profit & Loss</button>
-                            </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                          <div className="space-y-2">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">STRN (Sales Tax Reg.)</Label>
+                            <Input value={strn} onChange={e => setStrn(e.target.value)} placeholder="e.g. 32-00-1234-567-89" className="h-11 rounded-xl font-mono" />
                           </div>
-
-                          <div className="p-0 max-h-[600px] overflow-y-auto scrollbar-thin">
-                            {(activeFsTab === "bs" ? bsData : plData).map((sec) => (
-                              <div key={sec.id} className="border-b border-slate-100 last:border-0">
-                                <button 
-                                  onClick={() => setExpandedFsSections(prev => prev.includes(sec.id) ? prev.filter(x => x !== sec.id) : [...prev, sec.id])}
-                                  className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition-colors"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <div className={`w-1.5 h-6 rounded-full ${sec.color}`}></div>
-                                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{sec.title}</span>
-                                  </div>
-                                  {expandedFsSections.includes(sec.id) ? <ChevronUp className="w-4 h-4 text-slate-300" /> : <ChevronDown className="w-4 h-4 text-slate-300" />}
-                                </button>
-                                
-                                <AnimatePresence>
-                                  {expandedFsSections.includes(sec.id) && (
-                                    <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
-                                      <div className="px-6 pb-4">
-                                        <table className="w-full text-xs">
-                                          <thead>
-                                            <tr className="text-slate-400 border-b border-slate-50">
-                                              <th className="font-bold text-left py-2 w-[45%]">Line Item</th>
-                                              <th className="font-bold text-right py-2 w-[22%]">Current Year</th>
-                                              <th className="font-bold text-right py-2 w-[22%]">Prior Year</th>
-                                              <th className="py-2 w-[11%]"></th>
-                                            </tr>
-                                          </thead>
-                                          <tbody>
-                                            {sec.lines.map(line => (
-                                              <React.Fragment key={line.id}>
-                                                <tr className={`${line.bold ? 'font-bold bg-slate-50/50' : ''} group`}>
-                                                  <td className={`py-2 px-1 ${line.indent ? 'pl-6' : ''}`}>
-                                                    {line.isCustom ? (
-                                                      <input
-                                                        value={line.label}
-                                                        onChange={e => updateFsLabel(activeFsTab, sec.id, line.id, e.target.value)}
-                                                        placeholder="Enter line item name..."
-                                                        className="w-full bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none text-xs placeholder:text-slate-300"
-                                                        autoFocus
-                                                      />
-                                                    ) : (
-                                                      <span className="flex items-center gap-1">
-                                                        {line.label}
-                                                        {(line.breakups && line.breakups.length > 0) && (
-                                                          <span className="text-[9px] text-blue-500 font-bold">({line.breakups.length})</span>
-                                                        )}
-                                                      </span>
-                                                    )}
-                                                  </td>
-                                                  <td className="py-2 px-1">
-                                                    <input 
-                                                      value={line.cy} 
-                                                      onChange={e => activeFsTab === "bs" ? updateBsLine(sec.id, line.id, "cy", e.target.value) : updatePlLine(sec.id, line.id, "cy", e.target.value)}
-                                                      className={`w-full text-right bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono ${line.bold ? 'font-bold' : ''}`}
-                                                    />
-                                                  </td>
-                                                  <td className="py-2 px-1">
-                                                    <input 
-                                                      value={line.py} 
-                                                      onChange={e => activeFsTab === "bs" ? updateBsLine(sec.id, line.id, "py", e.target.value) : updatePlLine(sec.id, line.id, "py", e.target.value)}
-                                                      className={`w-full text-right bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono ${line.bold ? 'font-bold' : ''}`}
-                                                    />
-                                                  </td>
-                                                  <td className="py-2 px-1">
-                                                    {!line.subtotal && (
-                                                      <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button
-                                                          onClick={() => {
-                                                            addBreakup(activeFsTab, sec.id, line.id);
-                                                            if (!expandedBreakups.includes(line.id)) toggleBreakupExpand(line.id);
-                                                          }}
-                                                          title="Add breakup"
-                                                          className="p-1 rounded hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"
-                                                        >
-                                                          <SplitSquareVertical className="w-3 h-3" />
-                                                        </button>
-                                                        {(line.breakups && line.breakups.length > 0) && (
-                                                          <button
-                                                            onClick={() => toggleBreakupExpand(line.id)}
-                                                            title={expandedBreakups.includes(line.id) ? "Collapse breakups" : "Expand breakups"}
-                                                            className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                                                          >
-                                                            {expandedBreakups.includes(line.id) ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                                                          </button>
-                                                        )}
-                                                        {line.isCustom && (
-                                                          <button
-                                                            onClick={() => removeFsRow(activeFsTab, sec.id, line.id)}
-                                                            title="Remove row"
-                                                            className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-                                                          >
-                                                            <Trash2 className="w-3 h-3" />
-                                                          </button>
-                                                        )}
-                                                      </div>
-                                                    )}
-                                                  </td>
-                                                </tr>
-                                                {(line.breakups && line.breakups.length > 0 && expandedBreakups.includes(line.id)) && (
-                                                  <>
-                                                    {line.breakups.map(brk => (
-                                                      <tr key={brk.id} className="bg-blue-50/30 group/brk">
-                                                        <td className="py-1.5 pl-8 pr-1">
-                                                          <div className="flex items-center gap-1">
-                                                            <span className="text-blue-400 text-[10px]">┗</span>
-                                                            <input
-                                                              value={brk.label}
-                                                              onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "label", e.target.value)}
-                                                              placeholder="Breakup description..."
-                                                              className="flex-1 bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none text-[11px] text-slate-600 placeholder:text-slate-300"
-                                                            />
-                                                          </div>
-                                                        </td>
-                                                        <td className="py-1.5 px-1">
-                                                          <input
-                                                            value={brk.cy}
-                                                            onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "cy", e.target.value)}
-                                                            placeholder="0"
-                                                            className="w-full text-right bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono text-[11px] text-slate-600 placeholder:text-slate-300"
-                                                          />
-                                                        </td>
-                                                        <td className="py-1.5 px-1">
-                                                          <input
-                                                            value={brk.py}
-                                                            onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "py", e.target.value)}
-                                                            placeholder="0"
-                                                            className="w-full text-right bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono text-[11px] text-slate-600 placeholder:text-slate-300"
-                                                          />
-                                                        </td>
-                                                        <td className="py-1.5 px-1">
-                                                          <button
-                                                            onClick={() => removeBreakup(activeFsTab, sec.id, line.id, brk.id)}
-                                                            className="p-1 rounded opacity-0 group-hover/brk:opacity-100 hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all"
-                                                          >
-                                                            <Trash2 className="w-3 h-3" />
-                                                          </button>
-                                                        </td>
-                                                      </tr>
-                                                    ))}
-                                                  </>
-                                                )}
-                                              </React.Fragment>
-                                            ))}
-                                          </tbody>
-                                        </table>
-                                        <button
-                                          onClick={() => addFsRow(activeFsTab, sec.id)}
-                                          className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-blue-500 hover:text-blue-700 transition-colors px-1 py-1 rounded hover:bg-blue-50"
-                                        >
-                                          <Plus className="w-3 h-3" /> Add Row
-                                        </button>
-                                      </div>
-                                    </motion.div>
-                                  )}
-                                </AnimatePresence>
-                              </div>
-                            ))}
+                          <div className="space-y-2">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">Industry / Sector</Label>
+                            <Input value={industry} onChange={e => setIndustry(e.target.value)} placeholder="e.g. Textile Manufacturing" className="h-11 rounded-xl font-medium" />
                           </div>
                         </div>
                       </div>
 
-                      <div className="space-y-6">
-                        <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
-                          <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest">WP Groups</h3>
-                            <button onClick={() => setSelectedPapers(selectedPapers.length === ALL_WP_REFS.length ? [] : ALL_WP_REFS)} className="text-[10px] font-bold text-blue-600 hover:text-blue-700 uppercase">
-                              {selectedPapers.length === ALL_WP_REFS.length ? "Deselect All" : "Select All"}
-                            </button>
+                      {/* ── Engagement Team ──────────────────────────────── */}
+                      <div className="p-8 space-y-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
+                            <Briefcase className="w-3.5 h-3.5 text-indigo-600" />
                           </div>
-                          
-                          <div className="space-y-3">
-                            {WP_GROUPS.map(g => {
-                              const allSelected = g.refs.every(r => selectedPapers.includes(r));
-                              const someSelected = g.refs.some(r => selectedPapers.includes(r));
-                              return (
-                                <div key={g.prefix} className={`flex items-center justify-between p-3 rounded-xl border transition-all ${someSelected ? 'border-blue-200 bg-blue-50/30' : 'border-slate-100'}`}>
-                                  <div className="flex flex-col">
-                                    <span className="text-[10px] font-black text-slate-400 leading-none mb-1">{g.prefix}</span>
-                                    <span className={`text-xs font-bold ${someSelected ? 'text-slate-900' : 'text-slate-500'}`}>{g.label}</span>
+                          <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Engagement Team</h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">Preparer <span className="font-normal text-slate-400">(Associate / Senior)</span></Label>
+                            <Select value={preparer} onValueChange={setPreparer}>
+                              <SelectTrigger className="h-10 rounded-xl text-sm">
+                                <SelectValue placeholder="Select preparer..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {users.length > 0 ? (
+                                  users.map(u => <SelectItem key={u.id} value={u.name}>{u.name}{u.role ? ` — ${u.role}` : ""}</SelectItem>)
+                                ) : (
+                                  <>
+                                    <SelectItem value="Audit Associate">Audit Associate</SelectItem>
+                                    <SelectItem value="Audit Senior">Audit Senior</SelectItem>
+                                    <SelectItem value="Semi-Senior">Semi-Senior</SelectItem>
+                                  </>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">Reviewer <span className="font-normal text-slate-400">(Manager)</span></Label>
+                            <Select value={reviewer} onValueChange={setReviewer}>
+                              <SelectTrigger className="h-10 rounded-xl text-sm">
+                                <SelectValue placeholder="Select reviewer..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {users.length > 0 ? (
+                                  users.map(u => <SelectItem key={u.id} value={u.name}>{u.name}{u.role ? ` — ${u.role}` : ""}</SelectItem>)
+                                ) : (
+                                  <>
+                                    <SelectItem value="Audit Manager">Audit Manager</SelectItem>
+                                    <SelectItem value="Senior Manager">Senior Manager</SelectItem>
+                                  </>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">Approver <span className="font-normal text-slate-400">(Partner / EQCR)</span></Label>
+                            <Select value={approver} onValueChange={setApprover}>
+                              <SelectTrigger className="h-10 rounded-xl text-sm">
+                                <SelectValue placeholder="Select approver..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {users.length > 0 ? (
+                                  users.map(u => <SelectItem key={u.id} value={u.name}>{u.name}{u.role ? ` — ${u.role}` : ""}</SelectItem>)
+                                ) : (
+                                  <>
+                                    <SelectItem value="Engagement Partner">Engagement Partner</SelectItem>
+                                    <SelectItem value="EQCR Partner">EQCR Partner</SelectItem>
+                                  </>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        {preparer && reviewer && approver && (
+                          <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Team assigned — WPs will include sign-offs automatically
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ── Key Deadlines ──────────────────────────────── */}
+                      <div className="p-8 space-y-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                            <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                          </div>
+                          <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Key Deadlines</h3>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">Planning Deadline <span className="text-red-500">*</span></Label>
+                            <Input type="date" value={planningDeadline} onChange={e => setPlanningDeadline(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">Fieldwork Start</Label>
+                            <Input type="date" value={fieldworkStart} onChange={e => setFieldworkStart(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">Fieldwork End</Label>
+                            <Input type="date" value={fieldworkEnd} onChange={e => setFieldworkEnd(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">Reporting Deadline <span className="text-red-500">*</span></Label>
+                            <Input type="date" value={reportingDeadline} onChange={e => setReportingDeadline(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">Report Date</Label>
+                            <Input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
+                            <p className="text-[10px] text-slate-400 ml-1">Date of auditor's report</p>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">Filing Deadline</Label>
+                            <Input type="date" value={filingDeadline} onChange={e => setFilingDeadline(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
+                            <p className="text-[10px] text-slate-400 ml-1">SECP / regulatory filing deadline</p>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-600 ml-1">Archive Date</Label>
+                            <Input type="date" value={archiveDate} onChange={e => setArchiveDate(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
+                            <p className="text-[10px] text-slate-400 ml-1">ISA 230 — File assembly deadline (60 days post-report)</p>
+                          </div>
+                        </div>
+
+                        {planningDeadline && fieldworkStart && fieldworkEnd && reportingDeadline && (
+                          <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2.5">
+                            <CheckCircle2 className="w-4 h-4" />
+                            Timeline set — working papers will receive phase-appropriate dates automatically
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ── WP Groups ──────────────────────────────── */}
+                      <div className="p-8 space-y-6">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
+                              <Layers className="w-3.5 h-3.5 text-violet-600" />
+                            </div>
+                            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">WP Groups</h3>
+                          </div>
+                          <button onClick={() => setSelectedPapers(selectedPapers.length === ALL_WP_REFS.length ? [] : ALL_WP_REFS)} className="text-[10px] font-bold text-blue-600 hover:text-blue-700 uppercase">
+                            {selectedPapers.length === ALL_WP_REFS.length ? "Deselect All" : "Select All"}
+                          </button>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {WP_GROUPS.map(g => {
+                            const allSelected = g.refs.every(r => selectedPapers.includes(r));
+                            const someSelected = g.refs.some(r => selectedPapers.includes(r));
+                            return (
+                              <div key={g.prefix} className={`flex items-center justify-between p-3 rounded-xl border transition-all ${someSelected ? 'border-blue-200 bg-blue-50/30' : 'border-slate-100'}`}>
+                                <div className="flex flex-col">
+                                  <span className="text-[10px] font-black text-slate-400 leading-none mb-1">{g.prefix}</span>
+                                  <span className={`text-xs font-bold ${someSelected ? 'text-slate-900' : 'text-slate-500'}`}>{g.label}</span>
+                                </div>
+                                <Switch 
+                                  checked={allSelected} 
+                                  onCheckedChange={() => toggleGroupSelection(g.refs)}
+                                  className="data-[state=checked]:bg-blue-600"
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ── 121 Engagement Configuration Variables (flat) ── */}
+                    <div className="mt-8">
+                      <EngagementConfig
+                        values={configValues}
+                        onChange={handleConfigChange}
+                        users={users}
+                      />
+                    </div>
+
+                    {/* ── Financial Statement (FS) Data — Untouched ── */}
+                    <div className="mt-8 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+                            <Table className="w-4 h-4" />
+                          </div>
+                          <h3 className="font-bold text-slate-800">Financial Statement (FS) Data</h3>
+                        </div>
+                        <div className="flex bg-white border border-slate-200 rounded-lg p-1">
+                          <button onClick={() => setActiveFsTab("bs")} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeFsTab === "bs" ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>Balance Sheet</button>
+                          <button onClick={() => setActiveFsTab("pl")} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeFsTab === "pl" ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>Profit & Loss</button>
+                        </div>
+                      </div>
+
+                      <div className="p-0 max-h-[600px] overflow-y-auto scrollbar-thin">
+                        {(activeFsTab === "bs" ? bsData : plData).map((sec) => (
+                          <div key={sec.id} className="border-b border-slate-100 last:border-0">
+                            <button 
+                              onClick={() => setExpandedFsSections(prev => prev.includes(sec.id) ? prev.filter(x => x !== sec.id) : [...prev, sec.id])}
+                              className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition-colors"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className={`w-1.5 h-6 rounded-full ${sec.color}`}></div>
+                                <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{sec.title}</span>
+                              </div>
+                              {expandedFsSections.includes(sec.id) ? <ChevronUp className="w-4 h-4 text-slate-300" /> : <ChevronDown className="w-4 h-4 text-slate-300" />}
+                            </button>
+                            
+                            <AnimatePresence>
+                              {expandedFsSections.includes(sec.id) && (
+                                <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
+                                  <div className="px-6 pb-4">
+                                    <table className="w-full text-xs">
+                                      <thead>
+                                        <tr className="text-slate-400 border-b border-slate-50">
+                                          <th className="font-bold text-left py-2 w-[45%]">Line Item</th>
+                                          <th className="font-bold text-right py-2 w-[22%]">Current Year</th>
+                                          <th className="font-bold text-right py-2 w-[22%]">Prior Year</th>
+                                          <th className="py-2 w-[11%]"></th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {sec.lines.map(line => (
+                                          <React.Fragment key={line.id}>
+                                            <tr className={`${line.bold ? 'font-bold bg-slate-50/50' : ''} group`}>
+                                              <td className={`py-2 px-1 ${line.indent ? 'pl-6' : ''}`}>
+                                                {line.isCustom ? (
+                                                  <input
+                                                    value={line.label}
+                                                    onChange={e => updateFsLabel(activeFsTab, sec.id, line.id, e.target.value)}
+                                                    placeholder="Enter line item name..."
+                                                    className="w-full bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none text-xs placeholder:text-slate-300"
+                                                    autoFocus
+                                                  />
+                                                ) : (
+                                                  <span className="flex items-center gap-1">
+                                                    {line.label}
+                                                    {(line.breakups && line.breakups.length > 0) && (
+                                                      <span className="text-[9px] text-blue-500 font-bold">({line.breakups.length})</span>
+                                                    )}
+                                                  </span>
+                                                )}
+                                              </td>
+                                              <td className="py-2 px-1">
+                                                <input 
+                                                  value={line.cy} 
+                                                  onChange={e => activeFsTab === "bs" ? updateBsLine(sec.id, line.id, "cy", e.target.value) : updatePlLine(sec.id, line.id, "cy", e.target.value)}
+                                                  className={`w-full text-right bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono ${line.bold ? 'font-bold' : ''}`}
+                                                />
+                                              </td>
+                                              <td className="py-2 px-1">
+                                                <input 
+                                                  value={line.py} 
+                                                  onChange={e => activeFsTab === "bs" ? updateBsLine(sec.id, line.id, "py", e.target.value) : updatePlLine(sec.id, line.id, "py", e.target.value)}
+                                                  className={`w-full text-right bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono ${line.bold ? 'font-bold' : ''}`}
+                                                />
+                                              </td>
+                                              <td className="py-2 px-1">
+                                                {!line.subtotal && (
+                                                  <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button
+                                                      onClick={() => {
+                                                        addBreakup(activeFsTab, sec.id, line.id);
+                                                        if (!expandedBreakups.includes(line.id)) toggleBreakupExpand(line.id);
+                                                      }}
+                                                      title="Add breakup"
+                                                      className="p-1 rounded hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"
+                                                    >
+                                                      <SplitSquareVertical className="w-3 h-3" />
+                                                    </button>
+                                                    {(line.breakups && line.breakups.length > 0) && (
+                                                      <button
+                                                        onClick={() => toggleBreakupExpand(line.id)}
+                                                        title={expandedBreakups.includes(line.id) ? "Collapse breakups" : "Expand breakups"}
+                                                        className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                                                      >
+                                                        {expandedBreakups.includes(line.id) ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                                      </button>
+                                                    )}
+                                                    {line.isCustom && (
+                                                      <button
+                                                        onClick={() => removeFsRow(activeFsTab, sec.id, line.id)}
+                                                        title="Remove row"
+                                                        className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+                                                      >
+                                                        <Trash2 className="w-3 h-3" />
+                                                      </button>
+                                                    )}
+                                                  </div>
+                                                )}
+                                              </td>
+                                            </tr>
+                                            {(line.breakups && line.breakups.length > 0 && expandedBreakups.includes(line.id)) && (
+                                              <>
+                                                {line.breakups.map(brk => (
+                                                  <tr key={brk.id} className="bg-blue-50/30 group/brk">
+                                                    <td className="py-1.5 pl-8 pr-1">
+                                                      <div className="flex items-center gap-1">
+                                                        <span className="text-blue-400 text-[10px]">┗</span>
+                                                        <input
+                                                          value={brk.label}
+                                                          onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "label", e.target.value)}
+                                                          placeholder="Breakup description..."
+                                                          className="flex-1 bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none text-[11px] text-slate-600 placeholder:text-slate-300"
+                                                        />
+                                                      </div>
+                                                    </td>
+                                                    <td className="py-1.5 px-1">
+                                                      <input
+                                                        value={brk.cy}
+                                                        onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "cy", e.target.value)}
+                                                        placeholder="0"
+                                                        className="w-full text-right bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono text-[11px] text-slate-600 placeholder:text-slate-300"
+                                                      />
+                                                    </td>
+                                                    <td className="py-1.5 px-1">
+                                                      <input
+                                                        value={brk.py}
+                                                        onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "py", e.target.value)}
+                                                        placeholder="0"
+                                                        className="w-full text-right bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono text-[11px] text-slate-600 placeholder:text-slate-300"
+                                                      />
+                                                    </td>
+                                                    <td className="py-1.5 px-1">
+                                                      <button
+                                                        onClick={() => removeBreakup(activeFsTab, sec.id, line.id, brk.id)}
+                                                        className="p-1 rounded opacity-0 group-hover/brk:opacity-100 hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all"
+                                                      >
+                                                        <Trash2 className="w-3 h-3" />
+                                                      </button>
+                                                    </td>
+                                                  </tr>
+                                                ))}
+                                              </>
+                                            )}
+                                          </React.Fragment>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                    <button
+                                      onClick={() => addFsRow(activeFsTab, sec.id)}
+                                      className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-blue-500 hover:text-blue-700 transition-colors px-1 py-1 rounded hover:bg-blue-50"
+                                    >
+                                      <Plus className="w-3 h-3" /> Add Row
+                                    </button>
                                   </div>
-                                  <Switch 
-                                    checked={allSelected} 
-                                    onCheckedChange={() => toggleGroupSelection(g.refs)}
-                                    className="data-[state=checked]:bg-blue-600"
-                                  />
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* ── Configuration Summary (sticky bottom bar) ── */}
+                    <div className="mt-8 bg-gradient-to-r from-slate-900 to-blue-900 rounded-xl p-5 text-white relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+                      <div className="relative z-10">
+                        <h4 className="text-[10px] font-bold text-blue-300 uppercase tracking-widest mb-3">Configuration Summary</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                          <div className="bg-white/10 rounded-lg p-3 text-center">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Documents</p>
+                            <p className="text-lg font-black text-white">{files.length}</p>
+                          </div>
+                          <div className="bg-white/10 rounded-lg p-3 text-center">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Selected WPs</p>
+                            <p className="text-lg font-black text-white">{selectedPapers.length}<span className="text-sm text-white/50">/{ALL_WP_REFS.length}</span></p>
+                          </div>
+                          <div className="bg-white/10 rounded-lg p-3 text-center">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Config Vars</p>
+                            <p className="text-lg font-black text-white">{VARIABLE_DEFS.filter(v => isVariableVisible(v, configValues) && isFieldComplete(v, configValues[v.key])).length}<span className="text-sm text-white/50">/{VARIABLE_DEFS.filter(v => isVariableVisible(v, configValues)).length}</span></p>
+                          </div>
+                          <div className="bg-white/10 rounded-lg p-3 text-center">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Triggered WPs</p>
+                            <p className="text-lg font-black text-blue-400">{getAllTriggeredWPs(configValues).length}</p>
+                          </div>
+                          <div className="bg-white/10 rounded-lg p-3 text-center">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Status</p>
+                            {(() => {
+                              const v = validateAllMandatory(configValues);
+                              return v.valid ? (
+                                <div className="flex items-center justify-center gap-1 text-emerald-400 mt-1">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  <span className="text-[10px] font-bold uppercase">Ready</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-center gap-1 text-amber-400 mt-1">
+                                  <AlertTriangle className="w-4 h-4" />
+                                  <span className="text-[10px] font-bold uppercase">{v.missing.length} left</span>
                                 </div>
                               );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* ── Engagement Team ─────────────────────────────────── */}
-                        <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
-                          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                            <Briefcase className="w-4 h-4 text-blue-500" /> Engagement Team
-                          </h3>
-
-                          <div className="space-y-3">
-                            {/* Preparer */}
-                            <div className="space-y-1.5">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Preparer <span className="font-normal text-slate-400">(Associate / Senior)</span></Label>
-                              <Select value={preparer} onValueChange={setPreparer}>
-                                <SelectTrigger className="h-10 rounded-xl text-sm">
-                                  <SelectValue placeholder="Select preparer..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {users.length > 0 ? (
-                                    users.map(u => <SelectItem key={u.id} value={u.name}>{u.name}{u.role ? ` — ${u.role}` : ""}</SelectItem>)
-                                  ) : (
-                                    <>
-                                      <SelectItem value="Audit Associate">Audit Associate</SelectItem>
-                                      <SelectItem value="Audit Senior">Audit Senior</SelectItem>
-                                      <SelectItem value="Semi-Senior">Semi-Senior</SelectItem>
-                                    </>
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            {/* Reviewer */}
-                            <div className="space-y-1.5">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Reviewer <span className="font-normal text-slate-400">(Manager)</span></Label>
-                              <Select value={reviewer} onValueChange={setReviewer}>
-                                <SelectTrigger className="h-10 rounded-xl text-sm">
-                                  <SelectValue placeholder="Select reviewer..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {users.length > 0 ? (
-                                    users.map(u => <SelectItem key={u.id} value={u.name}>{u.name}{u.role ? ` — ${u.role}` : ""}</SelectItem>)
-                                  ) : (
-                                    <>
-                                      <SelectItem value="Audit Manager">Audit Manager</SelectItem>
-                                      <SelectItem value="Senior Manager">Senior Manager</SelectItem>
-                                    </>
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            {/* Approver */}
-                            <div className="space-y-1.5">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Approver <span className="font-normal text-slate-400">(Partner / EQCR)</span></Label>
-                              <Select value={approver} onValueChange={setApprover}>
-                                <SelectTrigger className="h-10 rounded-xl text-sm">
-                                  <SelectValue placeholder="Select approver..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {users.length > 0 ? (
-                                    users.map(u => <SelectItem key={u.id} value={u.name}>{u.name}{u.role ? ` — ${u.role}` : ""}</SelectItem>)
-                                  ) : (
-                                    <>
-                                      <SelectItem value="Engagement Partner">Engagement Partner</SelectItem>
-                                      <SelectItem value="EQCR Partner">EQCR Partner</SelectItem>
-                                    </>
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-
-                          {preparer && reviewer && approver && (
-                            <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              Team assigned — WPs will include sign-offs automatically
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="bg-gradient-to-br from-slate-900 to-blue-900 rounded-xl p-6 text-white shadow-xl relative overflow-hidden">
-                          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
-                          <div className="relative z-10">
-                            <h4 className="text-[10px] font-bold text-blue-300 uppercase tracking-widest mb-4">Configuration Summary</h4>
-                            <div className="space-y-4">
-                              <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                                <span className="text-xs text-white/60">Documents</span>
-                                <span className="text-xs font-bold">{files.length} Files</span>
-                              </div>
-                              <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                                <span className="text-xs text-white/60">Selected WPs</span>
-                                <span className="text-xs font-bold">{selectedPapers.length} / {ALL_WP_REFS.length}</span>
-                              </div>
-                              <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                                <span className="text-xs text-white/60">Config Variables</span>
-                                <span className="text-xs font-bold">{VARIABLE_DEFS.filter(v => isVariableVisible(v, configValues) && isFieldComplete(v, configValues[v.key])).length} / {VARIABLE_DEFS.filter(v => isVariableVisible(v, configValues)).length}</span>
-                              </div>
-                              <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                                <span className="text-xs text-white/60">Triggered WPs</span>
-                                <span className="text-xs font-bold">{getAllTriggeredWPs(configValues).length} Active</span>
-                              </div>
-                              <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                                <span className="text-xs text-white/60">FS Sections</span>
-                                <span className="text-xs font-bold">12 Total</span>
-                              </div>
-                              {(() => {
-                                const v = validateAllMandatory(configValues);
-                                return v.valid ? (
-                                  <div className="pt-2 flex items-center gap-2 text-emerald-400">
-                                    <CheckCircle2 className="w-4 h-4" />
-                                    <span className="text-[10px] font-bold uppercase tracking-widest">Ready for analysis</span>
-                                  </div>
-                                ) : (
-                                  <div className="pt-2 flex items-center gap-2 text-amber-400">
-                                    <AlertTriangle className="w-4 h-4" />
-                                    <span className="text-[10px] font-bold uppercase tracking-widest">{v.missing.length} mandatory fields remaining</span>
-                                  </div>
-                                );
-                              })()}
-                            </div>
+                            })()}
                           </div>
                         </div>
                       </div>
