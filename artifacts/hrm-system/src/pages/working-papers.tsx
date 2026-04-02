@@ -18,6 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
+import EngagementConfig from "@/components/engagement-config";
+import { getDefaultValues, validateAllMandatory, getAllTriggeredWPs, VARIABLE_DEFS, isFieldComplete, isVariableVisible } from "@/lib/engagement-variable-defs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface UploadedFile { file: File; id: string; classified?: string; }
@@ -511,6 +513,11 @@ export default function WorkingPapers() {
   const [approver, setApprover] = useState("");
   const [users, setUsers] = useState<Array<{id: number; name: string; role?: string; email?: string}>>([]);
 
+  const [configValues, setConfigValues] = useState<Record<string, any>>(() => getDefaultValues());
+  const handleConfigChange = useCallback((key: string, value: any) => {
+    setConfigValues(prev => ({ ...prev, [key]: value }));
+  }, []);
+
   useEffect(() => {
     const prev = document.title;
     document.title = "Pakistan Audit Working Paper Generator | ANA & Co. Chartered Accountants";
@@ -831,6 +838,7 @@ export default function WorkingPapers() {
           archiveDate,
           bsData,
           plData,
+          configValues,
         }),
       });
 
@@ -1089,173 +1097,11 @@ export default function WorkingPapers() {
                           </div>
                         </div>
 
-                        <div className="bg-white rounded-xl p-8 border border-slate-200 shadow-sm space-y-6">
-                          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Shield className="w-4 h-4" /> Engagement Variables</h3>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Entity Type</Label>
-                              <Select value={entityType} onValueChange={setEntityType}>
-                                <SelectTrigger className="h-11 rounded-xl font-medium"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  {["Private Limited", "Public Limited", "Single Member", "LLP", "Partnership", "Sole Proprietor", "AOP", "Trust", "NPO / NGO", "Government Entity"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Reporting Framework</Label>
-                              <Select value={framework} onValueChange={setFramework}>
-                                <SelectTrigger className="h-11 rounded-xl font-medium"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  {["IFRS", "IFRS for SMEs", "IAS", "Fourth Schedule (Cos Act)", "IPSAS", "Other"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Listed Status</Label>
-                              <Select value={listedStatus} onValueChange={setListedStatus}>
-                                <SelectTrigger className="h-11 rounded-xl font-medium"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  {["Unlisted", "PSX Listed", "GEM Board"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Control Reliance</Label>
-                              <Select value={controlReliance} onValueChange={setControlReliance}>
-                                <SelectTrigger className="h-11 rounded-xl font-medium"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  {["Full", "Partial", "None"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap gap-6 pt-2">
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={firstYearAudit} onCheckedChange={setFirstYearAudit} className="data-[state=checked]:bg-blue-600" />
-                              <span className="text-xs font-bold text-slate-700">First Year Audit (ISA 510)</span>
-                            </label>
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={goingConcernFlag} onCheckedChange={setGoingConcernFlag} className="data-[state=checked]:bg-red-600" />
-                              <span className="text-xs font-bold text-slate-700">Going Concern Doubt (ISA 570)</span>
-                            </label>
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={newClient} onCheckedChange={setNewClient} className="data-[state=checked]:bg-amber-600" />
-                              <span className="text-xs font-bold text-slate-700">New Client</span>
-                            </label>
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={groupAuditFlag} onCheckedChange={setGroupAuditFlag} className="data-[state=checked]:bg-purple-600" />
-                              <span className="text-xs font-bold text-slate-700">Group Audit (ISA 600)</span>
-                            </label>
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={internalAuditExists} onCheckedChange={setInternalAuditExists} className="data-[state=checked]:bg-teal-600" />
-                              <span className="text-xs font-bold text-slate-700">Internal Audit Exists (ISA 610)</span>
-                            </label>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Currency</Label>
-                              <Select value={currency} onValueChange={setCurrency}>
-                                <SelectTrigger className="h-11 rounded-xl font-medium"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  {["PKR", "USD", "GBP", "EUR", "AED", "SAR"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Sampling Method (ISA 530)</Label>
-                              <Select value={samplingMethod} onValueChange={setSamplingMethod}>
-                                <SelectTrigger className="h-11 rounded-xl font-medium"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  {["Statistical", "Non-Statistical", "Judgmental", "Systematic", "Random"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-600 ml-1">Confidence Level</Label>
-                              <Select value={confidenceLevel} onValueChange={setConfidenceLevel}>
-                                <SelectTrigger className="h-11 rounded-xl font-medium"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  {["90%", "95%", "99%"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* ── Ethics & Independence ─────────────────────────── */}
-                        <div className="bg-white rounded-xl p-8 border border-slate-200 shadow-sm space-y-4">
-                          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Scale className="w-4 h-4" /> Ethics & Independence (IESBA)</h3>
-                          <div className="flex flex-wrap gap-6">
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={independenceConfirmed} onCheckedChange={setIndependenceConfirmed} className="data-[state=checked]:bg-emerald-600" />
-                              <span className="text-xs font-bold text-slate-700">Independence Confirmed</span>
-                            </label>
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={conflictCheck} onCheckedChange={setConflictCheck} className="data-[state=checked]:bg-emerald-600" />
-                              <span className="text-xs font-bold text-slate-700">Conflict Check Cleared</span>
-                            </label>
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={eqcrRequired} onCheckedChange={setEqcrRequired} className="data-[state=checked]:bg-purple-600" />
-                              <span className="text-xs font-bold text-slate-700">EQCR Required (ISQM 2)</span>
-                            </label>
-                          </div>
-                        </div>
-
-                        {/* ── Special Area Flags ────────────────────────────── */}
-                        <div className="bg-white rounded-xl p-8 border border-slate-200 shadow-sm space-y-4">
-                          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-amber-500" /> Special Area Flags</h3>
-                          <div className="flex flex-wrap gap-6">
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={relatedPartyFlag} onCheckedChange={setRelatedPartyFlag} className="data-[state=checked]:bg-amber-600" />
-                              <span className="text-xs font-bold text-slate-700">Related Parties (ISA 550)</span>
-                            </label>
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={subsequentEventsFlag} onCheckedChange={setSubsequentEventsFlag} className="data-[state=checked]:bg-amber-600" />
-                              <span className="text-xs font-bold text-slate-700">Subsequent Events (ISA 560)</span>
-                            </label>
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={estimatesFlag} onCheckedChange={setEstimatesFlag} className="data-[state=checked]:bg-amber-600" />
-                              <span className="text-xs font-bold text-slate-700">Accounting Estimates (ISA 540)</span>
-                            </label>
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={litigationFlag} onCheckedChange={setLitigationFlag} className="data-[state=checked]:bg-red-600" />
-                              <span className="text-xs font-bold text-slate-700">Litigation / Claims (ISA 501)</span>
-                            </label>
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={expertRequired} onCheckedChange={setExpertRequired} className="data-[state=checked]:bg-purple-600" />
-                              <span className="text-xs font-bold text-slate-700">Expert Required (ISA 620)</span>
-                            </label>
-                          </div>
-                        </div>
-
-                        {/* ── Tax & Regulatory (Pakistan) ───────────────────── */}
-                        <div className="bg-white rounded-xl p-8 border border-slate-200 shadow-sm space-y-4">
-                          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Hash className="w-4 h-4 text-orange-500" /> Tax & Regulatory (Pakistan)</h3>
-                          <div className="flex flex-wrap gap-6">
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={currentTaxApplicable} onCheckedChange={setCurrentTaxApplicable} className="data-[state=checked]:bg-orange-600" />
-                              <span className="text-xs font-bold text-slate-700">Current Tax (ITO 2001)</span>
-                            </label>
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={deferredTaxApplicable} onCheckedChange={setDeferredTaxApplicable} className="data-[state=checked]:bg-orange-600" />
-                              <span className="text-xs font-bold text-slate-700">Deferred Tax (IAS 12)</span>
-                            </label>
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={whtExposure} onCheckedChange={setWhtExposure} className="data-[state=checked]:bg-orange-600" />
-                              <span className="text-xs font-bold text-slate-700">WHT Exposure</span>
-                            </label>
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={salesTaxRegistered} onCheckedChange={setSalesTaxRegistered} className="data-[state=checked]:bg-orange-600" />
-                              <span className="text-xs font-bold text-slate-700">Sales Tax Registered</span>
-                            </label>
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                              <Switch checked={superTaxApplicable} onCheckedChange={setSuperTaxApplicable} className="data-[state=checked]:bg-red-600" />
-                              <span className="text-xs font-bold text-slate-700">Super Tax Applicable</span>
-                            </label>
-                          </div>
-                        </div>
+                        <EngagementConfig
+                          values={configValues}
+                          onChange={handleConfigChange}
+                          users={users}
+                        />
 
                         {/* ── Key Deadlines ─────────────────────────────────── */}
                         <div className="bg-white rounded-xl p-8 border border-slate-200 shadow-sm space-y-6">
@@ -1503,13 +1349,31 @@ export default function WorkingPapers() {
                                 <span className="text-xs font-bold">{selectedPapers.length} / {ALL_WP_REFS.length}</span>
                               </div>
                               <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                                <span className="text-xs text-white/60">Config Variables</span>
+                                <span className="text-xs font-bold">{VARIABLE_DEFS.filter(v => isVariableVisible(v, configValues) && isFieldComplete(v, configValues[v.key])).length} / {VARIABLE_DEFS.filter(v => isVariableVisible(v, configValues)).length}</span>
+                              </div>
+                              <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                                <span className="text-xs text-white/60">Triggered WPs</span>
+                                <span className="text-xs font-bold">{getAllTriggeredWPs(configValues).length} Active</span>
+                              </div>
+                              <div className="flex items-center justify-between border-b border-white/10 pb-2">
                                 <span className="text-xs text-white/60">FS Sections</span>
                                 <span className="text-xs font-bold">12 Total</span>
                               </div>
-                              <div className="pt-2 flex items-center gap-2 text-emerald-400">
-                                <CheckCircle2 className="w-4 h-4" />
-                                <span className="text-[10px] font-bold uppercase tracking-widest">Ready for analysis</span>
-                              </div>
+                              {(() => {
+                                const v = validateAllMandatory(configValues);
+                                return v.valid ? (
+                                  <div className="pt-2 flex items-center gap-2 text-emerald-400">
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    <span className="text-[10px] font-bold uppercase tracking-widest">Ready for analysis</span>
+                                  </div>
+                                ) : (
+                                  <div className="pt-2 flex items-center gap-2 text-amber-400">
+                                    <AlertTriangle className="w-4 h-4" />
+                                    <span className="text-[10px] font-bold uppercase tracking-widest">{v.missing.length} mandatory fields remaining</span>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
                         </div>
