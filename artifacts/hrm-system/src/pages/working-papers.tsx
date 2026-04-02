@@ -275,46 +275,45 @@ function DropZone({ files, onAdd, onRemove }: { files: UploadedFile[]; onAdd: (f
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div
         onDragOver={e => { e.preventDefault(); setDrag(true); }}
         onDragLeave={() => setDrag(false)}
         onDrop={onDrop}
         onClick={() => inputRef.current?.click()}
-        className={`border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all bg-white relative overflow-hidden shadow-sm group ${drag ? "border-blue-500 bg-blue-50/50 scale-[1.01]" : "border-slate-300 hover:border-blue-400 hover:bg-slate-50/50"}`}
+        className={`border border-dashed rounded-xl py-12 px-8 text-center cursor-pointer transition-all bg-white ${drag ? "border-blue-400 bg-blue-50/40" : "border-slate-300 hover:border-blue-300 hover:bg-slate-50/60"}`}
       >
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-        <div className="w-16 h-16 bg-white border border-slate-200 shadow-sm rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300 relative z-10">
-          <Upload className="w-8 h-8 text-blue-600" />
+        <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mx-auto mb-4">
+          <Upload className="w-6 h-6 text-blue-600" />
         </div>
-        <h3 className="text-lg font-bold text-slate-800 relative z-10">Drop your audit documents here</h3>
-        <p className="text-sm text-slate-500 mt-2 relative z-10">PDF · Excel · CSV · Word · Images · Emails — up to 20 files</p>
-        <div className="flex items-center justify-center gap-2 mt-4 relative z-10">
+        <p className="text-sm font-semibold text-slate-800">Drop your audit documents here</p>
+        <p className="text-xs text-slate-400 mt-1">PDF · Excel · CSV · Word · Images · Emails — up to 20 files</p>
+        <div className="flex items-center justify-center gap-1.5 mt-3">
           {["PDF", "XLSX", "CSV", "DOCX", "JPG", "EML"].map(ext => (
-            <Badge key={ext} variant="secondary" className="bg-slate-100 text-slate-500 hover:bg-slate-100 font-bold">{ext}</Badge>
+            <span key={ext} className="text-[10px] font-bold text-slate-400 border border-slate-200 rounded px-1.5 py-0.5 font-mono">{ext}</span>
           ))}
         </div>
-        <Button className="mt-6 relative z-10 shadow-sm" variant="secondary">Browse Files</Button>
+        <button className="mt-5 text-xs font-semibold text-slate-600 border border-slate-300 rounded-lg px-4 py-2 hover:bg-slate-50 transition-colors">Browse Files</button>
         <input ref={inputRef} type="file" multiple className="hidden"
           accept=".pdf,.xlsx,.xls,.csv,.txt,.docx,.doc,.jpg,.jpeg,.png,.webp,.eml"
           onChange={e => e.target.files && onAdd(e.target.files)} />
       </div>
 
       {files.length > 0 && (
-        <div className="space-y-3">
-          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Uploaded Files ({files.length})</h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Uploaded Files ({files.length})</p>
+          <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white">
             {files.map(f => (
-              <motion.div key={f.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                className="flex items-center gap-3 p-3.5 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-blue-200 transition-colors group">
-                <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center border border-slate-100 group-hover:bg-blue-50 transition-colors">
+              <motion.div key={f.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/60 transition-colors group">
+                <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center border border-slate-100 shrink-0">
                   {fileIcon(f.file)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-slate-800 truncate">{f.file.name}</p>
-                  <p className="text-[11px] font-medium text-slate-500">{(f.file.size / 1024).toFixed(0)} KB {f.classified ? `· ${f.classified}` : ""}</p>
+                  <p className="text-sm font-semibold text-slate-800 truncate">{f.file.name}</p>
+                  <p className="text-[11px] text-slate-400">{(f.file.size / 1024).toFixed(0)} KB {f.classified ? <span className="ml-1 text-blue-600 font-medium">· {f.classified}</span> : ""}</p>
                 </div>
-                <button onClick={e => { e.stopPropagation(); onRemove(f.id); }} className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all">
+                <button onClick={e => { e.stopPropagation(); onRemove(f.id); }} className="w-7 h-7 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100">
                   <X className="w-4 h-4" />
                 </button>
               </motion.div>
@@ -765,100 +764,105 @@ export default function WorkingPapers() {
   const sectionPapers = (sec: string) => workingPapers.filter(wp => (wp.section || "Uncategorized") === sec);
 
   return (
-    <div className="flex h-screen overflow-hidden font-['Plus_Jakarta_Sans',Inter,system-ui] text-slate-900 bg-slate-50">
+    <div className="flex h-screen overflow-hidden font-sans text-slate-900 bg-white">
       
-      {/* LEFT RAIL (from Mockup) */}
-      <div className="w-[280px] shrink-0 bg-[#0F172A] text-slate-100 flex flex-col h-full border-r border-slate-800 shadow-2xl z-10 relative overflow-hidden">
-        <div className="px-6 pt-6 pb-5 border-b border-slate-800/60">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em]">Audit Working Papers</p>
-          <p className="text-[9px] text-slate-600 mt-1 leading-relaxed">End-to-End Pakistan Audit System</p>
-          <p className="text-[9px] text-slate-700 mt-0.5">ISA 200–720 · ISQM 1&2 · Companies Act 2017</p>
+      {/* ── LEFT RAIL ─────────────────────────────────────────────────────── */}
+      <aside className="w-[220px] shrink-0 bg-[#0A1628] text-slate-100 flex flex-col h-full border-r border-white/5 z-10 relative">
+        {/* Header */}
+        <div className="px-5 pt-5 pb-4 border-b border-white/[0.06]">
+          <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Audit Working Papers</p>
+          <p className="text-[8px] text-slate-600 mt-0.5 leading-snug">End-to-End Pakistan Audit System</p>
+          <p className="text-[8px] text-slate-700 mt-px">ISA 200–720 · ISQM 1&2 · Companies Act 2017</p>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-8 scrollbar-thin">
+        {/* Steps */}
+        <div className="flex-1 overflow-y-auto py-6 px-5">
           <div className="relative">
-            <div className="absolute left-[15px] top-4 bottom-4 w-px bg-slate-800"></div>
-            <div className="space-y-8 relative">
+            {/* Vertical connector line */}
+            <div className="absolute left-[13px] top-[14px] bottom-[14px] w-px bg-slate-800" />
+            <div className="space-y-1 relative">
               {STEPS.map((s, idx) => {
                 const isActive = step === idx;
-                const isPast = step > idx;
-                const isClickable = idx <= step || (isPast);
+                const isPast   = step > idx;
+                const canClick = idx <= step;
                 return (
-                  <div key={s.id} className="flex items-start gap-4 relative">
-                    <div 
-                      onClick={() => isClickable && setStep(idx)}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-[2px] relative z-10 bg-[#0F172A] transition-all duration-300 cursor-pointer
-                      ${isActive ? 'border-blue-500 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.4)]' : isPast ? 'border-emerald-500 text-emerald-400' : 'border-slate-800 text-slate-600'}
-                    `}>
-                      {isPast ? <Check className="w-4 h-4" /> : <s.icon className="w-4 h-4" />}
+                  <button
+                    key={s.id}
+                    onClick={() => canClick && setStep(idx)}
+                    disabled={!canClick}
+                    className={`w-full flex items-center gap-3 px-0 py-2.5 text-left transition-all duration-200 rounded-none group ${canClick ? 'cursor-pointer' : 'cursor-not-allowed opacity-35'}`}
+                  >
+                    {/* Step circle */}
+                    <div className={`w-[26px] h-[26px] rounded-full flex items-center justify-center shrink-0 relative z-10 border transition-all duration-200
+                      ${isActive ? 'bg-blue-600 border-blue-600' : isPast ? 'bg-emerald-600/20 border-emerald-500' : 'bg-[#0A1628] border-slate-700'}`}>
+                      {isPast
+                        ? <Check className="w-3 h-3 text-emerald-400" />
+                        : <span className={`text-[10px] font-black ${isActive ? 'text-white' : 'text-slate-500'}`}>{idx + 1}</span>
+                      }
                     </div>
-                    <div className={`flex flex-col pt-1.5 cursor-pointer ${isClickable ? 'opacity-100' : 'opacity-40 cursor-not-allowed'}`} onClick={() => isClickable && setStep(idx)}>
-                      <span className={`text-[10px] uppercase tracking-wider font-bold mb-0.5 ${isActive ? 'text-blue-400' : isPast ? 'text-emerald-400' : 'text-slate-500'}`}>Step {idx + 1}</span>
-                      <span className={`text-sm font-medium ${isActive ? 'text-white' : isPast ? 'text-slate-300' : 'text-slate-600'}`}>{s.shortLabel}</span>
+                    {/* Label */}
+                    <div className="flex flex-col min-w-0">
+                      <span className={`text-[8px] uppercase tracking-widest font-bold leading-none mb-px ${isActive ? 'text-blue-400' : isPast ? 'text-emerald-500' : 'text-slate-600'}`}>
+                        Step {idx + 1}
+                      </span>
+                      <span className={`text-[12px] font-semibold leading-tight truncate ${isActive ? 'text-white' : isPast ? 'text-slate-400' : 'text-slate-600'}`}>
+                        {s.shortLabel}
+                      </span>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
           </div>
 
-          <div className="mt-12 bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Engagement Details</h3>
-            <div className="space-y-3">
-              <div>
-                <p className="text-[10px] text-slate-500 font-medium">Client</p>
-                <p className="text-sm font-bold text-slate-200 truncate">{entityName || "—"}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-500 font-medium">NTN</p>
-                <p className="text-sm font-mono font-bold text-blue-300 tracking-wider">{ntn || "—"}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-500 font-medium">Period</p>
-                <p className="text-sm font-bold text-slate-200">{financialYear}</p>
-              </div>
-              <div className="pt-2 flex flex-wrap gap-1.5">
-                <Badge className="bg-blue-500/10 text-blue-400 border-blue-500/20 text-[10px] px-2 py-0 h-5">{engagementType}</Badge>
-              </div>
+          {/* Engagement quick-view (only when entity is set) */}
+          {entityName && (
+            <div className="mt-8 pt-5 border-t border-white/[0.06]">
+              <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-2">Engagement</p>
+              <p className="text-xs font-bold text-slate-200 truncate leading-tight">{entityName}</p>
+              {ntn && <p className="text-[10px] font-mono text-blue-400 mt-0.5">{ntn}</p>}
+              <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{financialYear}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer — firm + compliance */}
+        <div className="px-5 py-4 border-t border-white/[0.06]">
+          <p className="text-[11px] font-bold text-white leading-tight truncate">{firmName}</p>
+          <p className="text-[9px] text-slate-500 mb-3">Chartered Accountants</p>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 py-1 px-2 rounded border border-emerald-500/25 bg-emerald-500/[0.07]">
+              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
+              <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wide">ISA 200–720 Compliant</span>
+            </div>
+            <div className="flex items-center gap-1.5 py-1 px-2 rounded border border-blue-400/25 bg-blue-400/[0.07]">
+              <Shield className="w-2.5 h-2.5 text-blue-400 shrink-0" />
+              <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wide">ISQM 1&2 · IESBA Code</span>
+            </div>
+            <div className="flex items-center gap-1.5 py-1 px-2 rounded border border-violet-400/25 bg-violet-400/[0.07]">
+              <BookOpen className="w-2.5 h-2.5 text-violet-400 shrink-0" />
+              <span className="text-[9px] font-bold text-violet-400 uppercase tracking-wide">Companies Act 2017 · FBR</span>
             </div>
           </div>
         </div>
+      </aside>
 
-        <div className="p-6 border-t border-slate-800/80 bg-slate-900/50">
-          <p className="text-sm font-bold text-white truncate">{firmName}</p>
-          <p className="text-xs text-slate-400 mb-3">Chartered Accountants</p>
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 text-emerald-400 bg-emerald-400/10 px-3 py-1.5 rounded-lg border border-emerald-400/20">
-              <CheckCircle2 className="w-3 h-3" />
-              <span className="text-[10px] font-bold tracking-wide uppercase">ISA 200–720 Compliant</span>
-            </div>
-            <div className="flex items-center gap-2 text-blue-400 bg-blue-400/10 px-3 py-1.5 rounded-lg border border-blue-400/20">
-              <Shield className="w-3 h-3" />
-              <span className="text-[10px] font-bold tracking-wide uppercase">ISQM 1&2 · IESBA Code</span>
-            </div>
-            <div className="flex items-center gap-2 text-violet-400 bg-violet-400/10 px-3 py-1.5 rounded-lg border border-violet-400/20">
-              <BookOpen className="w-3 h-3" />
-              <span className="text-[10px] font-bold tracking-wide uppercase">Companies Act 2017 · FBR</span>
-            </div>
+      {/* ── RIGHT CONTENT ─────────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-[#F8FAFC]">
+        {/* Top bar */}
+        <header className="h-14 flex items-center justify-between px-8 bg-white border-b border-slate-200 shrink-0 z-20">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="font-medium text-slate-400">Working Papers</span>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+            <span className="font-semibold text-slate-800">{STEPS[step].label}</span>
           </div>
-        </div>
-      </div>
-
-      {/* RIGHT CONTENT */}
-      <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-slate-50/50">
-        <header className="h-16 flex items-center justify-between px-8 bg-white border-b border-slate-200/60 shrink-0 z-20 shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-slate-400">Working Papers</span>
-            <ChevronRight className="w-4 h-4 text-slate-300" />
-            <span className="text-sm font-extrabold text-slate-800">{STEPS[step].label}</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" className="text-slate-500 font-bold text-xs h-8">Save Draft</Button>
-          </div>
+          <Button variant="ghost" size="sm" className="text-slate-500 text-xs font-semibold h-8 px-3 hover:bg-slate-100">
+            Save Draft
+          </Button>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-8 py-8 scrollbar-thin">
-          <div className="max-w-5xl mx-auto pb-32">
+        <div className="flex-1 overflow-y-auto px-10 py-8">
+          <div className="max-w-4xl mx-auto pb-28">
             <AnimatePresence mode="wait">
               <motion.div key={step} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.3 }}>
                 
@@ -866,11 +870,11 @@ export default function WorkingPapers() {
                 {step === 0 && (
                   <div className="space-y-8">
                     <div>
-                      <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Upload Audit Documents</h2>
-                      <p className="text-slate-500 mt-2">Upload Trial Balance, General Ledger, Financial Statements, bank statements, contracts, and confirmations. The system will auto-structure data and generate ISA-compliant audit documentation from Acceptance through EQCR.</p>
-                      <div className="flex flex-wrap gap-2 mt-3">
+                      <h2 className="text-2xl font-bold text-slate-900">Upload Audit Documents</h2>
+                      <p className="text-sm text-slate-500 mt-1.5 leading-relaxed max-w-2xl">Upload Trial Balance, General Ledger, Financial Statements, bank statements, contracts, and confirmations. The system will auto-structure data and generate ISA-compliant audit documentation from Acceptance through EQCR.</p>
+                      <div className="flex flex-wrap gap-1.5 mt-3">
                         {["TB / GL", "Financial Statements", "Bank Statements", "Contracts", "Confirmations", "Board Minutes", "Tax Returns"].map(tag => (
-                          <span key={tag} className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-2.5 py-1 uppercase tracking-wide">{tag}</span>
+                          <span key={tag} className="text-[10px] font-semibold text-slate-600 border border-slate-200 rounded-full px-2.5 py-1 bg-white uppercase tracking-wide">{tag}</span>
                         ))}
                       </div>
                     </div>
@@ -881,7 +885,7 @@ export default function WorkingPapers() {
                       <Label className="text-xs font-bold text-slate-700 uppercase tracking-widest flex items-center gap-2"><Sparkles className="w-3.5 h-3.5 text-blue-500" /> Special Context / Instructions</Label>
                       <Textarea 
                         placeholder="Add specific focus areas, materiality considerations, or known issues the AI should prioritize during analysis..."
-                        className="min-h-[120px] rounded-2xl border-slate-200 focus:ring-blue-500 focus:border-blue-500 text-sm leading-relaxed"
+                        className="min-h-[120px] rounded-xl border-slate-200 focus:ring-blue-500 focus:border-blue-500 text-sm leading-relaxed"
                         value={instructions}
                         onChange={e => setInstructions(e.target.value)}
                       />
@@ -899,13 +903,13 @@ export default function WorkingPapers() {
                 {step === 1 && (
                   <div className="space-y-8">
                     <div>
-                      <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Configure Engagement</h2>
+                      <h2 className="text-2xl font-bold text-slate-900">Configure Engagement</h2>
                       <p className="text-slate-500 mt-2">Set entity particulars, define engagement timeline, assign the audit team, and populate Financial Statement data. The system uses this to drive materiality, risk assessment, and procedural selection across all phases.</p>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                       <div className="lg:col-span-2 space-y-6">
-                        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+                        <div className="bg-white rounded-xl p-8 border border-slate-200 shadow-sm space-y-6">
                           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Building2 className="w-4 h-4" /> Entity & Firm Details</h3>
                           
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -949,7 +953,7 @@ export default function WorkingPapers() {
                         </div>
 
                         {/* ── Key Deadlines ─────────────────────────────────── */}
-                        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+                        <div className="bg-white rounded-xl p-8 border border-slate-200 shadow-sm space-y-6">
                           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-emerald-500" /> Key Deadlines
                             <span className="font-normal text-slate-400 normal-case tracking-normal">— Engagement timeline and milestone dates</span>
@@ -1001,7 +1005,7 @@ export default function WorkingPapers() {
                         </div>
 
                         {/* FS Panel */}
-                        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                           <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center">
@@ -1074,7 +1078,7 @@ export default function WorkingPapers() {
                       </div>
 
                       <div className="space-y-6">
-                        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+                        <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
                           <div className="flex items-center justify-between mb-6">
                             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest">WP Groups</h3>
                             <button onClick={() => setSelectedPapers(selectedPapers.length === ALL_WP_REFS.length ? [] : ALL_WP_REFS)} className="text-[10px] font-bold text-blue-600 hover:text-blue-700 uppercase">
@@ -1104,7 +1108,7 @@ export default function WorkingPapers() {
                         </div>
 
                         {/* ── Engagement Team ─────────────────────────────────── */}
-                        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+                        <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
                           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                             <Briefcase className="w-4 h-4 text-blue-500" /> Engagement Team
                           </h3>
@@ -1180,7 +1184,7 @@ export default function WorkingPapers() {
                           )}
                         </div>
 
-                        <div className="bg-gradient-to-br from-slate-900 to-blue-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
+                        <div className="bg-gradient-to-br from-slate-900 to-blue-900 rounded-xl p-6 text-white shadow-xl relative overflow-hidden">
                           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
                           <div className="relative z-10">
                             <h4 className="text-[10px] font-bold text-blue-300 uppercase tracking-widest mb-4">Configuration Summary</h4>
@@ -1228,22 +1232,22 @@ export default function WorkingPapers() {
                           <Sparkles className="w-10 h-10 text-blue-600 animate-pulse" />
                         </div>
                         <div>
-                          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Ready to Analyse</h2>
+                          <h2 className="text-2xl font-bold text-slate-900">Ready to Analyse</h2>
                           <p className="text-slate-500 mt-2 max-w-xl mx-auto leading-relaxed">The AI engine will process your documents to auto-determine materiality (overall / PM / trivial), assess inherent and fraud risks (ISA 315/240), map each FS line item to assertions, identify IC weaknesses, and prepare analytical procedures (ISA 500, 520).</p>
                         </div>
-                        <Button onClick={handleAnalyze} size="lg" className="h-14 px-10 bg-blue-600 hover:bg-blue-700 text-lg font-bold shadow-xl shadow-blue-200 rounded-2xl group">
+                        <Button onClick={handleAnalyze} size="lg" className="h-14 px-10 bg-blue-600 hover:bg-blue-700 text-lg font-bold shadow-none rounded-xl group">
                           Run AI Audit Analysis <Sparkles className="ml-3 w-5 h-5 group-hover:rotate-12 transition-transform" />
                         </Button>
                       </div>
                     ) : (
                       <div className="space-y-8">
                         <div>
-                          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Audit Analysis Results</h2>
+                          <h2 className="text-2xl font-bold text-slate-900">Audit Analysis Results</h2>
                           <p className="text-slate-500 mt-2 text-lg">Comprehensive insights derived from the uploaded documents and FS data.</p>
                         </div>
 
                         {analyzing && (
-                          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+                          <div className="bg-white rounded-xl p-8 border border-slate-200 shadow-sm space-y-6">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-sm font-bold text-blue-600 uppercase tracking-widest flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> {progressMsg}</span>
                               <span className="text-sm font-black text-slate-900">{progress}%</span>
@@ -1255,7 +1259,7 @@ export default function WorkingPapers() {
 
                         {analysis && (
                           <>
-                            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                               <div className="flex border-b border-slate-100 overflow-x-auto scrollbar-thin scrollbar-hidden">
                                 {[
                                   { id: "summary", label: "Executive Summary", icon: FileText },
@@ -1281,7 +1285,7 @@ export default function WorkingPapers() {
                                     <div className="space-y-6">
                                       <div>
                                         <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Building2 className="w-3.5 h-3.5" /> Entity Context</h4>
-                                        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-3">
+                                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
                                           <p className="text-sm text-slate-700 leading-relaxed font-medium">{analysis.entity?.context || "Strategic business review indicates steady growth in export markets."}</p>
                                           <div className="grid grid-cols-2 gap-4 pt-2">
                                             <div>
@@ -1298,12 +1302,12 @@ export default function WorkingPapers() {
                                       <div>
                                         <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Scale className="w-3.5 h-3.5" /> Materiality Determination</h4>
                                         <div className="grid grid-cols-2 gap-4">
-                                          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                                          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
                                             <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Overall Materiality</p>
                                             <p className="text-lg font-black text-slate-900">{fmtPKR(analysis.materiality?.overall)}</p>
                                             <p className="text-[10px] text-slate-500 font-bold mt-1">Based on {analysis.materiality?.benchmark || "5% of PBT"}</p>
                                           </div>
-                                          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                                          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
                                             <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Performance Mat.</p>
                                             <p className="text-lg font-black text-slate-900">{fmtPKR(analysis.materiality?.performance)}</p>
                                             <p className="text-[10px] text-slate-500 font-bold mt-1">75% of Overall</p>
@@ -1317,7 +1321,7 @@ export default function WorkingPapers() {
                                         <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> Key Audit Areas</h4>
                                         <div className="space-y-3">
                                           {(analysis.key_audit_areas || ["Revenue Recognition", "Inventory Valuation", "Property, Plant & Equipment"]).map((area, i) => (
-                                            <div key={i} className="flex items-center gap-3 p-3.5 bg-white border border-slate-200 rounded-2xl shadow-sm hover:border-blue-200 transition-colors">
+                                            <div key={i} className="flex items-center gap-3 p-3.5 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-blue-200 transition-colors">
                                               <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center font-mono font-bold text-xs">{i+1}</div>
                                               <span className="text-sm font-bold text-slate-800">{area}</span>
                                               <Badge className="ml-auto bg-amber-50 text-amber-700 border-amber-200 text-[10px] h-5">ISA 701</Badge>
@@ -1325,7 +1329,7 @@ export default function WorkingPapers() {
                                           ))}
                                         </div>
                                       </div>
-                                      <div className="bg-blue-600 rounded-3xl p-6 text-white shadow-xl">
+                                      <div className="bg-blue-600 rounded-xl p-6 text-white shadow-xl">
                                         <h4 className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-3">AI Auditor Insights</h4>
                                         <p className="text-sm font-medium leading-relaxed italic">"Risk assessment suggests focus on revenue cut-off and classification of non-current liabilities. Variance in admin expenses requires detailed substantive testing."</p>
                                       </div>
@@ -1335,7 +1339,7 @@ export default function WorkingPapers() {
 
                                 {analysisTab === "ratios" && (
                                   <div className="space-y-6">
-                                    <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm bg-white">
+                                    <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm bg-white">
                                       <table className="w-full text-xs text-left">
                                         <thead className="bg-slate-50 border-b border-slate-200">
                                           <tr>
@@ -1367,7 +1371,7 @@ export default function WorkingPapers() {
                                         </tbody>
                                       </table>
                                     </div>
-                                    <div className="bg-slate-900 rounded-2xl p-6 text-white">
+                                    <div className="bg-slate-900 rounded-xl p-6 text-white">
                                       <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Trend Analysis Conclusion</h4>
                                       <p className="text-sm font-medium text-slate-300 leading-relaxed">{analysis.analytical_procedures?.trend_analysis || "Stable revenue growth with improving gross margins. Liquidity ratios are within acceptable limits, though receivables aging has increased."}</p>
                                     </div>
@@ -1384,7 +1388,7 @@ export default function WorkingPapers() {
                                     ].map(item => {
                                       const data = (analysis.reconciliation as any)?.[item.key] || { status: "Verified", difference: 0, notes: "No variances identified." };
                                       return (
-                                        <div key={item.key} className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm hover:border-blue-200 transition-colors">
+                                        <div key={item.key} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:border-blue-200 transition-colors">
                                           <div className="flex items-center justify-between mb-4">
                                             <div className="flex items-center gap-2">
                                               <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center">
@@ -1414,7 +1418,7 @@ export default function WorkingPapers() {
                                     {(analysis.evidence_items || []).length > 0 ? (
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {analysis.evidence_items?.map((e, i) => (
-                                          <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-start gap-3">
+                                          <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex items-start gap-3">
                                             <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center shrink-0 border border-purple-100">
                                               <Link2 className="w-5 h-5 text-purple-600" />
                                             </div>
@@ -1430,7 +1434,7 @@ export default function WorkingPapers() {
                                         ))}
                                       </div>
                                     ) : (
-                                      <div className="flex flex-col items-center justify-center py-12 text-slate-400 space-y-3 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
+                                      <div className="flex flex-col items-center justify-center py-12 text-slate-400 space-y-3 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
                                         <Link2 className="w-8 h-8 opacity-20" />
                                         <p className="text-sm font-bold">No evidence items extracted yet.</p>
                                       </div>
@@ -1443,7 +1447,7 @@ export default function WorkingPapers() {
                                     {(analysis.internal_control_weaknesses || []).length > 0 ? (
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {analysis.internal_control_weaknesses?.map((w, i) => (
-                                          <div key={i} className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-3 relative overflow-hidden group hover:border-blue-200 transition-colors">
+                                          <div key={i} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3 relative overflow-hidden group hover:border-blue-200 transition-colors">
                                             <div className={`absolute top-0 left-0 w-1.5 h-full ${w.risk_level === "High" ? "bg-red-500" : w.risk_level === "Medium" ? "bg-amber-500" : "bg-emerald-500"}`}></div>
                                             <div className="flex items-center justify-between">
                                               <span className="text-xs font-black text-slate-900 uppercase tracking-widest">{w.area}</span>
@@ -1458,7 +1462,7 @@ export default function WorkingPapers() {
                                         ))}
                                       </div>
                                     ) : (
-                                      <div className="flex flex-col items-center justify-center py-12 text-slate-400 space-y-3 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
+                                      <div className="flex flex-col items-center justify-center py-12 text-slate-400 space-y-3 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
                                         <Shield className="w-8 h-8 opacity-20" />
                                         <p className="text-sm font-bold">No internal control weaknesses identified.</p>
                                       </div>
@@ -1468,7 +1472,7 @@ export default function WorkingPapers() {
                               </div>
                             </div>
 
-                            <div className="bg-white rounded-3xl border border-blue-200 p-8 shadow-lg shadow-blue-50 relative overflow-hidden">
+                            <div className="bg-white rounded-xl border border-blue-200 p-8 shadow-lg shadow-blue-50 relative overflow-hidden">
                               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50 rounded-full -mr-32 -mt-32 blur-3xl opacity-50"></div>
                               <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
                                 <div className="flex-1">
@@ -1482,7 +1486,7 @@ export default function WorkingPapers() {
                                       <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest animate-pulse">{progressMsg}</p>
                                     </div>
                                   )}
-                                  <Button onClick={handleGenerate} disabled={generating} size="lg" className="h-14 px-8 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold shadow-xl shadow-blue-200 rounded-2xl w-full">
+                                  <Button onClick={handleGenerate} disabled={generating} size="lg" className="h-14 px-8 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold shadow-none rounded-xl w-full">
                                     {generating ? <><Loader2 className="w-5 h-5 mr-3 animate-spin" /> Generating File...</> : <><FileCheck className="w-5 h-5 mr-3" /> Generate Complete File</>}
                                   </Button>
                                 </div>
@@ -1505,14 +1509,14 @@ export default function WorkingPapers() {
                 {step === 3 && (
                   <div className="space-y-8">
                     <div>
-                      <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Audit Working Papers</h2>
+                      <h2 className="text-2xl font-bold text-slate-900">Audit Working Papers</h2>
                       <p className="text-slate-500 mt-2">Auto-generated, fully cross-referenced working papers — Acceptance → Planning → Execution → Completion → Reporting → EQCR. ISA 200–720 · ISQM 1&2 · Companies Act 2017 compliant. Each paper carries prepared-by, reviewed-by, and approved-by sign-offs with phase-appropriate dates.</p>
                     </div>
 
                     {workingPapers.length === 0 ? (
                       generating ? (
                         /* ─── Phase-by-phase progress ───────────────────────────────────────── */
-                        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 space-y-8">
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 space-y-8">
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2.5">
@@ -1536,7 +1540,7 @@ export default function WorkingPapers() {
                               const isActive  = activePhaseLabel === phase.label;
                               return (
                                 <div key={phase.prefix}
-                                  className={`rounded-2xl p-4 border transition-all duration-500 ${
+                                  className={`rounded-xl p-4 border transition-all duration-500 ${
                                     isDone   ? "bg-emerald-50 border-emerald-200 shadow-sm" :
                                     isActive ? "bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-300" :
                                                "bg-slate-50 border-slate-100"
@@ -1560,7 +1564,7 @@ export default function WorkingPapers() {
                         </div>
                       ) : (
                         /* ─── Idle: trigger generation ──────────────────────────────────────── */
-                        <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-sm text-center space-y-8">
+                        <div className="bg-white rounded-xl p-12 border border-slate-200 shadow-sm text-center space-y-8">
                           <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto">
                             <Sparkles className="w-10 h-10 text-blue-600" />
                           </div>
@@ -1573,14 +1577,14 @@ export default function WorkingPapers() {
                               ))}
                             </div>
                           </div>
-                          <Button onClick={handleGenerate} size="lg" className="h-14 px-10 bg-blue-600 hover:bg-blue-700 text-base font-bold shadow-xl shadow-blue-200 rounded-2xl group">
+                          <Button onClick={handleGenerate} size="lg" className="h-14 px-10 bg-blue-600 hover:bg-blue-700 text-base font-bold shadow-none rounded-xl group">
                             <Sparkles className="w-5 h-5 mr-2 group-hover:rotate-12 transition-transform" /> Generate All Working Papers
                           </Button>
                         </div>
                       )
                     ) : (
                       <>
-                        <div className="bg-emerald-600 rounded-2xl p-4 text-white shadow-lg flex items-center justify-between">
+                        <div className="bg-emerald-600 rounded-xl p-4 text-white shadow-lg flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
                               <CheckCircle2 className="w-5 h-5" />
@@ -1592,7 +1596,7 @@ export default function WorkingPapers() {
 
                         {/* Evidence Index (from Production) */}
                         {evidenceIndex.length > 0 && (
-                          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                             <button onClick={() => setExpandedWPGroups(prev => prev.includes("__evidence__") ? prev.filter(p => p !== "__evidence__") : [...prev, "__evidence__"])}
                               className="w-full flex items-center gap-3 p-5 hover:bg-slate-50/50 transition-colors text-left"
                             >
@@ -1648,7 +1652,7 @@ export default function WorkingPapers() {
                             const isOpen = expandedWPGroups.includes(section);
                             
                             return (
-                              <div key={section} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                              <div key={section} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                                 <button onClick={() => toggleWPGroupExpand(section)} className="w-full flex items-center gap-4 p-5 hover:bg-slate-50/50 transition-colors text-left">
                                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-sm shrink-0 ${group?.color || "bg-slate-100 text-slate-600 border-slate-200"}`}>
                                     <span className="font-bold text-sm">{group?.prefix || "WP"}</span>
@@ -1697,11 +1701,11 @@ export default function WorkingPapers() {
                 {step === 4 && (
                   <div className="space-y-10">
                     <div>
-                      <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Export & Finalize</h2>
+                      <h2 className="text-2xl font-bold text-slate-900">Export & Finalize</h2>
                       <p className="text-slate-500 mt-2">Download the complete, inspection-ready audit file — all phases, all working papers, and all client-provided evidence combined into a single deliverable. Choose your format: editable Excel workbook, Word report, archived PDF, or the confirmation letters bundle.</p>
                     </div>
 
-                    <div className="bg-[#0F172A] rounded-[2.5rem] p-10 text-white shadow-2xl relative overflow-hidden">
+                    <div className="bg-[#0F172A] rounded-xl p-8 text-white relative overflow-hidden">
                       <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/20 rounded-full -mr-48 -mt-48 blur-[100px]"></div>
                       <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-600/10 rounded-full -ml-32 -mb-32 blur-[80px]"></div>
                       
@@ -1716,11 +1720,11 @@ export default function WorkingPapers() {
                             <p className="text-slate-400 mt-1 font-medium">{financialYear} · {workingPapers.length} Generated Papers</p>
                           </div>
                           <div className="flex items-center gap-3">
-                            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center min-w-[100px]">
+                            <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center min-w-[100px]">
                               <p className="text-[10px] font-bold text-slate-500 uppercase">Compliance</p>
                               <p className="text-xl font-black text-emerald-400">100%</p>
                             </div>
-                            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center min-w-[100px]">
+                            <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center min-w-[100px]">
                               <p className="text-[10px] font-bold text-slate-500 uppercase">Evidence</p>
                               <p className="text-xl font-black text-blue-400">{evidenceIndex.length}</p>
                             </div>
@@ -1738,10 +1742,10 @@ export default function WorkingPapers() {
                               key={card.id}
                               onClick={card.handler}
                               disabled={card.loading}
-                              className="group bg-white/5 border border-white/10 hover:bg-white/[0.08] hover:border-white/20 rounded-3xl p-6 transition-all text-left relative overflow-hidden"
+                              className="group bg-white/5 border border-white/10 hover:bg-white/[0.08] hover:border-white/20 rounded-xl p-6 transition-all text-left relative overflow-hidden"
                             >
                               <div className="flex items-center gap-4">
-                                <div className={`w-14 h-14 rounded-2xl bg-${card.color}-500/20 flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                                <div className={`w-14 h-14 rounded-xl bg-${card.color}-500/20 flex items-center justify-center group-hover:scale-110 transition-transform`}>
                                   <card.icon className={`w-7 h-7 text-${card.color}-400`} />
                                 </div>
                                 <div className="flex-1">
