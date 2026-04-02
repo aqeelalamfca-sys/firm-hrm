@@ -310,9 +310,82 @@ Return ONLY valid JSON, no markdown, no extra text.`;
   }
 });
 
+// ─── Date Engine Helpers ────────────────────────────────────────────────────
+function randomDateInRange(start: Date, end: Date): Date {
+  const diff = Math.max(end.getTime() - start.getTime(), 86400000);
+  return new Date(start.getTime() + Math.floor(Math.random() * diff));
+}
+
+function fmtDate(d: Date): string {
+  return d.toLocaleDateString("en-PK", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function parseOrFallback(dateStr: string | undefined, fallback: Date): Date {
+  if (!dateStr) return fallback;
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? fallback : d;
+}
+
+function getWPSignoffs(
+  ref: string,
+  engDates: { planningDeadline?: string; fieldworkStart?: string; fieldworkEnd?: string; reportingDeadline?: string; reportDate?: string; filingDeadline?: string; archiveDate?: string },
+  teamNames: { preparer: string; reviewer: string; approver: string }
+) {
+  const today = new Date();
+  const pd  = parseOrFallback(engDates.planningDeadline,  today);
+  const fws = parseOrFallback(engDates.fieldworkStart,    new Date(pd.getTime()  + 7  * 86400000));
+  const fwe = parseOrFallback(engDates.fieldworkEnd,      new Date(fws.getTime() + 14 * 86400000));
+  const rd  = parseOrFallback(engDates.reportingDeadline, new Date(fwe.getTime() + 10 * 86400000));
+  const rpt = parseOrFallback(engDates.reportDate,        new Date(rd.getTime()  + 7  * 86400000));
+  const fil = parseOrFallback(engDates.filingDeadline,    new Date(rpt.getTime() + 14 * 86400000));
+
+  const ppStart = new Date(pd.getTime() - 14 * 86400000);
+  const prefix  = (ref || "").split("-")[0].toUpperCase();
+
+  let phaseStart: Date;
+  let phaseEnd:   Date;
+  switch (prefix) {
+    case "PP":                        phaseStart = ppStart; phaseEnd = pd;  break;
+    case "DI": case "IR": case "OB":  phaseStart = pd;  phaseEnd = fws; break;
+    case "PL":                        phaseStart = pd;  phaseEnd = fws; break;
+    case "EX": case "FH": case "EV":  phaseStart = fws; phaseEnd = fwe; break;
+    case "FN": case "DL": case "QR":  phaseStart = rd;  phaseEnd = rpt; break;
+    case "IN":                        phaseStart = rpt; phaseEnd = fil; break;
+    default:                          phaseStart = fws; phaseEnd = fwe; break;
+  }
+
+  if (phaseEnd <= phaseStart) phaseEnd = new Date(phaseStart.getTime() + 3 * 86400000);
+
+  const prepDate    = randomDateInRange(phaseStart, phaseEnd);
+  const reviewDate  = new Date(prepDate.getTime()   + (1 + Math.floor(Math.random() * 3)) * 86400000);
+  const approveDate = new Date(reviewDate.getTime() + (1 + Math.floor(Math.random() * 2)) * 86400000);
+
+  return {
+    prepared_by:    teamNames.preparer || "Audit Senior",
+    prepared_date:  fmtDate(prepDate),
+    reviewed_by:    teamNames.reviewer || "Audit Manager",
+    reviewed_date:  fmtDate(reviewDate),
+    approved_by:    teamNames.approver || "Engagement Partner",
+    approved_date:  fmtDate(approveDate),
+  };
+}
+
 // ─── POST /api/working-papers/generate ────────────────────────────────────
 router.post("/generate", async (req: Request, res: Response) => {
-  const { analysis, selectedPapers, entityName, financialYear, engagementType, firmName } = req.body;
+  const {
+    analysis, selectedPapers,
+    entityName, financialYear, engagementType, firmName, ntn, secp,
+    preparer, reviewer, approver,
+    planningDeadline, fieldworkStart, fieldworkEnd,
+    reportingDeadline, reportDate, filingDeadline, archiveDate,
+  } = req.body;
+
+  const engDates   = { planningDeadline, fieldworkStart, fieldworkEnd, reportingDeadline, reportDate, filingDeadline, archiveDate };
+  const teamNames  = {
+    preparer:  preparer  || "Audit Senior",
+    reviewer:  reviewer  || "Audit Manager",
+    approver:  approver  || "Engagement Partner",
+  };
 
   if (!analysis) {
     return res.status(400).json({ error: "No analysis data provided." });
@@ -501,14 +574,23 @@ Use professional audit language throughout.`;
     const workingPapers = papersData.working_papers || [];
 
     const enrichedPapers = workingPapers.map((wp: any) => {
-      const def = wpDefinitions[wp.ref] || {};
+      const def      = wpDefinitions[wp.ref] || {};
+      const signoffs = getWPSignoffs(wp.ref, engDates, teamNames);
       return {
         ...wp,
-        section_label: def.section || wp.section,
-        isa_references: wp.isa_references || [def.isa || "ISA 500"],
-        assertions: wp.assertions || [],
-        evidence_refs: wp.evidence_refs || [],
+        section_label:   def.section || wp.section,
+        isa_references:  wp.isa_references || [def.isa || "ISA 500"],
+        assertions:      wp.assertions || [],
+        evidence_refs:   wp.evidence_refs || [],
         cross_references: wp.cross_references || [],
+        // Engagement team sign-offs (injected by date engine)
+        prepared_by:   signoffs.prepared_by,
+        prepared_date: signoffs.prepared_date,
+        reviewed_by:   signoffs.reviewed_by,
+        reviewed_date: signoffs.reviewed_date,
+        approved_by:   signoffs.approved_by,
+        approved_date: signoffs.approved_date,
+        partner:       teamNames.approver,
       };
     });
 
@@ -524,13 +606,29 @@ Use professional audit language throughout.`;
       working_papers: enrichedPapers,
       evidence_index: generatedEvidenceIndex,
       meta: {
-        entity: entityName || entity.name,
-        financial_year: financialYear || entity.financial_year,
+        entity:          entityName || entity.name,
+        financial_year:  financialYear || entity.financial_year,
         engagement_type: engagementType,
-        firm_name: firmName || "Alam & Aulakh Chartered Accountants",
-        generated_at: new Date().toISOString(),
-        total_papers: enrichedPapers.length,
-        total_evidence: generatedEvidenceIndex.length,
+        firm_name:       firmName || "ANA & Co. Chartered Accountants",
+        ntn,
+        secp,
+        generated_at:    new Date().toISOString(),
+        total_papers:    enrichedPapers.length,
+        total_evidence:  generatedEvidenceIndex.length,
+        team: {
+          prepared_by: teamNames.preparer,
+          reviewed_by: teamNames.reviewer,
+          approved_by: teamNames.approver,
+        },
+        deadlines: {
+          planning_deadline:   planningDeadline   || null,
+          fieldwork_start:     fieldworkStart     || null,
+          fieldwork_end:       fieldworkEnd       || null,
+          reporting_deadline:  reportingDeadline  || null,
+          report_date:         reportDate         || null,
+          filing_deadline:     filingDeadline     || null,
+          archive_date:        archiveDate        || null,
+        },
       },
     });
   } catch (err: any) {

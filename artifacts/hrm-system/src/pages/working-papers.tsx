@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
@@ -419,6 +419,32 @@ export default function WorkingPapers() {
   const [expandedWPCards, setExpandedWPCards] = useState<string[]>([]);
   const [analysisTab, setAnalysisTab] = useState<"summary" | "ratios" | "reconciliation" | "evidence" | "ic">("summary");
 
+  // ── Engagement Timeline (Key Deadlines) ─────────────────────────────────────
+  const [planningDeadline, setPlanningDeadline] = useState("");
+  const [fieldworkStart, setFieldworkStart] = useState("");
+  const [fieldworkEnd, setFieldworkEnd] = useState("");
+  const [reportingDeadline, setReportingDeadline] = useState("");
+  const [reportDate, setReportDate] = useState("");
+  const [filingDeadline, setFilingDeadline] = useState("");
+  const [archiveDate, setArchiveDate] = useState("");
+
+  // ── Engagement Team (Preparer / Reviewer / Approver) ─────────────────────
+  const [preparer, setPreparer] = useState("");
+  const [reviewer, setReviewer] = useState("");
+  const [approver, setApprover] = useState("");
+  const [users, setUsers] = useState<Array<{id: number; name: string; role?: string; email?: string}>>([]);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch("/api/users", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(data => {
+        const list = Array.isArray(data) ? data : (data.users || []);
+        setUsers(list.map((u: any) => ({ id: u.id, name: u.name || u.username || u.email, role: u.role, email: u.email })));
+      })
+      .catch(() => {});
+  }, [token]);
+
   // API/Processing state
   const [analyzing, setAnalyzing] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -542,7 +568,22 @@ export default function WorkingPapers() {
         body: JSON.stringify({
           analysis,
           selectedPapers,
-          config: { entityName, engagementType, financialYear, firmName, ntn, secp }
+          entityName,
+          engagementType,
+          financialYear,
+          firmName,
+          ntn,
+          secp,
+          preparer,
+          reviewer,
+          approver,
+          planningDeadline,
+          fieldworkStart,
+          fieldworkEnd,
+          reportingDeadline,
+          reportDate,
+          filingDeadline,
+          archiveDate,
         }),
       });
 
@@ -842,6 +883,58 @@ export default function WorkingPapers() {
                           </div>
                         </div>
 
+                        {/* ── Key Deadlines ─────────────────────────────────── */}
+                        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+                          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-emerald-500" /> Key Deadlines
+                            <span className="font-normal text-slate-400 normal-case tracking-normal">— Engagement timeline and milestone dates</span>
+                          </h3>
+
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Planning Deadline <span className="text-red-500">*</span></Label>
+                              <Input type="date" value={planningDeadline} onChange={e => setPlanningDeadline(e.target.value)} className="h-11 rounded-xl font-mono text-sm" />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Fieldwork Start</Label>
+                              <Input type="date" value={fieldworkStart} onChange={e => setFieldworkStart(e.target.value)} className="h-11 rounded-xl font-mono text-sm" />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Fieldwork End</Label>
+                              <Input type="date" value={fieldworkEnd} onChange={e => setFieldworkEnd(e.target.value)} className="h-11 rounded-xl font-mono text-sm" />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Reporting Deadline <span className="text-red-500">*</span></Label>
+                              <Input type="date" value={reportingDeadline} onChange={e => setReportingDeadline(e.target.value)} className="h-11 rounded-xl font-mono text-sm" />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Report Date</Label>
+                              <Input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)} className="h-11 rounded-xl font-mono text-sm" />
+                              <p className="text-[10px] text-slate-400 ml-1">Date of auditor's report</p>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Filing Deadline</Label>
+                              <Input type="date" value={filingDeadline} onChange={e => setFilingDeadline(e.target.value)} className="h-11 rounded-xl font-mono text-sm" />
+                              <p className="text-[10px] text-slate-400 ml-1">SECP / regulatory filing deadline</p>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Archive Date</Label>
+                              <Input type="date" value={archiveDate} onChange={e => setArchiveDate(e.target.value)} className="h-11 rounded-xl font-mono text-sm" />
+                              <p className="text-[10px] text-slate-400 ml-1">ISA 230 — File assembly deadline (60 days post-report)</p>
+                            </div>
+                          </div>
+
+                          {planningDeadline && fieldworkStart && fieldworkEnd && reportingDeadline && (
+                            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2.5">
+                              <CheckCircle2 className="w-4 h-4" />
+                              Timeline set — working papers will receive phase-appropriate dates automatically
+                            </div>
+                          )}
+                        </div>
+
                         {/* FS Panel */}
                         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                           <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -943,6 +1036,83 @@ export default function WorkingPapers() {
                               );
                             })}
                           </div>
+                        </div>
+
+                        {/* ── Engagement Team ─────────────────────────────────── */}
+                        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+                          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <Briefcase className="w-4 h-4 text-blue-500" /> Engagement Team
+                          </h3>
+
+                          <div className="space-y-3">
+                            {/* Preparer */}
+                            <div className="space-y-1.5">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Preparer <span className="font-normal text-slate-400">(Associate / Senior)</span></Label>
+                              <Select value={preparer} onValueChange={setPreparer}>
+                                <SelectTrigger className="h-10 rounded-xl text-sm">
+                                  <SelectValue placeholder="Select preparer..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {users.length > 0 ? (
+                                    users.map(u => <SelectItem key={u.id} value={u.name}>{u.name}{u.role ? ` — ${u.role}` : ""}</SelectItem>)
+                                  ) : (
+                                    <>
+                                      <SelectItem value="Audit Associate">Audit Associate</SelectItem>
+                                      <SelectItem value="Audit Senior">Audit Senior</SelectItem>
+                                      <SelectItem value="Semi-Senior">Semi-Senior</SelectItem>
+                                    </>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Reviewer */}
+                            <div className="space-y-1.5">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Reviewer <span className="font-normal text-slate-400">(Manager)</span></Label>
+                              <Select value={reviewer} onValueChange={setReviewer}>
+                                <SelectTrigger className="h-10 rounded-xl text-sm">
+                                  <SelectValue placeholder="Select reviewer..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {users.length > 0 ? (
+                                    users.map(u => <SelectItem key={u.id} value={u.name}>{u.name}{u.role ? ` — ${u.role}` : ""}</SelectItem>)
+                                  ) : (
+                                    <>
+                                      <SelectItem value="Audit Manager">Audit Manager</SelectItem>
+                                      <SelectItem value="Senior Manager">Senior Manager</SelectItem>
+                                    </>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Approver */}
+                            <div className="space-y-1.5">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Approver <span className="font-normal text-slate-400">(Partner / EQCR)</span></Label>
+                              <Select value={approver} onValueChange={setApprover}>
+                                <SelectTrigger className="h-10 rounded-xl text-sm">
+                                  <SelectValue placeholder="Select approver..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {users.length > 0 ? (
+                                    users.map(u => <SelectItem key={u.id} value={u.name}>{u.name}{u.role ? ` — ${u.role}` : ""}</SelectItem>)
+                                  ) : (
+                                    <>
+                                      <SelectItem value="Engagement Partner">Engagement Partner</SelectItem>
+                                      <SelectItem value="EQCR Partner">EQCR Partner</SelectItem>
+                                    </>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          {preparer && reviewer && approver && (
+                            <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              Team assigned — WPs will include sign-offs automatically
+                            </div>
+                          )}
                         </div>
 
                         <div className="bg-gradient-to-br from-slate-900 to-blue-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
