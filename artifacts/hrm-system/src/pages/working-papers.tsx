@@ -454,6 +454,11 @@ export default function WorkingPapers() {
   const [expandedWPCards, setExpandedWPCards] = useState<string[]>([]);
   const [analysisTab, setAnalysisTab] = useState<"summary" | "ratios" | "reconciliation" | "evidence" | "ic">("summary");
 
+  // ── Audit Period ─────────────────────────────────────────────────────────────
+  const [periodStart, setPeriodStart] = useState("");
+  const [periodEnd, setPeriodEnd] = useState("");
+  const [periodSuggested, setPeriodSuggested] = useState(false);
+
   // ── Engagement Timeline (Key Deadlines) ─────────────────────────────────────
   const [planningDeadline, setPlanningDeadline] = useState("");
   const [fieldworkStart, setFieldworkStart] = useState("");
@@ -485,6 +490,50 @@ export default function WorkingPapers() {
       })
       .catch(() => {});
   }, [token]);
+
+  // ── Auto-suggest period start/end from Financial Year text ───────────────────
+  useEffect(() => {
+    if (!financialYear.trim()) return;
+    // Try to find a closing date from common patterns
+    // "Year ended June 30, 2024" | "Year ended 30 June 2024" | "2024-06-30" | "June 30, 2024"
+    const MONTHS: Record<string, number> = {
+      january:1,february:2,march:3,april:4,may:5,june:6,
+      july:7,august:8,september:9,october:10,november:11,december:12,
+      jan:1,feb:2,mar:3,apr:4,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12,
+    };
+    let endDate: Date | null = null;
+
+    // ISO: YYYY-MM-DD anywhere in string
+    const isoMatch = financialYear.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+      endDate = new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+    }
+
+    if (!endDate) {
+      // "Month DD, YYYY" or "DD Month YYYY"
+      const fy = financialYear.toLowerCase();
+      for (const [mon, num] of Object.entries(MONTHS)) {
+        // Pattern: month name, then optional day + year
+        const m1 = new RegExp(`${mon}\\s+(\\d{1,2})[,\\s]+(\\d{4})`).exec(fy);
+        if (m1) { endDate = new Date(Number(m1[2]), num - 1, Number(m1[1])); break; }
+        // Pattern: day then month name then year
+        const m2 = new RegExp(`(\\d{1,2})\\s+${mon}\\s+(\\d{4})`).exec(fy);
+        if (m2) { endDate = new Date(Number(m2[2]), num - 1, Number(m2[1])); break; }
+      }
+    }
+
+    if (!endDate || isNaN(endDate.getTime())) return;
+
+    // period end = closing date; period start = same day+1 one year before
+    const startDate = new Date(endDate);
+    startDate.setFullYear(startDate.getFullYear() - 1);
+    startDate.setDate(startDate.getDate() + 1);
+
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    setPeriodEnd(fmt(endDate));
+    setPeriodStart(fmt(startDate));
+    setPeriodSuggested(true);
+  }, [financialYear]);
 
   // Auto-extraction state
   const [extracting, setExtracting] = useState(false);
@@ -706,6 +755,8 @@ export default function WorkingPapers() {
           firmName,
           ntn,
           secp,
+          periodStart,
+          periodEnd,
           preparer,
           reviewer,
           approver,
@@ -994,7 +1045,21 @@ export default function WorkingPapers() {
                             </div>
                             <div className="space-y-2">
                               <Label className="text-xs font-bold text-slate-600 ml-1">Financial Year / Period</Label>
-                              <Input value={financialYear} onChange={e => setFinancialYear(e.target.value)} placeholder="Year ended June 30, 2024" className="h-11 rounded-xl font-medium" />
+                              <Input value={financialYear} onChange={e => { setFinancialYear(e.target.value); setPeriodSuggested(false); }} placeholder="Year ended June 30, 2024" className="h-11 rounded-xl font-medium" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">
+                                Period Start Date
+                                {periodSuggested && periodStart && <span className="ml-1.5 text-[9px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5 align-middle">suggested</span>}
+                              </Label>
+                              <Input type="date" value={periodStart} onChange={e => { setPeriodStart(e.target.value); setPeriodSuggested(false); }} className="h-11 rounded-xl font-mono text-sm" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">
+                                Period End Date
+                                {periodSuggested && periodEnd && <span className="ml-1.5 text-[9px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5 align-middle">suggested</span>}
+                              </Label>
+                              <Input type="date" value={periodEnd} onChange={e => { setPeriodEnd(e.target.value); setPeriodSuggested(false); }} className="h-11 rounded-xl font-mono text-sm" />
                             </div>
                             <div className="space-y-2">
                               <Label className="text-xs font-bold text-slate-600 ml-1">Engagement Type</Label>
