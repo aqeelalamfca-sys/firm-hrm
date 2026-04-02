@@ -996,9 +996,9 @@ export default function WorkingPapers() {
                     <div className="flex justify-end pt-4">
                       <Button onClick={handleExtractAndNext} disabled={files.length === 0 || extracting} size="lg" className="h-12 px-8 bg-blue-600 hover:bg-blue-700 font-bold rounded-xl group">
                         {extracting ? (
-                          <><Loader2 className="mr-2 w-4 h-4 animate-spin" /> Extracting fields…</>
+                          <><Loader2 className="mr-2 w-4 h-4 animate-spin" /> AI Extracting Data…</>
                         ) : (
-                          <>Next: Configure <ChevronRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" /></>
+                          <><Sparkles className="mr-2 w-4 h-4" /> Extract & Configure <ChevronRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" /></>
                         )}
                       </Button>
                     </div>
