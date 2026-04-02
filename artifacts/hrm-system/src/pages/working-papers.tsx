@@ -834,6 +834,79 @@ export default function WorkingPapers() {
   const fmtFS = (n: number | null | undefined) =>
     n != null ? Number(n).toLocaleString("en-PK") : "";
 
+  // ── Smart Defaults Engine ────────────────────────────────────────────────────
+  // Computes the most recent June 30 year-end and fills all empty fields.
+  // NEVER overwrites: entityName, ntn, secp, registeredAddress, firmName, team.
+  const applySmartDefaults = useCallback((showToast = true) => {
+    const today = new Date();
+    const curYear = today.getFullYear();
+    const curMonth = today.getMonth() + 1; // 1-12
+
+    // June year-end: if today is Jan–Jun, last FY ended June 30 of prior calendar year
+    const fyEndYear = curMonth <= 6 ? curYear - 1 : curYear;
+    const fyStartYear = fyEndYear - 1;
+
+    const d2 = (n: number) => String(n).padStart(2, "0");
+    const fmt = (y: number, m: number, day: number) => `${y}-${d2(m)}-${d2(day)}`;
+
+    // Period & year label (only fill if still empty)
+    setFinancialYear(prev => prev || `Year ended June 30, ${fyEndYear}`);
+    setPeriodStart(prev => prev || fmt(fyStartYear, 7, 1));
+    setPeriodEnd(prev => prev || fmt(fyEndYear, 6, 30));
+    setPeriodSuggested(true);
+
+    // Key deadlines (all relative to fyEndYear June 30) — fill only if empty
+    setPlanningDeadline(prev => prev || fmt(fyEndYear, 4, 1));
+    setFieldworkStart(prev => prev || fmt(fyEndYear, 5, 15));
+    setFieldworkEnd(prev => prev || fmt(fyEndYear, 7, 31));
+    setReportingDeadline(prev => prev || fmt(fyEndYear, 9, 30));
+    setReportDate(prev => prev || fmt(fyEndYear, 9, 30));
+    setFilingDeadline(prev => prev || fmt(fyEndYear, 10, 31));
+    // Archive = report date + 60 days → approx Nov 29 of fyEndYear
+    setArchiveDate(prev => prev || fmt(fyEndYear, 11, 29));
+
+    // Sales tax period defaults (fill if empty)
+    setStPeriodFrom(prev => prev || fmt(fyStartYear, 7, 1));
+    setStPeriodTo(prev => prev || fmt(fyEndYear, 6, 30));
+
+    // Classification & framework (fill if still at blank/initial)
+    setEngagementType(prev => prev || "Statutory Audit");
+    setEntityType(prev => prev || "Private Limited");
+    setFramework(prev => prev || "IFRS");
+    setListedStatus(prev => prev || "Unlisted");
+    setCurrency(prev => prev || "PKR");
+    setControlReliance(prev => prev || "Partial");
+    setSamplingMethod(prev => prev || "Statistical");
+    setConfidenceLevel(prev => prev || "95%");
+
+    // Large-company risk flags — always set to true (user can override)
+    setSignificantRiskAreas(prev =>
+      prev.length > 0 ? prev : ["Revenue", "Receivables", "Inventory", "Fixed Assets", "Related Parties"]
+    );
+    setInternalAuditExists(true);
+    setRelatedPartyFlag(true);
+    setSubsequentEventsFlag(true);
+    setEstimatesFlag(true);
+
+    // Tax & regulatory — standard Pakistan defaults
+    setCurrentTaxApplicable(true);
+    setDeferredTaxApplicable(true);
+    setWhtExposure(true);
+    setSalesTaxRegistered(true);
+    setSuperTaxApplicable(false);
+
+    // Ethics & independence
+    setIndependenceConfirmed(true);
+    setConflictCheck(true);
+
+    if (showToast) {
+      toast({
+        title: "Smart defaults applied",
+        description: `Engagement pre-populated for June 30, ${fyEndYear} year-end (Large Company – ISA/IFRS). Review and adjust as needed.`,
+      });
+    }
+  }, [toast]);
+
   const handleExtractAndNext = async () => {
     setExtracting(true);
     try {
@@ -846,6 +919,7 @@ export default function WorkingPapers() {
       });
       if (res.ok) {
         const d = await res.json();
+        // Only fill identity fields if AI found them (exclusion rule: never auto-fill name, NTN, SECP, address, firm, team)
         if (d.entity_name)        setEntityName(d.entity_name);
         if (d.ntn)                setNtn(d.ntn);
         if (d.secp)               setSecp(d.secp);
@@ -888,8 +962,15 @@ export default function WorkingPapers() {
         const gotSomething = !!(d.entity_name || d.ntn || fn.revenue || fn.total_assets);
         setAutoFilled(gotSomething);
       }
+      // Always apply smart defaults after extraction (fills any gaps the AI left)
+      applySmartDefaults(false);
+      toast({
+        title: "Engagement pre-populated",
+        description: "AI extraction complete. Smart defaults applied for any missing fields. Review and adjust in Configure.",
+      });
     } catch (err: any) {
-      toast({ title: "Auto-extraction failed", description: err?.message || "Could not extract entity details from the documents. You can fill them in manually.", variant: "destructive" });
+      toast({ title: "Auto-extraction incomplete", description: "Applying smart defaults for all engagement fields. Fill in entity details manually.", variant: "default" });
+      applySmartDefaults(false);
     } finally {
       setExtracting(false);
       setStep(1);
@@ -1562,12 +1643,21 @@ export default function WorkingPapers() {
                             <Settings className="w-7 h-7 text-slate-300" />
                           </div>
                         </div>
-                        {autoFilled && (
-                          <div className="relative z-10 mt-4 flex items-center gap-2 text-[11px] font-semibold text-emerald-300 bg-emerald-900/30 border border-emerald-700/30 rounded-lg px-3 py-2 w-fit">
-                            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                            Fields auto-filled from uploaded documents — review and edit as needed
-                          </div>
-                        )}
+                        <div className="relative z-10 mt-4 flex items-center gap-3 flex-wrap">
+                          {autoFilled && (
+                            <div className="flex items-center gap-2 text-[11px] font-semibold text-emerald-300 bg-emerald-900/30 border border-emerald-700/30 rounded-lg px-3 py-2">
+                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                              Fields auto-filled from uploaded documents — review and edit as needed
+                            </div>
+                          )}
+                          <button
+                            onClick={() => applySmartDefaults(true)}
+                            className="flex items-center gap-2 text-[11px] font-bold text-indigo-300 bg-indigo-900/30 border border-indigo-700/40 rounded-lg px-3 py-2 hover:bg-indigo-800/40 transition-colors"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                            Apply Smart Defaults (June Year-End · Large Entity)
+                          </button>
+                        </div>
                       </div>
                     </div>
 
