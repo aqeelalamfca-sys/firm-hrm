@@ -10,9 +10,9 @@ env:
 
 jobs:
   deploy:
-    name: Build & Deploy
+    name: Build & Deploy to ana-ca.com
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Checkout code
@@ -23,39 +23,19 @@ jobs:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          node -e "
-          const key = process.env.VPS_SSH_KEY;
-          let fixed = key.trim();
-          if (!fixed.includes('\n')) {
-            fixed = fixed
-              .replace('-----BEGIN OPENSSH PRIVATE KEY----- ', '-----BEGIN OPENSSH PRIVATE KEY-----\n')
-              .replace(' -----END OPENSSH PRIVATE KEY-----', '\n-----END OPENSSH PRIVATE KEY-----');
-            const lines = fixed.split('\n');
-            const result = [];
-            for (const line of lines) {
-              if (line.startsWith('-----')) {
-                result.push(line);
-              } else {
-                const body = line.replace(/ /g, '');
-                for (let i = 0; i < body.length; i += 64) result.push(body.slice(i, i+64));
-              }
-            }
-            fixed = result.join('\n') + '\n';
-          }
-          require('fs').writeFileSync(process.env.HOME + '/.ssh/vps_key', fixed, { mode: 0o600 });
-          console.log('SSH key written');
-          "
-          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
-          ssh-keygen -l -f ~/.ssh/vps_key
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_deploy
+          chmod 600 ~/.ssh/vps_deploy
+          ssh-keyscan -p ${{ secrets.VPS_PORT }} -T 10 ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keygen -l -f ~/.ssh/vps_deploy
           echo "SSH key ready"
 
-      - name: Deploy to VPS via SSH
+      - name: Deploy to VPS
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USERNAME }}
-          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
         run: |
-          ssh -i ~/.ssh/vps_key \
+          ssh -i ~/.ssh/vps_deploy \
               -o StrictHostKeyChecking=no \
               -o BatchMode=yes \
               -o ConnectTimeout=30 \
@@ -65,43 +45,59 @@ jobs:
           APP_DIR=~/firm-hrm
           DEPLOY_DIR="$APP_DIR/deploy"
 
-          if [ ! -d "$APP_DIR" ]; then
-            echo "Cloning repository..."
+          # Clone on first deploy, pull on subsequent
+          if [ ! -d "$APP_DIR/.git" ]; then
+            echo "[VPS] Cloning repository..."
             git clone https://github.com/aqeelalamfca-sys/firm-hrm.git "$APP_DIR"
+          else
+            echo "[VPS] Pulling latest code..."
+            cd "$APP_DIR"
+            git fetch origin main
+            git reset --hard origin/main
           fi
 
           cd "$APP_DIR"
-          echo "Pulling latest code..."
-          git fetch origin main
-          git merge origin/main --ff-only
+          echo "[VPS] Commit: $(git log --oneline -1)"
 
-          echo "Code: $(git log --oneline -1)"
-
+          # Ensure .env exists
           if [ ! -f "$DEPLOY_DIR/.env" ]; then
+            echo "[VPS] WARNING: $DEPLOY_DIR/.env not found — copying .env.example"
             cp "$DEPLOY_DIR/.env.example" "$DEPLOY_DIR/.env"
+            echo "[VPS] ACTION REQUIRED: Edit $DEPLOY_DIR/.env with real credentials"
           fi
 
-          cd "$DEPLOY_DIR"
-          echo "Building ana-backend..."
-          docker compose --env-file .env build --no-cache ana-backend
-          docker compose --env-file .env up -d --force-recreate ana-backend
+          # Ensure required Docker network exists
+          docker network create auditwise_auditwise 2>/dev/null || echo "[VPS] Docker network already exists"
 
-          echo "Waiting for health..."
+          # Build and restart backend container only (db is persistent)
+          cd "$DEPLOY_DIR"
+          echo "[VPS] Building ana-backend..."
+          docker compose --env-file .env build --no-cache ana-backend
+          docker compose --env-file .env up -d --force-recreate --no-deps ana-backend
+
+          # Health check loop (40s max)
+          echo "[VPS] Waiting for health..."
           for i in 1 2 3 4 5 6 7 8; do
             if curl -sf http://localhost:5002/api/health > /dev/null 2>&1; then
-              echo "Backend healthy!"
+              echo "[VPS] Backend healthy after ${i}x5s"
               break
             fi
-            echo "Attempt $i/8..."
+            [ $i -eq 8 ] && echo "[VPS] WARNING: health check timed out" && break
+            echo "[VPS] Attempt $i/8, waiting 5s..."
             sleep 5
           done
 
+          echo "[VPS] Container status:"
           docker ps --filter "name=ana-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-          curl -sf http://localhost:5002/api/health && echo ""
-          echo "Deploy complete!"
+          echo "[VPS] Deploy complete!"
           ENDSSH
 
       - name: Verify live site
         run: |
-          sleep 5
-          curl -sf --max-time 15 https://ana-ca.com/api/health && echo "Live site OK" || echo "Live check skipped"
+          sleep 8
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" --max-time 15 https://ana-ca.com/api/health || echo "000")
+          if [ "$STATUS" = "200" ]; then
+            echo "Live site healthy — https://ana-ca.com responds 200"
+          else
+            echo "Note: Live check returned HTTP $STATUS (DNS/SSL may still be propagating)"
+          fi

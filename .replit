@@ -24,32 +24,15 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Start application"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "API Server"
+args = "Deploy to Production"
 
 [[workflows.workflow]]
-name = "Start application"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "webview"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "PORT=18479 BASE_PATH=/ pnpm --filter @workspace/hrm-system run dev"
-waitForPort = 18479
-
-[[workflows.workflow]]
-name = "API Server"
+name = "Deploy to Production"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "PORT=8080 pnpm --filter @workspace/api-server run dev"
-waitForPort = 8080
+args = "bash scripts/deploy.sh"
 
 [workflows.workflow.metadata]
 outputType = "console"
