@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
+import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
@@ -598,6 +599,142 @@ export default function WorkingPapers() {
   const handleConfigChange = useCallback((key: string, value: any) => {
     setConfigValues(prev => ({ ...prev, [key]: value }));
   }, []);
+
+  // ── Variable Template Download / Upload ────────────────────────────────────
+  const [varTemplateUploading, setVarTemplateUploading] = useState(false);
+  const varTemplateFileRef = useRef<HTMLInputElement>(null);
+
+  const downloadVariableTemplate = useCallback(() => {
+    const sectionOrder: Record<string, string> = {
+      entity_legal: "1. Entity Legal & Classification",
+      financial_reporting: "2. Financial Reporting Basis",
+      prior_year: "3. Prior Year / Opening Balance Context",
+      materiality: "4. Materiality",
+      risk_assessment: "5. Risk Assessment",
+      it_controls: "6. IT / Controls / Service Organization",
+      experts_cycles: "7. Experts / Multi-location / Cycles",
+      sampling: "8. Sampling / Confirmations",
+      pakistan_tax: "9. Pakistan Tax & Regulatory",
+      significant_fs: "10. Significant FS Areas",
+      ethics: "11. Ethics / Independence / Quality",
+      team: "12. Team / Approvals / EQCR",
+      governance: "13. Governance / Deadlines / Subsequent Events",
+      reporting: "14. Reporting Drivers",
+      system_controls: "15. System Controls / Regeneration / Archive",
+    };
+
+    const rows = VARIABLE_DEFS.map(v => {
+      let rec = "";
+      if (v.defaultValue !== undefined && v.defaultValue !== null) {
+        rec = v.fieldType === "toggle" ? (v.defaultValue ? "Yes" : "No") : String(v.defaultValue);
+      } else if (v.fieldType === "toggle") {
+        rec = "No";
+      } else if (v.fieldType === "dropdown" && v.options && v.options.length > 0) {
+        rec = v.options[0];
+      }
+      return {
+        "Section": sectionOrder[v.section] || v.section,
+        "Variable Name": v.label,
+        "Field Type": v.fieldType,
+        "Allowed Values / Options": v.options ? v.options.join(" | ") : v.fieldType === "toggle" ? "Yes | No" : "",
+        "Mandatory": v.mandatory ? "Yes" : "No",
+        "High Impact": v.isHighImpact ? "Yes" : "No",
+        "Standard Reference": v.standardRef,
+        "WP Codes Affected": v.wpCodes.join(", "),
+        "Help Text": v.helpText,
+        "Recommended Response": rec,
+        "Variable Key (do not edit)": v.key,
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    const colWidths = [
+      { wch: 40 }, { wch: 45 }, { wch: 18 }, { wch: 60 },
+      { wch: 12 }, { wch: 14 }, { wch: 40 }, { wch: 22 },
+      { wch: 60 }, { wch: 40 }, { wch: 28 },
+    ];
+    ws["!cols"] = colWidths;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Engagement Variables");
+
+    const instrRows = [
+      { "Instructions": "HOW TO USE THIS TEMPLATE" },
+      { "Instructions": "" },
+      { "Instructions": "1. Review each variable in the 'Engagement Variables' sheet." },
+      { "Instructions": "2. Fill in the 'Recommended Response' column (column J) with your answers." },
+      { "Instructions": "3. For dropdown fields: enter one of the values listed in 'Allowed Values / Options'." },
+      { "Instructions": "4. For toggle fields: enter 'Yes' or 'No'." },
+      { "Instructions": "5. For multi-select fields: separate multiple values with a pipe character  |  (e.g. FBR | PRA)." },
+      { "Instructions": "6. For number fields: enter a plain number (no commas or currency symbols)." },
+      { "Instructions": "7. For date fields: use YYYY-MM-DD format (e.g. 2024-06-30)." },
+      { "Instructions": "8. Do NOT edit the 'Variable Key (do not edit)' column — it is used for import mapping." },
+      { "Instructions": "9. Save the file and upload it back using the 'Upload Variables' button on the Working Papers page." },
+      { "Instructions": "10. Your responses will be pre-loaded into Step 2 (Configure) as editable fields." },
+    ];
+    const instrWs = XLSX.utils.json_to_sheet(instrRows);
+    instrWs["!cols"] = [{ wch: 80 }];
+    XLSX.utils.book_append_sheet(wb, instrWs, "Instructions");
+
+    XLSX.writeFile(wb, "Engagement_Variable_Template.xlsx");
+  }, []);
+
+  const handleVariableTemplateUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setVarTemplateUploading(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const wb = XLSX.read(arrayBuffer, { type: "array" });
+      const sheetName = wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+      const keyCol = "Variable Key (do not edit)";
+      const valCol = "Recommended Response";
+
+      const updates: Record<string, any> = {};
+      let mapped = 0;
+
+      for (const row of rows) {
+        const key = String(row[keyCol] || "").trim();
+        const rawVal = String(row[valCol] ?? "").trim();
+        if (!key || !rawVal) continue;
+
+        const varDef = VARIABLE_DEFS.find(v => v.key === key);
+        if (!varDef) continue;
+
+        let parsed: any = rawVal;
+        if (varDef.fieldType === "toggle") {
+          parsed = rawVal.toLowerCase() === "yes" || rawVal === "true" || rawVal === "1";
+        } else if (varDef.fieldType === "number") {
+          const n = parseFloat(rawVal.replace(/,/g, ""));
+          if (!isNaN(n)) parsed = n;
+          else continue;
+        } else if (varDef.fieldType === "multi-select") {
+          parsed = rawVal.split("|").map((s: string) => s.trim()).filter(Boolean);
+        }
+
+        updates[key] = parsed;
+        mapped++;
+      }
+
+      if (mapped === 0) {
+        toast({ title: "No variables mapped", description: "Could not find any matching variable keys in the uploaded file. Ensure you used the official template.", variant: "destructive" });
+        return;
+      }
+
+      setConfigValues(prev => ({ ...prev, ...updates }));
+      toast({ title: "Variables Imported", description: `${mapped} variable(s) successfully loaded. Review and edit them in the Configure step.` });
+      setStep(1);
+    } catch {
+      toast({ title: "Upload failed", description: "Could not parse the uploaded file. Please use the downloaded template.", variant: "destructive" });
+    } finally {
+      setVarTemplateUploading(false);
+      if (varTemplateFileRef.current) varTemplateFileRef.current.value = "";
+    }
+  }, [toast]);
 
   useEffect(() => {
     const prev = document.title;
@@ -1226,6 +1363,69 @@ export default function WorkingPapers() {
                     </div>
 
                     <DropZone files={files} onAdd={addFiles} onRemove={removeFile} />
+
+                    {/* ── Engagement Variable Template ─────────────────── */}
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-5 space-y-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
+                          <FileSpreadsheet className="w-5 h-5 text-emerald-700" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-bold text-emerald-900">Engagement Variable Template</h3>
+                          <p className="text-xs text-emerald-700 mt-1 leading-relaxed">
+                            Download the Excel template with all 121 engagement variables and their recommended responses.
+                            Fill in your answers, then upload the file to pre-populate the Configure step — all fields remain editable.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button
+                          onClick={downloadVariableTemplate}
+                          className="flex items-center gap-3 rounded-xl border border-emerald-300 bg-white hover:bg-emerald-50 px-4 py-3.5 text-left transition-all group shadow-sm"
+                        >
+                          <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0 group-hover:bg-emerald-200 transition-colors">
+                            <Download className="w-4 h-4 text-emerald-700" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-slate-800">Download Template</p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">Excel · 121 variables · recommended responses pre-filled</p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+                        </button>
+
+                        <button
+                          onClick={() => varTemplateFileRef.current?.click()}
+                          disabled={varTemplateUploading}
+                          className="flex items-center gap-3 rounded-xl border border-blue-200 bg-white hover:bg-blue-50 px-4 py-3.5 text-left transition-all group shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center shrink-0 group-hover:bg-blue-200 transition-colors">
+                            {varTemplateUploading
+                              ? <Loader2 className="w-4 h-4 text-blue-700 animate-spin" />
+                              : <Upload className="w-4 h-4 text-blue-700" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-slate-800">
+                              {varTemplateUploading ? "Importing…" : "Upload Variables"}
+                            </p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">Upload filled template · auto-advances to Configure</p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+                        </button>
+                        <input
+                          ref={varTemplateFileRef}
+                          type="file"
+                          accept=".xlsx,.xls"
+                          onChange={handleVariableTemplateUpload}
+                          className="hidden"
+                        />
+                      </div>
+
+                      <p className="text-[10px] text-emerald-600 font-medium flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3 h-3 shrink-0" />
+                        You can also skip this and fill all variables manually in the Configure step
+                      </p>
+                    </div>
 
                     <div className="space-y-3">
                       <Label className="text-xs font-bold text-slate-700 uppercase tracking-widest flex items-center gap-2"><Sparkles className="w-3.5 h-3.5 text-blue-500" /> Special Context / Instructions</Label>
