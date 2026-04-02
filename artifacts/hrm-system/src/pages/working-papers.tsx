@@ -721,6 +721,9 @@ export default function WorkingPapers() {
     formData.append("plData", JSON.stringify(plData)); // NEW
 
     try {
+      setProgress(40);
+      setProgressMsg("Sending documents to AI engine...");
+
       const res = await fetch("/api/working-papers/analyze", {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` },
@@ -729,25 +732,18 @@ export default function WorkingPapers() {
 
       if (!res.ok) throw new Error(await res.text());
 
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("No reader");
+      setProgress(80);
+      setProgressMsg("Processing AI response...");
 
-      let partial = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = new TextDecoder().decode(value);
-        const lines = (partial + chunk).split("\n");
-        partial = lines.pop() || "";
+      const data = await res.json();
 
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = JSON.parse(line.slice(6));
-          if (data.progress) setProgress(data.progress);
-          if (data.message) setProgressMsg(data.message);
-          if (data.analysis) setAnalysis(data.analysis);
-        }
+      if (data.analysis) {
+        setAnalysis(data.analysis);
+      } else if (data.success === false || data.error) {
+        throw new Error(data.error || "Analysis returned no data");
       }
+
+      setProgress(100);
       setStep(2);
       toast({ title: "Analysis complete", description: "AI has processed the documents successfully." });
     } catch (err: any) {
@@ -1058,14 +1054,14 @@ export default function WorkingPapers() {
                                 Period Start Date
                                 {periodSuggested && periodStart && <span className="ml-1.5 text-[9px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5 align-middle">suggested</span>}
                               </Label>
-                              <Input type="date" value={periodStart} onChange={e => { setPeriodStart(e.target.value); setPeriodSuggested(false); }} className="h-11 rounded-xl font-mono text-sm" />
+                              <Input type="date" value={periodStart} onChange={e => { setPeriodStart(e.target.value); setPeriodSuggested(false); }} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
                             </div>
                             <div className="space-y-2">
                               <Label className="text-xs font-bold text-slate-600 ml-1">
                                 Period End Date
                                 {periodSuggested && periodEnd && <span className="ml-1.5 text-[9px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5 align-middle">suggested</span>}
                               </Label>
-                              <Input type="date" value={periodEnd} onChange={e => { setPeriodEnd(e.target.value); setPeriodSuggested(false); }} className="h-11 rounded-xl font-mono text-sm" />
+                              <Input type="date" value={periodEnd} onChange={e => { setPeriodEnd(e.target.value); setPeriodSuggested(false); }} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
                             </div>
                             <div className="space-y-2">
                               <Label className="text-xs font-bold text-slate-600 ml-1">Engagement Type</Label>
@@ -1279,36 +1275,36 @@ export default function WorkingPapers() {
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                             <div className="space-y-1.5">
                               <Label className="text-xs font-bold text-slate-600 ml-1">Planning Deadline <span className="text-red-500">*</span></Label>
-                              <Input type="date" value={planningDeadline} onChange={e => setPlanningDeadline(e.target.value)} className="h-11 rounded-xl font-mono text-sm" />
+                              <Input type="date" value={planningDeadline} onChange={e => setPlanningDeadline(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
                             </div>
                             <div className="space-y-1.5">
                               <Label className="text-xs font-bold text-slate-600 ml-1">Fieldwork Start</Label>
-                              <Input type="date" value={fieldworkStart} onChange={e => setFieldworkStart(e.target.value)} className="h-11 rounded-xl font-mono text-sm" />
+                              <Input type="date" value={fieldworkStart} onChange={e => setFieldworkStart(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
                             </div>
                             <div className="space-y-1.5">
                               <Label className="text-xs font-bold text-slate-600 ml-1">Fieldwork End</Label>
-                              <Input type="date" value={fieldworkEnd} onChange={e => setFieldworkEnd(e.target.value)} className="h-11 rounded-xl font-mono text-sm" />
+                              <Input type="date" value={fieldworkEnd} onChange={e => setFieldworkEnd(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
                             </div>
                             <div className="space-y-1.5">
                               <Label className="text-xs font-bold text-slate-600 ml-1">Reporting Deadline <span className="text-red-500">*</span></Label>
-                              <Input type="date" value={reportingDeadline} onChange={e => setReportingDeadline(e.target.value)} className="h-11 rounded-xl font-mono text-sm" />
+                              <Input type="date" value={reportingDeadline} onChange={e => setReportingDeadline(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
                             </div>
                           </div>
 
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
                             <div className="space-y-1.5">
                               <Label className="text-xs font-bold text-slate-600 ml-1">Report Date</Label>
-                              <Input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)} className="h-11 rounded-xl font-mono text-sm" />
+                              <Input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
                               <p className="text-[10px] text-slate-400 ml-1">Date of auditor's report</p>
                             </div>
                             <div className="space-y-1.5">
                               <Label className="text-xs font-bold text-slate-600 ml-1">Filing Deadline</Label>
-                              <Input type="date" value={filingDeadline} onChange={e => setFilingDeadline(e.target.value)} className="h-11 rounded-xl font-mono text-sm" />
+                              <Input type="date" value={filingDeadline} onChange={e => setFilingDeadline(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
                               <p className="text-[10px] text-slate-400 ml-1">SECP / regulatory filing deadline</p>
                             </div>
                             <div className="space-y-1.5">
                               <Label className="text-xs font-bold text-slate-600 ml-1">Archive Date</Label>
-                              <Input type="date" value={archiveDate} onChange={e => setArchiveDate(e.target.value)} className="h-11 rounded-xl font-mono text-sm" />
+                              <Input type="date" value={archiveDate} onChange={e => setArchiveDate(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
                               <p className="text-[10px] text-slate-400 ml-1">ISA 230 — File assembly deadline (60 days post-report)</p>
                             </div>
                           </div>
