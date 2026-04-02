@@ -458,7 +458,12 @@ router.post("/generate", async (req: Request, res: Response) => {
     entityName, financialYear, engagementType, firmName, ntn, secp,
     strn, industry, entityType, framework, listedStatus,
     firstYearAudit, goingConcernFlag, controlReliance, significantRiskAreas,
-    registeredAddress,
+    registeredAddress, periodStart, periodEnd, currency,
+    newClient, groupAuditFlag, internalAuditExists,
+    independenceConfirmed, conflictCheck, eqcrRequired,
+    samplingMethod, confidenceLevel,
+    relatedPartyFlag, subsequentEventsFlag, estimatesFlag, litigationFlag, expertRequired,
+    currentTaxApplicable, deferredTaxApplicable, whtExposure, salesTaxRegistered, superTaxApplicable,
     preparer, reviewer, approver,
     planningDeadline, fieldworkStart, fieldworkEnd,
     reportingDeadline, reportDate, filingDeadline, archiveDate,
@@ -488,16 +493,16 @@ router.post("/generate", async (req: Request, res: Response) => {
   const risks = analysis.risk_assessment || {};
 
   const allPapers = [
-    "A1", "A2", "A3", "A4",
-    "B1", "B2", "B3", "B4", "B5",
-    "C1", "C2", "C3",
-    "D1", "D2", "D3",
-    "E1", "E2", "E3", "E4", "E5", "E6", "E7",
-    "F1", "F2", "F3",
-    "G1", "G2", "G3", "G4",
-    "H1", "H2", "H3",
-    "I1", "I2",
-    "J1", "J2", "J3",
+    "A1", "A2", "A3", "A4", "A5", "A6",
+    "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10",
+    "C1", "C2", "C3", "C4", "C5", "C6",
+    "D1", "D2", "D3", "D4", "D5",
+    "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10",
+    "F1", "F2", "F3", "F4", "F5", "F6",
+    "G1", "G2", "G3", "G4", "G5", "G6", "G7",
+    "H1", "H2", "H3", "H4", "H5",
+    "I1", "I2", "I3", "I4",
+    "J1", "J2", "J3", "J4", "J5",
     "K1", "K2", "K3",
   ];
   const papersToGenerate = selectedPapers?.length > 0 ? selectedPapers : allPapers;
@@ -507,39 +512,66 @@ router.post("/generate", async (req: Request, res: Response) => {
     "A2": { title: "Independence & Ethics Compliance", section: "Acceptance & Continuance", isa: "ISA 200, IESBA Code", description: "Auditor independence, ethical compliance and self-review threat assessment." },
     "A3": { title: "Client Acceptance & Continuance", section: "Acceptance & Continuance", isa: "ISA 220, ISQM 1", description: "Client integrity, risk evaluation, and acceptance/continuance decision." },
     "A4": { title: "Anti-Money Laundering Checks", section: "Acceptance & Continuance", isa: "AMLA 2010, IESBA", description: "Beneficial ownership verification, PEP screening, and AML compliance." },
-    "B1": { title: "Materiality Determination", section: "Planning & Strategy", isa: "ISA 320", description: "Overall materiality, performance materiality, and trivial threshold calculation." },
-    "B2": { title: "Risk Assessment & Response", section: "Planning & Strategy", isa: "ISA 315, ISA 330", description: "Inherent and control risk identification with planned audit responses." },
-    "B3": { title: "Audit Plan & Strategy", section: "Planning & Strategy", isa: "ISA 300", description: "Overall audit strategy, scope, timing, and resource allocation." },
-    "B4": { title: "Opening Balances Verification", section: "Planning & Strategy", isa: "ISA 510", description: "Verification of opening balances and comparative figures." },
-    "B5": { title: "Sampling Plan", section: "Planning & Strategy", isa: "ISA 530", description: "Statistical and non-statistical sampling methodology and sample sizes." },
-    "C1": { title: "TB/GL Reconciliation & FS Data", section: "Data & Financial Statements", isa: "ISA 500", description: "Trial balance to financial statements and general ledger reconciliation." },
-    "C2": { title: "Analytical Procedures", section: "Data & Financial Statements", isa: "ISA 520", description: "Ratio analysis, variance analysis, and trend review." },
-    "C3": { title: "Evidence Index & Vault", section: "Data & Financial Statements", isa: "ISA 500, ISA 230", description: "Summary of all audit evidence obtained with cross-references." },
-    "D1": { title: "Understanding the Entity & Environment", section: "Internal Controls", isa: "ISA 315", description: "Entity structure, industry, regulatory environment, and key processes." },
-    "D2": { title: "Internal Control Evaluation", section: "Internal Controls", isa: "ISA 315, ISA 265", description: "Design and implementation testing of key internal controls." },
-    "D3": { title: "Fraud Risk Assessment", section: "Internal Controls", isa: "ISA 240", description: "Fraud risk factors, management override assessment, and revenue recognition risk." },
-    "E1": { title: "Revenue & Trade Receivables", section: "Substantive Testing", isa: "ISA 500, IFRS 15", description: "Revenue recognition testing, receivables confirmation, and aging analysis." },
-    "E2": { title: "Purchases & Trade Payables", section: "Substantive Testing", isa: "ISA 500, IAS 37", description: "Purchases testing, payables completeness, and cut-off procedures." },
-    "E3": { title: "Cash & Bank Balances", section: "Substantive Testing", isa: "ISA 505, ISA 500", description: "Bank confirmation, reconciliation, and cash count procedures." },
-    "E4": { title: "Inventory & Cost of Sales", section: "Substantive Testing", isa: "ISA 501, IAS 2", description: "Inventory observation, valuation, NRV testing, and cost analysis." },
-    "E5": { title: "Property, Plant & Equipment", section: "Substantive Testing", isa: "IAS 16, ISA 500", description: "Additions, disposals, depreciation, impairment, and revaluation testing." },
-    "E6": { title: "Payroll & Employee Benefits", section: "Substantive Testing", isa: "ISA 500, IAS 19", description: "Payroll testing, EOBI/SESSI, gratuity, and withholding tax compliance." },
-    "E7": { title: "Loans, Borrowings & Finance Costs", section: "Substantive Testing", isa: "ISA 500, IFRS 9", description: "Long-term financing, lease liabilities, and finance cost verification." },
+    "A5": { title: "Conflict of Interest Assessment", section: "Acceptance & Continuance", isa: "IESBA Code", description: "Assessment of conflicts of interest and safeguards applied." },
+    "A6": { title: "Client Risk Profiling", section: "Acceptance & Continuance", isa: "ISA 220, ISQM 1", description: "Client risk profile for acceptance/continuance decision-making." },
+    "B1": { title: "Understanding the Entity & Environment", section: "Planning & Strategy", isa: "ISA 315", description: "Entity structure, industry, regulatory environment, and key processes." },
+    "B2": { title: "Industry & Regulatory Analysis", section: "Planning & Strategy", isa: "ISA 315", description: "Industry-specific risks, regulatory requirements, and market conditions." },
+    "B3": { title: "Process Flowcharts & Narratives", section: "Planning & Strategy", isa: "ISA 315", description: "Business process documentation and transaction flow narratives." },
+    "B4": { title: "Risk Assessment Summary (RMM)", section: "Planning & Strategy", isa: "ISA 315, ISA 330", description: "Inherent and control risk identification with planned audit responses." },
+    "B5": { title: "Fraud Risk Assessment", section: "Planning & Strategy", isa: "ISA 240", description: "Fraud risk factors, management override assessment, and revenue recognition risk." },
+    "B6": { title: "Materiality Calculation Sheet", section: "Planning & Strategy", isa: "ISA 320", description: "Overall materiality, performance materiality, and trivial threshold calculation." },
+    "B7": { title: "Performance Materiality Allocation", section: "Planning & Strategy", isa: "ISA 320", description: "Allocation of performance materiality to individual account areas." },
+    "B8": { title: "Audit Strategy Document", section: "Planning & Strategy", isa: "ISA 300", description: "Overall audit strategy, scope, timing, and resource allocation." },
+    "B9": { title: "Audit Plan (Detailed)", section: "Planning & Strategy", isa: "ISA 300", description: "Detailed audit plan with nature, timing, and extent of procedures." },
+    "B10": { title: "Analytical Procedures (Planning)", section: "Planning & Strategy", isa: "ISA 520", description: "Planning-stage analytical procedures and expectation setting." },
+    "C1": { title: "Final Accounts Extraction Sheet", section: "Data & Financial Statements", isa: "ISA 500", description: "Extracted financial statement data with line item mapping." },
+    "C2": { title: "FS Line Item Mapping Sheet", section: "Data & Financial Statements", isa: "ISA 500", description: "Mapping of FS line items to audit areas and TB accounts." },
+    "C3": { title: "FS ↔ TB Reconciliation", section: "Data & Financial Statements", isa: "ISA 500", description: "Trial balance to financial statements reconciliation." },
+    "C4": { title: "Opening Balances Verification", section: "Data & Financial Statements", isa: "ISA 510", description: "Verification of opening balances and comparative figures." },
+    "C5": { title: "Lead Schedules (Auto Generated)", section: "Data & Financial Statements", isa: "ISA 500, ISA 230", description: "Lead schedules for all material account areas with cross-references." },
+    "C6": { title: "Comparative Analysis (YoY)", section: "Data & Financial Statements", isa: "ISA 520", description: "Year-on-year comparative analysis of financial statement items." },
+    "D1": { title: "Internal Control Evaluation", section: "Internal Controls", isa: "ISA 315, ISA 265", description: "Design and implementation testing of key internal controls." },
+    "D2": { title: "Walkthrough Documentation", section: "Internal Controls", isa: "ISA 315", description: "End-to-end walkthrough of key transaction cycles and controls." },
+    "D3": { title: "Test of Controls (ToC)", section: "Internal Controls", isa: "ISA 330", description: "Operating effectiveness testing of key internal controls." },
+    "D4": { title: "IT Controls Review", section: "Internal Controls", isa: "ISA 315", description: "IT general controls and application controls assessment." },
+    "D5": { title: "Control Deficiency Log", section: "Internal Controls", isa: "ISA 265", description: "Log of identified control deficiencies with severity classification." },
+    "E1": { title: "Cash & Bank", section: "Substantive Testing", isa: "ISA 505, ISA 500", description: "Bank confirmation, reconciliation, cash count, and cut-off testing." },
+    "E2": { title: "Trade Receivables", section: "Substantive Testing", isa: "ISA 505, IFRS 15", description: "Debtors aging analysis, confirmations, subsequent receipts, and provision assessment." },
+    "E3": { title: "Inventory & Cost of Sales", section: "Substantive Testing", isa: "ISA 501, IAS 2", description: "Inventory count observation, valuation, NRV, and slow-moving analysis." },
+    "E4": { title: "Property, Plant & Equipment", section: "Substantive Testing", isa: "IAS 16, ISA 500", description: "Fixed asset register verification, depreciation, additions, and disposals." },
+    "E5": { title: "Trade Payables", section: "Substantive Testing", isa: "ISA 500, ISA 505", description: "Creditors reconciliation, confirmations, and cut-off testing." },
+    "E6": { title: "Revenue", section: "Substantive Testing", isa: "IFRS 15, ISA 500", description: "Revenue recognition testing, cut-off, and analytical review." },
+    "E7": { title: "Expenses", section: "Substantive Testing", isa: "ISA 500", description: "Expense testing, analytical review, and cut-off procedures." },
+    "E8": { title: "Equity", section: "Substantive Testing", isa: "ISA 500, IAS 1", description: "Share capital verification and reserves movement schedule." },
+    "E9": { title: "Taxation", section: "Substantive Testing", isa: "IAS 12, ITO 2001", description: "Current tax computation, deferred tax calculation, and WHT compliance." },
+    "E10": { title: "Provisions & Contingent Liabilities", section: "Substantive Testing", isa: "IAS 37, ISA 501", description: "Provision testing, legal confirmations, and contingency assessment." },
     "F1": { title: "Related Party Transactions", section: "Special Areas", isa: "ISA 550, IAS 24", description: "Related party identification, transaction testing, and disclosure review." },
-    "F2": { title: "Accounting Estimates & Fair Values", section: "Special Areas", isa: "ISA 540, ISA 620", description: "Management estimates, expert reliance, and fair value measurement." },
-    "F3": { title: "Going Concern Assessment", section: "Special Areas", isa: "ISA 570", description: "Management's going concern assessment and auditor's evaluation." },
-    "G1": { title: "Subsequent Events Review", section: "Completion", isa: "ISA 560", description: "Events after reporting period and their impact on financial statements." },
-    "G2": { title: "Summary of Misstatements", section: "Completion", isa: "ISA 450", description: "Unadjusted and adjusted misstatements schedule with materiality assessment." },
-    "G3": { title: "Financial Statement Review", section: "Completion", isa: "ISA 700, ISA 720", description: "Final FS review for fair presentation, disclosures, and other information." },
-    "G4": { title: "Management Representations", section: "Completion", isa: "ISA 580", description: "Written representations from management on material matters." },
-    "H1": { title: "Audit Report Draft", section: "Reporting", isa: "ISA 700, ISA 705, ISA 706", description: "Draft audit opinion, basis for opinion, and emphasis of matter paragraphs." },
-    "H2": { title: "Management Letter", section: "Reporting", isa: "ISA 265, ISA 260", description: "Communication of control deficiencies and recommendations." },
-    "H3": { title: "Communication with TCWG", section: "Reporting", isa: "ISA 260", description: "Matters for those charged with governance including KAMs." },
-    "I1": { title: "EQCR Checklist", section: "Quality Control", isa: "ISQM 1, ISQM 2", description: "Engagement quality control review and sign-off." },
-    "I2": { title: "File Assembly & Completeness", section: "Quality Control", isa: "ISA 230", description: "Audit file assembly, completeness check, and 60-day deadline." },
-    "J1": { title: "Income Tax Compliance", section: "Tax & Regulatory", isa: "ITO 2001, ISA 500", description: "Income tax provision, advance tax, minimum tax, and WHT compliance." },
-    "J2": { title: "Sales Tax & FED Compliance", section: "Tax & Regulatory", isa: "STA 1990, FED Act", description: "Sales tax returns, input/output reconciliation, and FED obligations." },
-    "J3": { title: "Companies Act 2017 Compliance", section: "Tax & Regulatory", isa: "Companies Act 2017, SECP", description: "Statutory compliance checklist per Companies Act 2017 and SECP regulations." },
+    "F2": { title: "Going Concern Assessment", section: "Special Areas", isa: "ISA 570", description: "Management's going concern assessment and auditor's evaluation." },
+    "F3": { title: "Subsequent Events Review", section: "Special Areas", isa: "ISA 560", description: "Events after reporting period and their impact on financial statements." },
+    "F4": { title: "Accounting Estimates Review", section: "Special Areas", isa: "ISA 540, ISA 620", description: "Management estimates, expert reliance, and fair value measurement." },
+    "F5": { title: "Laws & Regulations Compliance", section: "Special Areas", isa: "ISA 250", description: "Compliance with applicable laws and regulations and impact assessment." },
+    "F6": { title: "Litigation & Claims", section: "Special Areas", isa: "ISA 501, IAS 37", description: "Legal counsel confirmations, pending litigation, and claims evaluation." },
+    "G1": { title: "Misstatements Summary", section: "Completion", isa: "ISA 450", description: "Unadjusted and adjusted misstatements schedule with materiality assessment." },
+    "G2": { title: "Adjusting Journal Entries", section: "Completion", isa: "ISA 450", description: "Proposed and accepted adjusting entries with financial impact analysis." },
+    "G3": { title: "Final Analytical Review", section: "Completion", isa: "ISA 520", description: "Final-stage analytical procedures to confirm overall audit conclusions." },
+    "G4": { title: "Audit Completion Checklist", section: "Completion", isa: "ISA 220, ISA 230", description: "Comprehensive audit completion procedures and partner review checklist." },
+    "G5": { title: "Going Concern Final Conclusion", section: "Completion", isa: "ISA 570", description: "Final going concern evaluation and impact on audit opinion." },
+    "G6": { title: "Subsequent Events Final Review", section: "Completion", isa: "ISA 560", description: "Final review of events between reporting date and audit report date." },
+    "G7": { title: "Management Representation Letter", section: "Completion", isa: "ISA 580", description: "Written representations from management on material matters." },
+    "H1": { title: "Audit Opinion Assessment", section: "Reporting", isa: "ISA 700, ISA 705", description: "Assessment of appropriate audit opinion type and basis." },
+    "H2": { title: "Draft Auditor's Report", section: "Reporting", isa: "ISA 700, ISA 705, ISA 706", description: "Draft audit report with opinion, basis, and emphasis of matter paragraphs." },
+    "H3": { title: "Key Audit Matters", section: "Reporting", isa: "ISA 701", description: "Identification and communication of key audit matters for listed entities." },
+    "H4": { title: "Emphasis of Matter / Other Matter", section: "Reporting", isa: "ISA 706", description: "Emphasis of matter and other matter paragraphs assessment." },
+    "H5": { title: "Other Information Review", section: "Reporting", isa: "ISA 720", description: "Review of other information in documents containing audited FS." },
+    "I1": { title: "Engagement Quality Review (EQCR)", section: "Quality Control", isa: "ISQM 1, ISQM 2", description: "Engagement quality control review and sign-off." },
+    "I2": { title: "Review Notes & Clearance", section: "Quality Control", isa: "ISA 220", description: "Review notes resolution and clearance documentation." },
+    "I3": { title: "Consultation Documentation", section: "Quality Control", isa: "ISA 220, ISQM 1", description: "Documentation of consultations on difficult or contentious matters." },
+    "I4": { title: "File Completion & Locking", section: "Quality Control", isa: "ISA 230", description: "Audit file assembly, completeness check, and 60-day locking deadline." },
+    "J1": { title: "Income Tax Computation", section: "Tax & Regulatory", isa: "ITO 2001, ISA 500", description: "Income tax provision, advance tax, minimum tax, and WHT compliance." },
+    "J2": { title: "Deferred Tax Working", section: "Tax & Regulatory", isa: "IAS 12, ITO 2001", description: "Deferred tax asset/liability calculation and movement schedule." },
+    "J3": { title: "Sales Tax Reconciliation", section: "Tax & Regulatory", isa: "STA 1990, FED Act", description: "Sales tax returns, input/output reconciliation, and FED obligations." },
+    "J4": { title: "Withholding Tax Compliance", section: "Tax & Regulatory", isa: "ITO 2001", description: "WHT deduction and deposit compliance for all applicable sections." },
+    "J5": { title: "Super Tax Calculation", section: "Tax & Regulatory", isa: "ITO 2001", description: "Super tax computation and applicability assessment." },
     "K1": { title: "Signed Audit Opinion", section: "Final Output & Archive", isa: "ISA 700, ISA 720", description: "Final signed audit report with all required elements." },
     "K2": { title: "Engagement Completion & Close", section: "Final Output & Archive", isa: "ISA 230, ISQM 1", description: "Engagement completion procedures, final partner review, and close." },
     "K3": { title: "Archive & Retention", section: "Final Output & Archive", isa: "ISA 230", description: "File archival per ISA 230 with retention schedule and access controls." },
@@ -568,10 +600,36 @@ ENTITY TYPE: ${entityType || "Private Limited"} | FRAMEWORK: ${framework || "IFR
 FIRST YEAR AUDIT: ${firstYearAudit ? "Yes (ISA 510 applies)" : "No"}
 GOING CONCERN FLAG: ${goingConcernFlag ? "Yes — ISA 570 extended procedures required" : "No material doubt"}
 CONTROL RELIANCE: ${controlReliance || "Partial"}
+NEW CLIENT: ${newClient ? "Yes" : "No"}
+GROUP AUDIT (ISA 600): ${groupAuditFlag ? "Yes" : "No"}
+INTERNAL AUDIT EXISTS (ISA 610): ${internalAuditExists ? "Yes" : "No"}
+CURRENCY: ${currency || "PKR"}
 ADDRESS: ${registeredAddress || "—"}
+PERIOD: ${periodStart || "—"} to ${periodEnd || "—"}
 FINANCIAL YEAR: ${financialYear || entity.financial_year || "Year ended June 30, 2024"}
 ENGAGEMENT TYPE: ${engagementType || "Statutory Audit"}
 FIRM: ${firmName || "ANA & Co. Chartered Accountants"}
+
+ETHICS & INDEPENDENCE (IESBA):
+- Independence Confirmed: ${independenceConfirmed !== false ? "Yes" : "No"}
+- Conflict Check Cleared: ${conflictCheck !== false ? "Yes" : "No"}
+- EQCR Required (ISQM 2): ${eqcrRequired ? "Yes" : "No"}
+
+SAMPLING (ISA 530): Method: ${samplingMethod || "Statistical"} | Confidence: ${confidenceLevel || "95%"}
+
+SPECIAL AREAS:
+- Related Parties (ISA 550): ${relatedPartyFlag ? "Flagged" : "Not flagged"}
+- Subsequent Events (ISA 560): ${subsequentEventsFlag ? "Flagged" : "Not flagged"}
+- Accounting Estimates (ISA 540): ${estimatesFlag ? "Flagged" : "Not flagged"}
+- Litigation / Claims (ISA 501): ${litigationFlag ? "Flagged" : "Not flagged"}
+- Expert Required (ISA 620): ${expertRequired ? "Yes" : "No"}
+
+TAX & REGULATORY (PAKISTAN):
+- Income Tax (ITO 2001): ${currentTaxApplicable !== false ? "Applicable" : "N/A"}
+- Deferred Tax (IAS 12): ${deferredTaxApplicable !== false ? "Applicable" : "N/A"}
+- WHT Exposure: ${whtExposure !== false ? "Yes" : "No"}
+- Sales Tax Registered: ${salesTaxRegistered !== false ? "Yes" : "No"}
+- Super Tax: ${superTaxApplicable ? "Applicable" : "N/A"}
 
 FINANCIAL DATA (Current Year):
 - Revenue: ${formatPKR(fin.revenue)}
@@ -727,7 +785,28 @@ Return JSON: { "working_papers": [...] }`;
         first_year_audit: firstYearAudit,
         going_concern_flag: goingConcernFlag,
         control_reliance: controlReliance,
+        currency: currency || "PKR",
+        new_client: newClient || false,
+        group_audit: groupAuditFlag || false,
+        internal_audit_exists: internalAuditExists || false,
+        independence_confirmed: independenceConfirmed !== false,
+        conflict_check: conflictCheck !== false,
+        eqcr_required: eqcrRequired || false,
+        sampling_method: samplingMethod || "Statistical",
+        confidence_level: confidenceLevel || "95%",
+        related_party_flag: relatedPartyFlag || false,
+        subsequent_events_flag: subsequentEventsFlag || false,
+        estimates_flag: estimatesFlag || false,
+        litigation_flag: litigationFlag || false,
+        expert_required: expertRequired || false,
+        current_tax_applicable: currentTaxApplicable !== false,
+        deferred_tax_applicable: deferredTaxApplicable !== false,
+        wht_exposure: whtExposure !== false,
+        sales_tax_registered: salesTaxRegistered !== false,
+        super_tax_applicable: superTaxApplicable || false,
         registered_address: registeredAddress,
+        period_start: periodStart || null,
+        period_end: periodEnd || null,
         generated_at:    new Date().toISOString(),
         total_papers:    enrichedPapers.length,
         total_evidence:  generatedEvidenceIndex.length,
@@ -1262,6 +1341,246 @@ router.post("/export-excel", async (req: Request, res: Response) => {
     const lsSheet = XLSX.utils.aoa_to_sheet(lsRows);
     lsSheet["!cols"] = [{ wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 20 }, { wch: 14 }, { wch: 10 }, { wch: 16 }];
     XLSX.utils.book_append_sheet(wb, lsSheet, "Lead Schedule");
+
+    // ── 7. PM ALLOCATION SHEET ─────────────────────────────────────────────
+    const pmRows: any[][] = [
+      ["PERFORMANCE MATERIALITY ALLOCATION — ISA 320.A12"],
+      [],
+      ["FS Line Item", "Carrying Amount (PKR)", "Allocated PM (PKR)", "% of Total PM", "Risk Level", "WP Ref"],
+    ];
+    const pmTotal = mat.performance_materiality || 0;
+    const pmAreas = [
+      { item: "Revenue", amount: fin.revenue, ref: "E7", risk: "High" },
+      { item: "Trade Receivables", amount: fin.trade_receivables, ref: "E1", risk: "Medium" },
+      { item: "Inventory", amount: fin.inventory, ref: "E4", risk: "Medium" },
+      { item: "Fixed Assets", amount: fin.fixed_assets, ref: "E5", risk: "Low" },
+      { item: "Trade Payables", amount: fin.trade_payables, ref: "E2", risk: "Medium" },
+      { item: "Cash & Bank", amount: fin.cash_and_bank, ref: "E3", risk: "Low" },
+      { item: "Other Income/Expenses", amount: fin.net_profit, ref: "E8", risk: "Medium" },
+    ];
+    const totalCarrying = pmAreas.reduce((s, a) => s + (a.amount || 0), 0);
+    for (const a of pmAreas) {
+      const pct = totalCarrying ? ((a.amount || 0) / totalCarrying * 100).toFixed(1) : "0";
+      const allocated = totalCarrying ? Math.round(pmTotal * (a.amount || 0) / totalCarrying) : 0;
+      pmRows.push([a.item, fmtN(a.amount), fmtN(allocated), `${pct}%`, a.risk, a.ref]);
+    }
+    pmRows.push([], ["Total", fmtN(totalCarrying), fmtN(pmTotal), "100%", "", ""]);
+    const pmSheet = XLSX.utils.aoa_to_sheet(pmRows);
+    pmSheet["!cols"] = [{ wch: 26 }, { wch: 22 }, { wch: 22 }, { wch: 14 }, { wch: 12 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, pmSheet, "PM Allocation");
+
+    // ── 8. FS MAPPING SHEET ────────────────────────────────────────────────
+    const fsMappingRows: any[][] = [
+      ["FINANCIAL STATEMENT ASSERTION MAPPING"],
+      [],
+      ["FS Line Item", "Existence", "Completeness", "Accuracy", "Valuation", "Rights & Obligations", "Cut-off", "Classification", "Presentation", "WP Ref"],
+      ["Revenue", "H", "H", "H", "M", "L", "H", "M", "M", "E7"],
+      ["Trade Receivables", "H", "H", "H", "H", "M", "H", "M", "M", "E1"],
+      ["Inventory", "H", "H", "M", "H", "M", "M", "M", "M", "E4"],
+      ["Fixed Assets", "M", "M", "L", "H", "M", "L", "M", "M", "E5"],
+      ["Trade Payables", "H", "H", "H", "M", "M", "H", "M", "M", "E2"],
+      ["Cash & Bank", "H", "H", "H", "L", "M", "M", "L", "L", "E3"],
+      ["Investments", "M", "M", "M", "H", "H", "L", "M", "M", "E6"],
+      ["Payroll / Staff Costs", "M", "H", "H", "L", "M", "H", "M", "M", "E8"],
+      [],
+      ["Legend: H = High Risk, M = Medium Risk, L = Low Risk"],
+    ];
+    const fsMappingSheet = XLSX.utils.aoa_to_sheet(fsMappingRows);
+    fsMappingSheet["!cols"] = [{ wch: 22 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, fsMappingSheet, "FS Mapping");
+
+    // ── 9. ToC MATRIX (Tests of Controls) ──────────────────────────────────
+    const tocRows: any[][] = [
+      ["TESTS OF CONTROLS MATRIX — ISA 330"],
+      [],
+      ["Process / Cycle", "Control Description", "Assertion", "Test Procedure", "Sample Size", "Result", "WP Ref"],
+      ["Revenue Cycle", "Authorization of sales orders", "Occurrence", "Inspect approval signatures on sample", "25", "", "D2"],
+      ["Revenue Cycle", "Segregation of duties — invoicing vs receipts", "Accuracy", "Walkthrough and observation", "N/A", "", "D2"],
+      ["Procurement", "PO approval for purchases above threshold", "Completeness", "Sample POs and verify authorization", "25", "", "D3"],
+      ["Procurement", "Three-way matching (PO/GRN/Invoice)", "Accuracy", "Re-perform matching on sample", "20", "", "D3"],
+      ["Payroll", "Authorization of payroll changes", "Occurrence", "Inspect HR approvals for new hires/terminations", "15", "", "D4"],
+      ["Cash & Bank", "Bank reconciliation review and approval", "Existence", "Inspect monthly bank reconciliations", "12", "", "D5"],
+      ["Fixed Assets", "Capital expenditure authorization", "Rights", "Inspect approval for additions > threshold", "10", "", "E5"],
+      ["IT General Controls", "Access controls — user provisioning", "Completeness", "Review user access logs", "N/A", "", "D4"],
+    ];
+    const tocSheet = XLSX.utils.aoa_to_sheet(tocRows);
+    tocSheet["!cols"] = [{ wch: 18 }, { wch: 40 }, { wch: 14 }, { wch: 40 }, { wch: 12 }, { wch: 10 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, tocSheet, "ToC Matrix");
+
+    // ── 10. ToD / SUBSTANTIVE TESTING MATRIX ────────────────────────────────
+    const todRows: any[][] = [
+      ["TESTS OF DETAILS / SUBSTANTIVE TESTING MATRIX — ISA 330/500"],
+      [],
+      ["FS Area", "Assertion Tested", "Procedure", "Source of Evidence", "Sample Size Basis", "Expected Result", "WP Ref"],
+      ["Trade Receivables", "Existence, Valuation", "External confirmation (ISA 505)", "Direct bank/debtor confirmation", `${meta?.sampling_method || "Statistical"}`, "100% response or alternative", "E1"],
+      ["Trade Payables", "Completeness, Accuracy", "Supplier statement reconciliation", "Supplier statements", "Top 10 + random 15", "Differences < PM", "E2"],
+      ["Cash & Bank", "Existence, Completeness", "Bank confirmation + reconciliation", "Bank certificates", "All banks", "Fully reconciled", "E3"],
+      ["Inventory", "Existence, Valuation", "Physical count observation + NRV test", "Count sheets + market prices", "Value-weighted", "Variance < PM", "E4"],
+      ["Fixed Assets", "Existence, Valuation", "Physical verification + depreciation recalculation", "FAR + inspection", "Above PM threshold", "Within tolerance", "E5"],
+      ["Revenue", "Occurrence, Accuracy", "Vouching sales to invoices/contracts", "Sales invoices, contracts", meta?.sampling_method || "Statistical", "Agree to supporting docs", "E7"],
+      ["Payroll", "Occurrence, Accuracy", "Recalculate selected months + statutory deductions", "Payroll registers", "3 months", "Within tolerance", "E8"],
+      ["Investments", "Existence, Valuation", "Confirmation + fair value testing", "Custodian certificates", "All material", "Agree to market values", "E6"],
+    ];
+    const todSheet = XLSX.utils.aoa_to_sheet(todRows);
+    todSheet["!cols"] = [{ wch: 20 }, { wch: 22 }, { wch: 36 }, { wch: 28 }, { wch: 18 }, { wch: 24 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, todSheet, "ToD Matrix");
+
+    // ── 11. MISSTATEMENT SUMMARY (ISA 450) ──────────────────────────────────
+    const misRows: any[][] = [
+      ["SUMMARY OF AUDIT MISSTATEMENTS — ISA 450"],
+      [],
+      ["No.", "Description", "FS Line Item", "Amount (DR)", "Amount (CR)", "Net Effect (PKR)", "Type", "Disposition"],
+      ["", "(To be populated during fieldwork)", "", "", "", "", "", ""],
+      [],
+      ["THRESHOLDS"],
+      ["Overall Materiality", fmtN(mat.overall_materiality)],
+      ["Performance Materiality", fmtN(mat.performance_materiality)],
+      ["Trivial (SAD) Threshold", fmtN(mat.trivial_threshold || (mat.overall_materiality || 0) * 0.05)],
+      [],
+      ["AGGREGATE UNCORRECTED MISSTATEMENTS"],
+      ["Total Factual Misstatements", "—"],
+      ["Total Judgmental Misstatements", "—"],
+      ["Total Projected Misstatements", "—"],
+      ["Grand Total", "—"],
+      ["Exceeds OM?", "—"],
+      [],
+      ["CONCLUSION"],
+      ["Based on audit work performed, aggregate uncorrected misstatements are [below/above] overall materiality. [No modification / Modification] to auditor's report is required."],
+    ];
+    const misSheet = XLSX.utils.aoa_to_sheet(misRows);
+    misSheet["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 22 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 14 }];
+    XLSX.utils.book_append_sheet(wb, misSheet, "Misstatements");
+
+    // ── 12. ADJUSTING JOURNAL ENTRIES (AJE) ─────────────────────────────────
+    const ajeRows: any[][] = [
+      ["SCHEDULE OF ADJUSTING JOURNAL ENTRIES"],
+      [],
+      ["AJE No.", "Date", "Account", "Description", "Debit (PKR)", "Credit (PKR)", "Proposed By", "Status"],
+      ["AJE-001", "", "", "(To be populated during fieldwork)", "", "", "", ""],
+      [],
+      ["SUMMARY"],
+      ["Total Proposed AJEs", "—"],
+      ["Total Accepted by Client", "—"],
+      ["Total Declined by Client", "—"],
+      ["Net Impact on Net Profit", "—"],
+      ["Net Impact on Total Assets", "—"],
+    ];
+    const ajeSheet = XLSX.utils.aoa_to_sheet(ajeRows);
+    ajeSheet["!cols"] = [{ wch: 12 }, { wch: 14 }, { wch: 28 }, { wch: 36 }, { wch: 18 }, { wch: 18 }, { wch: 16 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, ajeSheet, "AJE Schedule");
+
+    // ── 13. TAX COMPUTATION (Pakistan) ──────────────────────────────────────
+    const taxRows: any[][] = [
+      ["INCOME TAX COMPUTATION — Income Tax Ordinance 2001"],
+      [],
+      ["Particulars", "Amount (PKR)", "Reference / Notes"],
+      ["Accounting Profit Before Tax", fmtN(fin.net_profit), "Per audited FS"],
+      [],
+      ["ADD: Inadmissible Expenses"],
+      ["Accounting depreciation", "—", "Sec 22 — Tax depreciation applies"],
+      ["Provisions / Reserves", "—", "Sec 21(m)"],
+      ["Donations (excess of limit)", "—", "Sec 61"],
+      ["Other inadmissible items", "—", ""],
+      [],
+      ["LESS: Admissible Deductions"],
+      ["Tax depreciation", "—", "Third Schedule"],
+      ["Initial allowance", "—", "Third Schedule Part II"],
+      ["Brought forward losses", "—", "Sec 57"],
+      [],
+      ["Taxable Income", "—", ""],
+      ["Tax Rate Applied", "—", "First Schedule / Division II"],
+      ["Tax Liability", "—", ""],
+      ["Less: Tax Credits", "—", ""],
+      ["Less: Minimum Tax u/s 113", "—", "Turnover × 1.25%"],
+      ["Less: Advance Tax / WHT", "—", "Sec 147 / 148–236"],
+      ["Tax Payable / (Refundable)", "—", ""],
+    ];
+    if (meta?.super_tax_applicable) {
+      taxRows.push([], ["SUPER TAX (Sec 4C)"], ["Taxable Income", "—", ""], ["Super Tax Rate", "—", ""], ["Super Tax Liability", "—", ""]);
+    }
+    const taxSheet = XLSX.utils.aoa_to_sheet(taxRows);
+    taxSheet["!cols"] = [{ wch: 34 }, { wch: 22 }, { wch: 36 }];
+    XLSX.utils.book_append_sheet(wb, taxSheet, "Tax Computation");
+
+    // ── 14. DEFERRED TAX COMPUTATION (IAS 12) ───────────────────────────────
+    const dtRows: any[][] = [
+      ["DEFERRED TAX COMPUTATION — IAS 12"],
+      [],
+      ["Item", "Carrying Amount (PKR)", "Tax Base (PKR)", "Temporary Difference", "Type", "Deferred Tax Asset/Liability"],
+      ["Property, Plant & Equipment", fmtN(fin.fixed_assets), "—", "—", "Taxable", "—"],
+      ["Trade Receivables (Provision)", "—", "—", "—", "Deductible", "—"],
+      ["Provisions & Accruals", "—", "—", "—", "Deductible", "—"],
+      ["Lease Liabilities (IFRS 16)", "—", "—", "—", "Taxable", "—"],
+      ["Employee Benefits", "—", "—", "—", "Deductible", "—"],
+      [],
+      ["Net Deferred Tax Asset / (Liability)", "—"],
+      ["Tax Rate Applied", "—"],
+      ["Deferred Tax Recognized in P&L", "—"],
+      ["Deferred Tax Recognized in OCI", "—"],
+    ];
+    const dtSheet = XLSX.utils.aoa_to_sheet(dtRows);
+    dtSheet["!cols"] = [{ wch: 30 }, { wch: 22 }, { wch: 20 }, { wch: 22 }, { wch: 14 }, { wch: 26 }];
+    XLSX.utils.book_append_sheet(wb, dtSheet, "Deferred Tax");
+
+    // ── 15. WHT COMPLIANCE ──────────────────────────────────────────────────
+    const whtRows: any[][] = [
+      ["WITHHOLDING TAX COMPLIANCE — Income Tax Ordinance 2001"],
+      [],
+      ["Section", "Nature of Payment", "Rate", "Threshold (PKR)", "Test Performed", "Exceptions Found", "WP Ref"],
+      ["149", "Salary", "As per rates", "—", "Recalculate monthly deductions", "", "J3"],
+      ["153(1)(a)", "Goods supplies", "4.5% / 6.5%", "75,000", "Verify deduction on sample payments", "", "J3"],
+      ["153(1)(b)", "Services", "8% / 14%", "30,000", "Verify deduction on sample invoices", "", "J3"],
+      ["153(1)(c)", "Contracts", "7.5% / 12%", "75,000", "Sample contract payments", "", "J3"],
+      ["155", "Income from property", "15%", "—", "Review rent payments", "", "J3"],
+      ["231A", "Cash withdrawal > 50K", "0.6%", "50,000", "Bank statement review", "", "J3"],
+      ["236", "Various advance tax", "Varies", "—", "Review applicability", "", "J3"],
+    ];
+    const whtSheet = XLSX.utils.aoa_to_sheet(whtRows);
+    whtSheet["!cols"] = [{ wch: 12 }, { wch: 28 }, { wch: 14 }, { wch: 16 }, { wch: 36 }, { wch: 18 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, whtSheet, "WHT Compliance");
+
+    // ── 16. EVIDENCE INDEX ──────────────────────────────────────────────────
+    const evRows: any[][] = [
+      ["EVIDENCE INDEX — ISA 500/501/505/520"],
+      [],
+      ["Evidence Ref", "Description", "Type", "Source", "WP Ref", "Date Obtained", "Reliability"],
+    ];
+    const evidenceIndex = req.body.evidenceIndex || [];
+    if (evidenceIndex.length > 0) {
+      for (const ev of evidenceIndex) {
+        evRows.push([ev.ref || "", ev.description || "", ev.type || "", ev.source || "", ev.wp_ref || "", ev.date || "", ev.reliability || ""]);
+      }
+    } else {
+      evRows.push(["EV-1", "Trial Balance", "Primary", "Client Accounts", "B1", "", "High"]);
+      evRows.push(["EV-2", "Bank Statements", "External", "Financial Institution", "E3", "", "High"]);
+      evRows.push(["EV-3", "Tax Returns / Assessments", "External", "FBR Portal", "J1", "", "High"]);
+    }
+    const evSheet = XLSX.utils.aoa_to_sheet(evRows);
+    evSheet["!cols"] = [{ wch: 14 }, { wch: 36 }, { wch: 14 }, { wch: 22 }, { wch: 10 }, { wch: 16 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, evSheet, "Evidence Index");
+
+    // ── 17. SAMPLING SHEET (ISA 530) ─────────────────────────────────────────
+    const sampRows: any[][] = [
+      ["AUDIT SAMPLING DOCUMENTATION — ISA 530"],
+      [],
+      ["Parameter", "Value"],
+      ["Sampling Method", meta?.sampling_method || "Statistical"],
+      ["Confidence Level", meta?.confidence_level || "95%"],
+      ["Population Size", "To be determined per area"],
+      ["Tolerable Error", fmtN(mat.performance_materiality)],
+      ["Expected Error", fmtN((mat.performance_materiality || 0) * 0.1)],
+      [],
+      ["SAMPLE SIZE DETERMINATION BY AREA"],
+      ["FS Area", "Population Size", "Population Value (PKR)", "Sample Size", "Sample Value (PKR)", "Selection Method", "WP Ref"],
+      ["Trade Receivables", "—", fmtN(fin.trade_receivables), "—", "—", meta?.sampling_method || "Statistical", "E1"],
+      ["Trade Payables", "—", fmtN(fin.trade_payables), "—", "—", meta?.sampling_method || "Statistical", "E2"],
+      ["Revenue Transactions", "—", fmtN(fin.revenue), "—", "—", meta?.sampling_method || "Statistical", "E7"],
+      ["Payroll", "—", "—", "—", "—", meta?.sampling_method || "Statistical", "E8"],
+      ["Fixed Asset Additions", "—", "—", "—", "—", "Value-weighted", "E5"],
+    ];
+    const sampSheet = XLSX.utils.aoa_to_sheet(sampRows);
+    sampSheet["!cols"] = [{ wch: 22 }, { wch: 18 }, { wch: 22 }, { wch: 14 }, { wch: 22 }, { wch: 18 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, sampSheet, "Sampling");
 
     const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
     const filename = `AuditFile_${(meta?.entity || "Client").replace(/\s+/g, "_")}_${(meta?.financial_year || "2024").replace(/\s+/g, "_")}.xlsx`;

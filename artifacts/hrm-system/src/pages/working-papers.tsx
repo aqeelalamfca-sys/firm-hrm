@@ -67,16 +67,16 @@ const ENGAGEMENT_TYPES = [
 ];
 
 const WP_GROUPS = [
-  { prefix: "A", label: "Acceptance & Continuance", color: "bg-violet-100 text-violet-700 border-violet-200", refs: ["A1", "A2", "A3", "A4"] },
-  { prefix: "B", label: "Planning & Strategy", color: "bg-blue-100 text-blue-700 border-blue-200", refs: ["B1", "B2", "B3", "B4", "B5"] },
-  { prefix: "C", label: "Data & Financial Statements", color: "bg-sky-100 text-sky-700 border-sky-200", refs: ["C1", "C2", "C3"] },
-  { prefix: "D", label: "Internal Controls", color: "bg-red-100 text-red-700 border-red-200", refs: ["D1", "D2", "D3"] },
-  { prefix: "E", label: "Substantive Testing", color: "bg-emerald-100 text-emerald-700 border-emerald-200", refs: ["E1", "E2", "E3", "E4", "E5", "E6", "E7"] },
-  { prefix: "F", label: "Special Areas", color: "bg-teal-100 text-teal-700 border-teal-200", refs: ["F1", "F2", "F3"] },
-  { prefix: "G", label: "Completion", color: "bg-amber-100 text-amber-700 border-amber-200", refs: ["G1", "G2", "G3", "G4"] },
-  { prefix: "H", label: "Reporting", color: "bg-indigo-100 text-indigo-700 border-indigo-200", refs: ["H1", "H2", "H3"] },
-  { prefix: "I", label: "Quality Control", color: "bg-purple-100 text-purple-700 border-purple-200", refs: ["I1", "I2"] },
-  { prefix: "J", label: "Tax & Regulatory", color: "bg-orange-100 text-orange-700 border-orange-200", refs: ["J1", "J2", "J3"] },
+  { prefix: "A", label: "Pre-Engagement & Acceptance", color: "bg-violet-100 text-violet-700 border-violet-200", refs: ["A1", "A2", "A3", "A4", "A5", "A6"] },
+  { prefix: "B", label: "Planning", color: "bg-blue-100 text-blue-700 border-blue-200", refs: ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10"] },
+  { prefix: "C", label: "Data & FS Integration", color: "bg-sky-100 text-sky-700 border-sky-200", refs: ["C1", "C2", "C3", "C4", "C5", "C6"] },
+  { prefix: "D", label: "Internal Controls & ToC", color: "bg-red-100 text-red-700 border-red-200", refs: ["D1", "D2", "D3", "D4", "D5"] },
+  { prefix: "E", label: "Substantive Testing", color: "bg-emerald-100 text-emerald-700 border-emerald-200", refs: ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10"] },
+  { prefix: "F", label: "Special Areas", color: "bg-teal-100 text-teal-700 border-teal-200", refs: ["F1", "F2", "F3", "F4", "F5", "F6"] },
+  { prefix: "G", label: "Completion & Finalization", color: "bg-amber-100 text-amber-700 border-amber-200", refs: ["G1", "G2", "G3", "G4", "G5", "G6", "G7"] },
+  { prefix: "H", label: "Reporting", color: "bg-indigo-100 text-indigo-700 border-indigo-200", refs: ["H1", "H2", "H3", "H4", "H5"] },
+  { prefix: "I", label: "Quality Control & Review", color: "bg-purple-100 text-purple-700 border-purple-200", refs: ["I1", "I2", "I3", "I4"] },
+  { prefix: "J", label: "Tax & Regulatory (Pakistan)", color: "bg-orange-100 text-orange-700 border-orange-200", refs: ["J1", "J2", "J3", "J4", "J5"] },
   { prefix: "K", label: "Final Output & Archive", color: "bg-green-100 text-green-700 border-green-200", refs: ["K1", "K2", "K3"] },
 ];
 
@@ -91,16 +91,16 @@ const STEPS = [
 ];
 
 const AUDIT_PHASES: { prefix: string; label: string; papers: number; description: string }[] = [
-  { prefix: "A", label: "Acceptance & Continuance", papers: 4, description: "Engagement letter, independence, ethics & client acceptance" },
-  { prefix: "B", label: "Planning & Strategy", papers: 5, description: "Materiality, risk assessment, audit plan & opening balances" },
-  { prefix: "C", label: "Data & FS", papers: 3, description: "TB/GL reconciliation, FS data & analytical procedures" },
-  { prefix: "D", label: "Internal Controls", papers: 3, description: "Entity understanding, IC evaluation & fraud risk assessment" },
-  { prefix: "E", label: "Substantive Testing", papers: 7, description: "Revenue, purchases, cash, inventory, PPE, payroll & receivables" },
-  { prefix: "F", label: "Special Areas", papers: 3, description: "Related parties, estimates & going concern" },
-  { prefix: "G", label: "Completion", papers: 4, description: "Subsequent events, misstatements, FS review & management reps" },
-  { prefix: "H", label: "Reporting", papers: 3, description: "Audit report draft, management letter & TCWG communication" },
-  { prefix: "I", label: "Quality Control", papers: 2, description: "ISQM 1/2 EQCR checklist & file assembly" },
-  { prefix: "J", label: "Tax & Regulatory", papers: 3, description: "Income tax, sales tax & Companies Act 2017 compliance" },
+  { prefix: "A", label: "Pre-Engagement & Acceptance", papers: 6, description: "Engagement letter, independence, ethics, AML, conflict & risk profiling" },
+  { prefix: "B", label: "Planning", papers: 10, description: "Entity understanding, risk, fraud, materiality, strategy, plan & analytics" },
+  { prefix: "C", label: "Data & FS Integration", papers: 6, description: "FS extraction, mapping, TB reconciliation, opening balances & lead schedules" },
+  { prefix: "D", label: "Internal Controls & ToC", papers: 5, description: "IC evaluation, walkthroughs, test of controls, IT review & deficiency log" },
+  { prefix: "E", label: "Substantive Testing", papers: 10, description: "Cash, receivables, inventory, PPE, payables, revenue, expenses, equity, tax & provisions" },
+  { prefix: "F", label: "Special Areas", papers: 6, description: "Related parties, going concern, subsequent events, estimates, laws & litigation" },
+  { prefix: "G", label: "Completion & Finalization", papers: 7, description: "Misstatements, AJE, final analytics, checklist, going concern, events & reps" },
+  { prefix: "H", label: "Reporting", papers: 5, description: "Opinion assessment, auditor's report, KAMs, EoM & other information" },
+  { prefix: "I", label: "Quality Control & Review", papers: 4, description: "EQCR, review notes, consultation & file completion" },
+  { prefix: "J", label: "Tax & Regulatory (Pakistan)", papers: 5, description: "Income tax, deferred tax, sales tax, WHT & super tax" },
   { prefix: "K", label: "Final Output", papers: 3, description: "Signed opinion, engagement close & archive" },
 ];
 
@@ -468,6 +468,33 @@ export default function WorkingPapers() {
   const [goingConcernFlag, setGoingConcernFlag] = useState(false);
   const [controlReliance, setControlReliance] = useState("Partial");
   const [significantRiskAreas, setSignificantRiskAreas] = useState<string[]>([]);
+  const [currency, setCurrency] = useState("PKR");
+  const [newClient, setNewClient] = useState(false);
+  const [groupAuditFlag, setGroupAuditFlag] = useState(false);
+  const [internalAuditExists, setInternalAuditExists] = useState(false);
+
+  // ── Ethics & Independence (Variable Group D) ─────────────────────────────
+  const [independenceConfirmed, setIndependenceConfirmed] = useState(true);
+  const [conflictCheck, setConflictCheck] = useState(true);
+  const [eqcrRequired, setEqcrRequired] = useState(false);
+
+  // ── Sampling Variables (Variable Group N) ─────────────────────────────────
+  const [samplingMethod, setSamplingMethod] = useState("Statistical");
+  const [confidenceLevel, setConfidenceLevel] = useState("95%");
+
+  // ── Special Area Flags (Variable Group O) ─────────────────────────────────
+  const [relatedPartyFlag, setRelatedPartyFlag] = useState(false);
+  const [subsequentEventsFlag, setSubsequentEventsFlag] = useState(false);
+  const [estimatesFlag, setEstimatesFlag] = useState(false);
+  const [litigationFlag, setLitigationFlag] = useState(false);
+  const [expertRequired, setExpertRequired] = useState(false);
+
+  // ── Tax & Regulatory Variables (Variable Group P) ─────────────────────────
+  const [currentTaxApplicable, setCurrentTaxApplicable] = useState(true);
+  const [deferredTaxApplicable, setDeferredTaxApplicable] = useState(true);
+  const [whtExposure, setWhtExposure] = useState(true);
+  const [salesTaxRegistered, setSalesTaxRegistered] = useState(true);
+  const [superTaxApplicable, setSuperTaxApplicable] = useState(false);
 
   // ── Engagement Timeline (Key Deadlines) ─────────────────────────────────────
   const [planningDeadline, setPlanningDeadline] = useState("");
@@ -777,6 +804,25 @@ export default function WorkingPapers() {
           registeredAddress,
           periodStart,
           periodEnd,
+          currency,
+          newClient,
+          groupAuditFlag,
+          internalAuditExists,
+          independenceConfirmed,
+          conflictCheck,
+          eqcrRequired,
+          samplingMethod,
+          confidenceLevel,
+          relatedPartyFlag,
+          subsequentEventsFlag,
+          estimatesFlag,
+          litigationFlag,
+          expertRequired,
+          currentTaxApplicable,
+          deferredTaxApplicable,
+          whtExposure,
+          salesTaxRegistered,
+          superTaxApplicable,
           preparer,
           reviewer,
           approver,
@@ -1105,6 +1151,111 @@ export default function WorkingPapers() {
                             <label className="flex items-center gap-2.5 cursor-pointer">
                               <Switch checked={goingConcernFlag} onCheckedChange={setGoingConcernFlag} className="data-[state=checked]:bg-red-600" />
                               <span className="text-xs font-bold text-slate-700">Going Concern Doubt (ISA 570)</span>
+                            </label>
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={newClient} onCheckedChange={setNewClient} className="data-[state=checked]:bg-amber-600" />
+                              <span className="text-xs font-bold text-slate-700">New Client</span>
+                            </label>
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={groupAuditFlag} onCheckedChange={setGroupAuditFlag} className="data-[state=checked]:bg-purple-600" />
+                              <span className="text-xs font-bold text-slate-700">Group Audit (ISA 600)</span>
+                            </label>
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={internalAuditExists} onCheckedChange={setInternalAuditExists} className="data-[state=checked]:bg-teal-600" />
+                              <span className="text-xs font-bold text-slate-700">Internal Audit Exists (ISA 610)</span>
+                            </label>
+                          </div>
+                          <div className="grid grid-cols-2 gap-6 pt-2">
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Currency</Label>
+                              <Select value={currency} onValueChange={setCurrency}>
+                                <SelectTrigger className="h-11 rounded-xl font-medium"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {["PKR", "USD", "GBP", "EUR", "AED", "SAR"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Sampling Method (ISA 530)</Label>
+                              <Select value={samplingMethod} onValueChange={setSamplingMethod}>
+                                <SelectTrigger className="h-11 rounded-xl font-medium"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {["Statistical", "Non-Statistical", "Judgmental", "Systematic", "Random"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* ── Ethics & Independence ─────────────────────────── */}
+                        <div className="bg-white rounded-xl p-8 border border-slate-200 shadow-sm space-y-4">
+                          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Scale className="w-4 h-4" /> Ethics & Independence (IESBA)</h3>
+                          <div className="flex flex-wrap gap-6">
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={independenceConfirmed} onCheckedChange={setIndependenceConfirmed} className="data-[state=checked]:bg-emerald-600" />
+                              <span className="text-xs font-bold text-slate-700">Independence Confirmed</span>
+                            </label>
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={conflictCheck} onCheckedChange={setConflictCheck} className="data-[state=checked]:bg-emerald-600" />
+                              <span className="text-xs font-bold text-slate-700">Conflict Check Cleared</span>
+                            </label>
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={eqcrRequired} onCheckedChange={setEqcrRequired} className="data-[state=checked]:bg-purple-600" />
+                              <span className="text-xs font-bold text-slate-700">EQCR Required (ISQM 2)</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* ── Special Area Flags ────────────────────────────── */}
+                        <div className="bg-white rounded-xl p-8 border border-slate-200 shadow-sm space-y-4">
+                          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-amber-500" /> Special Area Flags</h3>
+                          <div className="flex flex-wrap gap-6">
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={relatedPartyFlag} onCheckedChange={setRelatedPartyFlag} className="data-[state=checked]:bg-amber-600" />
+                              <span className="text-xs font-bold text-slate-700">Related Parties (ISA 550)</span>
+                            </label>
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={subsequentEventsFlag} onCheckedChange={setSubsequentEventsFlag} className="data-[state=checked]:bg-amber-600" />
+                              <span className="text-xs font-bold text-slate-700">Subsequent Events (ISA 560)</span>
+                            </label>
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={estimatesFlag} onCheckedChange={setEstimatesFlag} className="data-[state=checked]:bg-amber-600" />
+                              <span className="text-xs font-bold text-slate-700">Accounting Estimates (ISA 540)</span>
+                            </label>
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={litigationFlag} onCheckedChange={setLitigationFlag} className="data-[state=checked]:bg-red-600" />
+                              <span className="text-xs font-bold text-slate-700">Litigation / Claims (ISA 501)</span>
+                            </label>
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={expertRequired} onCheckedChange={setExpertRequired} className="data-[state=checked]:bg-purple-600" />
+                              <span className="text-xs font-bold text-slate-700">Expert Required (ISA 620)</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* ── Tax & Regulatory (Pakistan) ───────────────────── */}
+                        <div className="bg-white rounded-xl p-8 border border-slate-200 shadow-sm space-y-4">
+                          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Hash className="w-4 h-4 text-orange-500" /> Tax & Regulatory (Pakistan)</h3>
+                          <div className="flex flex-wrap gap-6">
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={currentTaxApplicable} onCheckedChange={setCurrentTaxApplicable} className="data-[state=checked]:bg-orange-600" />
+                              <span className="text-xs font-bold text-slate-700">Current Tax (ITO 2001)</span>
+                            </label>
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={deferredTaxApplicable} onCheckedChange={setDeferredTaxApplicable} className="data-[state=checked]:bg-orange-600" />
+                              <span className="text-xs font-bold text-slate-700">Deferred Tax (IAS 12)</span>
+                            </label>
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={whtExposure} onCheckedChange={setWhtExposure} className="data-[state=checked]:bg-orange-600" />
+                              <span className="text-xs font-bold text-slate-700">WHT Exposure</span>
+                            </label>
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={salesTaxRegistered} onCheckedChange={setSalesTaxRegistered} className="data-[state=checked]:bg-orange-600" />
+                              <span className="text-xs font-bold text-slate-700">Sales Tax Registered</span>
+                            </label>
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={superTaxApplicable} onCheckedChange={setSuperTaxApplicable} className="data-[state=checked]:bg-red-600" />
+                              <span className="text-xs font-bold text-slate-700">Super Tax Applicable</span>
                             </label>
                           </div>
                         </div>
