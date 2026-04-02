@@ -30,6 +30,29 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - Security enhancements include Helmet security headers, AES-256-CBC encryption for sensitive client credentials, rate limiting, and structured logging with Pino.
 - Performance is optimized through N+1 query elimination strategies (e.g., batched queries, SQL-level filtering), extensive database indexing, and frontend memoization.
 
+**Audit Working Paper Generator (A-K Code System):**
+- Frontend: `artifacts/hrm-system/src/pages/working-papers.tsx` (~2100+ lines)
+- Backend: `artifacts/api-server/src/routes/working-papers.ts` (~1850+ lines)
+- 5-step wizard: Upload → Configure → Analyse → Generate → Export
+- **A-K Code System**: 65 papers across 11 phases (A=Acceptance/6, B=Planning/10, C=Risk Assessment/6, D=Internal Controls/5, E=Substantive Testing/10, F=Special Areas/6, G=Completion/7, H=Reporting/5, I=Quality & Ethics/4, J=Tax & Regulatory/5, K=Final Output/3)
+- **Phase-by-phase AI generation**: 4-batch approach (A-D, E, F-H, I-K) to avoid token limits
+- **121-Variable Dynamic Engagement Configuration Engine**:
+  - Definitions: `artifacts/hrm-system/src/lib/engagement-variable-defs.ts` — all 121 variables across 15 sections
+  - Component: `artifacts/hrm-system/src/components/engagement-config.tsx` — dynamic rendering engine
+  - **15 Sections**: Entity Legal & Classification, Financial Reporting Basis, Prior Year / Opening Balance Context, Materiality, Risk Assessment, IT / Controls / Service Organization, Experts / Multi-location / Cycles, Sampling / Confirmations, Pakistan Tax & Regulatory, Significant FS Areas, Ethics / Independence / Quality, Team / Approvals / EQCR, Governance / Deadlines / Subsequent Events, Reporting Drivers, System Controls / Regeneration / Archive
+  - **6 Field Types**: dropdown, toggle, text, number, date, multi-select, user-picker
+  - **Dependency Rules**: `showWhen` (single parent) and `showWhenAny` (OR conditions) for conditional field visibility
+  - **Helpers**: `isVariableVisible()`, `getSectionStatus()`, `validateAllMandatory()`, `getAllTriggeredWPs()`, `getDefaultValues()`, `isFieldComplete()` (canonical completion checker)
+  - **UI Features**: Collapsible section cards with status chips (Not Started/In Progress/Complete), field-level tooltips with ISA standard references + WP code mapping + high-impact badge, section completion tracking, triggered WP display per section, summary stats panel (mandatory/sections/triggered WPs/completed)
+  - **WP Code Mapping**: Each variable maps to specific working paper codes (A1-K3) via wpCodes array
+  - **Backward compatibility**: Legacy individual state variables preserved alongside `configValues` Record state; both sent in generate API payload
+- **Enhanced Excel export (17 sheets)**: Cover, Index, Section sheets + Materiality (ISA 320/450), Analytical Review (ISA 520), Lead Schedule, PM Allocation, FS Mapping, ToC Matrix, ToD Matrix, Misstatements (ISA 450), AJE Schedule, Tax Computation, Deferred Tax (IAS 12), WHT Compliance, Evidence Index, Sampling (ISA 530)
+- **WP Reference Mapping**: E1=Cash & Bank, E2=Trade Receivables, E3=Inventory, E4=PPE, E5=Trade Payables, E6=Revenue, E7=Expenses, E8=Equity, E9=Taxation, E10=Provisions; J1=Income Tax, J2=Deferred Tax, J3=Sales Tax, J4=WHT, J5=Super Tax
+- **Confirmation letters**: Bank (E1), Debtors (E2), Creditors (E5), Legal (G4) with ISA 505/580 refs
+- Full Financial Statement data entry: Balance Sheet (7 sections, 32 line items) + P&L (5 sections, 15 line items)
+- Export formats: PDF, DOCX, Excel, Confirmations bundle
+- Docker: `deploy/Dockerfile` uses `--no-frozen-lockfile` (patched for pnpm lockfile drift)
+
 **Key Features & Implementations:**
 - **Authentication & RBAC:** Secure login with HMAC-signed tokens, granular role-based access control for all API routes and UI elements.
 - **Employee & Trainee Management:** Comprehensive CRUD operations for employees with auto-generated codes, detailed profiles, and tracking. Includes a 9-step CA training application process with file uploads, CRN generation, MCQ assessment, and smart interview scheduling.

@@ -256,7 +256,7 @@ export function getSectionStatus(sectionId: string, values: Record<string, any>)
   };
 }
 
-function isFieldComplete(v: VariableDef, val: any): boolean {
+export function isFieldComplete(v: VariableDef, val: any): boolean {
   if (v.fieldType === "toggle") return val !== undefined;
   if (v.fieldType === "multi-select") return Array.isArray(val) && val.length > 0;
   return val !== undefined && val !== null && val !== "";
