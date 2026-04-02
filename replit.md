@@ -30,10 +30,13 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - Security enhancements include Helmet security headers, AES-256-CBC encryption for sensitive client credentials, rate limiting, and structured logging with Pino.
 - Performance is optimized through N+1 query elimination strategies (e.g., batched queries, SQL-level filtering), extensive database indexing, and frontend memoization.
 
+**Admin Credentials (seeded):** `admin@calfirm.com` / `Admin@123` (role: `super_admin`). Password hashed as `SHA256(password + "hrm_salt_2024")`. DB column is `password_hash`; role enum values: `super_admin`, `hr_admin`, `finance_officer`, `manager`, `employee`, `partner`, `trainee`.
+
 **Audit Working Paper Generator (A-K Code System):**
-- Frontend: `artifacts/hrm-system/src/pages/working-papers.tsx` (~2100+ lines)
-- Backend: `artifacts/api-server/src/routes/working-papers.ts` (~1850+ lines)
-- 5-step wizard: Upload → Configure → Analyse → Generate → Export
+- Frontend: `artifacts/hrm-system/src/pages/working-papers.tsx` (~3045 lines)
+- Backend: `artifacts/api-server/src/routes/working-papers.ts` (~2264 lines)
+- 5-step wizard: Upload (0) → Configure (1) → Analyse (2) → Generate/Review (3) → Export (4)
+- **Bug fixes applied**: `handleAnalyze` now stays on Step 2 (`setStep(2)`) so analysis results are visible before generating; `handleGenerate` now stays on Step 3 (`setStep(3)`) so papers are reviewable before export; `salesTaxRows` added to generate payload; `configValues` + `salesTaxRows` + `periodStart`/`periodEnd` added to analyze payload; Sales Tax xlsx upload now uses `XLSX.read(arrayBuffer)` (binary parsing) instead of `file.text()` for proper `.xlsx` support; all 4 export handlers now call `URL.revokeObjectURL()` to prevent blob leaks; `bsData`/`plData`/`salesTaxRows` added to all 4 export payloads; `handleExtractAndNext` catch block now shows a toast instead of silently swallowing errors; "Start New Engagement" reset now clears ALL 50+ state variables back to defaults.
 - **A-K Code System**: 65 papers across 11 phases (A=Acceptance/6, B=Planning/10, C=Risk Assessment/6, D=Internal Controls/5, E=Substantive Testing/10, F=Special Areas/6, G=Completion/7, H=Reporting/5, I=Quality & Ethics/4, J=Tax & Regulatory/5, K=Final Output/3)
 - **Phase-by-phase AI generation**: 4-batch approach (A-D, E, F-H, I-K) to avoid token limits
 - **121-Variable Dynamic Engagement Configuration Engine**:

@@ -1,0 +1,375 @@
+Below is a step-by-step ultimate prompt you can paste into Replit or give to your developer to update the system exactly as required, based on the current workflow and issues noted in your uploaded file .
+
+Ultimate Step-by-Step Prompt for Replit / Developer
+
+Task:
+Update the existing AI Audit Working Paper Generator into a complete, production-grade workflow with the following mandatory sequence and logic. The system must be smooth, editable, standards-driven, and capable of reading uploaded files, extracting variables automatically, allowing user edits/finalization, and then generating complete outputs including Trial Balance, complete transaction-wise ledgers, and working papers.
+
+1. STEP 1 — UPLOAD FILES MODULE
+
+Create a dedicated Upload Files step as the first screen.
+
+Functional requirements:
+Allow upload of multiple files, up to at least 20 files.
+Accept the following formats:
+PDF
+Excel (.xlsx, .xls, .csv)
+Word (.docx)
+Images (.jpg, .jpeg, .png, .webp)
+EML / email files
+TXT
+Show uploaded files in a proper list/grid with:
+file name
+type
+size
+upload status
+remove option
+preview option where possible
+Add client-side validation before upload:
+file type validation
+max file size validation
+duplicate file warning
+Add proper file classification:
+Financial Statements
+Trial Balance
+General Ledger
+Bank Statements
+Invoices / Sales Tax Data
+Confirmations
+Corporate Documents
+Tax Notices / Returns
+Other Supporting Evidence
+Store uploaded files in application state and backend storage properly.
+Add a clear button:
+“Extract & Configure”
+This button must trigger the AI extraction process and move to the next step only after successful extraction.
+Important fixes:
+Do not silently fail.
+If extraction fails, show a clear error toast/message.
+Add progress indicator during extraction.
+Do not truncate important files excessively; implement chunking for large documents instead of crude short text clipping.
+2. STEP 2 — AI READ COMPLETE FILES, OCR, AND AUTO-PUSH VARIABLES
+
+Build a complete AI Extraction Engine that reads all uploaded files intelligently.
+
+Mandatory extraction logic:
+Use OCR for:
+scanned PDFs
+scanned images
+image-based financial statements
+bank statements
+invoices
+tax records
+Use text parsing for:
+machine-readable PDFs
+Word files
+Excel
+CSV
+TXT
+EML
+AI must do the following:
+Read all uploaded files completely.
+Extract all relevant information from documents.
+Classify document content.
+Detect entity/master information automatically, including:
+entity name
+legal form
+registration number
+NTN
+STRN / sales tax registration
+SECP number
+address
+reporting framework
+audit period / year end
+currency
+industry
+directors / management names if available
+Extract financial data automatically, including:
+Statement of Financial Position heads
+Profit or Loss heads
+notes balances where possible
+comparative figures
+tax data
+sales tax data
+bank figures
+debtor/creditor figures
+Extract accounting data automatically, including:
+Trial Balance line items
+chart of accounts
+GL transactions
+transaction dates
+narration/description
+debit/credit
+opening balance
+closing balance
+Extract audit variables and directly push them into variable fields.
+Variable handling:
+Auto-populate all variable fields directly after extraction.
+Variables must be editable.
+Each variable should show:
+field name
+extracted value
+source file reference
+confidence indicator where possible
+If AI is uncertain, mark the field for user review.
+Missing variables should remain editable manually.
+Important development requirements:
+Send both uploaded file content and all extracted/config variables to later stages.
+Do not leave config variables out of analysis.
+Properly parse uploaded Excel sales tax files using XLSX parser, not plain-text split logic.
+Build extraction for Trial Balance from uploaded documents and connect the existing extraction endpoint to the UI if already present.
+Maintain structured JSON output from AI for downstream use.
+3. STEP 3 — VARIABLE EDITING, FS EDITING, FINALIZATION, AND WORKING PAPER SELECTION
+
+Create a full Review & Finalize screen after AI extraction.
+
+A. Variable Editing
+
+Display all extracted variables in structured sections such as:
+
+Entity Information
+Registration & Tax Information
+Engagement Information
+Team Details
+Reporting Framework
+Audit Period
+Risk Variables
+Applicable Law / Regulatory Variables
+Industry Variables
+Sales Tax Variables
+Other Engagement Variables
+Requirements:
+All variables must be editable.
+Allow dropdowns, text fields, dates, numeric inputs, toggles.
+Show source mapping wherever available.
+Allow user to confirm/finalize variables.
+B. FS Editing and Finalization
+
+Create editable sections for:
+
+Statement of Financial Position
+Profit or Loss
+Other key schedules if applicable
+Requirements:
+AI should prefill FS lines from uploaded files.
+User can:
+edit figures
+add/remove rows
+map line items
+classify headings
+Add a Finalize FS button.
+After finalization, the FS data becomes the approved basis for:
+Trial Balance
+Ledger generation
+Working paper generation
+C. Working Paper Selection
+
+Create a section where user can select the working papers to generate.
+
+Requirements:
+Allow:
+Select All
+Select by phase
+Select individual working papers
+Phase-wise grouping example:
+Pre-Engagement / Acceptance
+Planning
+Risk Assessment
+Internal Controls
+Substantive Procedures
+Completion
+Reporting
+Tax / Sales Tax Reconciliation
+Confirmations
+EQCR / Inspection
+Selected working papers must be saved and passed to the generation engine.
+D. Final Confirmation
+
+Before moving to generation:
+
+user must finalize:
+variables
+FS
+working paper selection
+Show a summary page:
+uploaded files count
+extracted variables count
+missing variables count
+finalized FS status
+selected WPs count
+
+Add a clear button:
+
+“Finalize & Run AI”
+4. STEP 4 — AI GENERATION ENGINE
+
+Once finalized, AI must process all approved information and generate the outputs properly.
+
+AI must generate the following:
+A) Trial Balance
+
+Generate a proper editable Trial Balance.
+
+Requirements:
+Auto-create line items from uploaded data and extracted records.
+Include:
+code
+account title
+opening balance
+debit
+credit
+closing balance
+mapped FS head
+If source files already contain TB, use that and normalize it.
+If only FS/ledger data exists, derive TB logically.
+AI should auto-code and classify line items.
+TB must be editable before export if user returns to review.
+B) Complete Transaction-Wise Ledgers
+
+Generate complete transaction-wise ledgers account by account.
+
+Requirements:
+Each ledger should contain:
+date
+voucher/reference
+narration
+debit
+credit
+running balance
+Build ledgers from:
+uploaded GL
+uploaded Excel
+bank data
+invoices
+extracted accounting entries
+If full ledgers are not uploaded, AI should reconstruct transaction-wise ledgers as far as data permits and clearly mark estimated/reconstructed areas.
+Keep ledgers linked to TB and FS heads.
+C) Working Papers
+
+Generate complete selected working papers automatically.
+
+Each working paper must contain:
+Working paper title and code
+Objective
+Scope
+Assertions addressed
+Standard reference
+Source documents used
+Detailed procedures performed
+Calculations / reconciliations
+Findings / observations
+Exceptions noted
+Conclusion
+Cross references
+Prepared by / Reviewed by / Approved by
+Date fields
+Mandatory logic:
+Working papers must use:
+finalized variables
+finalized FS
+TB
+ledgers
+uploaded evidence
+sales tax data
+risk and materiality logic
+Sales tax data must be included in relevant papers.
+Analysis stage must use all config variables.
+Generated working papers must be viewable before export.
+Do not auto-jump directly to export without allowing review.
+5. STEP 5 — REVIEW GENERATED OUTPUTS BEFORE EXPORT
+
+After generation, show a proper Review Generated Results step.
+
+Must show:
+analysis summary
+materiality
+key risks
+major audit areas
+generated TB
+generated ledgers
+generated papers
+generation status by phase
+summary counts:
+total papers generated
+selected vs completed
+errors or warnings
+Add buttons:
+Edit / Regenerate
+Proceed to Export
+Important fixes:
+Do not skip analysis results.
+Do not skip working paper preview.
+User must be able to see and review outputs before export.
+6. STEP 6 — EXPORT & FINALIZATION
+
+Create export options for:
+
+Excel
+Word
+PDF
+Confirmations bundle
+Export rules:
+Include all finalized data in exports:
+variables
+FS
+TB
+transaction-wise ledgers
+sales tax rows
+working papers
+Ensure all exports include full detailed data, not only summary content.
+Revoke object URLs after download to avoid memory leaks.
+Add clean file naming convention:
+ClientName_YearEnd_AuditWorkingPapers.xlsx
+ClientName_YearEnd_AuditWorkingPapers.docx
+ClientName_YearEnd_AuditWorkingPapers.pdf
+CRITICAL FIXES TO IMPLEMENT
+
+Implement these corrections while updating the system:
+
+Do not jump from analysis directly to generate without displaying results.
+Do not jump from generation directly to export without displaying generated papers.
+Include sales tax rows in generation payload.
+Include all config/engagement variables in analysis payload.
+Properly parse uploaded .xlsx sales tax files using Excel parser.
+Include FS detail data in all exports.
+Add proper error handling with visible user feedback.
+Replace fake progress animation with real API progress/status.
+Fully reset all fields on “Start New Engagement”.
+Add stale data warning if files/config are changed after analysis.
+Add manual review/edit option for generated working papers.
+Add local save/draft persistence to prevent data loss.
+Connect invisible/unwired TB extraction endpoint to UI.
+Add guard checks before AI analysis runs.
+Improve naming clarity of buttons and steps.
+REQUIRED OUTPUT STRUCTURE
+
+The final system must produce these outputs in sequence:
+
+Output 1 — Extracted & Editable Variables
+Output 2 — Editable & Finalized Financial Statements
+Output 3 — Editable & Finalized Trial Balance
+Output 4 — Complete Transaction-wise Ledgers
+Output 5 — Complete Working Papers
+Output 6 — Export Bundle (Excel, Word, PDF, Confirmations)
+UI / UX REQUIREMENTS
+Step wizard must be visible and logical.
+User must always know:
+current step
+completed steps
+pending fields
+Use autosave.
+Use clear section headings.
+Add real-time validation.
+Add review/finalization buttons for each major section.
+Keep all data linked end-to-end:
+Uploads → Extraction → Variables → FS → TB → Ledgers → Analysis → Working Papers → Export
+DEVELOPER INSTRUCTION
+
+Refactor the current workflow so that it becomes:
+
+Upload Files → AI Extract + OCR → Variable Review/Edit → FS Review/Edit → Finalize → AI Generate TB + Ledgers + Working Papers → Review Outputs → Export
+
+Everything must be editable, reviewable, and fully linked.
+No important user-entered data should be dropped at any stage.
+No hidden API features should remain unwired.
+The system must be production-grade, audit-ready, and robust.

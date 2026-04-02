@@ -888,8 +888,8 @@ export default function WorkingPapers() {
         const gotSomething = !!(d.entity_name || d.ntn || fn.revenue || fn.total_assets);
         setAutoFilled(gotSomething);
       }
-    } catch {
-      // silently fail — user can fill manually
+    } catch (err: any) {
+      toast({ title: "Auto-extraction failed", description: err?.message || "Could not extract entity details from the documents. You can fill them in manually.", variant: "destructive" });
     } finally {
       setExtracting(false);
       setStep(1);
@@ -930,10 +930,6 @@ export default function WorkingPapers() {
     if (!file) return;
     setStUploading(true);
     try {
-      const text = await file.text();
-      const lines = text.split("\n").filter(l => l.trim());
-      if (lines.length < 2) { toast({ title: "Empty file", description: "The uploaded file contains no data rows.", variant: "destructive" }); return; }
-      const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
       const colMap: Record<string, keyof SalesTaxRow> = {
         "period from": "periodFrom", "period to": "periodTo",
         "invoice date": "invoiceDate", "invoice no.": "invoiceNo", "invoice no": "invoiceNo",
@@ -951,10 +947,21 @@ export default function WorkingPapers() {
         "adjustment / debit note / credit note": "adjustment", "adj / dn / cn": "adjustment",
         "net tax": "netTax",
       };
+
+      const arrayBuffer = await file.arrayBuffer();
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(arrayBuffer, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      if (!sheetName) { toast({ title: "Empty file", description: "The uploaded file has no sheets.", variant: "destructive" }); return; }
+      const sheet = workbook.Sheets[sheetName];
+      const rawData: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" }) as string[][];
+
+      if (rawData.length < 2) { toast({ title: "Empty file", description: "The uploaded file contains no data rows.", variant: "destructive" }); return; }
+      const headers = (rawData[0] as string[]).map(h => String(h ?? "").trim().toLowerCase());
       const headerMap: (keyof SalesTaxRow | null)[] = headers.map(h => colMap[h] || null);
       const rows: SalesTaxRow[] = [];
-      for (let i = 1; i < lines.length; i++) {
-        const vals = lines[i].split(",").map(v => v.trim());
+      for (let i = 1; i < rawData.length; i++) {
+        const vals = (rawData[i] as string[]).map(v => String(v ?? "").trim());
         const row = emptySalesTaxRow();
         headerMap.forEach((field, idx) => { if (field && field !== "id" && vals[idx]) (row as any)[field] = vals[idx]; });
         const hasData = Object.entries(row).some(([k, v]) => k !== "id" && v);
@@ -964,10 +971,10 @@ export default function WorkingPapers() {
         setSalesTaxRows(prev => [...prev, ...rows]);
         toast({ title: "Sales Tax Data Imported", description: `${rows.length} row(s) loaded from "${file.name}".` });
       } else {
-        toast({ title: "No data mapped", description: "Could not map any rows from the uploaded file. Check column headers.", variant: "destructive" });
+        toast({ title: "No data mapped", description: "Could not map any rows from the uploaded file. Check column headers match the template.", variant: "destructive" });
       }
-    } catch {
-      toast({ title: "Upload failed", description: "Could not parse the uploaded file.", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err?.message || "Could not parse the uploaded file.", variant: "destructive" });
     } finally {
       setStUploading(false);
       if (stFileRef.current) stFileRef.current.value = "";
@@ -1090,6 +1097,10 @@ export default function WorkingPapers() {
       toast({ title: "No files", description: "Upload at least one document first.", variant: "destructive" });
       return;
     }
+    if (!entityName.trim()) {
+      toast({ title: "Entity name required", description: "Please enter the entity name in the Configure step before running analysis.", variant: "destructive" });
+      return;
+    }
     setAnalyzing(true);
     setProgress(10);
     setProgressMsg("Uploading documents...");
@@ -1097,14 +1108,18 @@ export default function WorkingPapers() {
     const formData = new FormData();
     files.forEach(f => formData.append("files", f.file));
     formData.append("entityName", entityName);
-    formData.append("ntn", ntn); // NEW
-    formData.append("secp", secp); // NEW
+    formData.append("ntn", ntn);
+    formData.append("secp", secp);
     formData.append("engagementType", engagementType);
     formData.append("financialYear", financialYear);
     formData.append("firmName", firmName);
     formData.append("instructions", instructions);
-    formData.append("bsData", JSON.stringify(bsData)); // NEW
-    formData.append("plData", JSON.stringify(plData)); // NEW
+    formData.append("bsData", JSON.stringify(bsData));
+    formData.append("plData", JSON.stringify(plData));
+    formData.append("configValues", JSON.stringify(configValues));
+    formData.append("salesTaxRows", JSON.stringify(salesTaxRows));
+    formData.append("periodStart", periodStart);
+    formData.append("periodEnd", periodEnd);
 
     try {
       setProgress(40);
@@ -1130,8 +1145,8 @@ export default function WorkingPapers() {
       }
 
       setProgress(100);
-      setStep(3);
-      toast({ title: "Analysis complete", description: "AI has processed the documents successfully." });
+      setStep(2);
+      toast({ title: "Analysis complete", description: "Review the results below, then click Generate Working Papers." });
     } catch (err: any) {
       toast({ title: "Analysis failed", description: err.message, variant: "destructive" });
     } finally {
@@ -1217,6 +1232,7 @@ export default function WorkingPapers() {
           archiveDate,
           bsData,
           plData,
+          salesTaxRows,
           configValues,
         }),
       });
@@ -1240,8 +1256,8 @@ export default function WorkingPapers() {
       setProgress(100);
       setProgressMsg("All working papers generated successfully.");
 
-      setStep(4);
-      toast({ title: "Generation complete", description: `${papers.length} working papers generated across 11 audit phases (A-K).` });
+      setStep(3);
+      toast({ title: "Generation complete", description: `${papers.length} working papers generated across 11 audit phases (A-K). Review below then export.` });
     } catch (err: any) {
       clearInterval(phaseInterval);
       toast({ title: "Generation failed", description: err.message, variant: "destructive" });
@@ -1256,7 +1272,7 @@ export default function WorkingPapers() {
       const res = await fetch("/api/working-papers/export-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ workingPapers, evidenceIndex, meta: generationMeta, analysis, entityName, financialYear }),
+        body: JSON.stringify({ workingPapers, evidenceIndex, meta: generationMeta, analysis, entityName, financialYear, bsData, plData, salesTaxRows }),
       });
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
@@ -1264,6 +1280,7 @@ export default function WorkingPapers() {
       const a = document.createElement("a");
       a.href = url; a.download = `Audit_WP_${entityName.replace(/\s+/g, "_")}.pdf`;
       a.click();
+      window.URL.revokeObjectURL(url);
     } catch (err: any) {
       toast({ title: "Export failed", description: err.message, variant: "destructive" });
     } finally {
@@ -1277,7 +1294,7 @@ export default function WorkingPapers() {
       const res = await fetch("/api/working-papers/export-excel", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ workingPapers, evidenceIndex, meta: generationMeta, analysis, entityName, financialYear }),
+        body: JSON.stringify({ workingPapers, evidenceIndex, meta: generationMeta, analysis, entityName, financialYear, bsData, plData, salesTaxRows }),
       });
       if (!res.ok) throw new Error("Excel export failed");
       const blob = await res.blob();
@@ -1285,6 +1302,7 @@ export default function WorkingPapers() {
       const a = document.createElement("a");
       a.href = url; a.download = `Audit_WP_${entityName.replace(/\s+/g, "_")}.xlsx`;
       a.click();
+      window.URL.revokeObjectURL(url);
     } catch (err: any) {
       toast({ title: "Excel export failed", description: err.message, variant: "destructive" });
     } finally {
@@ -1298,7 +1316,7 @@ export default function WorkingPapers() {
       const res = await fetch("/api/working-papers/export-docx", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ workingPapers, evidenceIndex, meta: generationMeta, analysis, entityName, financialYear }),
+        body: JSON.stringify({ workingPapers, evidenceIndex, meta: generationMeta, analysis, entityName, financialYear, bsData, plData, salesTaxRows }),
       });
       if (!res.ok) throw new Error("DOCX export failed");
       const blob = await res.blob();
@@ -1306,6 +1324,7 @@ export default function WorkingPapers() {
       const a = document.createElement("a");
       a.href = url; a.download = `Audit_WP_${entityName.replace(/\s+/g, "_")}.docx`;
       a.click();
+      window.URL.revokeObjectURL(url);
     } catch (err: any) {
       toast({ title: "DOCX export failed", description: err.message, variant: "destructive" });
     } finally {
@@ -1319,7 +1338,7 @@ export default function WorkingPapers() {
       const res = await fetch("/api/working-papers/generate-confirmations", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ analysis, meta: { entity: entityName, financial_year: financialYear, firm_name: firmName, ...generationMeta } }),
+        body: JSON.stringify({ analysis, bsData, plData, salesTaxRows, meta: { entity: entityName, financial_year: financialYear, firm_name: firmName, ...generationMeta } }),
       });
       if (!res.ok) throw new Error("Confirmations generation failed");
       const blob = await res.blob();
@@ -1327,6 +1346,7 @@ export default function WorkingPapers() {
       const a = document.createElement("a");
       a.href = url; a.download = `Confirmations_${entityName.replace(/\s+/g, "_")}.pdf`;
       a.click();
+      window.URL.revokeObjectURL(url);
     } catch (err: any) {
       toast({ title: "Generation failed", description: err.message, variant: "destructive" });
     } finally {
@@ -2934,7 +2954,80 @@ export default function WorkingPapers() {
                     </div>
 
                     <div className="flex justify-between items-center pb-12">
-                      <Button variant="ghost" onClick={() => { setStep(0); setFiles([]); setAnalysis(null); setWorkingPapers([]); setEvidenceIndex([]); setEntityName(""); setNtn(""); }} className="font-bold text-slate-500 rounded-xl px-6 h-12">
+                      <Button variant="ghost" onClick={() => {
+                        setStep(0);
+                        setFiles([]);
+                        setAnalysis(null);
+                        setWorkingPapers([]);
+                        setEvidenceIndex([]);
+                        setGenerationMeta(null);
+                        setEntityName("");
+                        setNtn("");
+                        setSecp("");
+                        setStrn("");
+                        setInstructions("");
+                        setRegisteredAddress("");
+                        setEngagementType("Statutory Audit");
+                        setFinancialYear("Year ended June 30, 2024");
+                        setBsData(INITIAL_BS);
+                        setPlData(INITIAL_PL);
+                        setSalesTaxRows([]);
+                        setConfigValues(getDefaultValues());
+                        setSelectedPapers(ALL_WP_REFS);
+                        setPreparer("");
+                        setReviewer("");
+                        setApprover("");
+                        setPlanningDeadline("");
+                        setFieldworkStart("");
+                        setFieldworkEnd("");
+                        setReportingDeadline("");
+                        setReportDate("");
+                        setFilingDeadline("");
+                        setArchiveDate("");
+                        setPeriodStart("");
+                        setPeriodEnd("");
+                        setIndustry("");
+                        setEntityType("Private Limited");
+                        setFramework("IFRS");
+                        setListedStatus("Unlisted");
+                        setFirstYearAudit(false);
+                        setGoingConcernFlag(false);
+                        setControlReliance("Partial");
+                        setSignificantRiskAreas([]);
+                        setCurrency("PKR");
+                        setNewClient(false);
+                        setGroupAuditFlag(false);
+                        setInternalAuditExists(false);
+                        setIndependenceConfirmed(true);
+                        setConflictCheck(true);
+                        setEqcrRequired(false);
+                        setSamplingMethod("Statistical");
+                        setConfidenceLevel("95%");
+                        setRelatedPartyFlag(false);
+                        setSubsequentEventsFlag(false);
+                        setEstimatesFlag(false);
+                        setLitigationFlag(false);
+                        setExpertRequired(false);
+                        setCurrentTaxApplicable(true);
+                        setDeferredTaxApplicable(true);
+                        setWhtExposure(true);
+                        setSalesTaxRegistered(true);
+                        setSuperTaxApplicable(false);
+                        setStPeriodFrom("");
+                        setStPeriodTo("");
+                        setAutoFilled(false);
+                        setProgress(0);
+                        setProgressMsg("");
+                        setCompletedPhases([]);
+                        setActivePhaseLabel("");
+                        setExpandedFsSections(["nca", "ca", "rev"]);
+                        setActiveFsTab("bs");
+                        setGlData([]);
+                        setTbData2([]);
+                        setCoaData([]);
+                        setGlTbSummary(null);
+                        toast({ title: "Engagement reset", description: "All fields have been cleared. Ready for a new engagement." });
+                      }} className="font-bold text-slate-500 rounded-xl px-6 h-12">
                         <RefreshCw className="w-4 h-4 mr-2" /> Start New Engagement
                       </Button>
                       <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">ISA 230 Compliant · Secure Archive Active</p>
