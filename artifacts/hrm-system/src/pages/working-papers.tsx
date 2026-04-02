@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import EngagementConfig from "@/components/engagement-config";
+import TrialBalance, { type TBLine } from "@/components/trial-balance";
 import { getDefaultValues, validateAllMandatory, getAllTriggeredWPs, VARIABLE_DEFS, isFieldComplete, isVariableVisible } from "@/lib/engagement-variable-defs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -92,10 +93,11 @@ const ALL_WP_REFS = WP_GROUPS.flatMap(g => g.refs);
 
 const STEPS = [
   { id: 0, label: "Upload Documents", shortLabel: "Upload", icon: Upload },
-  { id: 1, label: "Engagement Configuration", shortLabel: "Configure", icon: Settings },
-  { id: 2, label: "AI Analysis", shortLabel: "Analyse", icon: FileSearch },
-  { id: 3, label: "Generate Working Papers", shortLabel: "Generate", icon: Sparkles },
-  { id: 4, label: "Export & Finalize", shortLabel: "Export", icon: FileOutput },
+  { id: 1, label: "Trial Balance", shortLabel: "TB", icon: Table },
+  { id: 2, label: "Engagement Configuration", shortLabel: "Configure", icon: Settings },
+  { id: 3, label: "AI Analysis", shortLabel: "Analyse", icon: FileSearch },
+  { id: 4, label: "Generate Working Papers", shortLabel: "Generate", icon: Sparkles },
+  { id: 5, label: "Export & Finalize", shortLabel: "Export", icon: FileOutput },
 ];
 
 const AUDIT_PHASES: { prefix: string; label: string; papers: number; description: string }[] = [
@@ -461,6 +463,9 @@ export default function WorkingPapers() {
   const [expandedWPCards, setExpandedWPCards] = useState<string[]>([]);
   const [analysisTab, setAnalysisTab] = useState<"summary" | "ratios" | "reconciliation" | "evidence" | "ic">("summary");
 
+  const [tbLines, setTbLines] = useState<TBLine[]>([]);
+  const [tbLoading, setTbLoading] = useState(false);
+
   // ── Audit Period ─────────────────────────────────────────────────────────────
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
@@ -621,14 +626,25 @@ export default function WorkingPapers() {
     try {
       const fd = new FormData();
       files.forEach(f => fd.append("files", f.file));
-      const res = await fetch("/api/working-papers/extract-entity", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      if (res.ok) {
-        const d = await res.json();
-        // ── Entity fields ──
+
+      const fdTb = new FormData();
+      files.forEach(f => fdTb.append("files", f.file));
+
+      const [entityRes, tbRes] = await Promise.allSettled([
+        fetch("/api/working-papers/extract-entity", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        }),
+        fetch("/api/working-papers/extract-tb", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: fdTb,
+        }),
+      ]);
+
+      if (entityRes.status === "fulfilled" && entityRes.value.ok) {
+        const d = await entityRes.value.json();
         if (d.entity_name)        setEntityName(d.entity_name);
         if (d.ntn)                setNtn(d.ntn);
         if (d.secp)               setSecp(d.secp);
@@ -636,7 +652,6 @@ export default function WorkingPapers() {
         if (d.registered_address) setRegisteredAddress(d.registered_address);
         if (d.engagement_type)    setEngagementType(d.engagement_type);
 
-        // ── Balance Sheet line items ──
         const fn = d.financials || {};
         const patchBS = (secId: string, lineId: string, cy: number | null, py?: number | null) => {
           setBsData(prev => prev.map(s => s.id === secId ? {
@@ -669,9 +684,25 @@ export default function WorkingPapers() {
         patchPL("rev", "gp",     fn.gross_profit,         null);
         patchPL("tax", "pat",    fn.net_profit,           fn.prior_year_net_profit);
 
-        // Mark fields as auto-filled only if we got something useful
         const gotSomething = !!(d.entity_name || d.ntn || fn.revenue || fn.total_assets);
         setAutoFilled(gotSomething);
+      }
+
+      if (tbRes.status === "fulfilled" && tbRes.value.ok) {
+        const tbData = await tbRes.value.json();
+        if (Array.isArray(tbData.lines) && tbData.lines.length > 0) {
+          setTbLines(tbData.lines.map((l: any, i: number) => ({
+            id: `tb_${Date.now()}_${i}`,
+            accountCode: l.accountCode || "",
+            accountName: l.accountName || "",
+            debit: l.debit || "",
+            credit: l.credit || "",
+            pyBalance: l.pyBalance || "",
+            group: l.group || "",
+            fsHead: l.fsHead || "",
+            mappingStatus: l.mappingStatus || "unmapped",
+          })));
+        }
       }
     } catch {
       // silently fail — user can fill manually
@@ -679,6 +710,109 @@ export default function WorkingPapers() {
       setExtracting(false);
       setStep(1);
     }
+  };
+
+  const handleRerunTBCoding = async () => {
+    setTbLoading(true);
+    try {
+      const fd = new FormData();
+      files.forEach(f => fd.append("files", f.file));
+      const res = await fetch("/api/working-papers/extract-tb", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      if (res.ok) {
+        const tbData = await res.json();
+        if (Array.isArray(tbData.lines) && tbData.lines.length > 0) {
+          setTbLines(tbData.lines.map((l: any, i: number) => ({
+            id: `tb_${Date.now()}_${i}`,
+            accountCode: l.accountCode || "",
+            accountName: l.accountName || "",
+            debit: l.debit || "",
+            credit: l.credit || "",
+            pyBalance: l.pyBalance || "",
+            group: l.group || "",
+            fsHead: l.fsHead || "",
+            mappingStatus: l.mappingStatus || "unmapped",
+          })));
+        }
+      }
+    } catch {
+      toast({ title: "Re-coding failed", description: "Could not re-run AI coding. Please try again.", variant: "destructive" });
+    } finally {
+      setTbLoading(false);
+    }
+  };
+
+  const mapTBtoFS = () => {
+    const fsMap: Record<string, { cy: number; py: number }> = {};
+    tbLines.forEach(l => {
+      if (!l.fsHead || l.mappingStatus === "unmapped") return;
+      if (!fsMap[l.fsHead]) fsMap[l.fsHead] = { cy: 0, py: 0 };
+      const debit = parseFloat(l.debit.replace(/[^0-9.\-]/g, "")) || 0;
+      const credit = parseFloat(l.credit.replace(/[^0-9.\-]/g, "")) || 0;
+      const isDebitNature = ["Non-Current Assets", "Current Assets", "Cost of Sales", "Operating Expenses", "Finance Costs", "Taxation"].includes(l.group);
+      fsMap[l.fsHead].cy += isDebitNature ? (debit - credit) : (credit - debit);
+      fsMap[l.fsHead].py += parseFloat(l.pyBalance.replace(/[^0-9.\-]/g, "")) || 0;
+    });
+
+    const fmt = (n: number) => n !== 0 ? Number(Math.round(n)).toLocaleString("en-PK") : "";
+    const FS_HEAD_TO_LINE: Record<string, { tab: "bs" | "pl"; secId: string; lineId: string }> = {
+      "Property, Plant & Equipment": { tab: "bs", secId: "nca", lineId: "ppe" },
+      "Capital Work-in-Progress": { tab: "bs", secId: "nca", lineId: "cwip" },
+      "Right-of-Use Assets": { tab: "bs", secId: "nca", lineId: "rou" },
+      "Intangible Assets": { tab: "bs", secId: "nca", lineId: "ia" },
+      "Long-term Investments": { tab: "bs", secId: "nca", lineId: "lti" },
+      "Long-term Deposits & Prepayments": { tab: "bs", secId: "nca", lineId: "ltd" },
+      "Stores, Spare Parts & Loose Tools": { tab: "bs", secId: "ca", lineId: "stores" },
+      "Stock-in-Trade": { tab: "bs", secId: "ca", lineId: "stock" },
+      "Trade Debts": { tab: "bs", secId: "ca", lineId: "td" },
+      "Loans & Advances": { tab: "bs", secId: "ca", lineId: "la" },
+      "Short-term Prepayments": { tab: "bs", secId: "ca", lineId: "prepay" },
+      "Other Receivables": { tab: "bs", secId: "ca", lineId: "orecv" },
+      "Tax Refunds Due from Government": { tab: "bs", secId: "ca", lineId: "taxref" },
+      "Cash & Bank Balances": { tab: "bs", secId: "ca", lineId: "cash" },
+      "Share Capital": { tab: "bs", secId: "eq", lineId: "sc" },
+      "Share Premium": { tab: "bs", secId: "eq", lineId: "sp" },
+      "General Reserve": { tab: "bs", secId: "eq", lineId: "gr" },
+      "Unappropriated Profit": { tab: "bs", secId: "eq", lineId: "up" },
+      "Long-term Financing": { tab: "bs", secId: "ncl", lineId: "ltf" },
+      "Lease Liabilities (Non-Current)": { tab: "bs", secId: "ncl", lineId: "ll" },
+      "Deferred Tax Liability": { tab: "bs", secId: "ncl", lineId: "dtl" },
+      "Staff Retirement Benefits": { tab: "bs", secId: "ncl", lineId: "srb" },
+      "Trade & Other Payables": { tab: "bs", secId: "cl", lineId: "tp" },
+      "Accrued Liabilities & Provisions": { tab: "bs", secId: "cl", lineId: "al" },
+      "Short-term Borrowings": { tab: "bs", secId: "cl", lineId: "stb" },
+      "Current Portion of Long-term Financing": { tab: "bs", secId: "cl", lineId: "cltf" },
+      "Sales Tax Payable": { tab: "bs", secId: "cl", lineId: "stp" },
+      "Income Tax Payable": { tab: "bs", secId: "cl", lineId: "itp" },
+      "Net Sales / Revenue from Contracts": { tab: "pl", secId: "rev", lineId: "sales" },
+      "Cost of Sales": { tab: "pl", secId: "rev", lineId: "cos" },
+      "Distribution & Selling Expenses": { tab: "pl", secId: "opex", lineId: "dse" },
+      "Administrative & General Expenses": { tab: "pl", secId: "opex", lineId: "adm" },
+      "Other Operating Expenses": { tab: "pl", secId: "opex", lineId: "ooe" },
+      "Finance Costs": { tab: "pl", secId: "finoi", lineId: "fc" },
+      "Other Income / Gain on Disposal": { tab: "pl", secId: "finoi", lineId: "oi" },
+      "Current Tax Expense": { tab: "pl", secId: "tax", lineId: "cur_tax" },
+      "Deferred Tax (Charge)/Credit": { tab: "pl", secId: "tax", lineId: "def_tax" },
+      "Actuarial Gains/(Losses)": { tab: "pl", secId: "oci", lineId: "act" },
+      "Exchange Differences": { tab: "pl", secId: "oci", lineId: "fx" },
+    };
+
+    Object.entries(fsMap).forEach(([fsHead, amounts]) => {
+      const mapping = FS_HEAD_TO_LINE[fsHead];
+      if (!mapping) return;
+      const { tab, secId, lineId } = mapping;
+      const setter = tab === "bs" ? setBsData : setPlData;
+      setter(prev => prev.map(s => s.id === secId ? {
+        ...s, lines: s.lines.map(l => l.id === lineId ? {
+          ...l,
+          cy: fmt(amounts.cy),
+          ...(amounts.py !== 0 ? { py: fmt(amounts.py) } : {}),
+        } : l)
+      } : s));
+    });
   };
 
   const updateBsLine = (secId: string, lineId: string, field: "cy" | "py", val: string) => {
@@ -826,7 +960,7 @@ export default function WorkingPapers() {
       }
 
       setProgress(100);
-      setStep(2);
+      setStep(3);
       toast({ title: "Analysis complete", description: "AI has processed the documents successfully." });
     } catch (err: any) {
       toast({ title: "Analysis failed", description: err.message, variant: "destructive" });
@@ -936,7 +1070,7 @@ export default function WorkingPapers() {
       setProgress(100);
       setProgressMsg("All working papers generated successfully.");
 
-      setStep(3);
+      setStep(4);
       toast({ title: "Generation complete", description: `${papers.length} working papers generated across 11 audit phases (A-K).` });
     } catch (err: any) {
       clearInterval(phaseInterval);
@@ -1088,8 +1222,42 @@ export default function WorkingPapers() {
                   </div>
                 )}
 
-                {/* STEP 1: CONFIGURE Engagement */}
+                {/* STEP 1: TRIAL BALANCE */}
                 {step === 1 && (
+                  <div className="space-y-6">
+                    <div className="mb-2">
+                      <h2 className="text-2xl font-bold text-slate-900">Trial Balance</h2>
+                      <p className="text-sm text-slate-500 mt-1.5 leading-relaxed max-w-2xl">
+                        Review the AI-extracted trial balance. Verify account codes, adjust group/FS head mappings, add or remove lines as needed. On proceeding, mapped balances will auto-populate the Financial Statements in the Configure step.
+                      </p>
+                      {tbLines.length > 0 && (
+                        <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 w-fit">
+                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                          {tbLines.length} accounts extracted — {tbLines.filter(l => l.mappingStatus === "mapped").length} mapped, {tbLines.filter(l => l.mappingStatus === "review").length} for review, {tbLines.filter(l => l.mappingStatus === "unmapped").length} unmapped
+                        </div>
+                      )}
+                    </div>
+
+                    <TrialBalance
+                      lines={tbLines}
+                      onLinesChange={setTbLines}
+                      isLoading={tbLoading}
+                      onRerunAI={handleRerunTBCoding}
+                    />
+
+                    <div className="flex justify-between pt-8 border-t border-slate-200">
+                      <Button variant="ghost" onClick={() => setStep(0)} size="lg" className="font-bold text-slate-500 rounded-xl px-6">
+                        <ChevronRight className="mr-2 w-4 h-4 rotate-180" /> Back to Upload
+                      </Button>
+                      <Button onClick={() => { mapTBtoFS(); setStep(2); }} size="lg" className="h-12 px-8 bg-blue-600 hover:bg-blue-700 font-bold shadow-lg shadow-blue-200 rounded-xl group">
+                        Next: Configure Engagement <ChevronRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 2: CONFIGURE Engagement */}
+                {step === 2 && (
                   <div className="space-y-0">
                     <div className="mb-6">
                       <h2 className="text-2xl font-bold text-slate-900">Configure Engagement</h2>
@@ -1573,18 +1741,18 @@ export default function WorkingPapers() {
                     </div>
 
                     <div className="flex justify-between pt-8 border-t border-slate-200">
-                      <Button variant="ghost" onClick={() => setStep(0)} size="lg" className="font-bold text-slate-500 rounded-xl px-6">
-                        <ChevronRight className="mr-2 w-4 h-4 rotate-180" /> Back to Upload
+                      <Button variant="ghost" onClick={() => setStep(1)} size="lg" className="font-bold text-slate-500 rounded-xl px-6">
+                        <ChevronRight className="mr-2 w-4 h-4 rotate-180" /> Back to Trial Balance
                       </Button>
-                      <Button onClick={() => setStep(2)} disabled={!entityName} size="lg" className="h-12 px-8 bg-blue-600 hover:bg-blue-700 font-bold shadow-lg shadow-blue-200 rounded-xl group">
+                      <Button onClick={() => setStep(3)} disabled={!entityName} size="lg" className="h-12 px-8 bg-blue-600 hover:bg-blue-700 font-bold shadow-lg shadow-blue-200 rounded-xl group">
                         Next: Analyse <ChevronRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
                       </Button>
                     </div>
                   </div>
                 )}
 
-                {/* STEP 2: ANALYSE / Results */}
-                {step === 2 && (
+                {/* STEP 3: ANALYSE / Results */}
+                {step === 3 && (
                   <div className="space-y-8">
                     {!analysis && !analyzing ? (
                       <div className="flex flex-col items-center justify-center py-20 text-center space-y-6">
@@ -1857,7 +2025,7 @@ export default function WorkingPapers() {
                         )}
 
                         <div className="flex justify-start">
-                          <Button variant="ghost" onClick={() => setStep(1)} disabled={analyzing || generating} className="font-bold text-slate-500 rounded-xl px-6">
+                          <Button variant="ghost" onClick={() => setStep(2)} disabled={analyzing || generating} className="font-bold text-slate-500 rounded-xl px-6">
                             <ChevronRight className="mr-2 w-4 h-4 rotate-180" /> Back to Config
                           </Button>
                         </div>
@@ -1866,8 +2034,8 @@ export default function WorkingPapers() {
                   </div>
                 )}
 
-                {/* STEP 3: GENERATE / View Working Papers */}
-                {step === 3 && (
+                {/* STEP 4: GENERATE / View Working Papers */}
+                {step === 4 && (
                   <div className="space-y-8">
                     <div>
                       <h2 className="text-2xl font-bold text-slate-900">Audit Working Papers</h2>
@@ -2049,18 +2217,18 @@ export default function WorkingPapers() {
                     )}
 
                     <div className="flex justify-between pt-8 border-t border-slate-200">
-                      <Button variant="ghost" onClick={() => setStep(2)} className="font-bold text-slate-500 rounded-xl px-6">
+                      <Button variant="ghost" onClick={() => setStep(3)} className="font-bold text-slate-500 rounded-xl px-6">
                         <ChevronRight className="mr-2 w-4 h-4 rotate-180" /> Back to Analysis
                       </Button>
-                      <Button onClick={() => setStep(4)} size="lg" className="h-12 px-8 bg-blue-600 hover:bg-blue-700 font-bold shadow-lg shadow-blue-200 rounded-xl group">
+                      <Button onClick={() => setStep(5)} size="lg" className="h-12 px-8 bg-blue-600 hover:bg-blue-700 font-bold shadow-lg shadow-blue-200 rounded-xl group">
                         Next: Export & Finalize <ChevronRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
                       </Button>
                     </div>
                   </div>
                 )}
 
-                {/* STEP 4: EXPORT */}
-                {step === 4 && (
+                {/* STEP 5: EXPORT */}
+                {step === 5 && (
                   <div className="space-y-10">
                     <div>
                       <h2 className="text-2xl font-bold text-slate-900">Export & Finalize</h2>

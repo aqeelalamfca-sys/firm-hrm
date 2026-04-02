@@ -211,6 +211,99 @@ ${docSummary}`;
   }
 });
 
+// ─── POST /api/working-papers/extract-tb ──────────────────────────────────
+// Extract and auto-code Trial Balance lines from uploaded documents
+router.post("/extract-tb", upload.array("files", 20), async (req: Request, res: Response) => {
+  const files = req.files as Express.Multer.File[] | undefined;
+  if (!files || files.length === 0) {
+    return res.status(400).json({ error: "No files uploaded" });
+  }
+
+  const ai = await getAIClient();
+  if (!ai) {
+    return res.status(200).json({ lines: [] });
+  }
+
+  try {
+    const docs: string[] = [];
+    const imageFiles = files.filter(f => f.mimetype.startsWith("image/"));
+    for (const file of files.slice(0, 10)) {
+      const content = await extractTextFromFile(file);
+      docs.push(`FILE: ${file.originalname}\n${content.slice(0, 6000)}`);
+    }
+    const docSummary = docs.join("\n\n---\n\n");
+
+    const userPrompt = `Extract ALL Trial Balance line items from these documents. For each account line, classify it into the Pakistan chart of accounts structure.
+
+Return ONLY valid JSON — no markdown, no extra text:
+{
+  "lines": [
+    {
+      "accountCode": "string (e.g. 1001, 2001, 3001, etc.)",
+      "accountName": "string (exact account name from TB)",
+      "debit": "string (debit amount, use empty string if zero/none)",
+      "credit": "string (credit amount, use empty string if zero/none)",
+      "pyBalance": "string (prior year closing balance if available, else empty)",
+      "group": "string (one of: Non-Current Assets, Current Assets, Equity, Non-Current Liabilities, Current Liabilities, Revenue, Cost of Sales, Operating Expenses, Finance Costs, Other Income, Taxation, Other Comprehensive Income)",
+      "fsHead": "string (FS line item mapping, e.g. Property, Plant & Equipment; Cash & Bank Balances; Trade Debts; Stock-in-Trade; Net Sales / Revenue from Contracts; Cost of Sales; etc.)",
+      "mappingStatus": "mapped" or "review" or "unmapped"
+    }
+  ]
+}
+
+RULES:
+- Extract EVERY account line from the trial balance, not just summaries
+- Use actual amounts from the documents, format as plain numbers (e.g. "1234567", not "1,234,567")
+- If an account clearly maps to a standard FS head, set status to "mapped"
+- If mapping is uncertain, set status to "review"
+- If no clear mapping exists, set status to "unmapped"
+- Group classification must match one of the exact group names listed above
+- fsHead must match standard Pakistan audit FS line items
+- Include both debit and credit balances as shown in TB
+- If TB is not found in documents, extract whatever financial line items exist and code them
+
+DOCUMENTS:
+${docSummary}`;
+
+    const messageContent: any[] = [{ type: "text", text: userPrompt }];
+    for (const imgFile of imageFiles.slice(0, 3)) {
+      const base64 = imgFile.buffer.toString("base64");
+      messageContent.push({ type: "image_url", image_url: { url: `data:${imgFile.mimetype};base64,${base64}`, detail: "high" } });
+    }
+
+    const response = await ai.client.chat.completions.create({
+      model: ai.model,
+      messages: [
+        { role: "system", content: "You are an expert chartered accountant and auditor specializing in Pakistan audit standards. Extract trial balance data precisely and classify each account into the correct financial statement group and FS head mapping. Return only valid JSON." },
+        { role: "user", content: messageContent },
+      ],
+      max_tokens: 4000,
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+    });
+
+    const raw = response.choices[0]?.message?.content || '{"lines":[]}';
+    let data: any = {};
+    try { data = JSON.parse(raw); } catch { data = { lines: [] }; }
+
+    const lines = Array.isArray(data.lines) ? data.lines.map((l: any, i: number) => ({
+      accountCode: String(l.accountCode || `${(i + 1) * 1000}`),
+      accountName: String(l.accountName || ""),
+      debit: String(l.debit || ""),
+      credit: String(l.credit || ""),
+      pyBalance: String(l.pyBalance || ""),
+      group: String(l.group || ""),
+      fsHead: String(l.fsHead || ""),
+      mappingStatus: ["mapped", "review", "unmapped"].includes(l.mappingStatus) ? l.mappingStatus : "unmapped",
+    })) : [];
+
+    return res.json({ lines });
+  } catch (err: any) {
+    logger.error({ err }, "extract-tb failed");
+    return res.status(200).json({ lines: [] });
+  }
+});
+
 // ─── POST /api/working-papers/analyze ─────────────────────────────────────
 router.post("/analyze", upload.array("files", 20), async (req: Request, res: Response) => {
   const files = req.files as Express.Multer.File[] | undefined;
