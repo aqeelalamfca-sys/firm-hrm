@@ -544,6 +544,87 @@ function getWPSignoffs(
   };
 }
 
+// ─── POST /api/working-papers/generate-gl-tb ──────────────────────────────
+router.post("/generate-gl-tb", async (req: Request, res: Response) => {
+  const { entityName, industry, financialYear, bsData, plData, ntn, strn, engagementType, framework } = req.body;
+  const ai = await getAIClient();
+  if (!ai) return res.status(503).json({ error: "AI service not configured." });
+
+  const bsSummary = (bsData || []).map((s: any) => s.lines?.map((l: any) => `${l.label}: CY=${l.cy || 0}, PY=${l.py || 0}`).join("; ")).join(" | ");
+  const plSummary = (plData || []).map((s: any) => s.lines?.map((l: any) => `${l.label}: CY=${l.cy || 0}, PY=${l.py || 0}`).join("; ")).join(" | ");
+
+  const prompt = `You are a senior chartered accountant in Pakistan. Generate a COMPLETE General Ledger and Trial Balance for the following entity.
+
+ENTITY: ${entityName || "Sample Company"}
+INDUSTRY: ${industry || "Manufacturing"}
+FINANCIAL YEAR: ${financialYear || "Year ended June 30, 2024"}
+NTN: ${ntn || "N/A"} | STRN: ${strn || "N/A"}
+FRAMEWORK: ${framework || "IFRS"}
+ENGAGEMENT: ${engagementType || "Statutory Audit"}
+
+FINANCIAL STATEMENTS DATA:
+Balance Sheet: ${bsSummary || "Not provided"}
+Profit & Loss: ${plSummary || "Not provided"}
+
+INSTRUCTIONS:
+1. Generate a detailed General Ledger with realistic Pakistan-style transactions for the full financial year.
+2. Use Pakistani Chart of Accounts coding (4-digit codes): 1xxx=Assets, 2xxx=Liabilities, 3xxx=Equity, 4xxx=Revenue, 5xxx=Cost of Sales, 6xxx=Expenses, 7xxx=Other Income, 8xxx=Tax.
+3. Each GL entry must have: date, voucher_no (JV-001 format), account_code, account_name, narration (Pakistan business context), debit, credit.
+4. Include typical Pakistan transactions: sales tax input/output, WHT deductions, bank charges, supplier payments, salary disbursement, utility payments, depreciation, provisions, tax payments, EOBI/gratuity.
+5. Generate minimum 40-60 transaction entries covering the full year.
+6. From the GL, derive a Trial Balance that EXACTLY matches - every account's total debits and credits must reconcile.
+7. Trial Balance columns: account_code, account_name, debit_total, credit_total, balance_dr, balance_cr.
+8. TB total debits MUST equal total credits (balanced).
+
+Return ONLY valid JSON:
+{
+  "general_ledger": [
+    { "date": "2023-07-01", "voucher_no": "JV-001", "account_code": "1001", "account_name": "Cash at Bank - HBL", "narration": "Opening balance brought forward", "debit": 500000, "credit": 0 }
+  ],
+  "trial_balance": [
+    { "account_code": "1001", "account_name": "Cash at Bank - HBL", "debit_total": 5000000, "credit_total": 4500000, "balance_dr": 500000, "balance_cr": 0 }
+  ],
+  "chart_of_accounts": [
+    { "code": "1001", "name": "Cash at Bank - HBL", "group": "Current Assets", "type": "Asset" }
+  ]
+}`;
+
+  try {
+    const completion = await ai.chat.completions.create({
+      model: ai._model || "gpt-4o",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+      response_format: { type: "json_object" },
+    });
+
+    const raw = completion.choices?.[0]?.message?.content || "{}";
+    const parsed = JSON.parse(raw);
+
+    const gl = parsed.general_ledger || [];
+    const tb = parsed.trial_balance || [];
+    const coa = parsed.chart_of_accounts || [];
+
+    const totalDr = tb.reduce((s: number, r: any) => s + (r.balance_dr || 0), 0);
+    const totalCr = tb.reduce((s: number, r: any) => s + (r.balance_cr || 0), 0);
+
+    res.json({
+      general_ledger: gl,
+      trial_balance: tb,
+      chart_of_accounts: coa,
+      summary: {
+        gl_entries: gl.length,
+        tb_accounts: tb.length,
+        total_debit: totalDr,
+        total_credit: totalCr,
+        is_balanced: Math.abs(totalDr - totalCr) < 1,
+      },
+    });
+  } catch (err: any) {
+    logger.error("GL/TB generation failed:", err);
+    res.status(500).json({ error: err.message || "GL/TB generation failed" });
+  }
+});
+
 // ─── POST /api/working-papers/generate ────────────────────────────────────
 router.post("/generate", async (req: Request, res: Response) => {
   const {
