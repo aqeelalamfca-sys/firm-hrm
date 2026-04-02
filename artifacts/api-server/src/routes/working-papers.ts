@@ -147,9 +147,9 @@ router.post("/extract-entity", upload.array("files", 20), async (req: Request, r
   try {
     const imageFiles = files.filter(f => f.mimetype.startsWith("image/"));
     const docs: string[] = [];
-    for (const file of files.slice(0, 8)) {
+    for (const file of files.slice(0, 10)) {
       const content = await extractTextFromFile(file);
-      docs.push(`FILE: ${file.originalname}\n${content.slice(0, 4000)}`);
+      docs.push(`FILE: ${file.originalname}\n${smartChunk(content, 6000)}`);
     }
     const docSummary = docs.join("\n\n---\n\n");
 
@@ -304,10 +304,28 @@ ${docSummary}`;
   }
 });
 
+// Helper: smart chunking — takes head + tail to preserve both header info and totals
+function smartChunk(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  const head = Math.round(maxChars * 0.65);
+  const tail = maxChars - head;
+  return `${text.slice(0, head)}\n\n[... ${text.length - maxChars} chars truncated — showing tail ...]\n\n${text.slice(-tail)}`;
+}
+
 // ─── POST /api/working-papers/analyze ─────────────────────────────────────
 router.post("/analyze", upload.array("files", 20), async (req: Request, res: Response) => {
   const files = req.files as Express.Multer.File[] | undefined;
   const { instructions, entityName, engagementType, financialYear } = req.body;
+
+  // Parse optional user-provided file classifications
+  let userClassifications: Record<string, string> = {};
+  try {
+    const raw = req.body.fileClassifications;
+    if (raw) {
+      const arr: Array<{ name: string; docType: string }> = JSON.parse(raw);
+      arr.forEach(c => { userClassifications[c.name] = c.docType; });
+    }
+  } catch {}
 
   if (!files || files.length === 0) {
     return res.status(400).json({ error: "No files uploaded." });
@@ -324,14 +342,15 @@ router.post("/analyze", upload.array("files", 20), async (req: Request, res: Res
 
     for (const file of files) {
       const content = await extractTextFromFile(file);
-      const type = classifyDocument(file, content);
+      // User-provided classification takes priority over auto-classify
+      const type = userClassifications[file.originalname] || classifyDocument(file, content);
       const isImage = file.mimetype.startsWith("image/");
-      extractedDocs.push({ filename: file.originalname, type, content: isImage ? "" : content.slice(0, 8000), isImage });
+      extractedDocs.push({ filename: file.originalname, type, content: isImage ? "" : content, isImage });
       if (isImage) imageFiles.push(file);
     }
 
     const docSummary = extractedDocs.map(d =>
-      `FILE: ${d.filename}\nTYPE: ${d.type}\n${d.isImage ? "[Scanned image - analyzed via vision]" : d.content.slice(0, 3000)}`
+      `FILE: ${d.filename}\nTYPE: ${d.type}\n${d.isImage ? "[Scanned image — analyzed via vision API]" : smartChunk(d.content, 8000)}`
     ).join("\n\n---\n\n");
 
     const systemPrompt = `You are AuditWise Engine v3, an enterprise-grade audit AI specializing in Pakistan audit & accounting standards.

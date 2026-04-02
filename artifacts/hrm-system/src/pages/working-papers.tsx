@@ -24,7 +24,22 @@ import EngagementConfig from "@/components/engagement-config";
 import { getDefaultValues, validateAllMandatory, getAllTriggeredWPs, VARIABLE_DEFS, isFieldComplete, isVariableVisible } from "@/lib/engagement-variable-defs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface UploadedFile { file: File; id: string; classified?: string; }
+interface UploadedFile { file: File; id: string; classified?: string; docType?: string; }
+
+const DOC_TYPES = [
+  "Financial Statements",
+  "Trial Balance",
+  "General Ledger",
+  "Bank Statement",
+  "Invoice / Sales Tax",
+  "Confirmation",
+  "Corporate Document",
+  "Tax Notice / Return",
+  "Board Minutes",
+  "Other Evidence",
+];
+
+const DRAFT_KEY = "ana_wp_draft_v2";
 interface AnalysisResult {
   entity?: any; financials?: any; materiality?: any;
   risk_assessment?: any; key_audit_areas?: any[];
@@ -324,8 +339,9 @@ function classifyFile(filename: string): string {
   return "Supporting Document";
 }
 
-function DropZone({ files, onAdd, onRemove }: { files: UploadedFile[]; onAdd: (f: FileList) => void; onRemove: (id: string) => void }) {
+function DropZone({ files, onAdd, onRemove, onClassify }: { files: UploadedFile[]; onAdd: (f: FileList) => void; onRemove: (id: string) => void; onClassify?: (id: string, t: string) => void }) {
   const [drag, setDrag] = useState(false);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -375,21 +391,44 @@ function DropZone({ files, onAdd, onRemove }: { files: UploadedFile[]; onAdd: (f
         <div className="space-y-2.5">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Uploaded Files ({files.length})</p>
           <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-2xl overflow-hidden bg-white shadow-sm">
-            {files.map(f => (
+            {files.map(f => {
+              const activeType = f.docType || f.classified || "";
+              return (
               <motion.div key={f.id} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50/70 transition-colors group">
+                className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50/70 transition-colors group relative">
                 <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 shrink-0">
                   {fileIcon(f.file)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-800 truncate">{f.file.name}</p>
-                  <p className="text-[11px] text-slate-400 font-medium">{(f.file.size / 1024).toFixed(0)} KB {f.classified ? <span className="ml-1 text-blue-600 font-semibold">· {f.classified}</span> : ""}</p>
+                  <p className="text-[11px] text-slate-400 font-medium">{(f.file.size / 1024).toFixed(0)} KB</p>
                 </div>
-                <button onClick={e => { e.stopPropagation(); onRemove(f.id); }} className="w-7 h-7 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100">
+                {/* Classification badge / dropdown */}
+                <div className="relative shrink-0">
+                  <button
+                    onClick={e => { e.stopPropagation(); setOpenMenu(openMenu === f.id ? null : f.id); }}
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all flex items-center gap-1 ${
+                      activeType ? "bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100" : "bg-slate-50 text-slate-400 border-slate-200 hover:border-blue-300"
+                    }`}
+                  >
+                    {activeType || "Classify"}
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                  {openMenu === f.id && (
+                    <div className="absolute right-0 top-7 z-30 w-48 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+                      {DOC_TYPES.map(dt => (
+                        <button key={dt} onClick={e => { e.stopPropagation(); onClassify?.(f.id, dt); setOpenMenu(null); }}
+                          className={`w-full text-left text-xs font-semibold px-4 py-2.5 hover:bg-blue-50 transition-colors ${activeType === dt ? "text-blue-600 bg-blue-50" : "text-slate-700"}`}
+                        >{dt}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button onClick={e => { e.stopPropagation(); onRemove(f.id); }} className="w-7 h-7 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100 shrink-0">
                   <X className="w-4 h-4" />
                 </button>
               </motion.div>
-            ))}
+            );})}
           </div>
         </div>
       )}
@@ -602,8 +641,15 @@ export default function WorkingPapers() {
   const [users, setUsers] = useState<Array<{id: number; name: string; role?: string; email?: string}>>([]);
 
   const [configValues, setConfigValues] = useState<Record<string, any>>(() => getDefaultValues());
+
+  // ── Draft persistence & stale-data tracking ──────────────────────────────────
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  const [configChangedAfterAnalysis, setConfigChangedAfterAnalysis] = useState(false);
+  const [selectedPhases, setSelectedPhases] = useState<string[]>(WP_GROUPS.map(g => g.prefix));
+
   const handleConfigChange = useCallback((key: string, value: any) => {
     setConfigValues(prev => ({ ...prev, [key]: value }));
+    setConfigChangedAfterAnalysis(true);
   }, []);
 
   // ── Variable Template Download / Upload ────────────────────────────────────
@@ -826,9 +872,93 @@ export default function WorkingPapers() {
   const addFiles = useCallback((fl: FileList) => {
     const newFiles = Array.from(fl).map(f => ({ file: f, id: `${f.name}-${Date.now()}-${Math.random()}`, classified: classifyFile(f.name) }));
     setFiles(prev => [...prev, ...newFiles]);
+    setConfigChangedAfterAnalysis(true);
   }, []);
 
-  const removeFile = useCallback((id: string) => setFiles(prev => prev.filter(f => f.id !== id)), []);
+  const removeFile = useCallback((id: string) => {
+    setFiles(prev => prev.filter(f => f.id !== id));
+    setConfigChangedAfterAnalysis(true);
+  }, []);
+
+  const classifyFileDoc = useCallback((id: string, docType: string) => {
+    setFiles(prev => prev.map(f => f.id === id ? { ...f, docType } : f));
+  }, []);
+
+  // ── localStorage draft persistence ──────────────────────────────────────────
+  // Load draft on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (d.entityName) setEntityName(d.entityName);
+      if (d.ntn) setNtn(d.ntn);
+      if (d.secp) setSecp(d.secp);
+      if (d.financialYear) setFinancialYear(d.financialYear);
+      if (d.periodStart) setPeriodStart(d.periodStart);
+      if (d.periodEnd) setPeriodEnd(d.periodEnd);
+      if (d.engagementType) setEngagementType(d.engagementType);
+      if (d.entityType) setEntityType(d.entityType);
+      if (d.framework) setFramework(d.framework);
+      if (d.listedStatus) setListedStatus(d.listedStatus);
+      if (d.currency) setCurrency(d.currency);
+      if (d.strn) setStrn(d.strn);
+      if (d.industry) setIndustry(d.industry);
+      if (d.registeredAddress) setRegisteredAddress(d.registeredAddress);
+      if (d.firmName) setFirmName(d.firmName);
+      if (d.planningDeadline) setPlanningDeadline(d.planningDeadline);
+      if (d.fieldworkStart) setFieldworkStart(d.fieldworkStart);
+      if (d.fieldworkEnd) setFieldworkEnd(d.fieldworkEnd);
+      if (d.reportingDeadline) setReportingDeadline(d.reportingDeadline);
+      if (d.reportDate) setReportDate(d.reportDate);
+      if (d.filingDeadline) setFilingDeadline(d.filingDeadline);
+      if (d.archiveDate) setArchiveDate(d.archiveDate);
+      if (d.stPeriodFrom) setStPeriodFrom(d.stPeriodFrom);
+      if (d.stPeriodTo) setStPeriodTo(d.stPeriodTo);
+      if (d.stTaxType) setStTaxType(d.stTaxType);
+      if (d.stJurisdiction) setStJurisdiction(d.stJurisdiction);
+      if (d.stReturnPeriod) setStReturnPeriod(d.stReturnPeriod);
+      if (d.preparer) setPreparer(d.preparer);
+      if (d.reviewer) setReviewer(d.reviewer);
+      if (d.approver) setApprover(d.approver);
+      if (d.instructions) setInstructions(d.instructions);
+      if (d.configValues && typeof d.configValues === "object") setConfigValues(d.configValues);
+      if (d.bsData && d.bsData.length > 0) setBsData(d.bsData);
+      if (d.plData && d.plData.length > 0) setPlData(d.plData);
+      if (d.salesTaxRows && d.salesTaxRows.length > 0) setSalesTaxRows(d.salesTaxRows);
+      if (d.step && d.step > 0) setStep(d.step);
+      setDraftLoaded(true);
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Autosave draft to localStorage (debounced 1.5s)
+  useEffect(() => {
+    if (!draftLoaded && step === 0) return;
+    const timer = setTimeout(() => {
+      const draft = {
+        entityName, ntn, secp, financialYear, periodStart, periodEnd,
+        engagementType, entityType, framework, listedStatus, currency,
+        strn, industry, registeredAddress, firmName,
+        planningDeadline, fieldworkStart, fieldworkEnd, reportingDeadline,
+        reportDate, filingDeadline, archiveDate,
+        stPeriodFrom, stPeriodTo, stTaxType, stJurisdiction, stReturnPeriod,
+        preparer, reviewer, approver, instructions,
+        configValues, bsData, plData, salesTaxRows, step,
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [
+    entityName, ntn, secp, financialYear, periodStart, periodEnd,
+    engagementType, entityType, framework, listedStatus, currency,
+    strn, industry, registeredAddress, firmName,
+    planningDeadline, fieldworkStart, fieldworkEnd, reportingDeadline,
+    reportDate, filingDeadline, archiveDate,
+    stPeriodFrom, stPeriodTo, stTaxType, stJurisdiction, stReturnPeriod,
+    preparer, reviewer, approver, instructions,
+    configValues, bsData, plData, salesTaxRows, step, draftLoaded,
+  ]);
 
   // ── Auto-extract entity + financials from uploaded docs ──────────────────
   const fmtFS = (n: number | null | undefined) =>
@@ -1188,6 +1318,7 @@ export default function WorkingPapers() {
 
     const formData = new FormData();
     files.forEach(f => formData.append("files", f.file));
+    formData.append("fileClassifications", JSON.stringify(files.map(f => ({ name: f.file.name, docType: f.docType || f.classified || "Other" }))));
     formData.append("entityName", entityName);
     formData.append("ntn", ntn);
     formData.append("secp", secp);
@@ -1221,6 +1352,7 @@ export default function WorkingPapers() {
 
       if (data.analysis) {
         setAnalysis(data.analysis);
+        setConfigChangedAfterAnalysis(false);
       } else if (data.success === false || data.error) {
         throw new Error(data.error || "Analysis returned no data");
       }
@@ -1535,7 +1667,16 @@ export default function WorkingPapers() {
                       </div>
                     </div>
 
-                    <DropZone files={files} onAdd={addFiles} onRemove={removeFile} />
+                    {/* Draft restore banner */}
+                    {draftLoaded && (
+                      <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-3">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <p className="text-sm font-semibold text-emerald-800 flex-1">Previous engagement restored from autosave — all fields are editable.</p>
+                        <button onClick={() => { localStorage.removeItem(DRAFT_KEY); setDraftLoaded(false); }} className="text-[11px] font-bold text-emerald-600 hover:text-emerald-800 underline shrink-0">Clear</button>
+                      </div>
+                    )}
+
+                    <DropZone files={files} onAdd={addFiles} onRemove={removeFile} onClassify={classifyFileDoc} />
 
                     {/* ── Engagement Variable Template ─────────────────── */}
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-5 space-y-4">
@@ -2298,19 +2439,71 @@ export default function WorkingPapers() {
                       </div>
                     </div>
 
-                    {!analysis && !analyzing ? (
-                      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm flex flex-col items-center justify-center py-20 text-center space-y-6">
-                        <div className="w-24 h-24 bg-violet-50 rounded-full flex items-center justify-center relative">
-                          <div className="absolute inset-0 bg-violet-400/15 rounded-full animate-ping" style={{ animationDuration: "2s" }}></div>
-                          <Sparkles className="w-10 h-10 text-violet-600" />
+                    {/* Stale data warning */}
+                    {analysis && configChangedAfterAnalysis && !analyzing && (
+                      <div className="flex items-center gap-4 bg-amber-50 border border-amber-300 rounded-xl px-5 py-4 shadow-sm">
+                        <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                          <AlertTriangle className="w-5 h-5 text-amber-600" />
                         </div>
-                        <div>
-                          <h3 className="text-xl font-bold text-slate-900">Ready to Analyse</h3>
-                          <p className="text-slate-500 mt-2 max-w-xl mx-auto leading-relaxed text-sm">Click below to run the AI audit analysis engine — materiality, risk, assertions, IC weaknesses, and analytical procedures will be generated automatically.</p>
+                        <div className="flex-1">
+                          <p className="text-sm font-bold text-amber-900">Configuration Changed Since Last Analysis</p>
+                          <p className="text-xs text-amber-700 mt-0.5">Files, financial statements, or engagement variables have been modified. Re-run analysis to ensure working papers reflect current data.</p>
                         </div>
-                        <Button onClick={handleAnalyze} size="lg" className="h-12 px-8 bg-violet-600 hover:bg-violet-700 font-bold rounded-xl group shadow-lg shadow-violet-200">
-                          Run AI Audit Analysis <Sparkles className="ml-2.5 w-4 h-4 group-hover:rotate-12 transition-transform" />
+                        <Button size="sm" onClick={handleAnalyze} className="bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shrink-0 gap-2">
+                          <RefreshCw className="w-3.5 h-3.5" /> Re-run Analysis
                         </Button>
+                      </div>
+                    )}
+
+                    {!analysis && !analyzing ? (
+                      <div className="space-y-6">
+                        {/* Pre-analysis summary card */}
+                        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+                          <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <ClipboardCheck className="w-3.5 h-3.5" /> Engagement Summary — Ready for Analysis
+                          </h3>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 text-center">
+                              <p className="text-2xl font-black text-blue-600">{files.length}</p>
+                              <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-1">Files Uploaded</p>
+                              <p className="text-[10px] text-blue-400 mt-0.5">{files.filter(f => f.docType || f.classified).length} classified</p>
+                            </div>
+                            <div className="bg-violet-50 rounded-xl p-4 border border-violet-100 text-center">
+                              <p className="text-sm font-black text-violet-700 truncate">{entityName || "—"}</p>
+                              <p className="text-[10px] font-bold text-violet-500 uppercase tracking-widest mt-1">Entity</p>
+                              <p className="text-[10px] text-violet-400 mt-0.5">{engagementType}</p>
+                            </div>
+                            <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 text-center">
+                              <p className="text-sm font-black text-emerald-700">{financialYear.replace("Year ended ", "") || "—"}</p>
+                              <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mt-1">Financial Year</p>
+                              <p className="text-[10px] text-emerald-400 mt-0.5">{framework}</p>
+                            </div>
+                            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 text-center">
+                              <p className="text-2xl font-black text-slate-700">{selectedPapers.length}</p>
+                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Papers Selected</p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">{AUDIT_PHASES.length} phases</p>
+                            </div>
+                          </div>
+                          {(!entityName || files.length === 0) && (
+                            <div className="mt-4 flex items-center gap-2 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                              {!entityName ? "Entity name is required — go back to Configure and enter it." : "Upload at least one document before running analysis."}
+                            </div>
+                          )}
+                        </div>
+                        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm flex flex-col items-center justify-center py-16 text-center space-y-6">
+                          <div className="w-24 h-24 bg-violet-50 rounded-full flex items-center justify-center relative">
+                            <div className="absolute inset-0 bg-violet-400/15 rounded-full animate-ping" style={{ animationDuration: "2s" }}></div>
+                            <Sparkles className="w-10 h-10 text-violet-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-slate-900">Ready to Analyse</h3>
+                            <p className="text-slate-500 mt-2 max-w-xl mx-auto leading-relaxed text-sm">Click below to run the AI audit analysis engine — materiality, risk, assertions, IC weaknesses, and analytical procedures will be generated automatically.</p>
+                          </div>
+                          <Button onClick={handleAnalyze} size="lg" className="h-12 px-8 bg-violet-600 hover:bg-violet-700 font-bold rounded-xl group shadow-lg shadow-violet-200">
+                            Run AI Audit Analysis <Sparkles className="ml-2.5 w-4 h-4 group-hover:rotate-12 transition-transform" />
+                          </Button>
+                        </div>
                       </div>
                     ) : (
                       <div className="space-y-8">
@@ -2814,22 +3007,65 @@ export default function WorkingPapers() {
                             </div>
                           </div>
 
+                          {/* Phase Selection Panel */}
+                          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                                  <FileCheck className="w-4 h-4 text-blue-600" />
+                                </div>
+                                <div>
+                                  <h3 className="font-bold text-slate-900 text-sm">Select Working Paper Phases</h3>
+                                  <p className="text-[11px] text-slate-400 font-medium mt-0.5">{selectedPhases.length} of {WP_GROUPS.length} phases · {WP_GROUPS.filter(g => selectedPhases.includes(g.prefix)).flatMap(g => g.refs).length} papers</p>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button onClick={() => setSelectedPhases(WP_GROUPS.map(g => g.prefix))} className="text-[11px] font-bold text-blue-600 hover:text-blue-800 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors">All</button>
+                                <button onClick={() => setSelectedPhases([])} className="text-[11px] font-bold text-slate-500 hover:text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">None</button>
+                              </div>
+                            </div>
+                            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                              {WP_GROUPS.map(g => {
+                                const isOn = selectedPhases.includes(g.prefix);
+                                return (
+                                  <button key={g.prefix} onClick={() => setSelectedPhases(prev => isOn ? prev.filter(p => p !== g.prefix) : [...prev, g.prefix])}
+                                    className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${isOn ? "bg-blue-50 border-blue-200" : "bg-slate-50 border-slate-100 opacity-60 hover:opacity-80"}`}
+                                  >
+                                    <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 border-2 transition-all ${isOn ? "bg-blue-600 border-blue-600" : "border-slate-300 bg-white"}`}>
+                                      {isOn && <Check className="w-3.5 h-3.5 text-white" />}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${g.color}`}>{g.prefix}</span>
+                                        <span className="text-xs font-bold text-slate-700 truncate">{g.label}</span>
+                                      </div>
+                                      <p className="text-[10px] text-slate-400 mt-0.5">{g.refs.length} papers</p>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
                           {/* Main WP Generation */}
-                          <div className="bg-white rounded-xl p-12 border border-slate-200 shadow-sm text-center space-y-8">
+                          <div className="bg-white rounded-xl p-10 border border-slate-200 shadow-sm text-center space-y-6">
                             <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto">
                               <Sparkles className="w-10 h-10 text-blue-600" />
                             </div>
-                            <div className="max-w-lg mx-auto space-y-4">
-                              <h3 className="text-2xl font-extrabold text-slate-800">Ready to Generate {selectedPapers.length} Papers</h3>
-                              <p className="text-slate-500 font-medium leading-relaxed">The system will process all 11 phases (A–K) — from Acceptance & Continuance through Final Output — generating fully cross-referenced, ISA-compliant working papers with prepared-by, reviewed-by, and partner sign-offs.</p>
-                              <div className="flex flex-wrap justify-center gap-2 pt-2">
-                                {AUDIT_PHASES.map(p => (
-                                  <span key={p.prefix} className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-200 uppercase tracking-wide">{p.prefix}: {p.label}</span>
-                                ))}
-                              </div>
+                            <div className="max-w-lg mx-auto space-y-3">
+                              <h3 className="text-2xl font-extrabold text-slate-800">
+                                Ready to Generate{" "}
+                                {WP_GROUPS.filter(g => selectedPhases.includes(g.prefix)).flatMap(g => g.refs).length} Papers
+                              </h3>
+                              <p className="text-slate-500 font-medium leading-relaxed text-sm">
+                                Generating {selectedPhases.length} selected phase{selectedPhases.length !== 1 ? "s" : ""} — fully cross-referenced, ISA-compliant working papers with prepared-by, reviewed-by, and partner sign-offs.
+                              </p>
+                              {selectedPhases.length === 0 && (
+                                <p className="text-amber-600 font-bold text-sm">Select at least one phase above to generate.</p>
+                              )}
                             </div>
-                            <Button onClick={handleGenerate} size="lg" className="h-14 px-10 bg-blue-600 hover:bg-blue-700 text-base font-bold shadow-none rounded-xl group">
-                              <Sparkles className="w-5 h-5 mr-2 group-hover:rotate-12 transition-transform" /> Generate All Working Papers
+                            <Button onClick={handleGenerate} disabled={selectedPhases.length === 0} size="lg" className="h-14 px-10 bg-blue-600 hover:bg-blue-700 text-base font-bold shadow-none rounded-xl group disabled:opacity-50">
+                              <Sparkles className="w-5 h-5 mr-2 group-hover:rotate-12 transition-transform" /> Generate Working Papers
                             </Button>
                           </div>
                         </div>
@@ -3116,6 +3352,10 @@ export default function WorkingPapers() {
                         setTbData2([]);
                         setCoaData([]);
                         setGlTbSummary(null);
+                        setConfigChangedAfterAnalysis(false);
+                        setSelectedPhases(WP_GROUPS.map(g => g.prefix));
+                        setDraftLoaded(false);
+                        localStorage.removeItem(DRAFT_KEY);
                         toast({ title: "Engagement reset", description: "All fields have been cleared. Ready for a new engagement." });
                       }} className="font-bold text-slate-500 rounded-xl px-6 h-12">
                         <RefreshCw className="w-4 h-4 mr-2" /> Start New Engagement

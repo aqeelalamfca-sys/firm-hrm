@@ -33,10 +33,17 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 **Admin Credentials (seeded):** `admin@calfirm.com` / `Admin@123` (role: `super_admin`). Password hashed as `SHA256(password + "hrm_salt_2024")`. DB column is `password_hash`; role enum values: `super_admin`, `hr_admin`, `finance_officer`, `manager`, `employee`, `partner`, `trainee`.
 
 **Audit Working Paper Generator (A-K Code System):**
-- Frontend: `artifacts/hrm-system/src/pages/working-papers.tsx` (~3045 lines)
-- Backend: `artifacts/api-server/src/routes/working-papers.ts` (~2264 lines)
+- Frontend: `artifacts/hrm-system/src/pages/working-papers.tsx` (~3370 lines)
+- Backend: `artifacts/api-server/src/routes/working-papers.ts` (~2280 lines)
 - 5-step wizard: Upload (0) → Configure (1) → Analyse (2) → Generate/Review (3) → Export (4)
-- **Bug fixes applied**: `handleAnalyze` now stays on Step 2 (`setStep(2)`) so analysis results are visible before generating; `handleGenerate` now stays on Step 3 (`setStep(3)`) so papers are reviewable before export; `salesTaxRows` added to generate payload; `configValues` + `salesTaxRows` + `periodStart`/`periodEnd` added to analyze payload; Sales Tax xlsx upload now uses `XLSX.read(arrayBuffer)` (binary parsing) instead of `file.text()` for proper `.xlsx` support; all 4 export handlers now call `URL.revokeObjectURL()` to prevent blob leaks; `bsData`/`plData`/`salesTaxRows` added to all 4 export payloads; `handleExtractAndNext` catch block now shows a toast instead of silently swallowing errors; "Start New Engagement" reset now clears ALL 50+ state variables back to defaults.
+- **Bug fixes applied**: `handleAnalyze` stays on Step 2; `handleGenerate` stays on Step 3; `salesTaxRows` in all payloads; xlsx binary parsing; `URL.revokeObjectURL()` on all exports; full 50+ state reset on "Start New Engagement".
+- **Smart Defaults Engine**: `applySmartDefaults()` — auto-fills June year-end, deadlines, risk flags, framework, tax flags, sales tax period based on current date. Exclusions: entityName, NTN, SECP, address, firm, team. Auto-called after upload extraction; also available via "Apply Smart Defaults" button in Configure hero.
+- **File Classification Dropdown**: Each uploaded file has a "Classify" badge users can click to assign document type (10 types). Classifications override auto-classify in AI extraction/analysis.
+- **localStorage Draft Persistence**: Key `ana_wp_draft_v2`; saves 1.5s debounce; restored on mount with green banner; cleared on "Start New Engagement".
+- **Stale Data Warning**: `configChangedAfterAnalysis` flag triggers amber banner in Analyse step with "Re-run Analysis" button when config/files change after analysis.
+- **WP Phase Selection Panel**: Phase checkboxes A-K with All/None controls and paper count per phase; Generate disabled if 0 phases selected.
+- **Pre-Analysis Summary Card**: Entity/files/FY/papers summary shown before running analysis; validation warning if entity name missing.
+- **Backend Improvements**: `smartChunk()` for intelligent document truncation (head 65% + tail 35%); user classifications override auto-classify; 6000 chars/file in extract-entity, 8000 chars/file in analyze; 10-file limit in extract-entity.
 - **A-K Code System**: 65 papers across 11 phases (A=Acceptance/6, B=Planning/10, C=Risk Assessment/6, D=Internal Controls/5, E=Substantive Testing/10, F=Special Areas/6, G=Completion/7, H=Reporting/5, I=Quality & Ethics/4, J=Tax & Regulatory/5, K=Final Output/3)
 - **Phase-by-phase AI generation**: 4-batch approach (A-D, E, F-H, I-K) to avoid token limits
 - **121-Variable Dynamic Engagement Configuration Engine**:
