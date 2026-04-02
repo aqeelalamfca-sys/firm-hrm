@@ -420,18 +420,19 @@ function getWPSignoffs(
   const fil = parseOrFallback(engDates.filingDeadline,    new Date(rpt.getTime() + 14 * 86400000));
 
   const ppStart = new Date(pd.getTime() - 14 * 86400000);
-  const prefix  = (ref || "").split("-")[0].toUpperCase();
+  const prefix  = (ref || "").replace(/[0-9]/g, "").toUpperCase();
 
   let phaseStart: Date;
   let phaseEnd:   Date;
   switch (prefix) {
-    case "PP":                        phaseStart = ppStart; phaseEnd = pd;  break;
-    case "DI": case "IR": case "OB":  phaseStart = pd;  phaseEnd = fws; break;
-    case "PL":                        phaseStart = pd;  phaseEnd = fws; break;
-    case "EX": case "FH": case "EV":  phaseStart = fws; phaseEnd = fwe; break;
-    case "FN": case "DL": case "QR":  phaseStart = rd;  phaseEnd = rpt; break;
-    case "IN":                        phaseStart = rpt; phaseEnd = fil; break;
-    default:                          phaseStart = fws; phaseEnd = fwe; break;
+    case "A":                   phaseStart = ppStart; phaseEnd = pd;  break;
+    case "B": case "C":        phaseStart = pd;  phaseEnd = fws; break;
+    case "D":                   phaseStart = pd;  phaseEnd = fws; break;
+    case "E": case "F":        phaseStart = fws; phaseEnd = fwe; break;
+    case "G": case "H": case "I": phaseStart = rd;  phaseEnd = rpt; break;
+    case "J":                   phaseStart = fwe; phaseEnd = rd;  break;
+    case "K":                   phaseStart = rpt; phaseEnd = fil; break;
+    default:                    phaseStart = fws; phaseEnd = fwe; break;
   }
 
   if (phaseEnd <= phaseStart) phaseEnd = new Date(phaseStart.getTime() + 3 * 86400000);
@@ -455,9 +456,13 @@ router.post("/generate", async (req: Request, res: Response) => {
   const {
     analysis, selectedPapers,
     entityName, financialYear, engagementType, firmName, ntn, secp,
+    strn, industry, entityType, framework, listedStatus,
+    firstYearAudit, goingConcernFlag, controlReliance, significantRiskAreas,
+    registeredAddress,
     preparer, reviewer, approver,
     planningDeadline, fieldworkStart, fieldworkEnd,
     reportingDeadline, reportDate, filingDeadline, archiveDate,
+    bsData, plData,
   } = req.body;
 
   const engDates   = { planningDeadline, fieldworkStart, fieldworkEnd, reportingDeadline, reportDate, filingDeadline, archiveDate };
@@ -483,48 +488,61 @@ router.post("/generate", async (req: Request, res: Response) => {
   const risks = analysis.risk_assessment || {};
 
   const allPapers = [
-    "PP-100", "PP-101", "PP-102", "PP-103",
-    "DI-100", "DI-101",
-    "IR-100", "IR-101", "IR-102",
-    "OB-100", "OB-101",
-    "PL-100",
-    "EX-100", "EX-101", "EX-102", "EX-103", "EX-104", "EX-105", "EX-106",
-    "FH-100",
-    "EV-100",
-    "FN-100", "FN-101",
-    "DL-100",
-    "QR-100",
-    "IN-100",
+    "A1", "A2", "A3", "A4",
+    "B1", "B2", "B3", "B4", "B5",
+    "C1", "C2", "C3",
+    "D1", "D2", "D3",
+    "E1", "E2", "E3", "E4", "E5", "E6", "E7",
+    "F1", "F2", "F3",
+    "G1", "G2", "G3", "G4",
+    "H1", "H2", "H3",
+    "I1", "I2",
+    "J1", "J2", "J3",
+    "K1", "K2", "K3",
   ];
   const papersToGenerate = selectedPapers?.length > 0 ? selectedPapers : allPapers;
 
   const wpDefinitions: Record<string, { title: string; section: string; isa: string; description: string }> = {
-    "PP-100": { title: "Engagement Letter & Terms", section: "Pre-Planning", isa: "ISA 210", description: "Documents the terms of the audit engagement including scope, responsibilities, and fee arrangements." },
-    "PP-101": { title: "Independence & Ethics Compliance", section: "Pre-Planning", isa: "ISA 200, ICAP Code of Ethics", description: "Confirms auditor independence and compliance with ethical requirements." },
-    "PP-102": { title: "Materiality Determination", section: "Pre-Planning", isa: "ISA 320", description: "Calculation and documentation of overall and performance materiality." },
-    "PP-103": { title: "Client Acceptance & Continuance", section: "Pre-Planning", isa: "ISA 220, ISQM 1", description: "Assessment of client acceptance/continuance including integrity and risk evaluation." },
-    "DI-100": { title: "Understanding the Entity", section: "Discussion & Inquiry", isa: "ISA 315", description: "Understanding the entity, its environment, and internal controls." },
-    "DI-101": { title: "Related Party Identification", section: "Discussion & Inquiry", isa: "ISA 550", description: "Identification and assessment of related party transactions and balances." },
-    "IR-100": { title: "Risk Assessment Summary", section: "Risk Assessment", isa: "ISA 315, ISA 330", description: "Overall risk assessment and planned responses." },
-    "IR-101": { title: "Fraud Risk Assessment", section: "Risk Assessment", isa: "ISA 240", description: "Assessment of fraud risks and indicators." },
-    "IR-102": { title: "Internal Control Evaluation", section: "Risk Assessment", isa: "ISA 315", description: "Evaluation of design and implementation of key internal controls." },
-    "OB-100": { title: "Opening Balances Verification", section: "Opening Balances", isa: "ISA 510", description: "Procedures on opening balances and comparative figures." },
-    "OB-101": { title: "Prior Year Audit File Review", section: "Opening Balances", isa: "ISA 510", description: "Review of prior year working papers and audit adjustments." },
-    "PL-100": { title: "Audit Plan & Strategy", section: "Planning", isa: "ISA 300", description: "Overall audit strategy and detailed audit plan." },
-    "EX-100": { title: "Revenue & Receivables", section: "Execution", isa: "ISA 315, ISA 500", description: "Substantive procedures on revenue recognition and trade receivables." },
-    "EX-101": { title: "Purchases & Payables", section: "Execution", isa: "ISA 315, ISA 500", description: "Substantive procedures on purchases, expenses, and trade payables." },
-    "EX-102": { title: "Cash & Bank Balances", section: "Execution", isa: "ISA 505, ISA 500", description: "Cash and bank confirmation, reconciliation, and cut-off testing." },
-    "EX-103": { title: "Inventory & Cost of Sales", section: "Execution", isa: "ISA 501, ISA 500", description: "Inventory observation, valuation, and cost of sales analysis." },
-    "EX-104": { title: "Fixed Assets & Depreciation", section: "Execution", isa: "IAS 16, ISA 500", description: "Verification of fixed assets, additions, disposals, and depreciation." },
-    "EX-105": { title: "Payroll & Employee Costs", section: "Execution", isa: "ISA 500, IAS 19", description: "Payroll testing, employee benefits, and withholding tax compliance." },
-    "EX-106": { title: "Taxation & Compliance", section: "Execution", isa: "ISA 500, ITO 2001", description: "Income tax, sales tax, and regulatory compliance procedures." },
-    "FH-100": { title: "Analytical Procedures", section: "Fieldwork", isa: "ISA 520", description: "Final analytical review of financial statements." },
-    "EV-100": { title: "Audit Evidence Summary", section: "Evidence", isa: "ISA 500, ISA 230", description: "Summary of audit evidence obtained and its sufficiency and appropriateness." },
-    "FN-100": { title: "Financial Statement Review", section: "Finalization", isa: "ISA 700, ISA 720", description: "Review of financial statements for fair presentation and disclosures." },
-    "FN-101": { title: "Subsequent Events Review", section: "Finalization", isa: "ISA 560", description: "Review of events after the reporting period." },
-    "DL-100": { title: "Management Letter Points", section: "Deliverables", isa: "ISA 265, ISA 260", description: "Communication of significant matters to management and those charged with governance." },
-    "QR-100": { title: "Quality Review Checklist", section: "Quality Review", isa: "ISQM 1, ISQM 2", description: "Engagement quality review and sign-off." },
-    "IN-100": { title: "Audit Opinion Draft", section: "Issuance", isa: "ISA 700, ISA 705, ISA 706", description: "Draft audit opinion and basis for opinion paragraph." },
+    "A1": { title: "Engagement Letter & Terms", section: "Acceptance & Continuance", isa: "ISA 210", description: "Terms of engagement including scope, responsibilities, and fee." },
+    "A2": { title: "Independence & Ethics Compliance", section: "Acceptance & Continuance", isa: "ISA 200, IESBA Code", description: "Auditor independence, ethical compliance and self-review threat assessment." },
+    "A3": { title: "Client Acceptance & Continuance", section: "Acceptance & Continuance", isa: "ISA 220, ISQM 1", description: "Client integrity, risk evaluation, and acceptance/continuance decision." },
+    "A4": { title: "Anti-Money Laundering Checks", section: "Acceptance & Continuance", isa: "AMLA 2010, IESBA", description: "Beneficial ownership verification, PEP screening, and AML compliance." },
+    "B1": { title: "Materiality Determination", section: "Planning & Strategy", isa: "ISA 320", description: "Overall materiality, performance materiality, and trivial threshold calculation." },
+    "B2": { title: "Risk Assessment & Response", section: "Planning & Strategy", isa: "ISA 315, ISA 330", description: "Inherent and control risk identification with planned audit responses." },
+    "B3": { title: "Audit Plan & Strategy", section: "Planning & Strategy", isa: "ISA 300", description: "Overall audit strategy, scope, timing, and resource allocation." },
+    "B4": { title: "Opening Balances Verification", section: "Planning & Strategy", isa: "ISA 510", description: "Verification of opening balances and comparative figures." },
+    "B5": { title: "Sampling Plan", section: "Planning & Strategy", isa: "ISA 530", description: "Statistical and non-statistical sampling methodology and sample sizes." },
+    "C1": { title: "TB/GL Reconciliation & FS Data", section: "Data & Financial Statements", isa: "ISA 500", description: "Trial balance to financial statements and general ledger reconciliation." },
+    "C2": { title: "Analytical Procedures", section: "Data & Financial Statements", isa: "ISA 520", description: "Ratio analysis, variance analysis, and trend review." },
+    "C3": { title: "Evidence Index & Vault", section: "Data & Financial Statements", isa: "ISA 500, ISA 230", description: "Summary of all audit evidence obtained with cross-references." },
+    "D1": { title: "Understanding the Entity & Environment", section: "Internal Controls", isa: "ISA 315", description: "Entity structure, industry, regulatory environment, and key processes." },
+    "D2": { title: "Internal Control Evaluation", section: "Internal Controls", isa: "ISA 315, ISA 265", description: "Design and implementation testing of key internal controls." },
+    "D3": { title: "Fraud Risk Assessment", section: "Internal Controls", isa: "ISA 240", description: "Fraud risk factors, management override assessment, and revenue recognition risk." },
+    "E1": { title: "Revenue & Trade Receivables", section: "Substantive Testing", isa: "ISA 500, IFRS 15", description: "Revenue recognition testing, receivables confirmation, and aging analysis." },
+    "E2": { title: "Purchases & Trade Payables", section: "Substantive Testing", isa: "ISA 500, IAS 37", description: "Purchases testing, payables completeness, and cut-off procedures." },
+    "E3": { title: "Cash & Bank Balances", section: "Substantive Testing", isa: "ISA 505, ISA 500", description: "Bank confirmation, reconciliation, and cash count procedures." },
+    "E4": { title: "Inventory & Cost of Sales", section: "Substantive Testing", isa: "ISA 501, IAS 2", description: "Inventory observation, valuation, NRV testing, and cost analysis." },
+    "E5": { title: "Property, Plant & Equipment", section: "Substantive Testing", isa: "IAS 16, ISA 500", description: "Additions, disposals, depreciation, impairment, and revaluation testing." },
+    "E6": { title: "Payroll & Employee Benefits", section: "Substantive Testing", isa: "ISA 500, IAS 19", description: "Payroll testing, EOBI/SESSI, gratuity, and withholding tax compliance." },
+    "E7": { title: "Loans, Borrowings & Finance Costs", section: "Substantive Testing", isa: "ISA 500, IFRS 9", description: "Long-term financing, lease liabilities, and finance cost verification." },
+    "F1": { title: "Related Party Transactions", section: "Special Areas", isa: "ISA 550, IAS 24", description: "Related party identification, transaction testing, and disclosure review." },
+    "F2": { title: "Accounting Estimates & Fair Values", section: "Special Areas", isa: "ISA 540, ISA 620", description: "Management estimates, expert reliance, and fair value measurement." },
+    "F3": { title: "Going Concern Assessment", section: "Special Areas", isa: "ISA 570", description: "Management's going concern assessment and auditor's evaluation." },
+    "G1": { title: "Subsequent Events Review", section: "Completion", isa: "ISA 560", description: "Events after reporting period and their impact on financial statements." },
+    "G2": { title: "Summary of Misstatements", section: "Completion", isa: "ISA 450", description: "Unadjusted and adjusted misstatements schedule with materiality assessment." },
+    "G3": { title: "Financial Statement Review", section: "Completion", isa: "ISA 700, ISA 720", description: "Final FS review for fair presentation, disclosures, and other information." },
+    "G4": { title: "Management Representations", section: "Completion", isa: "ISA 580", description: "Written representations from management on material matters." },
+    "H1": { title: "Audit Report Draft", section: "Reporting", isa: "ISA 700, ISA 705, ISA 706", description: "Draft audit opinion, basis for opinion, and emphasis of matter paragraphs." },
+    "H2": { title: "Management Letter", section: "Reporting", isa: "ISA 265, ISA 260", description: "Communication of control deficiencies and recommendations." },
+    "H3": { title: "Communication with TCWG", section: "Reporting", isa: "ISA 260", description: "Matters for those charged with governance including KAMs." },
+    "I1": { title: "EQCR Checklist", section: "Quality Control", isa: "ISQM 1, ISQM 2", description: "Engagement quality control review and sign-off." },
+    "I2": { title: "File Assembly & Completeness", section: "Quality Control", isa: "ISA 230", description: "Audit file assembly, completeness check, and 60-day deadline." },
+    "J1": { title: "Income Tax Compliance", section: "Tax & Regulatory", isa: "ITO 2001, ISA 500", description: "Income tax provision, advance tax, minimum tax, and WHT compliance." },
+    "J2": { title: "Sales Tax & FED Compliance", section: "Tax & Regulatory", isa: "STA 1990, FED Act", description: "Sales tax returns, input/output reconciliation, and FED obligations." },
+    "J3": { title: "Companies Act 2017 Compliance", section: "Tax & Regulatory", isa: "Companies Act 2017, SECP", description: "Statutory compliance checklist per Companies Act 2017 and SECP regulations." },
+    "K1": { title: "Signed Audit Opinion", section: "Final Output & Archive", isa: "ISA 700, ISA 720", description: "Final signed audit report with all required elements." },
+    "K2": { title: "Engagement Completion & Close", section: "Final Output & Archive", isa: "ISA 230, ISQM 1", description: "Engagement completion procedures, final partner review, and close." },
+    "K3": { title: "Archive & Retention", section: "Final Output & Archive", isa: "ISA 230", description: "File archival per ISA 230 with retention schedule and access controls." },
   };
 
   const ap = analysis.analytical_procedures || {};
@@ -534,19 +552,26 @@ router.post("/generate", async (req: Request, res: Response) => {
 
   const evidenceSummary = evidenceItems.length > 0
     ? evidenceItems.map((e: any) => `  ${e.id}: ${e.filename} (${e.type}) — ${e.description}`).join("\n")
-    : "  A-100: Trial Balance [Auditor Assumption / Estimated]\n  B-200: General Ledger [Auditor Assumption / Estimated]\n  C-300: Bank Statements [Auditor Assumption / Estimated]";
+    : "  EV-1: Trial Balance\n  EV-2: General Ledger\n  EV-3: Bank Statements";
 
   const ratiosSummary = ap.ratios
     ? `Gross Margin: ${ap.ratios.gross_margin_pct?.toFixed(1)}% | Net Margin: ${ap.ratios.net_margin_pct?.toFixed(1)}% | Current Ratio: ${ap.ratios.current_ratio?.toFixed(2)} | D/E: ${ap.ratios.debt_to_equity?.toFixed(2)}`
     : "Ratios not computed";
 
-  try {
-    const papersPrompt = `You are AuditWise Engine v3, a professional audit AI. Generate detailed ISA-compliant audit working papers with full cross-referencing.
+  const bsSummary = Array.isArray(bsData) ? bsData.flatMap((s: any) => (s.lines || []).map((l: any) => `${l.label}: CY=${l.cy}, PY=${l.py}`)).join("\n") : "";
+  const plSummary = Array.isArray(plData) ? plData.flatMap((s: any) => (s.lines || []).map((l: any) => `${l.label}: CY=${l.cy}, PY=${l.py}`)).join("\n") : "";
 
-ENTITY: ${entityName || entity.name || "Client Company"}
+  const contextBlock = `ENTITY: ${entityName || entity.name || "Client Company"}
+NTN: ${ntn || "—"} | SECP: ${secp || "—"} | STRN: ${strn || "—"}
+INDUSTRY: ${industry || entity.industry || "—"}
+ENTITY TYPE: ${entityType || "Private Limited"} | FRAMEWORK: ${framework || "IFRS"} | LISTED: ${listedStatus || "Unlisted"}
+FIRST YEAR AUDIT: ${firstYearAudit ? "Yes (ISA 510 applies)" : "No"}
+GOING CONCERN FLAG: ${goingConcernFlag ? "Yes — ISA 570 extended procedures required" : "No material doubt"}
+CONTROL RELIANCE: ${controlReliance || "Partial"}
+ADDRESS: ${registeredAddress || "—"}
 FINANCIAL YEAR: ${financialYear || entity.financial_year || "Year ended June 30, 2024"}
 ENGAGEMENT TYPE: ${engagementType || "Statutory Audit"}
-FIRM: ${firmName || "Alam & Aulakh Chartered Accountants"}
+FIRM: ${firmName || "ANA & Co. Chartered Accountants"}
 
 FINANCIAL DATA (Current Year):
 - Revenue: ${formatPKR(fin.revenue)}
@@ -561,97 +586,92 @@ FINANCIAL DATA (Current Year):
 - Inventory: ${formatPKR(fin.inventory)}
 - Fixed Assets: ${formatPKR(fin.fixed_assets)}
 
-PRIOR YEAR:
-- Revenue: ${formatPKR(fin.prior_year_revenue || 0)}
-- Net Profit: ${formatPKR(fin.prior_year_net_profit || 0)}
-- Total Assets: ${formatPKR(fin.prior_year_total_assets || 0)}
+PRIOR YEAR: Revenue: ${formatPKR(fin.prior_year_revenue || 0)} | Net Profit: ${formatPKR(fin.prior_year_net_profit || 0)} | Total Assets: ${formatPKR(fin.prior_year_total_assets || 0)}
+
+${bsSummary ? `BALANCE SHEET DATA:\n${bsSummary}\n` : ""}
+${plSummary ? `PROFIT & LOSS DATA:\n${plSummary}\n` : ""}
 
 MATERIALITY (ISA 320):
-- Overall Materiality (OM): ${formatPKR(materiality.overall_materiality)} (${materiality.basis || "Net Profit"} × ${materiality.percentage_used || 5}%)
-- Performance Materiality (PM): ${formatPKR(materiality.performance_materiality)}
-- Trivial Threshold: ${formatPKR(materiality.trivial_threshold || materiality.overall_materiality * 0.05)}
-- Rationale: ${materiality.rationale || "Industry standard"}
+- OM: ${formatPKR(materiality.overall_materiality)} (${materiality.basis || "Net Profit"} × ${materiality.percentage_used || 5}%)
+- PM: ${formatPKR(materiality.performance_materiality)}
+- Trivial: ${formatPKR(materiality.trivial_threshold || (materiality.overall_materiality || 0) * 0.05)}
 
 OVERALL RISK: ${risks.overall_risk || "Medium"}
+RATIOS: ${ratiosSummary}
+RECONCILIATION: TB vs FS: ${reconciliation.tb_vs_fs?.status || "N/A"} | Bank: ${reconciliation.bank_reconciliation?.status || "N/A"}
+EVIDENCE: ${evidenceSummary}
+IC WEAKNESSES: ${icWeaknesses.length} identified`;
 
-ANALYTICAL PROCEDURES (ISA 520):
-${ratiosSummary}
-
-RECONCILIATION STATUS:
-- TB vs FS: ${reconciliation.tb_vs_fs?.status || "Not Available"}
-- TB vs GL: ${reconciliation.tb_vs_gl?.status || "Not Available"}
-- Bank Reconciliation: ${reconciliation.bank_reconciliation?.status || "Not Available"}
-
-EVIDENCE INDEX:
-${evidenceSummary}
-
-INTERNAL CONTROL WEAKNESSES: ${icWeaknesses.length} identified
-
-Generate the following working papers: ${papersToGenerate.join(", ")}
-
-For EACH working paper, return this EXACT JSON structure (all fields mandatory — NO placeholders):
+  const wpJsonSchema = `For EACH working paper, return this JSON structure:
 {
-  "ref": "PP-100",
+  "ref": "A1",
   "title": string,
   "section": string,
+  "section_label": string,
   "isa_references": [string],
-  "assertions": ["Existence","Completeness","Accuracy","Valuation","Rights & Obligations","Presentation & Disclosure"],
-  "objective": string (2-3 sentences, professional audit language),
+  "assertions": [string],
+  "objective": string (2-3 sentences),
   "scope": string,
-  "procedures": [
-    {
-      "no": string,
-      "procedure": string (specific, detailed audit procedure),
-      "finding": string (realistic finding referencing actual numbers),
-      "conclusion": string ("Satisfactory" | "Note Required" | "Matters Arising"),
-      "evidence_ref": string (e.g. "A-100", "C-300")
-    }
-  ],
+  "procedures": [{ "no": string, "procedure": string, "finding": string, "conclusion": "Satisfactory"|"Note Required"|"Matters Arising", "evidence_ref": string }],
   "summary_table": [{ "item": string, "value": string, "comment": string }] | null,
-  "key_findings": [string] (minimum 2 specific findings with amounts),
-  "auditor_conclusion": string (professional 3-4 sentence conclusion),
+  "key_findings": [string],
+  "auditor_conclusion": string,
   "risks_identified": [string],
   "recommendations": [string],
-  "evidence_refs": [string] (e.g. ["A-100", "B-200"]),
-  "cross_references": [string] (e.g. ["EX-100", "FH-100"]),
-  "preparer": "Audit Senior",
-  "reviewer": "Audit Manager",
-  "partner": "Partner",
-  "date_prepared": "${new Date().toLocaleDateString('en-PK')}",
+  "evidence_refs": [string],
+  "cross_references": [string],
   "status": "Draft"
 }
+RULES: Use real numbers, ISA 230 language, Pakistan standards (ITO 2001, STA 1990, Companies Act 2017). Never use placeholder text.
+Return JSON: { "working_papers": [...] }`;
 
-STRICT RULES:
-- Never use placeholder text like "XYZ" or "ABC". Use real numbers from financial data.
-- Each procedure must reference at least one evidence item.
-- Cross-reference related working papers.
-- Use ISA 230 compliant documentation language.
-- Assertions must be relevant to the specific WP area.
-- Pakistan-specific: Reference ITO 2001, STA 1990, Companies Act 2017 where applicable.
+  const batches: string[][] = [];
+  const batchGroups = [
+    papersToGenerate.filter(p => /^[A-D]/.test(p)),
+    papersToGenerate.filter(p => /^E/.test(p)),
+    papersToGenerate.filter(p => /^[F-H]/.test(p)),
+    papersToGenerate.filter(p => /^[I-K]/.test(p)),
+  ];
+  for (const bg of batchGroups) {
+    if (bg.length > 0) batches.push(bg);
+  }
 
-Return a JSON object: { "working_papers": [ ... array of all working papers ... ], "evidence_index": [ { "ref": string, "description": string, "type": string, "wp_refs": [string] } ] }
-Use professional audit language throughout.`;
+  try {
+    const allGeneratedPapers: any[] = [];
 
-    const genResponse = await ai.client.chat.completions.create({
-      model: ai.model,
-      messages: [
-        { role: "system", content: "You are AuditWise Engine v3, a professional Pakistan audit AI. Return only valid JSON. Never use placeholder text." },
-        { role: "user", content: papersPrompt },
-      ],
-      max_tokens: 12000,
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-    });
+    for (let bi = 0; bi < batches.length; bi++) {
+      const batch = batches[bi];
+      const batchDefs = batch.map(ref => {
+        const def = wpDefinitions[ref];
+        return def ? `${ref}: ${def.title} (${def.section}) — ${def.isa} — ${def.description}` : ref;
+      }).join("\n");
 
-    const raw = genResponse.choices[0]?.message?.content || "{}";
-    let papersData: any;
-    try {
-      papersData = JSON.parse(raw);
-    } catch {
-      papersData = { working_papers: [], evidence_index: [] };
+      const batchPrompt = `Generate the following audit working papers (batch ${bi + 1} of ${batches.length}):\n${batchDefs}\n\n${contextBlock}\n\n${wpJsonSchema}`;
+
+      const genResponse = await ai.client.chat.completions.create({
+        model: ai.model,
+        messages: [
+          { role: "system", content: "You are a professional Pakistan audit AI engine. Generate ISA-compliant working papers. Return only valid JSON. Never use placeholder text." },
+          { role: "user", content: batchPrompt },
+        ],
+        max_tokens: 12000,
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+      });
+
+      const raw = genResponse.choices[0]?.message?.content || "{}";
+      let batchData: any;
+      try {
+        batchData = JSON.parse(raw);
+      } catch {
+        batchData = { working_papers: [] };
+      }
+      const batchPapers = batchData.working_papers || [];
+      allGeneratedPapers.push(...batchPapers);
+      logger.info(`Batch ${bi + 1}/${batches.length}: generated ${batchPapers.length} papers`);
     }
 
-    const workingPapers = papersData.working_papers || [];
+    const workingPapers = allGeneratedPapers;
 
     const enrichedPapers = workingPapers.map((wp: any) => {
       const def      = wpDefinitions[wp.ref] || {};
@@ -674,7 +694,7 @@ Use professional audit language throughout.`;
       };
     });
 
-    const generatedEvidenceIndex = papersData.evidence_index || evidenceItems.map((e: any) => ({
+    const generatedEvidenceIndex = evidenceItems.map((e: any) => ({
       ref: e.id,
       description: e.description || e.filename,
       type: e.type,
@@ -692,6 +712,15 @@ Use professional audit language throughout.`;
         firm_name:       firmName || "ANA & Co. Chartered Accountants",
         ntn,
         secp,
+        strn,
+        industry,
+        entity_type:     entityType,
+        framework,
+        listed_status:   listedStatus,
+        first_year_audit: firstYearAudit,
+        going_concern_flag: goingConcernFlag,
+        control_reliance: controlReliance,
+        registered_address: registeredAddress,
         generated_at:    new Date().toISOString(),
         total_papers:    enrichedPapers.length,
         total_evidence:  generatedEvidenceIndex.length,
@@ -1157,6 +1186,76 @@ router.post("/export-excel", async (req: Request, res: Response) => {
       XLSX.utils.book_append_sheet(wb, sheet, sheetName);
     }
 
+    // ── 4. MATERIALITY SHEET (ISA 320) ──────────────────────────────────────
+    const matRows: any[][] = [
+      ["MATERIALITY DETERMINATION — ISA 320/450"],
+      [],
+      ["Parameter", "Value", "Rationale"],
+      ["Benchmark / Basis", mat.basis || "Net Profit", mat.rationale || "Industry standard"],
+      ["Benchmark Amount", fmtN(fin[mat.basis === "Revenue" ? "revenue" : mat.basis === "Total Assets" ? "total_assets" : "net_profit"]), ""],
+      ["Percentage Applied", mat.percentage_used ? `${mat.percentage_used}%` : "5%", ""],
+      ["Overall Materiality (OM)", fmtN(mat.overall_materiality), ""],
+      ["Performance Materiality (PM)", fmtN(mat.performance_materiality), "75% of OM — ISA 320.A12"],
+      ["Trivial Threshold (SAD)", fmtN(mat.trivial_threshold || (mat.overall_materiality || 0) * 0.05), "5% of OM — ISA 450.A2"],
+      [],
+      ["SUMMARY OF AUDIT DIFFERENCES (SAD)"],
+      ["No.", "Description", "Amount (PKR)", "Factual/Judgmental", "Passed/Adjusted"],
+      ["", "(Populated during fieldwork)", "", "", ""],
+    ];
+    const matSheet = XLSX.utils.aoa_to_sheet(matRows);
+    matSheet["!cols"] = [{ wch: 30 }, { wch: 28 }, { wch: 40 }];
+    XLSX.utils.book_append_sheet(wb, matSheet, "Materiality");
+
+    // ── 5. ANALYTICAL PROCEDURES SHEET (ISA 520) ─────────────────────────────
+    const ap = analysis?.analytical_procedures || {};
+    const ratios = ap.ratios || {};
+    const apRows: any[][] = [
+      ["ANALYTICAL PROCEDURES — ISA 520"],
+      [],
+      ["Ratio / Metric", "Current Year", "Prior Year", "Variance", "Comment"],
+      ["Revenue", fmtN(fin.revenue), fmtN(fin.prior_year_revenue), fin.revenue && fin.prior_year_revenue ? `${(((fin.revenue - fin.prior_year_revenue)/fin.prior_year_revenue)*100).toFixed(1)}%` : "N/A", ""],
+      ["Net Profit", fmtN(fin.net_profit), fmtN(fin.prior_year_net_profit), fin.net_profit && fin.prior_year_net_profit ? `${(((fin.net_profit - fin.prior_year_net_profit)/fin.prior_year_net_profit)*100).toFixed(1)}%` : "N/A", ""],
+      ["Total Assets", fmtN(fin.total_assets), fmtN(fin.prior_year_total_assets), fin.total_assets && fin.prior_year_total_assets ? `${(((fin.total_assets - fin.prior_year_total_assets)/fin.prior_year_total_assets)*100).toFixed(1)}%` : "N/A", ""],
+      [],
+      ["KEY RATIOS"],
+      ["Gross Margin %", ratios.gross_margin_pct ? `${ratios.gross_margin_pct.toFixed(1)}%` : "N/A", "", "", ""],
+      ["Net Margin %", ratios.net_margin_pct ? `${ratios.net_margin_pct.toFixed(1)}%` : "N/A", "", "", ""],
+      ["Current Ratio", ratios.current_ratio ? ratios.current_ratio.toFixed(2) : "N/A", "", "", ""],
+      ["Debt-to-Equity", ratios.debt_to_equity ? ratios.debt_to_equity.toFixed(2) : "N/A", "", "", ""],
+      ["Return on Assets %", fin.total_assets ? `${((fin.net_profit / fin.total_assets)*100).toFixed(1)}%` : "N/A", "", "", ""],
+      ["Return on Equity %", fin.equity ? `${((fin.net_profit / fin.equity)*100).toFixed(1)}%` : "N/A", "", "", ""],
+    ];
+    const apSheet = XLSX.utils.aoa_to_sheet(apRows);
+    apSheet["!cols"] = [{ wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 16 }, { wch: 30 }];
+    XLSX.utils.book_append_sheet(wb, apSheet, "Analytical Review");
+
+    // ── 6. LEAD SCHEDULE SHEET ───────────────────────────────────────────────
+    const lsRows: any[][] = [
+      ["LEAD SCHEDULE — BALANCE SHEET AREAS"],
+      [],
+      ["Area", "Current Year (PKR)", "Prior Year (PKR)", "Movement (PKR)", "Movement %", "WP Ref", "Materiality Flag"],
+    ];
+    const bsAreas = [
+      { area: "Cash & Bank", cy: fin.cash_and_bank, py: null, ref: "E3" },
+      { area: "Trade Receivables", cy: fin.trade_receivables, py: null, ref: "E1" },
+      { area: "Inventory", cy: fin.inventory, py: null, ref: "E4" },
+      { area: "Fixed Assets", cy: fin.fixed_assets, py: null, ref: "E5" },
+      { area: "Trade Payables", cy: fin.trade_payables, py: null, ref: "E2" },
+      { area: "Total Assets", cy: fin.total_assets, py: fin.prior_year_total_assets, ref: "—" },
+      { area: "Total Liabilities", cy: fin.total_liabilities, py: null, ref: "—" },
+      { area: "Equity", cy: fin.equity, py: null, ref: "—" },
+    ];
+    const om = mat.overall_materiality || 0;
+    for (const item of bsAreas) {
+      const mvt = item.py ? (item.cy || 0) - item.py : null;
+      const mvtPct = item.py && item.py !== 0 ? ((mvt! / item.py) * 100).toFixed(1) + "%" : "—";
+      const flag = (item.cy || 0) > om ? "Above OM" : "Below OM";
+      lsRows.push([item.area, fmtN(item.cy), item.py ? fmtN(item.py) : "—", mvt !== null ? fmtN(mvt) : "—", mvtPct, item.ref, flag]);
+    }
+    const lsSheet = XLSX.utils.aoa_to_sheet(lsRows);
+    lsSheet["!cols"] = [{ wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 20 }, { wch: 14 }, { wch: 10 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, lsSheet, "Lead Schedule");
+
     const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
     const filename = `AuditFile_${(meta?.entity || "Client").replace(/\s+/g, "_")}_${(meta?.financial_year || "2024").replace(/\s+/g, "_")}.xlsx`;
 
@@ -1521,7 +1620,7 @@ router.post("/generate-confirmations", async (req: Request, res: Response) => {
 
       drawStamp(460, doc.y - 60, "BANK CONFIRM");
       doc.moveDown();
-      doc.fillColor("#888888").fontSize(8).font("Helvetica-Oblique").text(`WP Ref: EX-102 | Evidence Ref: C-300 | ISA 315 Compliant`);
+      doc.fillColor("#888888").fontSize(8).font("Helvetica-Oblique").text(`WP Ref: E3 | Evidence Ref: C-300 | ISA 505 Compliant`);
       doc.fillColor("#333333").font("Helvetica").fontSize(10);
     }
 
@@ -1560,7 +1659,7 @@ router.post("/generate-confirmations", async (req: Request, res: Response) => {
 
       drawStamp(460, doc.y - 60, "CONFIRMED");
       doc.moveDown();
-      doc.fillColor("#888888").fontSize(8).font("Helvetica-Oblique").text(`WP Ref: EX-100 | Evidence Ref: A-100 | ISA 505 Compliant`);
+      doc.fillColor("#888888").fontSize(8).font("Helvetica-Oblique").text(`WP Ref: E1 | Evidence Ref: A-100 | ISA 505 Compliant`);
       doc.fillColor("#333333").font("Helvetica").fontSize(10);
     }
 
@@ -1599,7 +1698,7 @@ router.post("/generate-confirmations", async (req: Request, res: Response) => {
 
       drawStamp(460, doc.y - 60, "CONFIRMED");
       doc.moveDown();
-      doc.fillColor("#888888").fontSize(8).font("Helvetica-Oblique").text(`WP Ref: EX-101 | Evidence Ref: B-200 | ISA 505 Compliant`);
+      doc.fillColor("#888888").fontSize(8).font("Helvetica-Oblique").text(`WP Ref: E2 | Evidence Ref: B-200 | ISA 505 Compliant`);
       doc.fillColor("#333333").font("Helvetica").fontSize(10);
     }
 
@@ -1640,7 +1739,7 @@ router.post("/generate-confirmations", async (req: Request, res: Response) => {
 
       drawStamp(460, doc.y - 60, "LEGAL CONF.");
       doc.moveDown();
-      doc.fillColor("#888888").fontSize(8).font("Helvetica-Oblique").text(`WP Ref: FN-101 | Evidence Ref: E-500 | ISA 560 Compliant`);
+      doc.fillColor("#888888").fontSize(8).font("Helvetica-Oblique").text(`WP Ref: G1 | Evidence Ref: E-500 | ISA 501 Compliant`);
       doc.fillColor("#333333").font("Helvetica").fontSize(10);
     }
 

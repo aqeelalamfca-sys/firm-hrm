@@ -67,18 +67,17 @@ const ENGAGEMENT_TYPES = [
 ];
 
 const WP_GROUPS = [
-  { prefix: "PP", label: "Pre-Planning", color: "bg-violet-100 text-violet-700 border-violet-200", refs: ["PP-100", "PP-101", "PP-102", "PP-103"] },
-  { prefix: "DI", label: "Discussion & Inquiry", color: "bg-blue-100 text-blue-700 border-blue-200", refs: ["DI-100", "DI-101"] },
-  { prefix: "IR", label: "Risk Assessment", color: "bg-red-100 text-red-700 border-red-200", refs: ["IR-100", "IR-101", "IR-102"] },
-  { prefix: "OB", label: "Opening Balances", color: "bg-orange-100 text-orange-700 border-orange-200", refs: ["OB-100", "OB-101"] },
-  { prefix: "PL", label: "Planning", color: "bg-sky-100 text-sky-700 border-sky-200", refs: ["PL-100"] },
-  { prefix: "EX", label: "Execution / Substantive", color: "bg-emerald-100 text-emerald-700 border-emerald-200", refs: ["EX-100", "EX-101", "EX-102", "EX-103", "EX-104", "EX-105", "EX-106"] },
-  { prefix: "FH", label: "Fieldwork", color: "bg-teal-100 text-teal-700 border-teal-200", refs: ["FH-100"] },
-  { prefix: "EV", label: "Evidence", color: "bg-amber-100 text-amber-700 border-amber-200", refs: ["EV-100"] },
-  { prefix: "FN", label: "Finalization", color: "bg-indigo-100 text-indigo-700 border-indigo-200", refs: ["FN-100", "FN-101"] },
-  { prefix: "DL", label: "Deliverables", color: "bg-pink-100 text-pink-700 border-pink-200", refs: ["DL-100"] },
-  { prefix: "QR", label: "Quality Review", color: "bg-purple-100 text-purple-700 border-purple-200", refs: ["QR-100"] },
-  { prefix: "IN", label: "Audit Opinion", color: "bg-green-100 text-green-700 border-green-200", refs: ["IN-100"] },
+  { prefix: "A", label: "Acceptance & Continuance", color: "bg-violet-100 text-violet-700 border-violet-200", refs: ["A1", "A2", "A3", "A4"] },
+  { prefix: "B", label: "Planning & Strategy", color: "bg-blue-100 text-blue-700 border-blue-200", refs: ["B1", "B2", "B3", "B4", "B5"] },
+  { prefix: "C", label: "Data & Financial Statements", color: "bg-sky-100 text-sky-700 border-sky-200", refs: ["C1", "C2", "C3"] },
+  { prefix: "D", label: "Internal Controls", color: "bg-red-100 text-red-700 border-red-200", refs: ["D1", "D2", "D3"] },
+  { prefix: "E", label: "Substantive Testing", color: "bg-emerald-100 text-emerald-700 border-emerald-200", refs: ["E1", "E2", "E3", "E4", "E5", "E6", "E7"] },
+  { prefix: "F", label: "Special Areas", color: "bg-teal-100 text-teal-700 border-teal-200", refs: ["F1", "F2", "F3"] },
+  { prefix: "G", label: "Completion", color: "bg-amber-100 text-amber-700 border-amber-200", refs: ["G1", "G2", "G3", "G4"] },
+  { prefix: "H", label: "Reporting", color: "bg-indigo-100 text-indigo-700 border-indigo-200", refs: ["H1", "H2", "H3"] },
+  { prefix: "I", label: "Quality Control", color: "bg-purple-100 text-purple-700 border-purple-200", refs: ["I1", "I2"] },
+  { prefix: "J", label: "Tax & Regulatory", color: "bg-orange-100 text-orange-700 border-orange-200", refs: ["J1", "J2", "J3"] },
+  { prefix: "K", label: "Final Output & Archive", color: "bg-green-100 text-green-700 border-green-200", refs: ["K1", "K2", "K3"] },
 ];
 
 const ALL_WP_REFS = WP_GROUPS.flatMap(g => g.refs);
@@ -92,18 +91,17 @@ const STEPS = [
 ];
 
 const AUDIT_PHASES: { prefix: string; label: string; papers: number; description: string }[] = [
-  { prefix: "PP", label: "Pre-Planning", papers: 4, description: "Acceptance, continuance & independence checks" },
-  { prefix: "DI", label: "Discussion & Inquiry", papers: 2, description: "Engagement team briefing & client inquiry" },
-  { prefix: "IR", label: "Risk Assessment", papers: 3, description: "ISA 315 inherent, control & fraud risk mapping" },
-  { prefix: "OB", label: "Opening Balances", papers: 2, description: "ISA 510 verification of prior-period figures" },
-  { prefix: "PL", label: "Audit Planning", papers: 5, description: "Materiality, sampling plan & audit programme" },
-  { prefix: "EX", label: "Execution", papers: 8, description: "ToC, ToD & substantive procedures per FS head" },
-  { prefix: "FH", label: "Fieldwork", papers: 3, description: "Physical counts, confirmations & inspections" },
-  { prefix: "EV", label: "Evidence & Analytics", papers: 3, description: "ISA 500/520 analytical review & evidence vault" },
-  { prefix: "FN", label: "Finalisation", papers: 4, description: "Misstatements log, going concern & SEs" },
-  { prefix: "DL", label: "Deliverables", papers: 2, description: "Management letter & audit report drafts" },
-  { prefix: "QR", label: "EQCR", papers: 2, description: "ISQM 2 engagement quality control review" },
-  { prefix: "IN", label: "Audit Opinion", papers: 1, description: "ISA 700–720 signed opinion & archive" },
+  { prefix: "A", label: "Acceptance & Continuance", papers: 4, description: "Engagement letter, independence, ethics & client acceptance" },
+  { prefix: "B", label: "Planning & Strategy", papers: 5, description: "Materiality, risk assessment, audit plan & opening balances" },
+  { prefix: "C", label: "Data & FS", papers: 3, description: "TB/GL reconciliation, FS data & analytical procedures" },
+  { prefix: "D", label: "Internal Controls", papers: 3, description: "Entity understanding, IC evaluation & fraud risk assessment" },
+  { prefix: "E", label: "Substantive Testing", papers: 7, description: "Revenue, purchases, cash, inventory, PPE, payroll & receivables" },
+  { prefix: "F", label: "Special Areas", papers: 3, description: "Related parties, estimates & going concern" },
+  { prefix: "G", label: "Completion", papers: 4, description: "Subsequent events, misstatements, FS review & management reps" },
+  { prefix: "H", label: "Reporting", papers: 3, description: "Audit report draft, management letter & TCWG communication" },
+  { prefix: "I", label: "Quality Control", papers: 2, description: "ISQM 1/2 EQCR checklist & file assembly" },
+  { prefix: "J", label: "Tax & Regulatory", papers: 3, description: "Income tax, sales tax & Companies Act 2017 compliance" },
+  { prefix: "K", label: "Final Output", papers: 3, description: "Signed opinion, engagement close & archive" },
 ];
 
 const INITIAL_BS: FSSection[] = [
@@ -326,7 +324,8 @@ function DropZone({ files, onAdd, onRemove }: { files: UploadedFile[]; onAdd: (f
 }
 
 function WPCard({ wp, expanded, onToggle }: { wp: WorkingPaper; expanded: boolean; onToggle: () => void }) {
-  const group = WP_GROUPS.find(g => wp.ref.startsWith(g.prefix));
+  const wpLetter = (wp.ref || "").replace(/[0-9\-]/g, "");
+  const group = WP_GROUPS.find(g => g.prefix === wpLetter);
 
   return (
     <motion.div layout className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-3">
@@ -450,7 +449,7 @@ export default function WorkingPapers() {
   const [expandedFsSections, setExpandedFsSections] = useState<string[]>(["nca", "ca", "rev"]);
   const [activeFsTab, setActiveFsTab] = useState<"bs" | "pl">("bs");
   const [fsExpanded, setFsExpanded] = useState(true);
-  const [expandedWPGroups, setExpandedWPGroups] = useState<string[]>(["PP"]);
+  const [expandedWPGroups, setExpandedWPGroups] = useState<string[]>(["A"]);
   const [expandedWPCards, setExpandedWPCards] = useState<string[]>([]);
   const [analysisTab, setAnalysisTab] = useState<"summary" | "ratios" | "reconciliation" | "evidence" | "ic">("summary");
 
@@ -458,6 +457,17 @@ export default function WorkingPapers() {
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [periodSuggested, setPeriodSuggested] = useState(false);
+
+  // ── Extended Variables (A-K System) ─────────────────────────────────────────
+  const [strn, setStrn] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [entityType, setEntityType] = useState("Private Limited");
+  const [framework, setFramework] = useState("IFRS");
+  const [listedStatus, setListedStatus] = useState("Unlisted");
+  const [firstYearAudit, setFirstYearAudit] = useState(false);
+  const [goingConcernFlag, setGoingConcernFlag] = useState(false);
+  const [controlReliance, setControlReliance] = useState("Partial");
+  const [significantRiskAreas, setSignificantRiskAreas] = useState<string[]>([]);
 
   // ── Engagement Timeline (Key Deadlines) ─────────────────────────────────────
   const [planningDeadline, setPlanningDeadline] = useState("");
@@ -755,6 +765,16 @@ export default function WorkingPapers() {
           firmName,
           ntn,
           secp,
+          strn,
+          industry,
+          entityType,
+          framework,
+          listedStatus,
+          firstYearAudit,
+          goingConcernFlag,
+          controlReliance,
+          significantRiskAreas,
+          registeredAddress,
           periodStart,
           periodEnd,
           preparer,
@@ -767,6 +787,8 @@ export default function WorkingPapers() {
           reportDate,
           filingDeadline,
           archiveDate,
+          bsData,
+          plData,
         }),
       });
 
@@ -790,7 +812,7 @@ export default function WorkingPapers() {
       setProgressMsg("All working papers generated successfully.");
 
       setStep(3);
-      toast({ title: "Generation complete", description: `${papers.length} working papers generated across 12 audit phases.` });
+      toast({ title: "Generation complete", description: `${papers.length} working papers generated across 11 audit phases (A-K).` });
     } catch (err: any) {
       clearInterval(phaseInterval);
       toast({ title: "Generation failed", description: err.message, variant: "destructive" });
@@ -805,7 +827,7 @@ export default function WorkingPapers() {
       const res = await fetch("/api/working-papers/export-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ workingPapers, evidenceIndex, meta: generationMeta, entityName, financialYear }),
+        body: JSON.stringify({ workingPapers, evidenceIndex, meta: generationMeta, analysis, entityName, financialYear }),
       });
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
@@ -826,7 +848,7 @@ export default function WorkingPapers() {
       const res = await fetch("/api/working-papers/export-excel", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ workingPapers, evidenceIndex, meta: generationMeta, entityName, financialYear }),
+        body: JSON.stringify({ workingPapers, evidenceIndex, meta: generationMeta, analysis, entityName, financialYear }),
       });
       if (!res.ok) throw new Error("Excel export failed");
       const blob = await res.blob();
@@ -847,7 +869,7 @@ export default function WorkingPapers() {
       const res = await fetch("/api/working-papers/export-docx", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ workingPapers, evidenceIndex, meta: generationMeta, entityName, financialYear }),
+        body: JSON.stringify({ workingPapers, evidenceIndex, meta: generationMeta, analysis, entityName, financialYear }),
       });
       if (!res.ok) throw new Error("DOCX export failed");
       const blob = await res.blob();
@@ -1019,6 +1041,71 @@ export default function WorkingPapers() {
                           <div className="space-y-2 pt-2">
                             <Label className="text-xs font-bold text-slate-600 ml-1">Registered Address</Label>
                             <Input value={registeredAddress} onChange={e => setRegisteredAddress(e.target.value)} placeholder="Principal place of business..." className="h-11 rounded-xl font-medium" />
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">STRN (Sales Tax Reg.)</Label>
+                              <Input value={strn} onChange={e => setStrn(e.target.value)} placeholder="e.g. 32-00-1234-567-89" className="h-11 rounded-xl font-mono" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Industry / Sector</Label>
+                              <Input value={industry} onChange={e => setIndustry(e.target.value)} placeholder="e.g. Textile Manufacturing" className="h-11 rounded-xl font-medium" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl p-8 border border-slate-200 shadow-sm space-y-6">
+                          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Shield className="w-4 h-4" /> Engagement Variables</h3>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Entity Type</Label>
+                              <Select value={entityType} onValueChange={setEntityType}>
+                                <SelectTrigger className="h-11 rounded-xl font-medium"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {["Private Limited", "Public Limited", "Single Member", "LLP", "Partnership", "Sole Proprietor", "AOP", "Trust", "NPO / NGO", "Government Entity"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Reporting Framework</Label>
+                              <Select value={framework} onValueChange={setFramework}>
+                                <SelectTrigger className="h-11 rounded-xl font-medium"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {["IFRS", "IFRS for SMEs", "IAS", "Fourth Schedule (Cos Act)", "IPSAS", "Other"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Listed Status</Label>
+                              <Select value={listedStatus} onValueChange={setListedStatus}>
+                                <SelectTrigger className="h-11 rounded-xl font-medium"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {["Unlisted", "PSX Listed", "GEM Board"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold text-slate-600 ml-1">Control Reliance</Label>
+                              <Select value={controlReliance} onValueChange={setControlReliance}>
+                                <SelectTrigger className="h-11 rounded-xl font-medium"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {["Full", "Partial", "None"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-6 pt-2">
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={firstYearAudit} onCheckedChange={setFirstYearAudit} className="data-[state=checked]:bg-blue-600" />
+                              <span className="text-xs font-bold text-slate-700">First Year Audit (ISA 510)</span>
+                            </label>
+                            <label className="flex items-center gap-2.5 cursor-pointer">
+                              <Switch checked={goingConcernFlag} onCheckedChange={setGoingConcernFlag} className="data-[state=checked]:bg-red-600" />
+                              <span className="text-xs font-bold text-slate-700">Going Concern Doubt (ISA 570)</span>
+                            </label>
                           </div>
                         </div>
 
@@ -1580,7 +1667,7 @@ export default function WorkingPapers() {
                   <div className="space-y-8">
                     <div>
                       <h2 className="text-2xl font-bold text-slate-900">Audit Working Papers</h2>
-                      <p className="text-slate-500 mt-2">Auto-generated, fully cross-referenced working papers — Acceptance → Planning → Execution → Completion → Reporting → EQCR. ISA 200–720 · ISQM 1&2 · Companies Act 2017 compliant. Each paper carries prepared-by, reviewed-by, and approved-by sign-offs with phase-appropriate dates.</p>
+                      <p className="text-slate-500 mt-2">Auto-generated, fully cross-referenced working papers — A (Acceptance) → K (Final Output). ISA 200–720 · ISQM 1&2 · Companies Act 2017 compliant. Each paper carries prepared-by, reviewed-by, and approved-by sign-offs with phase-appropriate dates.</p>
                     </div>
 
                     {workingPapers.length === 0 ? (
@@ -1640,7 +1727,7 @@ export default function WorkingPapers() {
                           </div>
                           <div className="max-w-lg mx-auto space-y-4">
                             <h3 className="text-2xl font-extrabold text-slate-800">Ready to Generate {selectedPapers.length} Papers</h3>
-                            <p className="text-slate-500 font-medium leading-relaxed">The system will process all 12 audit phases — from Pre-Planning to Audit Opinion — generating fully cross-referenced, ISA-compliant working papers with prepared-by, reviewed-by, and partner sign-offs.</p>
+                            <p className="text-slate-500 font-medium leading-relaxed">The system will process all 11 phases (A–K) — from Acceptance & Continuance through Final Output — generating fully cross-referenced, ISA-compliant working papers with prepared-by, reviewed-by, and partner sign-offs.</p>
                             <div className="flex flex-wrap justify-center gap-2 pt-2">
                               {AUDIT_PHASES.map(p => (
                                 <span key={p.prefix} className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-200 uppercase tracking-wide">{p.prefix}: {p.label}</span>
@@ -1718,7 +1805,8 @@ export default function WorkingPapers() {
                           {uniqueSections.map(section => {
                             const papers = sectionPapers(section);
                             if (!papers.length) return null;
-                            const group = WP_GROUPS.find(g => papers[0]?.ref.startsWith(g.prefix));
+                            const wpLetter = (papers[0]?.ref || "").replace(/[0-9\-]/g, "");
+                            const group = WP_GROUPS.find(g => g.prefix === wpLetter);
                             const isOpen = expandedWPGroups.includes(section);
                             
                             return (
