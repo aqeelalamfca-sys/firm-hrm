@@ -961,14 +961,6 @@ export default function WorkingPapers() {
           <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
           <span className="font-semibold text-slate-800">{STEPS[step].label}</span>
         </div>
-        <div className="flex items-center gap-3">
-          <input
-            value={firmName}
-            onChange={e => setFirmName(e.target.value)}
-            className="text-[11px] font-bold text-slate-600 bg-transparent border-none outline-none focus:ring-1 focus:ring-blue-400 rounded px-2 py-0.5 max-w-[220px] truncate"
-            placeholder="Firm name..."
-          />
-        </div>
       </header>
 
       <div className="px-10 py-8">
