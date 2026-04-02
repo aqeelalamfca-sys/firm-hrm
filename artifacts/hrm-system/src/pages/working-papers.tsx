@@ -768,15 +768,8 @@ export default function WorkingPapers() {
       
       {/* ── LEFT RAIL ─────────────────────────────────────────────────────── */}
       <aside className="w-[220px] shrink-0 bg-[#0A1628] text-slate-100 flex flex-col sticky top-0 h-screen border-r border-white/5 z-10">
-        {/* Header */}
-        <div className="px-5 pt-5 pb-4 border-b border-white/[0.06]">
-          <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Audit Working Papers</p>
-          <p className="text-[8px] text-slate-600 mt-0.5 leading-snug">End-to-End Pakistan Audit System</p>
-          <p className="text-[8px] text-slate-700 mt-px">ISA 200–720 · ISQM 1&2 · Companies Act 2017</p>
-        </div>
-
         {/* Steps */}
-        <div className="flex-1 overflow-y-auto py-6 px-5">
+        <div className="flex-1 overflow-y-auto pt-8 pb-4 px-5">
           <div className="relative">
             {/* Vertical connector line */}
             <div className="absolute left-[13px] top-[14px] bottom-[14px] w-px bg-slate-800" />
