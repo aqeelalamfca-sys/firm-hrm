@@ -888,89 +888,27 @@ export default function WorkingPapers() {
   const sectionPapers = (sec: string) => workingPapers.filter(wp => (wp.section || "Uncategorized") === sec);
 
   return (
-    <div className="flex min-h-screen font-sans text-slate-900 bg-white">
-      
-      {/* ── LEFT RAIL ─────────────────────────────────────────────────────── */}
-      <aside className="w-[220px] shrink-0 bg-white flex flex-col sticky top-0 h-screen border-r border-slate-200 z-10">
-        {/* Steps */}
-        <div className="flex-1 overflow-y-auto pt-8 pb-4 px-5">
-          <div className="relative">
-            {/* Vertical connector line */}
-            <div className="absolute left-[13px] top-[14px] bottom-[14px] w-px bg-slate-200" />
-            <div className="space-y-1 relative">
-              {STEPS.map((s, idx) => {
-                const isActive = step === idx;
-                const isPast   = step > idx;
-                const canClick = idx <= step;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => canClick && setStep(idx)}
-                    disabled={!canClick}
-                    className={`w-full flex items-center gap-3 px-0 py-2.5 text-left transition-all duration-200 rounded-none group ${canClick ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'}`}
-                  >
-                    {/* Step circle */}
-                    <div className={`w-[26px] h-[26px] rounded-full flex items-center justify-center shrink-0 relative z-10 border transition-all duration-200
-                      ${isActive ? 'bg-blue-600 border-blue-600' : isPast ? 'bg-emerald-50 border-emerald-500' : 'bg-white border-slate-300'}`}>
-                      {isPast
-                        ? <Check className="w-3 h-3 text-emerald-500" />
-                        : <span className={`text-[10px] font-black ${isActive ? 'text-white' : 'text-slate-400'}`}>{idx + 1}</span>
-                      }
-                    </div>
-                    {/* Label */}
-                    <div className="flex flex-col min-w-0">
-                      <span className={`text-[8px] uppercase tracking-widest font-bold leading-none mb-px ${isActive ? 'text-blue-600' : isPast ? 'text-emerald-600' : 'text-slate-400'}`}>
-                        Step {idx + 1}
-                      </span>
-                      <span className={`text-[12px] font-semibold leading-tight truncate ${isActive ? 'text-slate-900' : isPast ? 'text-slate-500' : 'text-slate-400'}`}>
-                        {s.shortLabel}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+    <div className="flex flex-col min-h-screen font-sans text-slate-900 bg-[#F8FAFC]">
 
-          {/* Engagement quick-view (only when entity is set) */}
-          {entityName && (
-            <div className="mt-8 pt-5 border-t border-slate-100">
-              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">Engagement</p>
-              <p className="text-xs font-bold text-slate-800 truncate leading-tight">{entityName}</p>
-              {ntn && <p className="text-[10px] font-mono text-blue-600 mt-0.5">{ntn}</p>}
-              <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">{financialYear}</p>
-            </div>
-          )}
+      {/* ── TOP BAR ───────────────────────────────────────────────────────── */}
+      <header className="h-14 flex items-center justify-between px-8 bg-white border-b border-slate-200 sticky top-0 z-20">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="font-medium text-slate-400">Working Papers</span>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+          <span className="font-semibold text-slate-800">{STEPS[step].label}</span>
         </div>
-
-        {/* Footer — editable firm name */}
-        <div className="px-4 py-4 border-t border-slate-100">
+        <div className="flex items-center gap-3">
           <input
             value={firmName}
             onChange={e => setFirmName(e.target.value)}
-            className="w-full text-[11px] font-bold text-slate-900 bg-transparent border-none outline-none focus:ring-1 focus:ring-blue-400 rounded px-1 -mx-1 py-0.5 truncate leading-tight"
+            className="text-[11px] font-bold text-slate-600 bg-transparent border-none outline-none focus:ring-1 focus:ring-blue-400 rounded px-2 py-0.5 max-w-[220px] truncate"
             placeholder="Firm name..."
           />
-          <p className="text-[9px] text-slate-400 mt-0.5 px-1">Chartered Accountants</p>
         </div>
-      </aside>
+      </header>
 
-      {/* ── RIGHT CONTENT ─────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col bg-[#F8FAFC]">
-        {/* Top bar — sticky so it stays visible while scrolling */}
-        <header className="h-14 flex items-center justify-between px-8 bg-white border-b border-slate-200 sticky top-0 z-20">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="font-medium text-slate-400">Working Papers</span>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
-            <span className="font-semibold text-slate-800">{STEPS[step].label}</span>
-          </div>
-          <Button variant="ghost" size="sm" className="text-slate-500 text-xs font-semibold h-8 px-3 hover:bg-slate-100">
-            Save Draft
-          </Button>
-        </header>
-
-        <div className="px-10 py-8">
-          <div className="max-w-4xl mx-auto pb-28">
+      <div className="px-10 py-8">
+        <div className="max-w-4xl mx-auto pb-28">
             <AnimatePresence mode="wait">
               <motion.div key={step} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.3 }}>
                 
@@ -1917,7 +1855,6 @@ export default function WorkingPapers() {
 
               </motion.div>
             </AnimatePresence>
-          </div>
         </div>
       </div>
     </div>
