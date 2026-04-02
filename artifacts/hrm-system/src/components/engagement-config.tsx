@@ -379,6 +379,18 @@ export default function EngagementConfig({ values, onChange, users }: Engagement
 
   return (
     <div className="space-y-8">
+      {sectionData.map(({ section, variables, status }) => (
+        <SectionBlock
+          key={section.id}
+          section={section}
+          variables={variables}
+          values={values}
+          onChange={onChange}
+          status={status}
+          users={users}
+        />
+      ))}
+
       <div className="bg-gradient-to-r from-slate-900 to-blue-900 rounded-xl p-5 text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-3xl" />
         <div className="relative z-10">
@@ -409,18 +421,6 @@ export default function EngagementConfig({ values, onChange, users }: Engagement
           )}
         </div>
       </div>
-
-      {sectionData.map(({ section, variables, status }) => (
-        <SectionBlock
-          key={section.id}
-          section={section}
-          variables={variables}
-          values={values}
-          onChange={onChange}
-          status={status}
-          users={users}
-        />
-      ))}
     </div>
   );
 }
