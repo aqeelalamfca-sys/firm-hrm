@@ -829,21 +829,7 @@ export default function WorkingPapers() {
         {/* Footer — firm + compliance */}
         <div className="px-5 py-4 border-t border-white/[0.06]">
           <p className="text-[11px] font-bold text-white leading-tight truncate">{firmName}</p>
-          <p className="text-[9px] text-slate-500 mb-3">Chartered Accountants</p>
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5 py-1 px-2 rounded border border-emerald-500/25 bg-emerald-500/[0.07]">
-              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
-              <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wide">ISA 200–720 Compliant</span>
-            </div>
-            <div className="flex items-center gap-1.5 py-1 px-2 rounded border border-blue-400/25 bg-blue-400/[0.07]">
-              <Shield className="w-2.5 h-2.5 text-blue-400 shrink-0" />
-              <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wide">ISQM 1&2 · IESBA Code</span>
-            </div>
-            <div className="flex items-center gap-1.5 py-1 px-2 rounded border border-violet-400/25 bg-violet-400/[0.07]">
-              <BookOpen className="w-2.5 h-2.5 text-violet-400 shrink-0" />
-              <span className="text-[9px] font-bold text-violet-400 uppercase tracking-wide">Companies Act 2017 · FBR</span>
-            </div>
-          </div>
+          <p className="text-[9px] text-slate-500">Chartered Accountants</p>
         </div>
       </aside>
 
