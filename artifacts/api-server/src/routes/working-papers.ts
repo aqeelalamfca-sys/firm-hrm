@@ -600,7 +600,8 @@ OVERALL RISK: ${risks.overall_risk || "Medium"}
 RATIOS: ${ratiosSummary}
 RECONCILIATION: TB vs FS: ${reconciliation.tb_vs_fs?.status || "N/A"} | Bank: ${reconciliation.bank_reconciliation?.status || "N/A"}
 EVIDENCE: ${evidenceSummary}
-IC WEAKNESSES: ${icWeaknesses.length} identified`;
+IC WEAKNESSES: ${icWeaknesses.length} identified
+SIGNIFICANT RISK AREAS: ${Array.isArray(significantRiskAreas) && significantRiskAreas.length > 0 ? significantRiskAreas.join(", ") : "None specifically flagged"}`;
 
   const wpJsonSchema = `For EACH working paper, return this JSON structure:
 {
@@ -694,12 +695,18 @@ Return JSON: { "working_papers": [...] }`;
       };
     });
 
-    const generatedEvidenceIndex = evidenceItems.map((e: any) => ({
+    const defaultEvidence = [
+      { ref: "EV-1", description: "Trial Balance", type: "financial", wp_refs: enrichedPapers.map((wp: any) => wp.ref) },
+      { ref: "EV-2", description: "General Ledger", type: "financial", wp_refs: enrichedPapers.map((wp: any) => wp.ref) },
+      { ref: "EV-3", description: "Bank Statements", type: "financial", wp_refs: enrichedPapers.filter((wp: any) => wp.ref === "E3").map((wp: any) => wp.ref) },
+    ];
+    const uploadedEvidence = evidenceItems.map((e: any) => ({
       ref: e.id,
       description: e.description || e.filename,
       type: e.type,
       wp_refs: enrichedPapers.map((wp: any) => wp.ref).filter((_: any, i: number) => i % 3 === 0),
     }));
+    const generatedEvidenceIndex = uploadedEvidence.length > 0 ? uploadedEvidence : defaultEvidence;
 
     return res.json({
       success: true,
@@ -1739,7 +1746,7 @@ router.post("/generate-confirmations", async (req: Request, res: Response) => {
 
       drawStamp(460, doc.y - 60, "LEGAL CONF.");
       doc.moveDown();
-      doc.fillColor("#888888").fontSize(8).font("Helvetica-Oblique").text(`WP Ref: G1 | Evidence Ref: E-500 | ISA 501 Compliant`);
+      doc.fillColor("#888888").fontSize(8).font("Helvetica-Oblique").text(`WP Ref: G4 | Evidence Ref: E-500 | ISA 501 / ISA 580 Compliant`);
       doc.fillColor("#333333").font("Helvetica").fontSize(10);
     }
 
