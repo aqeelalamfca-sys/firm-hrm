@@ -435,6 +435,12 @@ export default function WorkingPapers() {
   const [users, setUsers] = useState<Array<{id: number; name: string; role?: string; email?: string}>>([]);
 
   useEffect(() => {
+    const prev = document.title;
+    document.title = "Pakistan Audit Working Paper Generator | ANA & Co. Chartered Accountants";
+    return () => { document.title = prev; };
+  }, []);
+
+  useEffect(() => {
     if (!token) return;
     fetch("/api/users", { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
@@ -713,7 +719,9 @@ export default function WorkingPapers() {
       {/* LEFT RAIL (from Mockup) */}
       <div className="w-[280px] shrink-0 bg-[#0F172A] text-slate-100 flex flex-col h-full border-r border-slate-800 shadow-2xl z-10 relative overflow-hidden">
         <div className="px-6 pt-6 pb-5 border-b border-slate-800/60">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em]">Working Papers</p>
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em]">Audit Working Papers</p>
+          <p className="text-[9px] text-slate-600 mt-1 leading-relaxed">End-to-End Pakistan Audit System</p>
+          <p className="text-[9px] text-slate-700 mt-0.5">ISA 200–720 · ISQM 1&2 · Companies Act 2017</p>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-8 scrollbar-thin">
@@ -768,9 +776,19 @@ export default function WorkingPapers() {
         <div className="p-6 border-t border-slate-800/80 bg-slate-900/50">
           <p className="text-sm font-bold text-white truncate">{firmName}</p>
           <p className="text-xs text-slate-400 mb-3">Chartered Accountants</p>
-          <div className="flex items-center gap-2 text-emerald-400 bg-emerald-400/10 px-3 py-1.5 rounded-lg border border-emerald-400/20 w-max">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span className="text-[10px] font-bold tracking-wide uppercase">100% ISA Compliant</span>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-emerald-400 bg-emerald-400/10 px-3 py-1.5 rounded-lg border border-emerald-400/20">
+              <CheckCircle2 className="w-3 h-3" />
+              <span className="text-[10px] font-bold tracking-wide uppercase">ISA 200–720 Compliant</span>
+            </div>
+            <div className="flex items-center gap-2 text-blue-400 bg-blue-400/10 px-3 py-1.5 rounded-lg border border-blue-400/20">
+              <Shield className="w-3 h-3" />
+              <span className="text-[10px] font-bold tracking-wide uppercase">ISQM 1&2 · IESBA Code</span>
+            </div>
+            <div className="flex items-center gap-2 text-violet-400 bg-violet-400/10 px-3 py-1.5 rounded-lg border border-violet-400/20">
+              <BookOpen className="w-3 h-3" />
+              <span className="text-[10px] font-bold tracking-wide uppercase">Companies Act 2017 · FBR</span>
+            </div>
           </div>
         </div>
       </div>
@@ -798,7 +816,12 @@ export default function WorkingPapers() {
                   <div className="space-y-8">
                     <div>
                       <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Upload Audit Documents</h2>
-                      <p className="text-slate-500 mt-2 text-lg">Provide the foundational documents for AI analysis and working paper generation.</p>
+                      <p className="text-slate-500 mt-2">Upload Trial Balance, General Ledger, Financial Statements, bank statements, contracts, and confirmations. The system will auto-structure data and generate ISA-compliant audit documentation from Acceptance through EQCR.</p>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {["TB / GL", "Financial Statements", "Bank Statements", "Contracts", "Confirmations", "Board Minutes", "Tax Returns"].map(tag => (
+                          <span key={tag} className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-2.5 py-1 uppercase tracking-wide">{tag}</span>
+                        ))}
+                      </div>
                     </div>
 
                     <DropZone files={files} onAdd={addFiles} onRemove={removeFile} />
@@ -826,7 +849,7 @@ export default function WorkingPapers() {
                   <div className="space-y-8">
                     <div>
                       <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Configure Engagement</h2>
-                      <p className="text-slate-500 mt-2 text-lg">Define the scope of the audit and initialize financial statement data.</p>
+                      <p className="text-slate-500 mt-2">Set entity particulars, define engagement timeline, assign the audit team, and populate Financial Statement data. The system uses this to drive materiality, risk assessment, and procedural selection across all phases.</p>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1155,7 +1178,7 @@ export default function WorkingPapers() {
                         </div>
                         <div>
                           <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Ready to Analyse</h2>
-                          <p className="text-slate-500 mt-2 max-w-lg mx-auto leading-relaxed">The AI Engine is ready to process your documents and financial data to identify risks, calculate materiality, and perform analytical procedures.</p>
+                          <p className="text-slate-500 mt-2 max-w-xl mx-auto leading-relaxed">The AI engine will process your documents to auto-determine materiality (overall / PM / trivial), assess inherent and fraud risks (ISA 315/240), map each FS line item to assertions, identify IC weaknesses, and prepare analytical procedures (ISA 500, 520).</p>
                         </div>
                         <Button onClick={handleAnalyze} size="lg" className="h-14 px-10 bg-blue-600 hover:bg-blue-700 text-lg font-bold shadow-xl shadow-blue-200 rounded-2xl group">
                           Run AI Audit Analysis <Sparkles className="ml-3 w-5 h-5 group-hover:rotate-12 transition-transform" />
@@ -1432,7 +1455,7 @@ export default function WorkingPapers() {
                   <div className="space-y-8">
                     <div>
                       <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Audit Working Papers</h2>
-                      <p className="text-slate-500 mt-2 text-lg">System-generated working papers with ISA 200-720 compliance.</p>
+                      <p className="text-slate-500 mt-2">Auto-generated, fully cross-referenced working papers — Acceptance → Planning → Execution → Completion → Reporting → EQCR. ISA 200–720 · ISQM 1&2 · Companies Act 2017 compliant. Each paper carries prepared-by, reviewed-by, and approved-by sign-offs with phase-appropriate dates.</p>
                     </div>
 
                     {workingPapers.length === 0 ? (
