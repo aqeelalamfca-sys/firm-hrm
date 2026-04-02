@@ -397,7 +397,7 @@ export default function Landing() {
                   Our proprietary audit management platform for efficient engagements.
                 </p>
                 <span className="w-full h-8 text-[11px] font-semibold rounded-lg text-white flex items-center justify-center gap-1.5 cta-blink cta-blink-5" style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)' }}>
-                  <Monitor className="w-3.5 h-3.5" /> Launch AuditWise
+                  <Monitor className="w-3.5 h-3.5" /> Launch Audit Platform
                 </span>
               </a>
 

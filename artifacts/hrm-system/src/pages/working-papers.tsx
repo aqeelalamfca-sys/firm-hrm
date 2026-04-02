@@ -712,16 +712,8 @@ export default function WorkingPapers() {
       
       {/* LEFT RAIL (from Mockup) */}
       <div className="w-[280px] shrink-0 bg-[#0F172A] text-slate-100 flex flex-col h-full border-r border-slate-800 shadow-2xl z-10 relative overflow-hidden">
-        <div className="p-6 pb-8 border-b border-slate-800/80">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-600/20 flex items-center justify-center border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
-              <Shield className="w-5 h-5 text-blue-400" />
-            </div>
-            <div>
-              <h1 className="font-bold text-lg leading-none tracking-tight text-white">AuditWise</h1>
-              <p className="text-[11px] font-medium text-slate-400 mt-1 tracking-wider uppercase">Enterprise Edition</p>
-            </div>
-          </div>
+        <div className="px-6 pt-6 pb-5 border-b border-slate-800/60">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em]">Working Papers</p>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-8 scrollbar-thin">
@@ -787,12 +779,11 @@ export default function WorkingPapers() {
       <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-slate-50/50">
         <header className="h-16 flex items-center justify-between px-8 bg-white border-b border-slate-200/60 shrink-0 z-20 shadow-sm">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-slate-400">Audit Wizard</span>
+            <span className="text-sm font-bold text-slate-400">Working Papers</span>
             <ChevronRight className="w-4 h-4 text-slate-300" />
             <span className="text-sm font-extrabold text-slate-800">{STEPS[step].label}</span>
           </div>
           <div className="flex items-center gap-4">
-            <Badge variant="outline" className="text-[10px] font-bold border-slate-200 text-slate-500 bg-slate-50 h-7 px-3">AuditWise Engine v3.1</Badge>
             <Button variant="ghost" size="sm" className="text-slate-500 font-bold text-xs h-8">Save Draft</Button>
           </div>
         </header>
@@ -1653,7 +1644,7 @@ export default function WorkingPapers() {
                       <Button variant="ghost" onClick={() => { setStep(0); setFiles([]); setAnalysis(null); setWorkingPapers([]); setEvidenceIndex([]); setEntityName(""); setNtn(""); }} className="font-bold text-slate-500 rounded-xl px-6 h-12">
                         <RefreshCw className="w-4 h-4 mr-2" /> Start New Engagement
                       </Button>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">AuditWise Enterprise v3.1 · Secure Cloud Archive Active</p>
+                      <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">ISA 230 Compliant · Secure Archive Active</p>
                     </div>
                   </div>
                 )}
