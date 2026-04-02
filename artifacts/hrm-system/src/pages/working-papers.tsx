@@ -8,7 +8,8 @@ import {
   Building2, Calendar, Briefcase, X, Plus, Eye, RefreshCw,
   BarChart2, FileCheck, ClipboardCheck, Star, Info, Sparkles,
   FileSearch, Scale, Target, Layers, FileOutput, Check, Table,
-  Activity, GitMerge, Link2, FileSpreadsheet, Mail, Hash, Settings, LayoutGrid, TrendingDown
+  Activity, GitMerge, Link2, FileSpreadsheet, Mail, Hash, Settings, LayoutGrid, TrendingDown,
+  Trash2, ListPlus, SplitSquareVertical
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,9 +57,14 @@ interface WorkingPaper {
 interface EvidenceItem { ref: string; description: string; type: string; wp_refs?: string[]; }
 
 // ─── Financial Statement Types (from Mockup) ──────────────────────────────────
+interface FSBreakup {
+  id: string; label: string; cy: string; py: string;
+}
 interface FSLine {
   id: string; label: string; cy: string; py: string;
   bold?: boolean; subtotal?: boolean; indent?: boolean; spacer?: boolean;
+  isCustom?: boolean;
+  breakups?: FSBreakup[];
 }
 interface FSSection { id: string; title: string; color: string; lines: FSLine[]; }
 
@@ -688,6 +694,75 @@ export default function WorkingPapers() {
     ));
   };
 
+  const addFsRow = (tab: "bs" | "pl", secId: string) => {
+    const setter = tab === "bs" ? setBsData : setPlData;
+    const uid = `custom_${Date.now()}`;
+    setter(prev => prev.map(s => {
+      if (s.id !== secId) return s;
+      const subtotalIdx = s.lines.findIndex(l => l.subtotal);
+      const newLine: FSLine = { id: uid, label: "", cy: "", py: "", isCustom: true };
+      const updated = [...s.lines];
+      if (subtotalIdx >= 0) updated.splice(subtotalIdx, 0, newLine);
+      else updated.push(newLine);
+      return { ...s, lines: updated };
+    }));
+  };
+
+  const removeFsRow = (tab: "bs" | "pl", secId: string, lineId: string) => {
+    const setter = tab === "bs" ? setBsData : setPlData;
+    setter(prev => prev.map(s => s.id === secId
+      ? { ...s, lines: s.lines.filter(l => l.id !== lineId) }
+      : s
+    ));
+  };
+
+  const updateFsLabel = (tab: "bs" | "pl", secId: string, lineId: string, label: string) => {
+    const setter = tab === "bs" ? setBsData : setPlData;
+    setter(prev => prev.map(s => s.id === secId
+      ? { ...s, lines: s.lines.map(l => l.id === lineId ? { ...l, label } : l) }
+      : s
+    ));
+  };
+
+  const addBreakup = (tab: "bs" | "pl", secId: string, lineId: string) => {
+    const setter = tab === "bs" ? setBsData : setPlData;
+    const uid = `brk_${Date.now()}`;
+    setter(prev => prev.map(s => s.id === secId
+      ? { ...s, lines: s.lines.map(l => l.id === lineId
+        ? { ...l, breakups: [...(l.breakups || []), { id: uid, label: "", cy: "", py: "" }] }
+        : l
+      )}
+      : s
+    ));
+  };
+
+  const removeBreakup = (tab: "bs" | "pl", secId: string, lineId: string, brkId: string) => {
+    const setter = tab === "bs" ? setBsData : setPlData;
+    setter(prev => prev.map(s => s.id === secId
+      ? { ...s, lines: s.lines.map(l => l.id === lineId
+        ? { ...l, breakups: (l.breakups || []).filter(b => b.id !== brkId) }
+        : l
+      )}
+      : s
+    ));
+  };
+
+  const updateBreakup = (tab: "bs" | "pl", secId: string, lineId: string, brkId: string, field: "label" | "cy" | "py", val: string) => {
+    const setter = tab === "bs" ? setBsData : setPlData;
+    setter(prev => prev.map(s => s.id === secId
+      ? { ...s, lines: s.lines.map(l => l.id === lineId
+        ? { ...l, breakups: (l.breakups || []).map(b => b.id === brkId ? { ...b, [field]: val } : b) }
+        : l
+      )}
+      : s
+    ));
+  };
+
+  const [expandedBreakups, setExpandedBreakups] = useState<string[]>([]);
+  const toggleBreakupExpand = (lineId: string) => {
+    setExpandedBreakups(prev => prev.includes(lineId) ? prev.filter(x => x !== lineId) : [...prev, lineId]);
+  };
+
   const togglePaperSelection = (ref: string) => {
     setSelectedPapers(prev => prev.includes(ref) ? prev.filter(r => r !== ref) : [...prev, ref]);
   };
@@ -1191,33 +1266,136 @@ export default function WorkingPapers() {
                                         <table className="w-full text-xs">
                                           <thead>
                                             <tr className="text-slate-400 border-b border-slate-50">
-                                              <th className="font-bold text-left py-2 w-1/2">Line Item</th>
-                                              <th className="font-bold text-right py-2">Current Year</th>
-                                              <th className="font-bold text-right py-2">Prior Year</th>
+                                              <th className="font-bold text-left py-2 w-[45%]">Line Item</th>
+                                              <th className="font-bold text-right py-2 w-[22%]">Current Year</th>
+                                              <th className="font-bold text-right py-2 w-[22%]">Prior Year</th>
+                                              <th className="py-2 w-[11%]"></th>
                                             </tr>
                                           </thead>
                                           <tbody>
                                             {sec.lines.map(line => (
-                                              <tr key={line.id} className={`${line.bold ? 'font-bold bg-slate-50/50' : ''} group`}>
-                                                <td className={`py-2 px-1 ${line.indent ? 'pl-6' : ''}`}>{line.label}</td>
-                                                <td className="py-2 px-1">
-                                                  <input 
-                                                    value={line.cy} 
-                                                    onChange={e => activeFsTab === "bs" ? updateBsLine(sec.id, line.id, "cy", e.target.value) : updatePlLine(sec.id, line.id, "cy", e.target.value)}
-                                                    className={`w-full text-right bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono ${line.bold ? 'font-bold' : ''}`}
-                                                  />
-                                                </td>
-                                                <td className="py-2 px-1">
-                                                  <input 
-                                                    value={line.py} 
-                                                    onChange={e => activeFsTab === "bs" ? updateBsLine(sec.id, line.id, "py", e.target.value) : updatePlLine(sec.id, line.id, "py", e.target.value)}
-                                                    className={`w-full text-right bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono ${line.bold ? 'font-bold' : ''}`}
-                                                  />
-                                                </td>
-                                              </tr>
+                                              <React.Fragment key={line.id}>
+                                                <tr className={`${line.bold ? 'font-bold bg-slate-50/50' : ''} group`}>
+                                                  <td className={`py-2 px-1 ${line.indent ? 'pl-6' : ''}`}>
+                                                    {line.isCustom ? (
+                                                      <input
+                                                        value={line.label}
+                                                        onChange={e => updateFsLabel(activeFsTab, sec.id, line.id, e.target.value)}
+                                                        placeholder="Enter line item name..."
+                                                        className="w-full bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none text-xs placeholder:text-slate-300"
+                                                        autoFocus
+                                                      />
+                                                    ) : (
+                                                      <span className="flex items-center gap-1">
+                                                        {line.label}
+                                                        {(line.breakups && line.breakups.length > 0) && (
+                                                          <span className="text-[9px] text-blue-500 font-bold">({line.breakups.length})</span>
+                                                        )}
+                                                      </span>
+                                                    )}
+                                                  </td>
+                                                  <td className="py-2 px-1">
+                                                    <input 
+                                                      value={line.cy} 
+                                                      onChange={e => activeFsTab === "bs" ? updateBsLine(sec.id, line.id, "cy", e.target.value) : updatePlLine(sec.id, line.id, "cy", e.target.value)}
+                                                      className={`w-full text-right bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono ${line.bold ? 'font-bold' : ''}`}
+                                                    />
+                                                  </td>
+                                                  <td className="py-2 px-1">
+                                                    <input 
+                                                      value={line.py} 
+                                                      onChange={e => activeFsTab === "bs" ? updateBsLine(sec.id, line.id, "py", e.target.value) : updatePlLine(sec.id, line.id, "py", e.target.value)}
+                                                      className={`w-full text-right bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono ${line.bold ? 'font-bold' : ''}`}
+                                                    />
+                                                  </td>
+                                                  <td className="py-2 px-1">
+                                                    {!line.subtotal && (
+                                                      <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button
+                                                          onClick={() => {
+                                                            addBreakup(activeFsTab, sec.id, line.id);
+                                                            if (!expandedBreakups.includes(line.id)) toggleBreakupExpand(line.id);
+                                                          }}
+                                                          title="Add breakup"
+                                                          className="p-1 rounded hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"
+                                                        >
+                                                          <SplitSquareVertical className="w-3 h-3" />
+                                                        </button>
+                                                        {(line.breakups && line.breakups.length > 0) && (
+                                                          <button
+                                                            onClick={() => toggleBreakupExpand(line.id)}
+                                                            title={expandedBreakups.includes(line.id) ? "Collapse breakups" : "Expand breakups"}
+                                                            className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                                                          >
+                                                            {expandedBreakups.includes(line.id) ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                                          </button>
+                                                        )}
+                                                        {line.isCustom && (
+                                                          <button
+                                                            onClick={() => removeFsRow(activeFsTab, sec.id, line.id)}
+                                                            title="Remove row"
+                                                            className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+                                                          >
+                                                            <Trash2 className="w-3 h-3" />
+                                                          </button>
+                                                        )}
+                                                      </div>
+                                                    )}
+                                                  </td>
+                                                </tr>
+                                                {(line.breakups && line.breakups.length > 0 && expandedBreakups.includes(line.id)) && (
+                                                  <>
+                                                    {line.breakups.map(brk => (
+                                                      <tr key={brk.id} className="bg-blue-50/30 group/brk">
+                                                        <td className="py-1.5 pl-8 pr-1">
+                                                          <div className="flex items-center gap-1">
+                                                            <span className="text-blue-400 text-[10px]">┗</span>
+                                                            <input
+                                                              value={brk.label}
+                                                              onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "label", e.target.value)}
+                                                              placeholder="Breakup description..."
+                                                              className="flex-1 bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none text-[11px] text-slate-600 placeholder:text-slate-300"
+                                                            />
+                                                          </div>
+                                                        </td>
+                                                        <td className="py-1.5 px-1">
+                                                          <input
+                                                            value={brk.cy}
+                                                            onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "cy", e.target.value)}
+                                                            placeholder="0"
+                                                            className="w-full text-right bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono text-[11px] text-slate-600 placeholder:text-slate-300"
+                                                          />
+                                                        </td>
+                                                        <td className="py-1.5 px-1">
+                                                          <input
+                                                            value={brk.py}
+                                                            onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "py", e.target.value)}
+                                                            placeholder="0"
+                                                            className="w-full text-right bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono text-[11px] text-slate-600 placeholder:text-slate-300"
+                                                          />
+                                                        </td>
+                                                        <td className="py-1.5 px-1">
+                                                          <button
+                                                            onClick={() => removeBreakup(activeFsTab, sec.id, line.id, brk.id)}
+                                                            className="p-1 rounded opacity-0 group-hover/brk:opacity-100 hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all"
+                                                          >
+                                                            <Trash2 className="w-3 h-3" />
+                                                          </button>
+                                                        </td>
+                                                      </tr>
+                                                    ))}
+                                                  </>
+                                                )}
+                                              </React.Fragment>
                                             ))}
                                           </tbody>
                                         </table>
+                                        <button
+                                          onClick={() => addFsRow(activeFsTab, sec.id)}
+                                          className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-blue-500 hover:text-blue-700 transition-colors px-1 py-1 rounded hover:bg-blue-50"
+                                        >
+                                          <Plus className="w-3 h-3" /> Add Row
+                                        </button>
                                       </div>
                                     </motion.div>
                                   )}
