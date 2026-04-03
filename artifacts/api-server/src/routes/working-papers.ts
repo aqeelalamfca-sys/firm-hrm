@@ -1703,274 +1703,386 @@ ABSOLUTE RULES:
 
 // ─── POST /api/working-papers/export-pdf ──────────────────────────────────
 router.post("/export-pdf", async (req: Request, res: Response) => {
-  const { workingPapers, meta, analysis } = req.body;
+    const { workingPapers, meta, analysis } = req.body;
 
-  if (!workingPapers || workingPapers.length === 0) {
-    return res.status(400).json({ error: "No working papers to export." });
-  }
-
-  try {
-    const doc = new PDFDocument({ size: "A4", margin: 50, info: { Title: `Audit Working Paper File — ${meta?.entity || "Client"}`, Author: meta?.firm_name || "ANA & Co." } });
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="AuditFile_${(meta?.entity || "Client").replace(/\s+/g, "_")}_${meta?.financial_year?.replace(/\s+/g, "_") || "2024"}.pdf"`);
-    doc.pipe(res);
-
-    const NAVY = "#1e3a5f";
-    const BLUE = "#2563eb";
-    const LIGHT_BLUE = "#eff6ff";
-    const GREEN = "#16a34a";
-    const GRAY = "#6b7280";
-    const LIGHT_GRAY = "#f3f4f6";
-    const RED = "#dc2626";
-    const fw = doc.page.width - 100;
-
-    function addWatermark() {
-      doc.save();
-      doc.opacity(0.05);
-      doc.fontSize(60).font("Helvetica-Bold").fillColor("#000000");
-      doc.rotate(-45, { origin: [doc.page.width / 2, doc.page.height / 2] });
-      doc.text("CONFIDENTIAL", 50, doc.page.height / 2 - 30, { width: doc.page.width - 100, align: "center" });
-      doc.restore();
+    if (!workingPapers || workingPapers.length === 0) {
+      return res.status(400).json({ error: "No working papers to export." });
     }
 
-    function addPageFooter(pageNum: number, total: number) {
-      const y = doc.page.height - 40;
-      doc.save();
-      doc.moveTo(50, y - 5).lineTo(doc.page.width - 50, y - 5).strokeColor("#e5e7eb").lineWidth(1).stroke();
-      doc.fontSize(7).fillColor(GRAY).font("Helvetica");
-      doc.text(`${meta?.firm_name || "ANA & Co. Chartered Accountants"} | Strictly Confidential`, 50, y, { align: "left" });
-      doc.text(`Page ${pageNum} of ${total}`, 50, y, { align: "right" });
-      doc.restore();
-    }
-
-    function addHeader(subtitle: string) {
-      doc.rect(0, 0, doc.page.width, 60).fill(NAVY);
-      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(14).text(meta?.firm_name || "ANA & Co. Chartered Accountants", 50, 15, { align: "left" });
-      doc.font("Helvetica").fontSize(9).fillColor("#93c5fd").text(subtitle, 50, 35, { align: "left" });
-      doc.fillColor("#ffffff").fontSize(9).text(`${meta?.entity || "Client"} | ${meta?.financial_year || "FY 2024"}`, 50, 35, { align: "right" });
-      doc.y = 80;
-    }
-
-    // ── COVER PAGE ─────────────────────────────────────────────────────────
-    doc.rect(0, 0, doc.page.width, doc.page.height).fill(NAVY);
-    doc.rect(0, doc.page.height - 8, doc.page.width, 8).fill(BLUE);
-    addWatermark();
-
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(28).text("AUDIT WORKING", 50, 140, { align: "center" });
-    doc.text("PAPER FILE", 50, 175, { align: "center" });
-    doc.rect(150, 220, doc.page.width - 300, 2).fill("#3b82f6");
-
-    doc.fontSize(16).fillColor("#93c5fd").text(meta?.entity || "Client Company", 50, 240, { align: "center" });
-    doc.fontSize(11).fillColor("#bfdbfe").text(`${meta?.engagement_type || "Statutory Audit"} | ${meta?.financial_year || "Year Ended June 30, 2024"}`, 50, 270, { align: "center" });
-
-    const infoY = 330;
-    const infoBoxW = 200;
-    doc.rect(50, infoY, infoBoxW, 120).fill("#1e40af").opacity(0.8);
-    doc.opacity(1);
-    doc.fillColor("#93c5fd").font("Helvetica-Bold").fontSize(8).text("AUDIT FIRM", 65, infoY + 12);
-    doc.fillColor("#ffffff").font("Helvetica").fontSize(10).text(meta?.firm_name || "ANA & Co. Chartered Accountants", 65, infoY + 28, { width: infoBoxW - 30 });
-
-    doc.rect(doc.page.width - 50 - infoBoxW, infoY, infoBoxW, 120).fill("#1e40af").opacity(0.8);
-    doc.opacity(1);
-    doc.fillColor("#93c5fd").font("Helvetica-Bold").fontSize(8).text("GENERATED", doc.page.width - 50 - infoBoxW + 15, infoY + 12);
-    doc.fillColor("#ffffff").font("Helvetica").fontSize(10).text(new Date().toLocaleDateString("en-PK", { day: "2-digit", month: "long", year: "numeric" }), doc.page.width - 50 - infoBoxW + 15, infoY + 28, { width: infoBoxW - 30 });
-
-    doc.fillColor("#60a5fa").fontSize(8).text(`Total Working Papers: ${workingPapers.length}`, 50, infoY + 175, { align: "center" });
-    doc.text("ISA 200–720 Compliant | Audit Working Papers", 50, infoY + 190, { align: "center" });
-    doc.fillColor("#fbbf24").fontSize(7).text("STRICTLY CONFIDENTIAL — For Audit Purposes Only", 50, doc.page.height - 60, { align: "center" });
-
-    // ── TABLE OF CONTENTS ──────────────────────────────────────────────────
-    doc.addPage();
-    addWatermark();
-    addHeader("Table of Contents");
-
-    doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(16).text("TABLE OF CONTENTS", 50, 90, { align: "center" });
-    doc.moveTo(50, 115).lineTo(doc.page.width - 50, 115).strokeColor(BLUE).lineWidth(2).stroke();
-    doc.y = 130;
-
-    const sections: Record<string, any[]> = {};
-    workingPapers.forEach((wp: any) => {
-      const sec = wp.section_label || wp.section || "General";
-      if (!sections[sec]) sections[sec] = [];
-      sections[sec].push(wp);
-    });
-
-    let pageCounter = 3;
-    for (const [secName, papers] of Object.entries(sections)) {
-      doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(10).text(secName.toUpperCase(), 50, doc.y, { continued: false });
-      doc.moveTo(50, doc.y + 2).lineTo(fw + 50, doc.y + 2).strokeColor(LIGHT_BLUE).lineWidth(0.5).stroke();
-      doc.y += 8;
-      for (const wp of papers) {
-        doc.fillColor("#111827").font("Helvetica").fontSize(9);
-        doc.text(`${wp.ref} — ${wp.title}`, 70, doc.y, { continued: false, width: fw - 80 });
-        doc.fillColor(GRAY).text(`Page ${pageCounter}`, 50, doc.y - 12, { align: "right" });
-        pageCounter++;
-        doc.y += 4;
-      }
-      doc.y += 6;
-    }
-    addPageFooter(2, workingPapers.length + 2);
-
-    // ── WORKING PAPERS ────────────────────────────────────────────────────
-    let wpPageNum = 3;
-    for (const wp of workingPapers) {
-      doc.addPage();
-      addWatermark();
-      addHeader(wp.section_label || wp.section || "Working Paper");
-
-      // WP header box
-      doc.rect(50, 80, fw, 55).fill(LIGHT_BLUE);
-      doc.rect(50, 80, 4, 55).fill(BLUE);
-      doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(13).text(`${wp.ref} — ${wp.title}`, 65, 90, { width: fw - 20 });
-      doc.fillColor(GRAY).font("Helvetica").fontSize(8).text(
-        `${(wp.isa_references || []).join(" | ")}  •  Prepared: ${wp.preparer || "Audit Senior"}  •  Reviewed: ${wp.reviewer || "Audit Manager"}  •  Date: ${wp.date_prepared || new Date().toLocaleDateString()}`,
-        65, 115, { width: fw - 20 }
-      );
-      doc.y = 148;
-
-      // Objective
-      if (wp.objective) {
-        doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(9).text("OBJECTIVE", 50, doc.y);
-        doc.y += 12;
-        doc.fillColor("#1f2937").font("Helvetica").fontSize(9).text(wp.objective, 50, doc.y, { width: fw });
-        doc.y += 18;
-      }
-
-      // Scope
-      if (wp.scope) {
-        doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(9).text("SCOPE", 50, doc.y);
-        doc.y += 12;
-        doc.fillColor("#1f2937").font("Helvetica").fontSize(9).text(wp.scope, 50, doc.y, { width: fw });
-        doc.y += 18;
-      }
-
-      // Procedures table
-      if (wp.procedures && wp.procedures.length > 0) {
-        doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(9).text("AUDIT PROCEDURES PERFORMED", 50, doc.y);
-        doc.y += 10;
-
-        const colWidths = [40, 170, 170, 90];
-        const headers = ["Ref", "Procedure", "Finding", "Conclusion"];
-        const rowH = 16;
-
-        doc.rect(50, doc.y, fw, rowH).fill(NAVY);
-        let cx = 50;
-        headers.forEach((h, i) => {
-          doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(7.5).text(h, cx + 4, doc.y + 4, { width: colWidths[i] - 8 });
-          cx += colWidths[i];
-        });
-        doc.y += rowH;
-
-        wp.procedures.forEach((proc: any, idx: number) => {
-          if (doc.y > doc.page.height - 150) {
-            doc.addPage();
-            addWatermark();
-            addHeader(`${wp.ref} — ${wp.title} (continued)`);
-            doc.y = 90;
-          }
-          const bg = idx % 2 === 0 ? "#ffffff" : LIGHT_GRAY;
-          const texts = [
-            proc.no || `${idx + 1}`,
-            proc.procedure || "",
-            proc.finding || "",
-            proc.conclusion || "",
-          ];
-          const maxLines = texts.reduce((max, t, i) => {
-            const lines = Math.ceil((t || "").length / Math.max(1, colWidths[i] / 5.5));
-            return Math.max(max, lines);
-          }, 1);
-          const dynH = Math.max(rowH, maxLines * 11 + 6);
-
-          doc.rect(50, doc.y, fw, dynH).fill(bg);
-          cx = 50;
-          texts.forEach((t, i) => {
-            doc.fillColor("#111827").font("Helvetica").fontSize(7.5).text(t, cx + 4, doc.y + 4, { width: colWidths[i] - 8 });
-            cx += colWidths[i];
-          });
-          doc.moveTo(50, doc.y + dynH).lineTo(50 + fw, doc.y + dynH).strokeColor("#e5e7eb").lineWidth(0.3).stroke();
-          doc.y += dynH;
-        });
-        doc.y += 12;
-      }
-
-      // Summary table if present
-      if (wp.summary_table && wp.summary_table.length > 0) {
-        if (doc.y > doc.page.height - 200) { doc.addPage(); addWatermark(); addHeader(`${wp.ref} — ${wp.title} (cont.)`); doc.y = 90; }
-        doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(9).text("SUMMARY SCHEDULE", 50, doc.y);
-        doc.y += 10;
-        const cols2 = [fw * 0.35, fw * 0.3, fw * 0.35];
-        const hdrs2 = ["Item", "Amount / Value", "Comment"];
-        doc.rect(50, doc.y, fw, 16).fill(BLUE);
-        let cx2 = 50;
-        hdrs2.forEach((h, i) => {
-          doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(7.5).text(h, cx2 + 4, doc.y + 4, { width: cols2[i] - 8 });
-          cx2 += cols2[i];
-        });
-        doc.y += 16;
-        wp.summary_table.forEach((row: any, idx: number) => {
-          const bg = idx % 2 === 0 ? "#ffffff" : LIGHT_GRAY;
-          doc.rect(50, doc.y, fw, 16).fill(bg);
-          cx2 = 50;
-          [row.item || "", row.value || "", row.comment || ""].forEach((t, i) => {
-            doc.fillColor("#111827").font("Helvetica").fontSize(7.5).text(t, cx2 + 4, doc.y + 4, { width: cols2[i] - 8 });
-            cx2 += cols2[i];
-          });
-          doc.y += 16;
-        });
-        doc.y += 12;
-      }
-
-      // Key findings
-      if (wp.key_findings && wp.key_findings.length > 0) {
-        if (doc.y > doc.page.height - 150) { doc.addPage(); addWatermark(); addHeader(`${wp.ref} — ${wp.title} (cont.)`); doc.y = 90; }
-        doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(9).text("KEY FINDINGS", 50, doc.y);
-        doc.y += 10;
-        wp.key_findings.forEach((f: string) => {
-          doc.rect(50, doc.y, 4, 14).fill(GREEN);
-          doc.fillColor("#111827").font("Helvetica").fontSize(8.5).text(f, 62, doc.y + 2, { width: fw - 20 });
-          doc.y += 16;
-        });
-        doc.y += 8;
-      }
-
-      // Conclusion box
-      if (wp.auditor_conclusion) {
-        if (doc.y > doc.page.height - 120) { doc.addPage(); addWatermark(); addHeader(`${wp.ref} — ${wp.title} (cont.)`); doc.y = 90; }
-        doc.rect(50, doc.y, fw, 48).fill("#f0fdf4");
-        doc.rect(50, doc.y, 4, 48).fill(GREEN);
-        doc.fillColor(GREEN).font("Helvetica-Bold").fontSize(8).text("AUDITOR'S CONCLUSION", 62, doc.y + 8);
-        doc.fillColor("#111827").font("Helvetica").fontSize(8.5).text(wp.auditor_conclusion, 62, doc.y + 22, { width: fw - 20 });
-        doc.y += 62;
-      }
-
-      // Sign-off strip
-      doc.rect(50, doc.y, fw, 32).fill(LIGHT_GRAY);
-      const signCols = [fw / 3, fw / 3, fw / 3];
-      const roles = [
-        { role: "Prepared By", name: wp.preparer || "Audit Senior" },
-        { role: "Reviewed By", name: wp.reviewer || "Audit Manager" },
-        { role: "Approved By (Partner)", name: wp.partner || "Partner" },
-      ];
-      let sx = 50;
-      roles.forEach(({ role, name }, i) => {
-        doc.fillColor(GRAY).font("Helvetica").fontSize(7).text(role, sx + 5, doc.y + 6, { width: signCols[i] - 10 });
-        doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(8).text(name, sx + 5, doc.y + 17, { width: signCols[i] - 10 });
-        sx += signCols[i];
+    try {
+      const doc = new PDFDocument({
+        size: "A4",
+        margins: { top: 72, bottom: 72, left: 56, right: 56 },
+        bufferPages: true,
+        info: {
+          Title: `Audit Working Paper File — ${meta?.entity || "Client"}`,
+          Author: meta?.firm_name || "ANA & Co. Chartered Accountants",
+          Subject: `${meta?.engagement_type || "Statutory Audit"} — ${meta?.financial_year || "FY 2024"}`,
+        },
       });
 
-      addPageFooter(wpPageNum, workingPapers.length + 2);
-      wpPageNum++;
-    }
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="AuditFile_${(meta?.entity || "Client").replace(/\s+/g, "_")}_${meta?.financial_year?.replace(/\s+/g, "_") || "2024"}.pdf"`);
+      doc.pipe(res);
 
-    doc.end();
-  } catch (err: any) {
-    logger.error({ err }, "PDF export failed");
-    if (!res.headersSent) {
-      res.status(500).json({ error: err?.message || "PDF export failed" });
+      const PW = 595.28;
+      const PH = 841.89;
+      const ML = 56;
+      const MR = 56;
+      const MT = 72;
+      const MB = 72;
+      const FW = PW - ML - MR;
+
+      const NAVY = "#0F2B46";
+      const NAVY2 = "#1B3A5C";
+      const BLUE = "#2563EB";
+      const BLUE_LIGHT = "#3B82F6";
+      const ACCENT = "#0EA5E9";
+      const BG_LIGHT = "#F0F5FA";
+      const BG_ALT = "#F8FAFC";
+      const GREEN = "#059669";
+      const GREEN_LIGHT = "#ECFDF5";
+      const GRAY = "#6B7280";
+      const GRAY_DARK = "#374151";
+      const GRAY_LIGHT = "#F3F4F6";
+      const GOLD = "#D97706";
+      const RED = "#DC2626";
+      const WHITE = "#FFFFFF";
+      const BORDER = "#D1D5DB";
+      const TEXT_DARK = "#111827";
+
+      let totalPages = workingPapers.length + 2;
+
+      function addWatermark() {
+        doc.save();
+        doc.opacity(0.03);
+        doc.fontSize(72).font("Helvetica-Bold").fillColor("#000000");
+        doc.rotate(-45, { origin: [PW / 2, PH / 2] });
+        doc.text("CONFIDENTIAL", 0, PH / 2 - 40, { width: PW, align: "center" });
+        doc.restore();
+      }
+
+      function addHeader(section: string, subtitle: string) {
+        doc.rect(0, 0, PW, 52).fill(NAVY);
+        doc.rect(0, 52, PW, 3).fill(ACCENT);
+        doc.fillColor(WHITE).font("Helvetica-Bold").fontSize(11)
+          .text(meta?.firm_name || "ANA & Co. Chartered Accountants", ML, 12, { width: FW * 0.6 });
+        doc.fillColor("#93C5FD").font("Helvetica").fontSize(8)
+          .text(section, ML, 32, { width: FW * 0.6 });
+        doc.fillColor(WHITE).font("Helvetica").fontSize(8)
+          .text(`${meta?.entity || "Client"} | ${meta?.financial_year || "FY 2024"}`, ML, 18, { align: "right", width: FW });
+        doc.fillColor("#93C5FD").fontSize(7)
+          .text(subtitle, ML, 32, { align: "right", width: FW });
+        doc.y = 72;
+      }
+
+      function addFooter(pageNum: number) {
+        const y = PH - 36;
+        doc.save();
+        doc.moveTo(ML, y - 8).lineTo(PW - MR, y - 8).strokeColor(BORDER).lineWidth(0.5).stroke();
+        doc.fillColor(GRAY).font("Helvetica").fontSize(6.5);
+        doc.text(`${meta?.firm_name || "ANA & Co. Chartered Accountants"} | Strictly Confidential`, ML, y - 2, { width: FW * 0.7 });
+        doc.text(`Page ${pageNum} of ${totalPages}`, ML, y - 2, { width: FW, align: "right" });
+        doc.restore();
+      }
+
+      function needsNewPage(spaceNeeded: number, wp?: any, contLabel?: string) {
+        if (doc.y > PH - MB - spaceNeeded) {
+          totalPages++;
+          doc.addPage();
+          addWatermark();
+          if (wp) addHeader(wp.section_label || wp.section || "", `${wp.ref} \u2014 ${wp.title} (continued)`);
+          else addHeader("", contLabel || "");
+          doc.y = 72;
+          return true;
+        }
+        return false;
+      }
+
+      function drawTable(headers: string[], rows: string[][], colWidths: number[], opts: { headerBg?: string; headerColor?: string; altBg?: string; fontSize?: number; headerFontSize?: number; cellPadding?: number; wp?: any } = {}) {
+        const hBg = opts.headerBg || NAVY;
+        const hColor = opts.headerColor || WHITE;
+        const altBg = opts.altBg || BG_ALT;
+        const fs2 = opts.fontSize || 7.5;
+        const hFs = opts.headerFontSize || 7.5;
+        const pad = opts.cellPadding || 5;
+        const rowH = 18;
+
+        needsNewPage(rowH + 20, opts.wp);
+
+        doc.rect(ML, doc.y, FW, rowH).fill(hBg);
+        let cx = ML;
+        for (let i = 0; i < headers.length; i++) {
+          doc.fillColor(hColor).font("Helvetica-Bold").fontSize(hFs)
+            .text(headers[i], cx + pad, doc.y + 4, { width: colWidths[i] - pad * 2 });
+          cx += colWidths[i];
+        }
+        doc.y += rowH;
+
+        for (let r = 0; r < rows.length; r++) {
+          const texts = rows[r];
+          const lineHeights = texts.map((rawT, i) => {
+            const t = String(rawT ?? "");
+            const charPerLine = Math.max(1, Math.floor((colWidths[i] - pad * 2) / (fs2 * 0.48)));
+            return Math.max(1, Math.ceil(t.length / charPerLine));
+          });
+          const maxLines = Math.max(1, ...lineHeights);
+          const dynH = Math.max(rowH, maxLines * (fs2 + 3) + pad * 2);
+
+          needsNewPage(dynH + 10, opts.wp);
+
+          const bg = r % 2 === 0 ? WHITE : altBg;
+          doc.rect(ML, doc.y, FW, dynH).fill(bg);
+
+          doc.moveTo(ML, doc.y).lineTo(ML + FW, doc.y).strokeColor(BORDER).lineWidth(0.3).stroke();
+
+          cx = ML;
+          for (let i = 0; i < texts.length; i++) {
+            let colCx = cx;
+            if (i > 0) {
+              doc.moveTo(cx, doc.y).lineTo(cx, doc.y + dynH).strokeColor(BORDER).lineWidth(0.2).stroke();
+            }
+            doc.fillColor(TEXT_DARK).font("Helvetica").fontSize(fs2)
+              .text(texts[i] || "", colCx + pad, doc.y + pad, { width: colWidths[i] - pad * 2 });
+            cx += colWidths[i];
+          }
+          doc.moveTo(ML, doc.y + dynH).lineTo(ML + FW, doc.y + dynH).strokeColor(BORDER).lineWidth(0.3).stroke();
+          doc.y += dynH;
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════════
+      // COVER PAGE
+      // ═══════════════════════════════════════════════════════════════════════════
+      doc.rect(0, 0, PW, PH).fill(NAVY);
+      doc.rect(0, PH - 6, PW, 6).fill(ACCENT);
+      doc.rect(0, 0, 6, PH).fill(ACCENT);
+      addWatermark();
+
+      doc.rect(ML, 80, FW, 2).fill(ACCENT);
+
+      doc.fillColor(WHITE).font("Helvetica-Bold").fontSize(36).text("AUDIT WORKING", ML, 110, { width: FW, align: "center" });
+      doc.text("PAPER FILE", ML, 155, { width: FW, align: "center" });
+
+      doc.rect(PW / 2 - 60, 205, 120, 2).fill(BLUE_LIGHT);
+
+      doc.fillColor("#93C5FD").font("Helvetica-Bold").fontSize(20)
+        .text(meta?.entity || "Client Company", ML, 230, { width: FW, align: "center" });
+
+      doc.fillColor("#BFDBFE").font("Helvetica").fontSize(12)
+        .text(`${meta?.engagement_type || "Statutory Audit"} | ${meta?.financial_year || "Year Ended June 30, 2024"}`, ML, 265, { width: FW, align: "center" });
+
+      const boxY = 330;
+      const boxW = 180;
+      const boxH = 100;
+      const boxGap = FW - boxW * 2;
+
+      doc.roundedRect(ML, boxY, boxW, boxH, 4).fill("#1E3A5F");
+      doc.fillColor("#93C5FD").font("Helvetica-Bold").fontSize(7).text("AUDIT FIRM", ML + 16, boxY + 14);
+      doc.fillColor(WHITE).font("Helvetica").fontSize(10)
+        .text(meta?.firm_name || "ANA & Co. Chartered Accountants", ML + 16, boxY + 32, { width: boxW - 32 });
+
+      doc.roundedRect(PW - MR - boxW, boxY, boxW, boxH, 4).fill("#1E3A5F");
+      doc.fillColor("#93C5FD").font("Helvetica-Bold").fontSize(7).text("GENERATED", PW - MR - boxW + 16, boxY + 14);
+      doc.fillColor(WHITE).font("Helvetica").fontSize(10)
+        .text(new Date().toLocaleDateString("en-PK", { day: "2-digit", month: "long", year: "numeric" }), PW - MR - boxW + 16, boxY + 32, { width: boxW - 32 });
+
+      doc.fillColor("#60A5FA").font("Helvetica").fontSize(9)
+        .text(`Total Working Papers: ${workingPapers.length}`, ML, boxY + boxH + 50, { width: FW, align: "center" });
+      doc.text("ISA 200\u2013720 Compliant | Audit Working Papers", ML, boxY + boxH + 68, { width: FW, align: "center" });
+
+      doc.fillColor(GOLD).font("Helvetica-Bold").fontSize(7)
+        .text("STRICTLY CONFIDENTIAL \u2014 For Audit Purposes Only", ML, PH - 50, { width: FW, align: "center" });
+
+      // ═══════════════════════════════════════════════════════════════════════════
+      // TABLE OF CONTENTS
+      // ═══════════════════════════════════════════════════════════════════════════
+      doc.addPage();
+      addWatermark();
+      addHeader("Table of Contents", `${meta?.entity || "Client"}`);
+
+      doc.y = 80;
+      doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(18).text("TABLE OF CONTENTS", ML, doc.y, { width: FW, align: "center" });
+      doc.y += 8;
+      doc.moveTo(ML + FW * 0.25, doc.y).lineTo(ML + FW * 0.75, doc.y).strokeColor(ACCENT).lineWidth(2).stroke();
+      doc.y += 16;
+
+      const sections: Record<string, any[]> = {};
+      workingPapers.forEach((wp: any) => {
+        const sec = wp.section_label || wp.section || "General";
+        if (!sections[sec]) sections[sec] = [];
+        sections[sec].push(wp);
+      });
+
+      let pgCounter = 3;
+      for (const [secName, papers] of Object.entries(sections)) {
+        needsNewPage(30);
+
+        doc.rect(ML, doc.y, FW, 18).fill(BG_LIGHT);
+        doc.rect(ML, doc.y, 3, 18).fill(ACCENT);
+        doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(9)
+          .text(secName.toUpperCase(), ML + 12, doc.y + 4, { width: FW - 20 });
+        doc.y += 22;
+
+        for (const wp of papers) {
+          needsNewPage(16);
+          doc.fillColor(TEXT_DARK).font("Helvetica").fontSize(8.5);
+          const titleText = `    ${wp.ref} \u2014 ${wp.title}`;
+          doc.text(titleText, ML + 8, doc.y, { width: FW - 80, continued: false });
+
+          const dots = "." .repeat(60);
+          doc.fillColor(GRAY).fontSize(7).text(dots, ML + 8, doc.y - 11, { width: FW - 60, align: "right" });
+          doc.fillColor(GRAY_DARK).font("Helvetica-Bold").fontSize(8)
+            .text(`Page ${pgCounter}`, ML, doc.y - 11, { width: FW, align: "right" });
+          pgCounter++;
+          doc.y += 3;
+        }
+        doc.y += 8;
+      }
+      addFooter(2);
+
+      // ═══════════════════════════════════════════════════════════════════════════
+      // INDIVIDUAL WORKING PAPERS
+      // ═══════════════════════════════════════════════════════════════════════════
+      let wpPage = 3;
+      for (const wp of workingPapers) {
+        doc.addPage();
+        addWatermark();
+        addHeader(wp.section_label || wp.section || "Working Paper", `${wp.ref} \u2014 ${wp.title}`);
+
+        doc.y = 72;
+
+        doc.rect(ML, doc.y, FW, 52).fill(BG_LIGHT);
+        doc.rect(ML, doc.y, 4, 52).fill(BLUE);
+        doc.rect(ML, doc.y, FW, 0.5).fill(BLUE);
+        doc.rect(ML, doc.y + 52, FW, 0.5).fill(BLUE);
+
+        doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(14)
+          .text(`${wp.ref} \u2014 ${wp.title}`, ML + 14, doc.y + 8, { width: FW - 28 });
+
+        const metaLine = `${(wp.isa_references || []).join(" | ")}  \u2022  Prepared: ${wp.preparer || meta?.preparer || "Audit Senior"}  \u2022  Reviewed: ${wp.reviewer || meta?.reviewer || "Audit Manager"}  \u2022  Date: ${wp.date_prepared || new Date().toLocaleDateString()}`;
+        doc.fillColor(GRAY).font("Helvetica").fontSize(7.5)
+          .text(metaLine, ML + 14, doc.y + 32, { width: FW - 28 });
+        doc.y += 66;
+
+        if (wp.objective) {
+          needsNewPage(50, wp);
+          doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(10).text("OBJECTIVE", ML, doc.y);
+          doc.y += 4;
+          doc.moveTo(ML, doc.y).lineTo(ML + 60, doc.y).strokeColor(ACCENT).lineWidth(1.5).stroke();
+          doc.y += 8;
+          doc.fillColor(TEXT_DARK).font("Helvetica").fontSize(9).text(wp.objective, ML, doc.y, { width: FW, lineGap: 2 });
+          doc.y += 16;
+        }
+
+        if (wp.scope) {
+          needsNewPage(50, wp);
+          doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(10).text("SCOPE", ML, doc.y);
+          doc.y += 4;
+          doc.moveTo(ML, doc.y).lineTo(ML + 40, doc.y).strokeColor(ACCENT).lineWidth(1.5).stroke();
+          doc.y += 8;
+          doc.fillColor(TEXT_DARK).font("Helvetica").fontSize(9).text(wp.scope, ML, doc.y, { width: FW, lineGap: 2 });
+          doc.y += 16;
+        }
+
+        if (wp.procedures && wp.procedures.length > 0) {
+          needsNewPage(60, wp);
+          doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(10).text("AUDIT PROCEDURES PERFORMED", ML, doc.y);
+          doc.y += 4;
+          doc.moveTo(ML, doc.y).lineTo(ML + 180, doc.y).strokeColor(ACCENT).lineWidth(1.5).stroke();
+          doc.y += 10;
+
+          const procCols = [FW * 0.06, FW * 0.34, FW * 0.38, FW * 0.22];
+          const procHeaders = ["Ref", "Procedure", "Finding", "Conclusion"];
+          const procRows = wp.procedures.map((p: any, i: number) => [
+            p.no || String(i + 1),
+            p.procedure || "",
+            p.finding || "",
+            p.conclusion || "",
+          ]);
+          drawTable(procHeaders, procRows, procCols, { wp, fontSize: 7.5, cellPadding: 4 });
+          doc.y += 16;
+        }
+
+        if (wp.summary_table && wp.summary_table.length > 0) {
+          needsNewPage(60, wp);
+          doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(10).text("SUMMARY SCHEDULE", ML, doc.y);
+          doc.y += 4;
+          doc.moveTo(ML, doc.y).lineTo(ML + 120, doc.y).strokeColor(ACCENT).lineWidth(1.5).stroke();
+          doc.y += 10;
+
+          const sumCols = [FW * 0.30, FW * 0.30, FW * 0.40];
+          const sumHeaders = ["Item", "Amount / Value", "Comment"];
+          const sumRows = wp.summary_table.map((r: any) => [r.item || "", r.value || "", r.comment || ""]);
+          drawTable(sumHeaders, sumRows, sumCols, { wp, headerBg: NAVY2, fontSize: 8 });
+          doc.y += 16;
+        }
+
+        if (wp.key_findings && wp.key_findings.length > 0) {
+          needsNewPage(50, wp);
+          doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(10).text("KEY FINDINGS", ML, doc.y);
+          doc.y += 4;
+          doc.moveTo(ML, doc.y).lineTo(ML + 90, doc.y).strokeColor(ACCENT).lineWidth(1.5).stroke();
+          doc.y += 10;
+
+          for (const f of wp.key_findings) {
+            needsNewPage(20, wp);
+            doc.rect(ML + 4, doc.y + 1, 3, 10).fill(GREEN);
+            doc.fillColor(TEXT_DARK).font("Helvetica").fontSize(8.5)
+              .text(f, ML + 16, doc.y, { width: FW - 24, lineGap: 1 });
+            doc.y += 6;
+          }
+          doc.y += 10;
+        }
+
+        if (wp.auditor_conclusion) {
+          needsNewPage(70, wp);
+          const concH = 56;
+          doc.rect(ML, doc.y, FW, concH).fill(GREEN_LIGHT);
+          doc.rect(ML, doc.y, 4, concH).fill(GREEN);
+          doc.rect(ML, doc.y, FW, 0.5).fill(GREEN);
+          doc.rect(ML, doc.y + concH, FW, 0.5).fill(GREEN);
+
+          doc.fillColor(GREEN).font("Helvetica-Bold").fontSize(8.5)
+            .text("AUDITOR'S CONCLUSION", ML + 14, doc.y + 8);
+          doc.fillColor(TEXT_DARK).font("Helvetica").fontSize(8.5)
+            .text(wp.auditor_conclusion, ML + 14, doc.y + 24, { width: FW - 28, lineGap: 1.5 });
+          doc.y += concH + 16;
+        }
+
+        needsNewPage(50, wp);
+        doc.rect(ML, doc.y, FW, 36).fill(BG_LIGHT);
+        doc.rect(ML, doc.y, FW, 0.5).fill(BORDER);
+        doc.rect(ML, doc.y + 36, FW, 0.5).fill(BORDER);
+
+        const signW = FW / 3;
+        const signRoles = [
+          { role: "Prepared By", name: wp.preparer || meta?.preparer || "Audit Senior" },
+          { role: "Reviewed By", name: wp.reviewer || meta?.reviewer || "Audit Manager" },
+          { role: "Approved By (Partner)", name: wp.partner || meta?.approver || "Engagement Partner" },
+        ];
+        let sx = ML;
+        for (const { role, name } of signRoles) {
+          doc.fillColor(GRAY).font("Helvetica").fontSize(7).text(role, sx + 8, doc.y + 6);
+          doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(8.5).text(name, sx + 8, doc.y + 18);
+          if (sx > ML) {
+            doc.moveTo(sx, doc.y + 4).lineTo(sx, doc.y + 32).strokeColor(BORDER).lineWidth(0.3).stroke();
+          }
+          sx += signW;
+        }
+
+        addFooter(wpPage);
+        wpPage++;
+      }
+
+      doc.end();
+    } catch (err: any) {
+      logger.error({ err }, "PDF export failed");
+      if (!res.headersSent) {
+        res.status(500).json({ error: err?.message || "PDF export failed" });
+      }
     }
-  }
-});
+  });
 
 // ─── POST /api/working-papers/export-excel ────────────────────────────────
 router.post("/export-excel", async (req: Request, res: Response) => {
@@ -2468,248 +2580,487 @@ router.post("/export-excel", async (req: Request, res: Response) => {
 
 // ─── POST /api/working-papers/export-docx ─────────────────────────────────
 router.post("/export-docx", async (req: Request, res: Response) => {
-  const { workingPapers, meta, analysis, evidenceIndex } = req.body;
+    const { workingPapers, meta, analysis, evidenceIndex } = req.body;
 
-  if (!workingPapers || workingPapers.length === 0) {
-    return res.status(400).json({ error: "No working papers to export." });
-  }
-
-  try {
-    const firmName = meta?.firm_name || "Alam & Aulakh Chartered Accountants";
-    const entityName = meta?.entity || "Client Company";
-    const financialYear = meta?.financial_year || "Year ended June 30, 2024";
-    const fin = analysis?.financials || {};
-    const materiality = analysis?.materiality || {};
-    const formatPKR = (n: number) => `PKR ${(n || 0).toLocaleString("en-PK")}`;
-
-    const cellShading = { fill: "1B3A6B", type: ShadingType.CLEAR, color: "auto" };
-    const lightShading = { fill: "EBF0FA", type: ShadingType.CLEAR, color: "auto" };
-
-    const makeCell = (text: string, bold = false, dark = false, width = 2500, bg?: IShadingAttributesProperties) =>
-      new TableCell({
-        width: { size: width, type: WidthType.DXA },
-        shading: dark ? cellShading : (bg ?? undefined),
-        children: [new Paragraph({
-          children: [new TextRun({ text, bold, color: dark ? "FFFFFF" : "1B3A6B", size: 20 })],
-        })],
-      });
-
-    const children: any[] = [];
-
-    // ── Cover Page ──────────────────────────────────────────────────────────
-    children.push(
-      new Paragraph({
-        children: [new TextRun({ text: firmName, bold: true, size: 48, color: "1B3A6B" })],
-        alignment: AlignmentType.CENTER,
-      }),
-      new Paragraph({
-        children: [new TextRun({ text: "AUDIT WORKING PAPERS — CONFIDENTIAL", size: 28, color: "7F9DBF", italics: true })],
-        alignment: AlignmentType.CENTER,
-      }),
-      new Paragraph({ children: [new TextRun({ text: "", size: 24 })] }),
-      new Paragraph({
-        children: [new TextRun({ text: entityName, bold: true, size: 40, color: "1B3A6B" })],
-        alignment: AlignmentType.CENTER,
-      }),
-      new Paragraph({
-        children: [new TextRun({ text: financialYear, size: 28, color: "333333" })],
-        alignment: AlignmentType.CENTER,
-      }),
-      new Paragraph({ children: [new TextRun({ text: "", size: 24 })] }),
-      new Paragraph({
-        children: [new TextRun({ text: `Engagement: ${meta?.engagement_type || "Statutory Audit"}`, size: 22, color: "555555" })],
-        alignment: AlignmentType.CENTER,
-      }),
-      new Paragraph({
-        children: [new TextRun({ text: `Generated: ${new Date().toLocaleDateString("en-PK")}`, size: 20, color: "888888", italics: true })],
-        alignment: AlignmentType.CENTER,
-      }),
-      new Paragraph({ children: [new PageBreak()] }),
-    );
-
-    // ── Table of Contents ────────────────────────────────────────────────────
-    children.push(
-      new Paragraph({ text: "TABLE OF CONTENTS", heading: HeadingLevel.HEADING_1 }),
-    );
-    const tocTable = new Table({
-      width: { size: 9000, type: WidthType.DXA },
-      rows: [
-        new TableRow({ children: [makeCell("WP Ref", true, true, 1500), makeCell("Title", true, true, 4000), makeCell("Section", true, true, 2000), makeCell("ISA", true, true, 1500)] }),
-        ...workingPapers.map((wp: any, i: number) =>
-          new TableRow({
-            children: [
-              makeCell(wp.ref, false, false, 1500, i % 2 === 0 ? lightShading : undefined),
-              makeCell(wp.title, false, false, 4000, i % 2 === 0 ? lightShading : undefined),
-              makeCell(wp.section_label || wp.section, false, false, 2000, i % 2 === 0 ? lightShading : undefined),
-              makeCell((wp.isa_references || []).join(", ").slice(0, 25), false, false, 1500, i % 2 === 0 ? lightShading : undefined),
-            ],
-          })
-        ),
-      ],
-    });
-    children.push(tocTable, new Paragraph({ children: [new PageBreak()] }));
-
-    // ── Financial Summary ────────────────────────────────────────────────────
-    if (fin.revenue) {
-      children.push(new Paragraph({ text: "FINANCIAL SUMMARY", heading: HeadingLevel.HEADING_1 }));
-      const finRows = [
-        ["Revenue", formatPKR(fin.revenue)],
-        ["Gross Profit", formatPKR(fin.gross_profit)],
-        ["Net Profit / (Loss)", formatPKR(fin.net_profit)],
-        ["Total Assets", formatPKR(fin.total_assets)],
-        ["Total Liabilities", formatPKR(fin.total_liabilities)],
-        ["Equity", formatPKR(fin.equity)],
-        ["Cash & Bank", formatPKR(fin.cash_and_bank)],
-        ["Overall Materiality", formatPKR(materiality.overall_materiality)],
-        ["Performance Materiality", formatPKR(materiality.performance_materiality)],
-      ];
-      const finTable = new Table({
-        width: { size: 9000, type: WidthType.DXA },
-        rows: [
-          new TableRow({ children: [makeCell("Item", true, true, 4500), makeCell("Amount (PKR)", true, true, 4500)] }),
-          ...finRows.map(([item, val], i) => new TableRow({
-            children: [
-              makeCell(item, true, false, 4500, i % 2 === 0 ? lightShading : undefined),
-              makeCell(val, false, false, 4500, i % 2 === 0 ? lightShading : undefined),
-            ],
-          })),
-        ],
-      });
-      children.push(finTable, new Paragraph({ children: [new PageBreak()] }));
+    if (!workingPapers || workingPapers.length === 0) {
+      return res.status(400).json({ error: "No working papers to export." });
     }
 
-    // ── Evidence Index ───────────────────────────────────────────────────────
-    if (evidenceIndex && evidenceIndex.length > 0) {
-      children.push(new Paragraph({ text: "EVIDENCE INDEX", heading: HeadingLevel.HEADING_1 }));
-      const evTable = new Table({
-        width: { size: 9000, type: WidthType.DXA },
-        rows: [
-          new TableRow({ children: [makeCell("Ref", true, true, 1000), makeCell("Description", true, true, 4000), makeCell("Type", true, true, 1500), makeCell("WPs Referenced", true, true, 2500)] }),
-          ...evidenceIndex.map((e: any, i: number) => new TableRow({
-            children: [
-              makeCell(e.ref, true, false, 1000, i % 2 === 0 ? lightShading : undefined),
-              makeCell(e.description, false, false, 4000, i % 2 === 0 ? lightShading : undefined),
-              makeCell(e.type, false, false, 1500, i % 2 === 0 ? lightShading : undefined),
-              makeCell((e.wp_refs || []).join(", "), false, false, 2500, i % 2 === 0 ? lightShading : undefined),
-            ],
-          })),
-        ],
-      });
-      children.push(evTable, new Paragraph({ children: [new PageBreak()] }));
-    }
+    try {
+      const firmName = meta?.firm_name || "Alam & Aulakh Chartered Accountants";
+      const entityName = meta?.entity || "Client Company";
+      const financialYear = meta?.financial_year || "Year ended June 30, 2024";
+      const fin = analysis?.financials || {};
+      const materiality = analysis?.materiality || {};
+      const formatPKR = (n: number) => `PKR ${(n || 0).toLocaleString("en-PK")}`;
+      const now = new Date().toLocaleDateString("en-PK", { day: "2-digit", month: "long", year: "numeric" });
 
-    // ── Working Papers ───────────────────────────────────────────────────────
-    for (const wp of workingPapers) {
+      const A4_W = 11906;
+      const MARGIN = 1134;
+      const TBL_W = A4_W - MARGIN * 2;
+
+      const NAVY_HEX = "0F2B46";
+      const NAVY2_HEX = "1B3A5C";
+      const BLUE_HEX = "2563EB";
+      const ACCENT_HEX = "0EA5E9";
+      const BG_LIGHT_HEX = "F0F5FA";
+      const BG_ALT_HEX = "F8FAFC";
+      const GREEN_HEX = "059669";
+      const GRAY_HEX = "6B7280";
+      const GOLD_HEX = "D97706";
+      const WHITE_HEX = "FFFFFF";
+      const TEXT_HEX = "111827";
+      const BORDER_HEX = "D1D5DB";
+
+      const thinBorder = { style: BorderStyle.SINGLE, size: 1, color: BORDER_HEX };
+      const noBorder = { style: BorderStyle.NONE, size: 0, color: WHITE_HEX };
+      const accentBorder = { style: BorderStyle.SINGLE, size: 4, color: ACCENT_HEX };
+      const clearBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder };
+
+      const makeCell = (text: string, opts: { bold?: boolean; dark?: boolean; width?: number; bg?: string; color?: string; size?: number; borders?: any; colspan?: number; alignment?: typeof AlignmentType[keyof typeof AlignmentType] } = {}) => {
+        const { bold = false, dark = false, width = 2000, bg, color, size = 20, borders, colspan } = opts;
+        const cellColor = dark ? WHITE_HEX : (color || NAVY2_HEX);
+        const shading = dark
+          ? { fill: NAVY_HEX, type: ShadingType.CLEAR, color: "auto" }
+          : bg
+            ? { fill: bg, type: ShadingType.CLEAR, color: "auto" }
+            : undefined;
+
+        return new TableCell({
+          width: { size: width, type: WidthType.DXA },
+          shading: shading as any,
+          borders: borders || {
+            top: thinBorder,
+            bottom: thinBorder,
+            left: thinBorder,
+            right: thinBorder,
+          },
+          columnSpan: colspan,
+          children: [new Paragraph({
+            spacing: { before: 40, after: 40 },
+            alignment: opts.alignment,
+            children: [new TextRun({ text, bold, color: cellColor, size, font: "Calibri" })],
+          })],
+        });
+      };
+
+      const children: any[] = [];
+
+      // ══ COVER PAGE ══════════════════════════════════════════════════════════
+      children.push(
+        new Paragraph({ spacing: { before: 2400 }, children: [] }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 100 },
+          children: [new TextRun({ text: firmName, bold: true, size: 52, color: NAVY_HEX, font: "Calibri" })],
+        }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 400 },
+          children: [new TextRun({ text: "AUDIT WORKING PAPERS", size: 36, color: ACCENT_HEX, font: "Calibri", bold: true })],
+        }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 100 },
+          children: [new TextRun({ text: "\u2500".repeat(40), color: ACCENT_HEX, size: 20 })],
+        }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 },
+          children: [new TextRun({ text: entityName, bold: true, size: 44, color: NAVY_HEX, font: "Calibri" })],
+        }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 100 },
+          children: [new TextRun({ text: `${meta?.engagement_type || "Statutory Audit"} | ${financialYear}`, size: 24, color: GRAY_HEX, font: "Calibri" })],
+        }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 600, after: 100 },
+          children: [new TextRun({ text: `Generated: ${now}  |  Total Working Papers: ${workingPapers.length}`, size: 20, color: GRAY_HEX, font: "Calibri", italics: true })],
+        }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 200 },
+          children: [new TextRun({ text: "ISA 200\u2013720 Compliant | STRICTLY CONFIDENTIAL", size: 18, color: GOLD_HEX, font: "Calibri", bold: true })],
+        }),
+        new Paragraph({ children: [new PageBreak()] }),
+      );
+
+      // ══ TABLE OF CONTENTS ═══════════════════════════════════════════════════
       children.push(
         new Paragraph({
-          children: [new TextRun({ text: `${wp.ref} — ${wp.title}`, bold: true, size: 32, color: "1B3A6B" })],
           heading: HeadingLevel.HEADING_1,
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({ text: `Section: `, bold: true }),
-            new TextRun({ text: wp.section_label || wp.section }),
-            new TextRun({ text: `   ISA: `, bold: true }),
-            new TextRun({ text: (wp.isa_references || []).join(", ") }),
-          ],
+          spacing: { after: 200 },
+          children: [new TextRun({ text: "TABLE OF CONTENTS", bold: true, size: 32, color: NAVY_HEX, font: "Calibri" })],
         }),
       );
 
-      if (wp.assertions && wp.assertions.length > 0) {
-        children.push(new Paragraph({
+      const tocRows: any[] = [
+        new TableRow({
+          tableHeader: true,
           children: [
-            new TextRun({ text: "Assertions: ", bold: true }),
-            new TextRun({ text: wp.assertions.join(" | "), italics: true, color: "1B3A6B" }),
+            makeCell("WP Ref", { bold: true, dark: true, width: Math.floor(TBL_W * 0.12) }),
+            makeCell("Title", { bold: true, dark: true, width: Math.floor(TBL_W * 0.42) }),
+            makeCell("Section", { bold: true, dark: true, width: Math.floor(TBL_W * 0.28) }),
+            makeCell("ISA Reference", { bold: true, dark: true, width: Math.floor(TBL_W * 0.18) }),
           ],
-        }));
-      }
+        }),
+      ];
 
-      if (wp.evidence_refs && wp.evidence_refs.length > 0) {
-        children.push(new Paragraph({
+      workingPapers.forEach((wp: any, i: number) => {
+        const bg = i % 2 === 0 ? BG_ALT_HEX : undefined;
+        tocRows.push(new TableRow({
           children: [
-            new TextRun({ text: "Evidence: ", bold: true }),
-            new TextRun({ text: wp.evidence_refs.join(", "), color: "336633" }),
+            makeCell(wp.ref || "", { bold: true, width: Math.floor(TBL_W * 0.12), bg }),
+            makeCell(wp.title || "", { width: Math.floor(TBL_W * 0.42), bg }),
+            makeCell(wp.section_label || wp.section || "", { width: Math.floor(TBL_W * 0.28), bg }),
+            makeCell((wp.isa_references || []).join(", ").slice(0, 30), { width: Math.floor(TBL_W * 0.18), bg, size: 18 }),
           ],
         }));
-      }
+      });
 
       children.push(
-        new Paragraph({ children: [new TextRun({ text: "OBJECTIVE", bold: true, color: "1B3A6B" })] }),
-        new Paragraph({ text: wp.objective || "" }),
-        new Paragraph({ children: [new TextRun({ text: "SCOPE", bold: true, color: "1B3A6B" })] }),
-        new Paragraph({ text: wp.scope || "" }),
+        new Table({ width: { size: TBL_W, type: WidthType.DXA }, rows: tocRows }),
+        new Paragraph({ children: [new PageBreak()] }),
       );
 
-      // Procedures table
-      if (wp.procedures && wp.procedures.length > 0) {
-        children.push(new Paragraph({ children: [new TextRun({ text: "AUDIT PROCEDURES PERFORMED", bold: true, color: "1B3A6B" })] }));
-        const procTable = new Table({
-          width: { size: 9000, type: WidthType.DXA },
+      // ══ FINANCIAL SUMMARY ═══════════════════════════════════════════════════
+      if (fin.revenue) {
+        children.push(
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            spacing: { after: 200 },
+            children: [new TextRun({ text: "FINANCIAL SUMMARY", bold: true, size: 28, color: NAVY_HEX, font: "Calibri" })],
+          }),
+        );
+        const finItems = [
+          ["Revenue", formatPKR(fin.revenue)],
+          ["Gross Profit", formatPKR(fin.gross_profit)],
+          ["Net Profit / (Loss)", formatPKR(fin.net_profit)],
+          ["Total Assets", formatPKR(fin.total_assets)],
+          ["Total Liabilities", formatPKR(fin.total_liabilities)],
+          ["Equity", formatPKR(fin.equity)],
+          ["Cash & Bank", formatPKR(fin.cash_and_bank)],
+          ["Overall Materiality (ISA 320)", formatPKR(materiality.overall_materiality)],
+          ["Performance Materiality", formatPKR(materiality.performance_materiality)],
+        ];
+        const half = Math.floor(TBL_W / 2);
+        const finTable = new Table({
+          width: { size: TBL_W, type: WidthType.DXA },
           rows: [
-            new TableRow({ children: [makeCell("No.", true, true, 600), makeCell("Procedure", true, true, 3200), makeCell("Finding", true, true, 2800), makeCell("Conclusion", true, true, 1400), makeCell("Ref", true, true, 1000)] }),
-            ...wp.procedures.map((p: any, i: number) => new TableRow({
+            new TableRow({ children: [makeCell("Item", { bold: true, dark: true, width: half }), makeCell("Amount (PKR)", { bold: true, dark: true, width: half })] }),
+            ...finItems.map(([item, val], i) => new TableRow({
               children: [
-                makeCell(p.no || String(i + 1), false, false, 600, i % 2 === 0 ? lightShading : undefined),
-                makeCell(p.procedure, false, false, 3200, i % 2 === 0 ? lightShading : undefined),
-                makeCell(p.finding, false, false, 2800, i % 2 === 0 ? lightShading : undefined),
-                makeCell(p.conclusion, false, false, 1400, i % 2 === 0 ? lightShading : undefined),
-                makeCell(p.evidence_ref || "", false, false, 1000, i % 2 === 0 ? lightShading : undefined),
+                makeCell(item, { bold: true, width: half, bg: i % 2 === 0 ? BG_ALT_HEX : undefined }),
+                makeCell(val, { width: half, bg: i % 2 === 0 ? BG_ALT_HEX : undefined }),
               ],
             })),
           ],
         });
-        children.push(procTable);
+        children.push(finTable, new Paragraph({ children: [new PageBreak()] }));
       }
 
-      // Key findings
-      if (wp.key_findings && wp.key_findings.length > 0) {
-        children.push(new Paragraph({ children: [new TextRun({ text: "KEY FINDINGS", bold: true, color: "1B3A6B" })] }));
-        wp.key_findings.forEach((f: string, i: number) => {
-          children.push(new Paragraph({ text: `${i + 1}. ${f}` }));
+      // ══ EVIDENCE INDEX ═══════════════════════════════════════════════════════
+      if (evidenceIndex && evidenceIndex.length > 0) {
+        children.push(
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            spacing: { after: 200 },
+            children: [new TextRun({ text: "EVIDENCE INDEX", bold: true, size: 28, color: NAVY_HEX, font: "Calibri" })],
+          }),
+        );
+        const evTable = new Table({
+          width: { size: TBL_W, type: WidthType.DXA },
+          rows: [
+            new TableRow({
+              children: [
+                makeCell("Ref", { bold: true, dark: true, width: Math.floor(TBL_W * 0.10) }),
+                makeCell("Description", { bold: true, dark: true, width: Math.floor(TBL_W * 0.42) }),
+                makeCell("Type", { bold: true, dark: true, width: Math.floor(TBL_W * 0.16) }),
+                makeCell("WPs Referenced", { bold: true, dark: true, width: Math.floor(TBL_W * 0.32) }),
+              ],
+            }),
+            ...evidenceIndex.map((e: any, i: number) => new TableRow({
+              children: [
+                makeCell(e.ref || "", { bold: true, width: Math.floor(TBL_W * 0.10), bg: i % 2 === 0 ? BG_ALT_HEX : undefined }),
+                makeCell(e.description || "", { width: Math.floor(TBL_W * 0.42), bg: i % 2 === 0 ? BG_ALT_HEX : undefined }),
+                makeCell(e.type || "", { width: Math.floor(TBL_W * 0.16), bg: i % 2 === 0 ? BG_ALT_HEX : undefined }),
+                makeCell((e.wp_refs || []).join(", "), { width: Math.floor(TBL_W * 0.32), bg: i % 2 === 0 ? BG_ALT_HEX : undefined }),
+              ],
+            })),
+          ],
         });
+        children.push(evTable, new Paragraph({ children: [new PageBreak()] }));
       }
 
-      // Auditor conclusion
-      children.push(
-        new Paragraph({ children: [new TextRun({ text: "AUDITOR'S CONCLUSION", bold: true, color: "1B3A6B" })] }),
-        new Paragraph({ text: wp.auditor_conclusion || "" }),
-      );
+      // ══ WORKING PAPERS ══════════════════════════════════════════════════════
+      for (const wp of workingPapers) {
+        // WP Title Banner
+        children.push(
+          new Paragraph({
+            spacing: { before: 100, after: 60 },
+            border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: ACCENT_HEX } },
+            children: [new TextRun({ text: `${wp.ref} \u2014 ${wp.title}`, bold: true, size: 30, color: NAVY_HEX, font: "Calibri" })],
+          }),
+        );
 
-      // Sign-off table
-      const signTable = new Table({
-        width: { size: 9000, type: WidthType.DXA },
-        rows: [
-          new TableRow({ children: [makeCell("Role", true, true, 2250), makeCell("Name", true, true, 2250), makeCell("Signature", true, true, 2250), makeCell("Date", true, true, 2250)] }),
-          new TableRow({ children: [makeCell("Preparer"), makeCell(wp.preparer || "Audit Senior"), makeCell(""), makeCell(wp.date_prepared || "")] }),
-          new TableRow({ children: [makeCell("Reviewer"), makeCell(wp.reviewer || "Audit Manager"), makeCell(""), makeCell("")] }),
-          new TableRow({ children: [makeCell("Partner"), makeCell(wp.partner || "Partner"), makeCell(""), makeCell("")] }),
-        ],
+        // Meta info line
+        const metaParts = [];
+        if (wp.section_label || wp.section) metaParts.push(`Section: ${wp.section_label || wp.section}`);
+        metaParts.push(`ISA: ${(wp.isa_references || []).join(", ")}`);
+        metaParts.push(`Prepared: ${wp.preparer || meta?.preparer || "Audit Senior"}`);
+        metaParts.push(`Reviewed: ${wp.reviewer || meta?.reviewer || "Audit Manager"}`);
+        metaParts.push(`Date: ${wp.date_prepared || now}`);
+
+        children.push(
+          new Paragraph({
+            spacing: { after: 200 },
+            children: [new TextRun({ text: metaParts.join("  \u2022  "), size: 17, color: GRAY_HEX, font: "Calibri" })],
+          }),
+        );
+
+        if (wp.assertions && wp.assertions.length > 0) {
+          children.push(new Paragraph({
+            spacing: { after: 80 },
+            children: [
+              new TextRun({ text: "Assertions: ", bold: true, size: 19, color: NAVY2_HEX, font: "Calibri" }),
+              new TextRun({ text: wp.assertions.join(" | "), italics: true, color: BLUE_HEX, size: 19, font: "Calibri" }),
+            ],
+          }));
+        }
+
+        // OBJECTIVE
+        children.push(
+          new Paragraph({
+            spacing: { before: 200, after: 60 },
+            children: [new TextRun({ text: "OBJECTIVE", bold: true, size: 22, color: NAVY_HEX, font: "Calibri" })],
+          }),
+          new Paragraph({
+            spacing: { after: 160 },
+            children: [new TextRun({ text: wp.objective || "", size: 20, color: TEXT_HEX, font: "Calibri" })],
+          }),
+        );
+
+        // SCOPE
+        children.push(
+          new Paragraph({
+            spacing: { before: 100, after: 60 },
+            children: [new TextRun({ text: "SCOPE", bold: true, size: 22, color: NAVY_HEX, font: "Calibri" })],
+          }),
+          new Paragraph({
+            spacing: { after: 160 },
+            children: [new TextRun({ text: wp.scope || "", size: 20, color: TEXT_HEX, font: "Calibri" })],
+          }),
+        );
+
+        // PROCEDURES TABLE
+        if (wp.procedures && wp.procedures.length > 0) {
+          children.push(
+            new Paragraph({
+              spacing: { before: 100, after: 100 },
+              children: [new TextRun({ text: "AUDIT PROCEDURES PERFORMED", bold: true, size: 22, color: NAVY_HEX, font: "Calibri" })],
+            }),
+          );
+
+          const pColW = [Math.floor(TBL_W * 0.06), Math.floor(TBL_W * 0.32), Math.floor(TBL_W * 0.36), Math.floor(TBL_W * 0.14), Math.floor(TBL_W * 0.12)];
+          const procTable = new Table({
+            width: { size: TBL_W, type: WidthType.DXA },
+            rows: [
+              new TableRow({
+                tableHeader: true,
+                children: [
+                  makeCell("Ref", { bold: true, dark: true, width: pColW[0], size: 18 }),
+                  makeCell("Procedure", { bold: true, dark: true, width: pColW[1], size: 18 }),
+                  makeCell("Finding", { bold: true, dark: true, width: pColW[2], size: 18 }),
+                  makeCell("Conclusion", { bold: true, dark: true, width: pColW[3], size: 18 }),
+                  makeCell("Evidence Ref", { bold: true, dark: true, width: pColW[4], size: 18 }),
+                ],
+              }),
+              ...wp.procedures.map((p: any, i: number) => {
+                const bg = i % 2 === 0 ? BG_ALT_HEX : undefined;
+                return new TableRow({
+                  children: [
+                    makeCell(p.no || String(i + 1), { bold: true, width: pColW[0], bg, size: 18 }),
+                    makeCell(p.procedure || "", { width: pColW[1], bg, size: 18 }),
+                    makeCell(p.finding || "", { width: pColW[2], bg, size: 18 }),
+                    makeCell(p.conclusion || "", { width: pColW[3], bg, size: 18, color: (p.conclusion || "").toLowerCase().includes("satisfactory") ? GREEN_HEX : undefined }),
+                    makeCell(p.evidence_ref || "", { width: pColW[4], bg, size: 18 }),
+                  ],
+                });
+              }),
+            ],
+          });
+          children.push(procTable);
+        }
+
+        // SUMMARY TABLE
+        if (wp.summary_table && wp.summary_table.length > 0) {
+          children.push(
+            new Paragraph({
+              spacing: { before: 200, after: 100 },
+              children: [new TextRun({ text: "SUMMARY SCHEDULE", bold: true, size: 22, color: NAVY_HEX, font: "Calibri" })],
+            }),
+          );
+
+          const sColW = [Math.floor(TBL_W * 0.30), Math.floor(TBL_W * 0.30), Math.floor(TBL_W * 0.40)];
+          const sumTable = new Table({
+            width: { size: TBL_W, type: WidthType.DXA },
+            rows: [
+              new TableRow({
+                children: [
+                  makeCell("Item", { bold: true, dark: true, width: sColW[0] }),
+                  makeCell("Amount / Value", { bold: true, dark: true, width: sColW[1] }),
+                  makeCell("Comment", { bold: true, dark: true, width: sColW[2] }),
+                ],
+              }),
+              ...wp.summary_table.map((r: any, i: number) => {
+                const bg = i % 2 === 0 ? BG_ALT_HEX : undefined;
+                return new TableRow({
+                  children: [
+                    makeCell(r.item || "", { bold: true, width: sColW[0], bg }),
+                    makeCell(r.value || "", { width: sColW[1], bg }),
+                    makeCell(r.comment || "", { width: sColW[2], bg, size: 18 }),
+                  ],
+                });
+              }),
+            ],
+          });
+          children.push(sumTable);
+        }
+
+        // KEY FINDINGS
+        if (wp.key_findings && wp.key_findings.length > 0) {
+          children.push(
+            new Paragraph({
+              spacing: { before: 200, after: 100 },
+              children: [new TextRun({ text: "KEY FINDINGS", bold: true, size: 22, color: NAVY_HEX, font: "Calibri" })],
+            }),
+          );
+          for (const f of wp.key_findings) {
+            children.push(new Paragraph({
+              spacing: { after: 60 },
+              bullet: { level: 0 },
+              children: [new TextRun({ text: f, size: 20, color: TEXT_HEX, font: "Calibri" })],
+            }));
+          }
+        }
+
+        // AUDITOR'S CONCLUSION
+        children.push(
+          new Paragraph({
+            spacing: { before: 200, after: 80 },
+            border: {
+              top: { style: BorderStyle.SINGLE, size: 2, color: GREEN_HEX },
+              bottom: { style: BorderStyle.SINGLE, size: 2, color: GREEN_HEX },
+              left: { style: BorderStyle.THICK, size: 6, color: GREEN_HEX },
+              right: noBorder,
+            },
+            shading: { fill: "ECFDF5", type: ShadingType.CLEAR, color: "auto" } as any,
+            children: [
+              new TextRun({ text: "  AUDITOR'S CONCLUSION", bold: true, size: 20, color: GREEN_HEX, font: "Calibri" }),
+            ],
+          }),
+          new Paragraph({
+            spacing: { after: 200 },
+            children: [new TextRun({ text: wp.auditor_conclusion || "", size: 20, color: TEXT_HEX, font: "Calibri" })],
+          }),
+        );
+
+        // SIGN-OFF TABLE
+        children.push(
+          new Paragraph({
+            spacing: { before: 100, after: 80 },
+            children: [new TextRun({ text: "SIGN-OFF", bold: true, size: 20, color: NAVY_HEX, font: "Calibri" })],
+          }),
+        );
+
+        const signW = Math.floor(TBL_W / 4);
+        const signTable = new Table({
+          width: { size: TBL_W, type: WidthType.DXA },
+          rows: [
+            new TableRow({
+              children: [
+                makeCell("Role", { bold: true, dark: true, width: signW }),
+                makeCell("Name", { bold: true, dark: true, width: signW }),
+                makeCell("Signature", { bold: true, dark: true, width: signW }),
+                makeCell("Date", { bold: true, dark: true, width: signW }),
+              ],
+            }),
+            new TableRow({
+              children: [
+                makeCell("Prepared By", { width: signW, bg: BG_ALT_HEX }),
+                makeCell(wp.preparer || meta?.preparer || "Audit Senior", { width: signW, bg: BG_ALT_HEX }),
+                makeCell("", { width: signW, bg: BG_ALT_HEX }),
+                makeCell(wp.date_prepared || now, { width: signW, bg: BG_ALT_HEX }),
+              ],
+            }),
+            new TableRow({
+              children: [
+                makeCell("Reviewed By", { width: signW }),
+                makeCell(wp.reviewer || meta?.reviewer || "Audit Manager", { width: signW }),
+                makeCell("", { width: signW }),
+                makeCell("", { width: signW }),
+              ],
+            }),
+            new TableRow({
+              children: [
+                makeCell("Approved By (Partner)", { width: signW, bg: BG_ALT_HEX }),
+                makeCell(wp.partner || meta?.approver || "Engagement Partner", { width: signW, bg: BG_ALT_HEX }),
+                makeCell("", { width: signW, bg: BG_ALT_HEX }),
+                makeCell("", { width: signW, bg: BG_ALT_HEX }),
+              ],
+            }),
+          ],
+        });
+        children.push(signTable);
+
+        // Page separator
+        children.push(
+          new Paragraph({
+            spacing: { before: 100 },
+            children: [new TextRun({ text: `${firmName} | Strictly Confidential`, size: 14, color: GRAY_HEX, font: "Calibri", italics: true })],
+          }),
+          new Paragraph({ children: [new PageBreak()] }),
+        );
+      }
+
+      const document = new Document({
+        creator: firmName,
+        title: `Audit Working Papers \u2014 ${entityName}`,
+        description: `ISA-Compliant Audit Working Papers \u2014 ${financialYear}`,
+        styles: {
+          default: {
+            document: {
+              run: { font: "Calibri", size: 20, color: TEXT_HEX },
+            },
+          },
+        },
+        sections: [{
+          properties: {
+            page: {
+              size: { width: 11906, height: 16838, orientation: 0 as any },
+              margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
+            },
+          },
+          children,
+        }],
       });
-      children.push(new Paragraph({ children: [new TextRun({ text: "SIGN-OFF", bold: true, color: "1B3A6B" })] }), signTable);
-      children.push(new Paragraph({ children: [new PageBreak()] }));
+
+      const buffer = await Packer.toBuffer(document);
+      const filename = `AuditFile_${entityName.replace(/\s+/g, "_")}_${financialYear.replace(/\s+/g, "_")}.docx`;
+
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Length", buffer.length);
+      return res.send(buffer);
+    } catch (err: any) {
+      logger.error({ err }, "DOCX export failed");
+      if (!res.headersSent) {
+        return res.status(500).json({ error: err?.message || "DOCX export failed" });
+      }
     }
-
-    const doc = new Document({
-      creator: firmName,
-      title: `Audit Working Papers — ${entityName}`,
-      description: `ISA-Compliant Audit Working Papers — ${financialYear}`,
-      sections: [{ children }],
-    });
-
-    const buffer = await Packer.toBuffer(doc);
-    const filename = `AuditFile_${entityName.replace(/\s+/g, "_")}_${financialYear.replace(/\s+/g, "_")}.docx`;
-
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Content-Length", buffer.length);
-    return res.send(buffer);
-  } catch (err: any) {
-    logger.error({ err }, "DOCX export failed");
-    if (!res.headersSent) {
-      return res.status(500).json({ error: err?.message || "DOCX export failed" });
-    }
-  }
-});
+  });
 
 // ─── POST /api/working-papers/generate-confirmations ──────────────────────
 router.post("/generate-confirmations", async (req: Request, res: Response) => {
