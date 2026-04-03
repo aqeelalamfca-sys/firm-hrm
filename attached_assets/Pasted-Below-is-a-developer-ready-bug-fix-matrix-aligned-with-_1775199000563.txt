@@ -1,0 +1,42 @@
+Below is a developer-ready bug-fix matrix aligned with your system architecture and AuditWise workflow:
+
+🔷 Working Paper Generator – Bug Fix & Refactor Matrix
+#	Issue	Root Cause	Required Fix	UI Change	State Change	API Change
+1	Engagement Variable Template card misplaced (Step 0)	Preset logic implemented before variable grid rendering	Move card to Step 1 (Configure Engagement) above variable grid	Relocate card to top of Step 1 with success message and highlight auto-filled fields	Ensure engagementVariables updates instantly on preset selection and persists	No API change (frontend logic only)
+2	No feedback after selecting company profile	No visual confirmation or state feedback implemented	Add confirmation message + highlight changed fields	Show banner: “Preset applied successfully” + highlight updated fields	Track autoFilledFields for session highlighting	No API change
+3	Variables prefilled but not visible immediately	UI separation between preset and config grid	Trigger immediate re-render of grid after preset selection	Auto-scroll or focus to variable grid after selection	Ensure reactive binding between preset and engagementVariables	No API change
+4	Duplicate “Generate Working Paper File” button in Step 2	Same handleGenerate used in multiple steps	Remove generate button from Step 2 completely	Keep only “Continue to Generate” button in Step 2	Remove generation trigger from Step 2 state	Ensure API is only called from Step 3
+5	Confusion between Step 2 and Step 3 roles	Overlapping responsibilities (analysis vs generation)	Clearly separate responsibilities: Step 2 = analysis, Step 3 = generation	Rename Step 2 CTA → “Continue to Generate Working Papers”	No additional state, only navigation control	No API change
+6	Duplicate WP selection (Step 1 vs Step 3)	Two independent systems: selectedPapers and selectedPhases	Remove Step 3 selection panel entirely	Delete phase selector UI in Step 3	Remove selectedPhases state completely	Ensure API uses only selectedPapers
+7	Step 3 selection has no effect	selectedPhases not passed to API	Eliminate dead logic	Remove misleading counts (11/11 phases)	Delete selectedPhases state and handlers	Clean API payload to exclude phases
+8	Mismatch in counts (44 papers vs 11 phases)	Dual selection systems with different aggregation logic	Standardize selection logic to paper-level only	Show only “X of Y papers selected”	Maintain single selectedPapers source	API reads only selectedPapers
+9	General Ledger & Trial Balance module in wrong step	Misclassified as generation instead of data input	Move GL/TB module to Step 1 under data inputs	Add collapsible “GL & Trial Balance” section in Step 1	Store output in glData / trialBalanceData	Ensure API consumes GL/TB data as input
+10	GL/TB module appears as prerequisite to generation	Incorrect placement before generate button	Reclassify as optional input tool	Remove from Step 3 completely	Integrate into Step 1 data pipeline	API uses data if available, not mandatory
+11	No single source of truth for WP selection	Multiple states controlling selection	Enforce selectedPapers as only source	Remove all duplicate selectors	Centralize selection logic in Step 1	API must strictly rely on selectedPapers
+12	Dead / unused state variables present	Legacy logic not cleaned	Remove unused states (selectedPhases, duplicates)	Clean UI accordingly	Delete redundant state hooks and reducers	Clean API payload structure
+13	Inconsistent state persistence across steps	Weak state management / re-renders	Ensure full persistence across navigation	No UI reset when switching steps	Use centralized state (Context/Zustand/Redux)	No API change
+14	No validation before generation	Missing pre-generation checks	Add validation layer before Step 3	Show validation warnings/errors in UI	Add validationStatus state	Block API call if validation fails
+15	No clarity on readiness for generation	No analysis summary or completeness indicator	Add readiness dashboard in Step 2	Show: Missing data, warnings, completeness %	Store analysisResults	Pass analysis summary optionally for audit trail
+16	AI analysis step not clearly defined	Mixed responsibilities with generation	Restrict Step 2 to analysis only	Add structured preview (TB, GL, WP coverage)	Maintain analysisResults as read-only	API may optionally log analysis snapshot
+17	Company category not dynamically impacting WPs	Weak linkage between presets and WP selection	Auto-suggest WPs based on category	Highlight suggested vs manual selections	Update selectedPapers on preset (non-destructive)	No API change
+18	Manual overrides lost on preset change	Preset overwrites user edits	Add confirmation before overwrite	Show modal: “Override existing values?”	Track manualOverrides	No API change
+19	No structured step naming and guidance	Poor UX clarity	Standardize step labels and descriptions	Rename steps: Upload / Configure / Analysis / Generate	No major state change	No API change
+20	No linkage between inputs and outputs	Weak data pipeline integration	Ensure all inputs feed generation	Show mapping summary in Step 2	Consolidate into generationPayload	API must consume full payload: variables + data + selection
+21	Generation triggered from multiple points	Lack of control flow discipline	Centralize generation in Step 3 only	Single primary button	Remove duplicate triggers	Single API endpoint call from Step 3
+22	No audit trail of selections and variables	Missing logging structure	Add audit log for selections & variables	Optional UI audit log view	Store auditTrail object	Send audit metadata in API payload
+23	No distinction between required vs optional inputs	All inputs treated equally	Define mandatory vs optional fields	Mark required fields visually	Add requiredFieldsStatus	Validate before API execution
+24	No integration of Sales Tax data in flow	Data module not linked properly	Integrate into Step 1 and analysis	Show tax data summary in Step 2	Store salesTaxData centrally	API includes tax data if applicable
+🔷 Summary (System Design Outcome)
+
+After applying the above fixes:
+
+Single source of truth:
+selectedPapers, engagementVariables, importedData, analysisResults
+Clean workflow:
+Upload → Configure → Analyze → Generate
+No duplication / dead logic
+Generation fully driven by:
+Variables (ISA-compliant)
+Company category
+Uploaded / generated data
+Selected working papers
