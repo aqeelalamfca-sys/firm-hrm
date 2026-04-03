@@ -124,6 +124,22 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - Frontend: full-screen modal popup for results with legal citations section (BookOpen icon), missing tax check section (ShieldAlert icon), Confirmed/Review legal basis badges
 - Route mounted before auth middleware (public endpoint, same as tax calculator page)
 
+**Working Papers Wizard:**
+- Route: `/working-papers` (auth-protected, staff only)
+- Source: `artifacts/hrm-system/src/pages/working-papers.tsx` (~3450 lines)
+- Backend: `artifacts/api-server/src/routes/working-papers.ts` (~2283 lines)
+- **3-section wizard** (STEPS array, ids 0–2):
+  1. **Upload** (step 0) — DropZone file upload · WP category selection (A–K phases via `selectedPhases` state, syncs to `selectedPapers` via useEffect) · Special context/instructions textarea · "Extract & Configure →" button (calls `handleExtractAndNext` → AI OCR extraction → setStep(1))
+  2. **Configure** (step 1) — Entity & firm details · Engagement team · Key deadlines · Financial Statements (BS/PL with manual + Excel upload) · Sales Tax data · Engagement variable template (121 variables in groups A–K) with profile defaults · "Continue to Output →" (setStep(2))
+  3. **Output** (step 2) — Four sub-sections on one page:
+     - **AI Analysis**: Run analysis button → materiality, risk, FS assertions, IC weaknesses; stale-data warning if config changed
+     - **GL & TB Generation**: `handleGenerateGlTb` → AI-generated GL entries + TB accounts; expandable GL/TB data tables
+     - **Working Papers**: idle/generating/generated view; phase-by-phase progress (A–K); evidence index; paper cards with expand/collapse and download per paper
+     - **Export & Finalize**: Excel (.xlsx), Word (.docx), PDF, and Confirmations Bundle download cards
+- **Draft key**: `DRAFT_KEY = "ana_wp_draft_v2"` — autosaved to localStorage (1.5s debounce)
+- **AI model**: `gpt-4o` via Replit proxy (`getAIClient()`)
+- pdfkit is in `external` array of `artifacts/api-server/build.mjs` (prevents Helvetica.afm crash)
+
 ## Deployment & CI/CD
 
 **Pipeline**: Replit → GitHub → GitHub Actions → Hostinger VPS (Docker)

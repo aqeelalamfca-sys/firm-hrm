@@ -426,11 +426,9 @@ const WP_PAPER_NAMES: Record<string, string> = {
 };
 
 const STEPS = [
-  { id: 0, label: "Upload & Extract", shortLabel: "Upload", icon: Upload },
-  { id: 1, label: "Configure Engagement", shortLabel: "Configure", icon: Settings },
-  { id: 2, label: "AI Analysis", shortLabel: "Analyse", icon: FileSearch },
-  { id: 3, label: "Generate Papers", shortLabel: "Generate", icon: Sparkles },
-  { id: 4, label: "Export & Finalize", shortLabel: "Export", icon: FileOutput },
+  { id: 0, label: "Upload", shortLabel: "Upload", icon: Upload },
+  { id: 1, label: "Configure", shortLabel: "Configure", icon: Settings },
+  { id: 2, label: "Output", shortLabel: "Output", icon: Sparkles },
 ];
 
 const AUDIT_PHASES: { prefix: string; label: string; papers: number; description: string }[] = [
@@ -812,6 +810,7 @@ export default function WorkingPapers() {
   const [financialYear, setFinancialYear] = useState("Year ended June 30, 2024");
   const [firmName, setFirmName] = useState("ANA & Co. Chartered Accountants");
   const [selectedPapers, setSelectedPapers] = useState<string[]>(ALL_WP_REFS);
+  const [selectedPhases, setSelectedPhases] = useState<string[]>(WP_GROUPS.map(g => g.prefix));
 
   // New mockup state
   const [ntn, setNtn] = useState("");
@@ -1067,8 +1066,8 @@ export default function WorkingPapers() {
       if (d.generationMeta && typeof d.generationMeta === "object") setGenerationMeta(d.generationMeta);
       // If draft restores to export step but no papers exist, fall back to generate step
       const restoredStep = d.step || 0;
-      if (restoredStep === 4 && (!d.workingPapers || d.workingPapers.length === 0)) {
-        setStep(3);
+      if (restoredStep > 2 || (restoredStep === 2 && (!d.workingPapers || d.workingPapers.length === 0))) {
+        setStep(2);
       } else if (restoredStep > 0) {
         setStep(restoredStep);
       }
@@ -1106,6 +1105,11 @@ export default function WorkingPapers() {
     configValues, bsData, plData, salesTaxRows, step,
     workingPapers, evidenceIndex, generationMeta, draftLoaded,
   ]);
+
+  // ── Sync selectedPhases → selectedPapers ────────────────────────────────
+  useEffect(() => {
+    setSelectedPapers(WP_GROUPS.filter(g => selectedPhases.includes(g.prefix)).flatMap(g => g.refs));
+  }, [selectedPhases]);
 
   // ── Auto-extract entity + financials from uploaded docs ──────────────────
   const fmtFS = (n: number | null | undefined) =>
@@ -1624,8 +1628,6 @@ export default function WorkingPapers() {
       setActivePhaseLabel("");
       setProgress(100);
       setProgressMsg("All working papers generated successfully.");
-
-      setStep(3);
       toast({ title: "Generation complete", description: `${papers.length} working papers generated across 11 audit phases (A-K). Review below then export.` });
     } catch (err: any) {
       clearInterval(phaseInterval);
@@ -1804,7 +1806,7 @@ export default function WorkingPapers() {
                         <div className="relative z-10 flex items-start justify-between gap-6">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-3">
-                              <span className="text-[10px] font-black text-blue-200 uppercase tracking-[0.2em]">Step 1 of 5</span>
+                              <span className="text-[10px] font-black text-blue-200 uppercase tracking-[0.2em]">Step 1 of 3</span>
                               <div className="h-px flex-1 max-w-[40px] bg-blue-400/40" />
                               <span className="text-[10px] font-bold text-blue-300 uppercase tracking-widest">ISA 230</span>
                             </div>
@@ -1833,6 +1835,47 @@ export default function WorkingPapers() {
                     )}
 
                     <DropZone files={files} onAdd={addFiles} onRemove={removeFile} onClassify={classifyFileDoc} />
+
+                    {/* ── Working Paper Category Selection ─────────────── */}
+                    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center">
+                            <Layers className="w-4 h-4 text-violet-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-bold text-slate-900">Working Paper Categories</h3>
+                            <p className="text-[11px] text-slate-400 font-medium mt-0.5">Select the audit phases to include · {selectedPhases.length} of {WP_GROUPS.length} phases selected</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => setSelectedPhases(WP_GROUPS.map(g => g.prefix))} className="text-[11px] font-bold text-blue-600 hover:text-blue-800 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors">All</button>
+                          <button onClick={() => setSelectedPhases([])} className="text-[11px] font-bold text-slate-500 hover:text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">None</button>
+                        </div>
+                      </div>
+                      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                        {WP_GROUPS.map(g => {
+                          const isOn = selectedPhases.includes(g.prefix);
+                          return (
+                            <button key={g.prefix}
+                              onClick={() => setSelectedPhases(prev => isOn ? prev.filter(p => p !== g.prefix) : [...prev, g.prefix])}
+                              className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${isOn ? "bg-blue-50 border-blue-200" : "bg-slate-50 border-slate-100 opacity-60 hover:opacity-80"}`}
+                            >
+                              <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 border-2 transition-all ${isOn ? "bg-blue-600 border-blue-600" : "border-slate-300 bg-white"}`}>
+                                {isOn && <Check className="w-3.5 h-3.5 text-white" />}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${g.color}`}>{g.prefix}</span>
+                                  <span className="text-xs font-bold text-slate-700 truncate">{g.label}</span>
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-0.5">{g.refs.length} papers</p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
 
                     <div className="space-y-3">
                       <Label className="text-xs font-bold text-slate-700 uppercase tracking-widest flex items-center gap-2"><Sparkles className="w-3.5 h-3.5 text-blue-500" /> Special Context / Instructions</Label>
@@ -1866,7 +1909,7 @@ export default function WorkingPapers() {
                         <div className="relative z-10 flex items-start justify-between gap-6">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-3">
-                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Step 2 of 5</span>
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Step 2 of 3</span>
                               <div className="h-px flex-1 max-w-[40px] bg-slate-600" />
                               <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">ISA 315 · ISA 300</span>
                             </div>
@@ -2486,245 +2529,13 @@ export default function WorkingPapers() {
                       )}
                     </div>
 
-                    {/* ── General Ledger & Trial Balance ──────────────── */}
-                    <div className="mt-6 bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                      <div className="p-8 space-y-6">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shrink-0 shadow-sm shadow-emerald-200">
-                              <Table className="w-[18px] h-[18px] text-white" />
-                            </div>
-                            <div>
-                              <h3 className="text-sm font-bold text-slate-900">General Ledger & Trial Balance</h3>
-                              <p className="text-xs text-slate-500 mt-0.5">AI-generated with Pakistan COA codes, narrations & industry-specific transactions — GL and TB are 100% matched</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {glTbSummary && <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">Generated</span>}
-                            <Button onClick={handleGenerateGlTb} disabled={generatingGlTb} className="rounded-xl font-bold gap-2 bg-emerald-600 hover:bg-emerald-700">
-                              {generatingGlTb ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> {glTbSummary ? "Re-generate" : "Generate GL & TB"}</>}
-                            </Button>
-                          </div>
-                        </div>
-
-                        {glTbSummary && (
-                          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                            <div className="bg-slate-50 rounded-lg p-3 text-center border border-slate-100">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">GL Entries</p>
-                              <p className="text-lg font-black text-slate-800">{glTbSummary.gl_entries}</p>
-                            </div>
-                            <div className="bg-slate-50 rounded-lg p-3 text-center border border-slate-100">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">TB Accounts</p>
-                              <p className="text-lg font-black text-slate-800">{glTbSummary.tb_accounts}</p>
-                            </div>
-                            <div className="bg-slate-50 rounded-lg p-3 text-center border border-slate-100">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">Total Debit</p>
-                              <p className="text-sm font-bold text-slate-800">{fmtPKR(glTbSummary.total_debit)}</p>
-                            </div>
-                            <div className="bg-slate-50 rounded-lg p-3 text-center border border-slate-100">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">Total Credit</p>
-                              <p className="text-sm font-bold text-slate-800">{fmtPKR(glTbSummary.total_credit)}</p>
-                            </div>
-                            <div className={`rounded-lg p-3 text-center border ${glTbSummary.is_balanced ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">Status</p>
-                              <p className={`text-sm font-black ${glTbSummary.is_balanced ? 'text-emerald-600' : 'text-red-600'}`}>
-                                {glTbSummary.is_balanced ? '✓ Balanced' : '✗ Unbalanced'}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-
-                        {(glData.length > 0 || tbData2.length > 0) && (
-                          <div className="space-y-4">
-                            <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
-                              {([["gl", "General Ledger", glData.length], ["tb", "Trial Balance", tbData2.length], ["coa", "Chart of Accounts", coaData.length]] as const).map(([key, label, count]) => (
-                                <button key={key} onClick={() => setGlTbTab(key)} className={`flex-1 px-3 py-2 rounded-md text-xs font-bold transition-all ${glTbTab === key ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>
-                                  {label} ({count})
-                                </button>
-                              ))}
-                            </div>
-                            <div className="border border-slate-200 rounded-xl overflow-hidden">
-                              <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                                {glTbTab === "gl" && (
-                                  <table className="w-full text-xs">
-                                    <thead className="sticky top-0 z-10">
-                                      <tr className="bg-slate-50 border-b border-slate-200">
-                                        <th className="px-3 py-2.5 text-left font-bold text-slate-500 uppercase text-[9px] tracking-wider">#</th>
-                                        <th className="px-3 py-2.5 text-left font-bold text-slate-500 uppercase text-[9px] tracking-wider">Date</th>
-                                        <th className="px-3 py-2.5 text-left font-bold text-slate-500 uppercase text-[9px] tracking-wider">Voucher</th>
-                                        <th className="px-3 py-2.5 text-left font-bold text-slate-500 uppercase text-[9px] tracking-wider">Code</th>
-                                        <th className="px-3 py-2.5 text-left font-bold text-slate-500 uppercase text-[9px] tracking-wider">Account Name</th>
-                                        <th className="px-3 py-2.5 text-left font-bold text-slate-500 uppercase text-[9px] tracking-wider min-w-[200px]">Narration</th>
-                                        <th className="px-3 py-2.5 text-right font-bold text-slate-500 uppercase text-[9px] tracking-wider">Debit (PKR)</th>
-                                        <th className="px-3 py-2.5 text-right font-bold text-slate-500 uppercase text-[9px] tracking-wider">Credit (PKR)</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {glData.map((entry, i) => (
-                                        <tr key={i} className="border-b border-slate-50 hover:bg-blue-50/30">
-                                          <td className="px-3 py-2 text-slate-400 font-mono">{i + 1}</td>
-                                          <td className="px-3 py-2 font-mono text-slate-700">{entry.date}</td>
-                                          <td className="px-3 py-2 font-mono text-blue-600 font-bold">{entry.voucher_no}</td>
-                                          <td className="px-3 py-2 font-mono font-bold text-slate-800">{entry.account_code}</td>
-                                          <td className="px-3 py-2 font-medium text-slate-800">{entry.account_name}</td>
-                                          <td className="px-3 py-2 text-slate-500">{entry.narration}</td>
-                                          <td className="px-3 py-2 text-right font-mono font-bold text-emerald-700">{entry.debit ? Number(entry.debit).toLocaleString("en-PK") : '-'}</td>
-                                          <td className="px-3 py-2 text-right font-mono font-bold text-red-600">{entry.credit ? Number(entry.credit).toLocaleString("en-PK") : '-'}</td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                    <tfoot>
-                                      <tr className="bg-slate-800 text-white font-bold">
-                                        <td colSpan={6} className="px-3 py-3 text-right uppercase text-[10px] tracking-widest">Total</td>
-                                        <td className="px-3 py-3 text-right font-mono">{glData.reduce((s, e) => s + (e.debit || 0), 0).toLocaleString("en-PK")}</td>
-                                        <td className="px-3 py-3 text-right font-mono">{glData.reduce((s, e) => s + (e.credit || 0), 0).toLocaleString("en-PK")}</td>
-                                      </tr>
-                                    </tfoot>
-                                  </table>
-                                )}
-                                {glTbTab === "tb" && (
-                                  <table className="w-full text-xs">
-                                    <thead className="sticky top-0 z-10">
-                                      <tr className="bg-slate-50 border-b border-slate-200">
-                                        <th className="px-3 py-2.5 text-left font-bold text-slate-500 uppercase text-[9px] tracking-wider">Code</th>
-                                        <th className="px-3 py-2.5 text-left font-bold text-slate-500 uppercase text-[9px] tracking-wider">Account Name</th>
-                                        <th className="px-3 py-2.5 text-right font-bold text-slate-500 uppercase text-[9px] tracking-wider">Debit Total</th>
-                                        <th className="px-3 py-2.5 text-right font-bold text-slate-500 uppercase text-[9px] tracking-wider">Credit Total</th>
-                                        <th className="px-3 py-2.5 text-right font-bold text-slate-500 uppercase text-[9px] tracking-wider">Balance (Dr)</th>
-                                        <th className="px-3 py-2.5 text-right font-bold text-slate-500 uppercase text-[9px] tracking-wider">Balance (Cr)</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {tbData2.map((row, i) => (
-                                        <tr key={i} className="border-b border-slate-50 hover:bg-blue-50/30">
-                                          <td className="px-3 py-2 font-mono font-bold text-slate-800">{row.account_code}</td>
-                                          <td className="px-3 py-2 font-medium text-slate-800">{row.account_name}</td>
-                                          <td className="px-3 py-2 text-right font-mono">{Number(row.debit_total || 0).toLocaleString("en-PK")}</td>
-                                          <td className="px-3 py-2 text-right font-mono">{Number(row.credit_total || 0).toLocaleString("en-PK")}</td>
-                                          <td className="px-3 py-2 text-right font-mono font-bold text-emerald-700">{row.balance_dr ? Number(row.balance_dr).toLocaleString("en-PK") : '-'}</td>
-                                          <td className="px-3 py-2 text-right font-mono font-bold text-red-600">{row.balance_cr ? Number(row.balance_cr).toLocaleString("en-PK") : '-'}</td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                    <tfoot>
-                                      <tr className="bg-slate-800 text-white font-bold">
-                                        <td colSpan={2} className="px-3 py-3 text-right uppercase text-[10px] tracking-widest">Total</td>
-                                        <td className="px-3 py-3 text-right font-mono">{tbData2.reduce((s, r) => s + (r.debit_total || 0), 0).toLocaleString("en-PK")}</td>
-                                        <td className="px-3 py-3 text-right font-mono">{tbData2.reduce((s, r) => s + (r.credit_total || 0), 0).toLocaleString("en-PK")}</td>
-                                        <td className="px-3 py-3 text-right font-mono">{tbData2.reduce((s, r) => s + (r.balance_dr || 0), 0).toLocaleString("en-PK")}</td>
-                                        <td className="px-3 py-3 text-right font-mono">{tbData2.reduce((s, r) => s + (r.balance_cr || 0), 0).toLocaleString("en-PK")}</td>
-                                      </tr>
-                                    </tfoot>
-                                  </table>
-                                )}
-                                {glTbTab === "coa" && (
-                                  <table className="w-full text-xs">
-                                    <thead className="sticky top-0 z-10">
-                                      <tr className="bg-slate-50 border-b border-slate-200">
-                                        <th className="px-3 py-2.5 text-left font-bold text-slate-500 uppercase text-[9px] tracking-wider">Code</th>
-                                        <th className="px-3 py-2.5 text-left font-bold text-slate-500 uppercase text-[9px] tracking-wider">Account Name</th>
-                                        <th className="px-3 py-2.5 text-left font-bold text-slate-500 uppercase text-[9px] tracking-wider">Group</th>
-                                        <th className="px-3 py-2.5 text-left font-bold text-slate-500 uppercase text-[9px] tracking-wider">Type</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {coaData.map((acc, i) => (
-                                        <tr key={i} className="border-b border-slate-50 hover:bg-blue-50/30">
-                                          <td className="px-3 py-2 font-mono font-bold text-slate-800">{acc.code}</td>
-                                          <td className="px-3 py-2 font-medium text-slate-800">{acc.name}</td>
-                                          <td className="px-3 py-2 text-slate-500">{acc.group}</td>
-                                          <td className="px-3 py-2"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${acc.type === 'Asset' ? 'bg-blue-50 text-blue-600' : acc.type === 'Liability' ? 'bg-orange-50 text-orange-600' : acc.type === 'Equity' ? 'bg-purple-50 text-purple-600' : acc.type === 'Revenue' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>{acc.type}</span></td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* ── Working Papers ──────────────────────────────── */}
-                    <div className="mt-6 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-8 space-y-6">
-                      <div className="flex items-center justify-between pb-5 border-b border-slate-100">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center shrink-0 shadow-sm shadow-violet-200">
-                            <Layers className="w-[18px] h-[18px] text-white" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="text-sm font-bold text-slate-900">Working Papers Selection</h3>
-                              <span className="text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-2 py-0.5">{selectedPapers.length}/{ALL_WP_REFS.length}</span>
-                            </div>
-                            <p className="text-xs text-slate-500 mt-0.5">Select the audit phases and papers to include in this engagement</p>
-                          </div>
-                        </div>
-                        <button onClick={() => setSelectedPapers(selectedPapers.length === ALL_WP_REFS.length ? [] : ALL_WP_REFS)} className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg px-3 py-1.5 transition-colors">
-                          {selectedPapers.length === ALL_WP_REFS.length ? "Deselect All" : "Select All"}
-                        </button>
-                      </div>
-                      
-                      <div className="space-y-3">
-                        {WP_GROUPS.map(g => {
-                          const allSelected = g.refs.every(r => selectedPapers.includes(r));
-                          const someSelected = g.refs.some(r => selectedPapers.includes(r));
-                          const selectedCount = g.refs.filter(r => selectedPapers.includes(r)).length;
-                          const isExpanded = expandedWPGroups.includes(g.prefix);
-                          return (
-                            <div key={g.prefix} className={`rounded-xl border transition-all ${someSelected ? 'border-blue-200' : 'border-slate-100'}`}>
-                              <div className="flex items-center justify-between p-3">
-                                <button
-                                  onClick={() => setExpandedWPGroups(prev => prev.includes(g.prefix) ? prev.filter(x => x !== g.prefix) : [...prev, g.prefix])}
-                                  className="flex items-center gap-2 flex-1 text-left"
-                                >
-                                  {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
-                                  <span className="text-[10px] font-black text-slate-400">{g.prefix}</span>
-                                  <span className={`text-xs font-bold ${someSelected ? 'text-slate-900' : 'text-slate-500'}`}>{g.label}</span>
-                                  <span className="text-[10px] text-slate-400 font-medium">{selectedCount}/{g.refs.length}</span>
-                                </button>
-                                <Switch 
-                                  checked={allSelected} 
-                                  onCheckedChange={() => toggleGroupSelection(g.refs)}
-                                  className="data-[state=checked]:bg-blue-600"
-                                />
-                              </div>
-                              <AnimatePresence>
-                                {isExpanded && (
-                                  <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
-                                    <div className="px-4 pb-3 space-y-0.5">
-                                      {g.refs.map(ref => {
-                                        const isSelected = selectedPapers.includes(ref);
-                                        return (
-                                          <label key={ref} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
-                                            <input
-                                              type="checkbox"
-                                              checked={isSelected}
-                                              onChange={() => setSelectedPapers(prev => prev.includes(ref) ? prev.filter(r => r !== ref) : [...prev, ref])}
-                                              className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
-                                            />
-                                            <span className="text-[10px] font-black text-slate-400 w-6">{ref}</span>
-                                            <span className={`text-xs ${isSelected ? 'text-slate-800 font-medium' : 'text-slate-500'}`}>{WP_PAPER_NAMES[ref] || ref}</span>
-                                          </label>
-                                        );
-                                      })}
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
 
                     <div className="flex justify-between items-center pt-6 mt-2 border-t border-slate-100">
                       <Button variant="ghost" onClick={() => setStep(0)} size="lg" className="h-11 px-5 font-bold text-slate-500 rounded-xl hover:bg-slate-100">
                         <ChevronRight className="mr-2 w-4 h-4 rotate-180" /> Back to Upload
                       </Button>
                       <Button onClick={() => setStep(2)} disabled={!entityName} size="lg" className="h-11 px-7 bg-blue-600 hover:bg-blue-700 font-bold rounded-xl group shadow-lg shadow-blue-200/60">
-                        Run Analysis <ChevronRight className="ml-2 w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                        Continue to Output <ChevronRight className="ml-2 w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                       </Button>
                     </div>
                   </div>
@@ -2735,20 +2546,20 @@ export default function WorkingPapers() {
                   <div className="space-y-8">
                     {/* Hero Header */}
                     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                      <div className="relative px-8 pt-7 pb-5 overflow-hidden" style={{ background: "linear-gradient(135deg, #1a1033 0%, #2d1b69 50%, #3730a3 100%)" }}>
-                        <div className="absolute top-0 right-0 w-72 h-72 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #a78bfa 0%, transparent 70%)", transform: "translate(30%, -30%)" }} />
+                      <div className="relative px-8 pt-7 pb-5 overflow-hidden" style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #1e3a8a 100%)" }}>
+                        <div className="absolute top-0 right-0 w-72 h-72 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #60a5fa 0%, transparent 70%)", transform: "translate(30%, -30%)" }} />
                         <div className="relative z-10 flex items-start justify-between gap-6">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-3">
-                              <span className="text-[10px] font-black text-violet-300 uppercase tracking-[0.2em]">Step 3 of 5</span>
-                              <div className="h-px flex-1 max-w-[40px] bg-violet-600" />
-                              <span className="text-[10px] font-bold text-violet-400 uppercase tracking-widest">ISA 315 · ISA 240 · ISA 520</span>
+                              <span className="text-[10px] font-black text-blue-300 uppercase tracking-[0.2em]">Step 3 of 3</span>
+                              <div className="h-px flex-1 max-w-[40px] bg-blue-700" />
+                              <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">ISA 200–720 · ISQM 1&2</span>
                             </div>
-                            <h2 className="text-2xl font-black text-white leading-tight">AI Audit Analysis</h2>
-                            <p className="text-sm text-violet-200 mt-1.5 leading-relaxed max-w-xl">The AI engine processes documents to determine materiality, assess inherent and fraud risks, map FS assertions, identify IC weaknesses, and prepare analytical procedures.</p>
+                            <h2 className="text-2xl font-black text-white leading-tight">Output</h2>
+                            <p className="text-sm text-blue-200 mt-1.5 leading-relaxed max-w-xl">AI analysis, General Ledger & Trial Balance, ISA-compliant working papers (A–K), and final export — all in one place.</p>
                           </div>
                           <div className="hidden md:flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 shrink-0 mt-1">
-                            <FileSearch className="w-7 h-7 text-violet-200" />
+                            <Sparkles className="w-7 h-7 text-blue-200" />
                           </div>
                         </div>
                       </div>
@@ -3074,9 +2885,9 @@ export default function WorkingPapers() {
                                     {selectedPapers.length} papers selected across {AUDIT_PHASES.length} phases — proceed to the Generate step to produce your ISA-compliant audit file.
                                   </p>
                                 </div>
-                                <Button onClick={() => setStep(3)} size="lg" className="h-12 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl group shrink-0 shadow-none gap-2">
-                                  Continue to Generate <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                                </Button>
+                                <div className="flex items-center gap-2 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 shrink-0">
+                                  <ChevronDown className="w-4 h-4" /> Continue below to generate
+                                </div>
                               </div>
                             </div>
                           </>
@@ -3092,26 +2903,145 @@ export default function WorkingPapers() {
                   </div>
                 )}
 
-                {/* STEP 3: GENERATE / View Working Papers */}
-                {step === 3 && (
-                  <div className="space-y-8">
-                    {/* Hero Header */}
+                {/* ── GL & TB Generation ────────────────────────────── */}
+                {step === 2 && (
+                  <div className="space-y-6">
                     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                      <div className="relative px-8 pt-7 pb-5 overflow-hidden" style={{ background: "linear-gradient(135deg, #052e16 0%, #064e3b 50%, #065f46 100%)" }}>
-                        <div className="absolute top-0 right-0 w-72 h-72 rounded-full opacity-10" style={{ background: "radial-gradient(circle, #34d399 0%, transparent 70%)", transform: "translate(30%, -30%)" }} />
-                        <div className="relative z-10 flex items-start justify-between gap-6">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-3">
-                              <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em]">Step 4 of 5</span>
-                              <div className="h-px flex-1 max-w-[40px] bg-emerald-700" />
-                              <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">ISA 200–720 · ISQM 1&2</span>
+                      <div className="p-6 space-y-5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shrink-0 shadow-sm shadow-emerald-200">
+                              <Table className="w-[18px] h-[18px] text-white" />
                             </div>
-                            <h2 className="text-2xl font-black text-white leading-tight">Audit Working Papers</h2>
-                            <p className="text-sm text-emerald-200 mt-1.5 leading-relaxed max-w-xl">Auto-generated, fully cross-referenced working papers — A through K. ISA 200–720 · ISQM 1&2 · Companies Act 2017 compliant. Prepared-by, reviewed-by and approved-by sign-offs on every paper.</p>
+                            <div>
+                              <h3 className="text-sm font-bold text-slate-900">General Ledger & Trial Balance</h3>
+                              <p className="text-xs text-slate-500 mt-0.5">AI-generated with Pakistan COA codes, narrations & industry-specific transactions — GL and TB are 100% matched</p>
+                            </div>
                           </div>
-                          <div className="hidden md:flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 shrink-0 mt-1">
-                            <Sparkles className="w-7 h-7 text-emerald-200" />
+                          <div className="flex items-center gap-2">
+                            {glTbSummary && <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">Generated</span>}
+                            <Button onClick={handleGenerateGlTb} disabled={generatingGlTb} className="rounded-xl font-bold gap-2 bg-emerald-600 hover:bg-emerald-700">
+                              {generatingGlTb ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> {glTbSummary ? "Re-generate" : "Generate GL & TB"}</>}
+                            </Button>
                           </div>
+                        </div>
+
+                        {glTbSummary && (
+                          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                            <div className="bg-slate-50 rounded-lg p-3 text-center border border-slate-100">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">GL Entries</p>
+                              <p className="text-lg font-black text-slate-800">{glTbSummary.gl_entries}</p>
+                            </div>
+                            <div className="bg-slate-50 rounded-lg p-3 text-center border border-slate-100">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">TB Accounts</p>
+                              <p className="text-lg font-black text-slate-800">{glTbSummary.tb_accounts}</p>
+                            </div>
+                            <div className="bg-slate-50 rounded-lg p-3 text-center border border-slate-100">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">Total Debit</p>
+                              <p className="text-sm font-bold text-slate-800">{fmtPKR(glTbSummary.total_debit)}</p>
+                            </div>
+                            <div className="bg-slate-50 rounded-lg p-3 text-center border border-slate-100">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">Total Credit</p>
+                              <p className="text-sm font-bold text-slate-800">{fmtPKR(glTbSummary.total_credit)}</p>
+                            </div>
+                            <div className={`rounded-lg p-3 text-center border ${glTbSummary.is_balanced ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">Status</p>
+                              <p className={`text-sm font-black ${glTbSummary.is_balanced ? 'text-emerald-600' : 'text-red-600'}`}>
+                                {glTbSummary.is_balanced ? '✓ Balanced' : '✗ Unbalanced'}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {glData.length > 0 && (
+                          <div className="rounded-xl border border-slate-200 overflow-hidden">
+                            <button onClick={() => setExpandedWPGroups(prev => prev.includes("__gl__") ? prev.filter(p => p !== "__gl__") : [...prev, "__gl__"])}
+                              className="w-full flex items-center justify-between px-5 py-3.5 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+                            >
+                              <span className="text-xs font-bold text-slate-700">General Ledger ({glData.length} entries)</span>
+                              {expandedWPGroups.includes("__gl__") ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                            </button>
+                            <AnimatePresence>
+                              {expandedWPGroups.includes("__gl__") && (
+                                <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-[11px]">
+                                      <thead className="bg-slate-50 border-b border-slate-200">
+                                        <tr>{["Date","Account","Narration","Debit","Credit","Ref"].map(h => <th key={h} className="px-3 py-2 text-left font-bold text-slate-500 uppercase tracking-widest text-[10px]">{h}</th>)}</tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100">
+                                        {glData.slice(0, 50).map((row: any, i: number) => (
+                                          <tr key={i} className="hover:bg-slate-50">
+                                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{row.date}</td>
+                                            <td className="px-3 py-2 font-medium text-slate-800">{row.account}</td>
+                                            <td className="px-3 py-2 text-slate-500 max-w-[200px] truncate">{row.narration}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-emerald-700">{row.debit ? fmtPKR(row.debit) : ""}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-red-600">{row.credit ? fmtPKR(row.credit) : ""}</td>
+                                            <td className="px-3 py-2 text-slate-400">{row.ref}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        )}
+
+                        {tbData2.length > 0 && (
+                          <div className="rounded-xl border border-slate-200 overflow-hidden">
+                            <button onClick={() => setExpandedWPGroups(prev => prev.includes("__tb__") ? prev.filter(p => p !== "__tb__") : [...prev, "__tb__"])}
+                              className="w-full flex items-center justify-between px-5 py-3.5 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+                            >
+                              <span className="text-xs font-bold text-slate-700">Trial Balance ({tbData2.length} accounts)</span>
+                              {expandedWPGroups.includes("__tb__") ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                            </button>
+                            <AnimatePresence>
+                              {expandedWPGroups.includes("__tb__") && (
+                                <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-[11px]">
+                                      <thead className="bg-slate-50 border-b border-slate-200">
+                                        <tr>{["Code","Account","Opening","Debit","Credit","Closing","Type"].map(h => <th key={h} className="px-3 py-2 text-left font-bold text-slate-500 uppercase tracking-widest text-[10px]">{h}</th>)}</tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100">
+                                        {tbData2.map((row: any, i: number) => (
+                                          <tr key={i} className="hover:bg-slate-50">
+                                            <td className="px-3 py-2 font-mono text-[10px] text-slate-500">{row.code}</td>
+                                            <td className="px-3 py-2 font-medium text-slate-800">{row.account}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-slate-600">{row.opening ? fmtPKR(row.opening) : "—"}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-emerald-700">{row.debit ? fmtPKR(row.debit) : "—"}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-red-600">{row.credit ? fmtPKR(row.credit) : "—"}</td>
+                                            <td className="px-3 py-2 text-right font-mono font-bold text-slate-800">{row.closing ? fmtPKR(row.closing) : "—"}</td>
+                                            <td className="px-3 py-2 text-[10px] text-slate-400">{row.type}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Working Papers Generation ─────────────────────── */}
+                {step === 2 && (
+                  <div className="space-y-8">
+                    {/* Working Papers section card header */}
+                    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                      <div className="px-6 py-4 flex items-center gap-3 border-b border-slate-100">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shrink-0 shadow-sm shadow-emerald-200">
+                          <Sparkles className="w-[18px] h-[18px] text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900">Working Papers</h3>
+                          <p className="text-xs text-slate-500 mt-0.5">ISA 200–720 · ISQM 1&2 · Phases A–K · {selectedPapers.length} papers selected</p>
                         </div>
                       </div>
                     </div>
@@ -3327,37 +3257,21 @@ export default function WorkingPapers() {
                       </>
                     )}
 
-                    <div className="flex justify-between items-center pt-6 mt-2 border-t border-slate-100">
-                      <Button variant="ghost" onClick={() => setStep(2)} className="h-11 px-5 font-bold text-slate-500 rounded-xl hover:bg-slate-100">
-                        <ChevronRight className="mr-2 w-4 h-4 rotate-180" /> Back to Analysis
-                      </Button>
-                      <Button onClick={() => setStep(4)} size="lg" className="h-11 px-7 bg-blue-600 hover:bg-blue-700 font-bold rounded-xl group shadow-lg shadow-blue-200/60">
-                        Export & Finalize <ChevronRight className="ml-2 w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                      </Button>
-                    </div>
                   </div>
                 )}
 
-                {/* STEP 4: EXPORT */}
-                {step === 4 && (
+                {/* ── Export & Finalize ──────────────────────────────── */}
+                {step === 2 && (
                   <div className="space-y-8">
-                    {/* Hero Header */}
+                    {/* Export section card header */}
                     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                      <div className="relative px-8 pt-7 pb-5 overflow-hidden" style={{ background: "linear-gradient(135deg, #0c0a09 0%, #1c1917 50%, #1a1a2e 100%)" }}>
-                        <div className="absolute top-0 right-0 w-72 h-72 rounded-full opacity-10" style={{ background: "radial-gradient(circle, #fbbf24 0%, transparent 70%)", transform: "translate(30%, -30%)" }} />
-                        <div className="relative z-10 flex items-start justify-between gap-6">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-3">
-                              <span className="text-[10px] font-black text-yellow-400 uppercase tracking-[0.2em]">Step 5 of 5</span>
-                              <div className="h-px flex-1 max-w-[40px] bg-yellow-800" />
-                              <span className="text-[10px] font-bold text-yellow-600 uppercase tracking-widest">ISA 230 · Final Archive</span>
-                            </div>
-                            <h2 className="text-2xl font-black text-white leading-tight">Export & Finalize</h2>
-                            <p className="text-sm text-stone-400 mt-1.5 leading-relaxed max-w-xl">Download the complete, inspection-ready audit file — all phases, working papers, and evidence in one deliverable. Choose Excel workbook, Word report, archived PDF, or confirmation letters bundle.</p>
-                          </div>
-                          <div className="hidden md:flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 shrink-0 mt-1">
-                            <FileOutput className="w-7 h-7 text-yellow-400" />
-                          </div>
+                      <div className="px-6 py-4 flex items-center gap-3 border-b border-slate-100">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center shrink-0 shadow-sm shadow-yellow-200">
+                          <FileOutput className="w-[18px] h-[18px] text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900">Export & Finalize</h3>
+                          <p className="text-xs text-slate-500 mt-0.5">Download working papers · Excel, Word, PDF, or Confirmations bundle</p>
                         </div>
                       </div>
                     </div>
@@ -3395,8 +3309,8 @@ export default function WorkingPapers() {
                               <p className="text-amber-300 font-bold text-sm">No working papers generated yet.</p>
                               <p className="text-amber-400/70 text-xs mt-0.5">Please go back to the Generate step and generate working papers before downloading.</p>
                             </div>
-                            <Button size="sm" variant="outline" onClick={() => setStep(3)} className="ml-auto border-amber-500/40 text-amber-300 hover:bg-amber-500/10 shrink-0">
-                              Go to Generate
+                            <Button size="sm" variant="outline" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="ml-auto border-amber-500/40 text-amber-300 hover:bg-amber-500/10 shrink-0">
+                              Scroll up to Generate
                             </Button>
                           </div>
                         )}
