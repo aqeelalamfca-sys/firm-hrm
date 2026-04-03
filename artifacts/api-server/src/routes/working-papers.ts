@@ -609,8 +609,8 @@ Return ONLY valid JSON:
 }`;
 
   try {
-    const completion = await ai.chat.completions.create({
-      model: ai._model || "gpt-4o",
+    const completion = await ai.client.chat.completions.create({
+      model: ai.model,
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
       response_format: { type: "json_object" },
