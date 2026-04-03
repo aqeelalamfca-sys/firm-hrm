@@ -10,7 +10,7 @@ import {
   BarChart2, FileCheck, ClipboardCheck, Star, Info, Sparkles,
   FileSearch, Scale, Target, Layers, FileOutput, Check, Table,
   Activity, GitMerge, Link2, FileSpreadsheet, Mail, Hash, Settings, LayoutGrid, TrendingDown,
-  Trash2, ListPlus, SplitSquareVertical
+  Trash2, ListPlus, SplitSquareVertical, AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -926,7 +926,16 @@ export default function WorkingPapers() {
       if (d.bsData && d.bsData.length > 0) setBsData(d.bsData);
       if (d.plData && d.plData.length > 0) setPlData(d.plData);
       if (d.salesTaxRows && d.salesTaxRows.length > 0) setSalesTaxRows(d.salesTaxRows);
-      if (d.step && d.step > 0) setStep(d.step);
+      if (d.workingPapers && d.workingPapers.length > 0) setWorkingPapers(d.workingPapers);
+      if (d.evidenceIndex && d.evidenceIndex.length > 0) setEvidenceIndex(d.evidenceIndex);
+      if (d.generationMeta && typeof d.generationMeta === "object") setGenerationMeta(d.generationMeta);
+      // If draft restores to export step but no papers exist, fall back to generate step
+      const restoredStep = d.step || 0;
+      if (restoredStep === 4 && (!d.workingPapers || d.workingPapers.length === 0)) {
+        setStep(3);
+      } else if (restoredStep > 0) {
+        setStep(restoredStep);
+      }
       setDraftLoaded(true);
     } catch {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -945,6 +954,7 @@ export default function WorkingPapers() {
         stPeriodFrom, stPeriodTo, stTaxType, stJurisdiction, stReturnPeriod,
         preparer, reviewer, approver, instructions,
         configValues, bsData, plData, salesTaxRows, step,
+        workingPapers, evidenceIndex, generationMeta,
       };
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     }, 1500);
@@ -957,7 +967,8 @@ export default function WorkingPapers() {
     reportDate, filingDeadline, archiveDate,
     stPeriodFrom, stPeriodTo, stTaxType, stJurisdiction, stReturnPeriod,
     preparer, reviewer, approver, instructions,
-    configValues, bsData, plData, salesTaxRows, step, draftLoaded,
+    configValues, bsData, plData, salesTaxRows, step,
+    workingPapers, evidenceIndex, generationMeta, draftLoaded,
   ]);
 
   // ── Auto-extract entity + financials from uploaded docs ──────────────────
@@ -3253,17 +3264,29 @@ export default function WorkingPapers() {
                           </div>
                         </div>
 
+                        {workingPapers.length === 0 && (
+                          <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-5 py-4 mb-2">
+                            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+                            <div>
+                              <p className="text-amber-300 font-bold text-sm">No working papers generated yet.</p>
+                              <p className="text-amber-400/70 text-xs mt-0.5">Please go back to the Generate step and generate working papers before downloading.</p>
+                            </div>
+                            <Button size="sm" variant="outline" onClick={() => setStep(3)} className="ml-auto border-amber-500/40 text-amber-300 hover:bg-amber-500/10 shrink-0">
+                              Go to Generate
+                            </Button>
+                          </div>
+                        )}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {[
-                            { id: "excel", label: "Microsoft Excel File", ext: ".xlsx", desc: "Complete workbook with automated cross-references and section tabs.", icon: Table, color: "emerald", handler: handleExportExcel, loading: exportingExcel },
-                            { id: "docx", label: "Microsoft Word File", ext: ".docx", desc: "Professional report format suitable for management deliverables.", icon: FileSpreadsheet, color: "sky", handler: handleExportDocx, loading: exportingDocx },
-                            { id: "pdf", label: "Adobe PDF File", ext: ".pdf", desc: "Final archived copy with high-fidelity formatting and sign-offs.", icon: FileText, color: "rose", handler: handleExport, loading: exporting },
-                            { id: "confirmations", label: "Confirmations Bundle", ext: ".pdf", desc: "Automated generation of bank, debtor, and creditor confirmation letters.", icon: Mail, color: "violet", handler: handleExportConfirmations, loading: exportingConfirmations },
+                            { id: "excel", label: "Microsoft Excel File", ext: ".xlsx", desc: "Complete workbook with automated cross-references and section tabs.", icon: Table, color: "emerald", handler: handleExportExcel, loading: exportingExcel, needsPapers: true },
+                            { id: "docx", label: "Microsoft Word File", ext: ".docx", desc: "Professional report format suitable for management deliverables.", icon: FileSpreadsheet, color: "sky", handler: handleExportDocx, loading: exportingDocx, needsPapers: true },
+                            { id: "pdf", label: "Adobe PDF File", ext: ".pdf", desc: "Final archived copy with high-fidelity formatting and sign-offs.", icon: FileText, color: "rose", handler: handleExport, loading: exporting, needsPapers: true },
+                            { id: "confirmations", label: "Confirmations Bundle", ext: ".pdf", desc: "Automated generation of bank, debtor, and creditor confirmation letters.", icon: Mail, color: "violet", handler: handleExportConfirmations, loading: exportingConfirmations, needsPapers: false },
                           ].map(card => (
                             <button
                               key={card.id}
                               onClick={card.handler}
-                              disabled={card.loading}
+                              disabled={card.loading || (card.needsPapers && workingPapers.length === 0)}
                               className="group bg-white/5 border border-white/10 hover:bg-white/[0.08] hover:border-white/20 rounded-xl p-6 transition-all text-left relative overflow-hidden"
                             >
                               <div className="flex items-center gap-4">
