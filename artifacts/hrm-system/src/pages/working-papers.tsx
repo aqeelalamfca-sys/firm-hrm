@@ -1847,7 +1847,7 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
 // ─── MAIN COMPONENT ────────────────────────────────────────────────────────────
 
 export default function WorkingPapers() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const params = useParams<{ stepId?: string }>();
@@ -1913,9 +1913,6 @@ export default function WorkingPapers() {
   const [generatingWPs, setGeneratingWPs] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
   const [wpGenProgress, setWpGenProgress] = useState(0);
-
-  // ─ Derived ─
-  const token = (user as any)?.token || "";
 
   function computeDefaultSelectedPapers(v: VariableMatrix): string[] {
     const selected: string[] = [];
