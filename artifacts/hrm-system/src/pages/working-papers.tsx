@@ -40,6 +40,266 @@ const DOC_TYPES = [
 ];
 
 const DRAFT_KEY = "ana_wp_draft_v2";
+
+type CompanyProfile = "pie" | "large" | "medium" | "small" | "ngo";
+
+const COMPANY_PROFILE_LABELS: Record<CompanyProfile, string> = {
+  pie:    "PIE / Listed",
+  large:  "Large Private Ltd",
+  medium: "Medium Private Ltd",
+  small:  "Small / Micro",
+  ngo:    "NGO / Section 42",
+};
+
+// Recommended default values for each of the 5 company profiles
+const PROFILE_DEFAULTS: Record<CompanyProfile, Record<string, any>> = {
+  pie: {
+    entityLegalForm: "Company", companyCategory: "Listed", entitySizeClassification: "PIE",
+    ownershipStructure: "Local", operationalStatus: "Active", industrySectorDetailed: "Manufacturing",
+    regulatedIndustryFlag: true, regulatorType: ["SECP","FBR"],
+    financialStatementsType: "Consolidated", reportingFrameworkDetailed: "Full IFRS",
+    basisOfPreparation: "Historical Cost", comparativeInformationType: "Full Comparative FS",
+    priorYearFsStatus: "Audited", predecessorAuditorInvolved: false, changeInAccountingPolicyFlag: false, reclassificationRestatementFlag: false,
+    materialityBenchmark: "PBT", specificMaterialityRequired: true, specificMaterialityAreas: ["Related Parties","Directors' Remuneration","Revenue"],
+    overallFsRiskLevel: "High", significantRisksIdentified: true,
+    significantRiskAreas: ["Revenue","Management Override","Estimates","Related Parties","Tax"],
+    fraudRiskFactorsPresent: true, managementOverrideRisk: true, noclarIndicator: false,
+    managementIntegrityConcern: false, goingConcernRiskLevel: "Low",
+    serviceOrganizationUsed: true, serviceOrganizationType: ["Payroll Processor","ERP Hosting"],
+    accountingSystemEnvironment: "ERP", itComplexity: "High",
+    ipeSystemReportsUsed: true, itgcTestingPlanned: true,
+    internalAuditFunctionExists: true, internalAuditReliancePlanned: true,
+    auditorsExpertUsed: true, managementExpertUsed: true, expertType: ["Valuer","Actuary"],
+    multiLocationAudit: true, numberOfLocations: 5, interimAuditPerformed: true,
+    applicableBusinessCycles: ["Revenue","Purchases","Inventory","Payroll","Treasury","Fixed Assets","Financial Close","Tax"],
+    controlRelianceByCycle: ["Revenue","Payroll","Treasury"],
+    segregationOfDutiesConcern: false, priorYearDeficienciesUnresolved: false,
+    substantiveAnalyticalProceduresPlanned: true, externalConfirmationsRequired: true,
+    confirmationTypesRequired: ["Banks","Trade Debtors","Trade Creditors","Loan Lenders","Lawyers","Related Parties"],
+    samplingApproach: "Statistical", stratificationRequired: true,
+    samplingUnit: "Invoice", selectionTechnique: "Random",
+    incomeTaxRegistered: true, salesTaxRegistered: true, salesTaxJurisdiction: ["FBR","PRA"],
+    fedApplicable: false, withholdingTaxAgentApplicable: true, salesTaxWithholdingApplicable: true,
+    deferredTaxApplicable: true, pendingTaxAssessmentsAppeals: false, atlFilerStatus: "Filer",
+    secpFilingApplicable: true, otherStatutoryDuesApplicable: ["EOBI","WWF","WPPF","Gratuity"],
+    donorGrantRestrictionsApplicable: false, section42NpoComplianceApplicable: false,
+    cashBankSignificant: true, receivablesSignificant: true, inventorySignificant: true,
+    inventoryCountAttendanceRequired: true, inventoryHeldByThirdParties: false, slowMovingObsoleteInventoryRisk: true,
+    fixedAssetsSignificant: true, cwipSignificant: false, intangiblesSignificant: true,
+    borrowingsSignificant: true, covenantComplianceRisk: true, leaseAccountingApplicable: true,
+    revenueComplexity: "High", longTermContractsExist: false,
+    provisionsContingenciesSignificant: true, relatedPartiesSignificant: true,
+    subsequentEventsSensitivity: "High",
+    independenceThreatsIdentified: false, nonAuditServicesProvided: true,
+    partnerRotationIssue: false, feeDependenceOverdueFees: false,
+    eqcrRequired: true,
+    tcwgBoardExists: true, auditCommitteeExists: true, authorizedSignatoriesAvailable: true,
+    legalCounselExists: true, boardMinutesAvailable: true,
+    expectedOpinionStatus: "Unmodified Expected", kamApplicable: true,
+    eomOmConsideration: false, otherInformationApplicable: true,
+    otherInformationSources: ["Directors' Report","Annual Report","Chairman Review"],
+    goingConcernMaterialUncertaintyExpected: false, referenceToExpertComponentAuditorInReport: false,
+    reportLanguage: "English",
+    versionControlOnRevisedUploads: true, fsTbGlSourceForWpGeneration: "Both",
+    autoRegenerateWpsOnVariableChange: true, finalizationReviewGate: true,
+    archiveRetentionLogic: "PIE Policy",
+  },
+  large: {
+    entityLegalForm: "Company", companyCategory: "Private Limited", entitySizeClassification: "Large",
+    ownershipStructure: "Family-Owned", operationalStatus: "Active", industrySectorDetailed: "Manufacturing",
+    regulatedIndustryFlag: false,
+    financialStatementsType: "Standalone", reportingFrameworkDetailed: "Full IFRS",
+    basisOfPreparation: "Historical Cost", comparativeInformationType: "Full Comparative FS",
+    priorYearFsStatus: "Audited", predecessorAuditorInvolved: false, changeInAccountingPolicyFlag: false, reclassificationRestatementFlag: false,
+    materialityBenchmark: "PBT", specificMaterialityRequired: false,
+    overallFsRiskLevel: "High", significantRisksIdentified: true,
+    significantRiskAreas: ["Revenue","Management Override","Related Parties"],
+    fraudRiskFactorsPresent: false, managementOverrideRisk: true, noclarIndicator: false,
+    managementIntegrityConcern: false, goingConcernRiskLevel: "Low",
+    serviceOrganizationUsed: true, serviceOrganizationType: ["Payroll Processor"],
+    accountingSystemEnvironment: "ERP", itComplexity: "High",
+    ipeSystemReportsUsed: true, itgcTestingPlanned: true,
+    internalAuditFunctionExists: true, internalAuditReliancePlanned: false,
+    auditorsExpertUsed: false, managementExpertUsed: false,
+    multiLocationAudit: false, interimAuditPerformed: true,
+    applicableBusinessCycles: ["Revenue","Purchases","Inventory","Payroll","Treasury","Fixed Assets","Financial Close","Tax"],
+    controlRelianceByCycle: ["Revenue","Purchases"],
+    segregationOfDutiesConcern: false, priorYearDeficienciesUnresolved: false,
+    substantiveAnalyticalProceduresPlanned: true, externalConfirmationsRequired: true,
+    confirmationTypesRequired: ["Banks","Trade Debtors","Trade Creditors"],
+    samplingApproach: "Statistical", stratificationRequired: true,
+    samplingUnit: "Invoice", selectionTechnique: "Systematic",
+    incomeTaxRegistered: true, salesTaxRegistered: true, salesTaxJurisdiction: ["FBR"],
+    fedApplicable: false, withholdingTaxAgentApplicable: true, salesTaxWithholdingApplicable: false,
+    deferredTaxApplicable: true, pendingTaxAssessmentsAppeals: false, atlFilerStatus: "Filer",
+    secpFilingApplicable: true, otherStatutoryDuesApplicable: ["EOBI","WWF","Gratuity"],
+    donorGrantRestrictionsApplicable: false, section42NpoComplianceApplicable: false,
+    cashBankSignificant: true, receivablesSignificant: true, inventorySignificant: true,
+    inventoryCountAttendanceRequired: true, inventoryHeldByThirdParties: false, slowMovingObsoleteInventoryRisk: true,
+    fixedAssetsSignificant: true, cwipSignificant: false, intangiblesSignificant: false,
+    borrowingsSignificant: true, covenantComplianceRisk: false, leaseAccountingApplicable: true,
+    revenueComplexity: "Moderate", longTermContractsExist: false,
+    provisionsContingenciesSignificant: true, relatedPartiesSignificant: true,
+    subsequentEventsSensitivity: "Moderate",
+    independenceThreatsIdentified: false, nonAuditServicesProvided: false,
+    partnerRotationIssue: false, feeDependenceOverdueFees: false,
+    eqcrRequired: false,
+    tcwgBoardExists: true, auditCommitteeExists: true, authorizedSignatoriesAvailable: true,
+    legalCounselExists: true, boardMinutesAvailable: true,
+    expectedOpinionStatus: "Unmodified Expected", kamApplicable: false,
+    eomOmConsideration: false, otherInformationApplicable: false,
+    goingConcernMaterialUncertaintyExpected: false, referenceToExpertComponentAuditorInReport: false,
+    reportLanguage: "English",
+    versionControlOnRevisedUploads: true, fsTbGlSourceForWpGeneration: "TB-Driven",
+    autoRegenerateWpsOnVariableChange: true, finalizationReviewGate: true,
+    archiveRetentionLogic: "Standard Firm Policy",
+  },
+  medium: {
+    entityLegalForm: "Company", companyCategory: "Private Limited", entitySizeClassification: "Medium",
+    ownershipStructure: "Family-Owned", operationalStatus: "Active", industrySectorDetailed: "Services",
+    regulatedIndustryFlag: false,
+    financialStatementsType: "Standalone", reportingFrameworkDetailed: "IFRS for SMEs",
+    basisOfPreparation: "Historical Cost", comparativeInformationType: "Corresponding Figures",
+    priorYearFsStatus: "Audited", predecessorAuditorInvolved: false, changeInAccountingPolicyFlag: false, reclassificationRestatementFlag: false,
+    materialityBenchmark: "Revenue", specificMaterialityRequired: false,
+    overallFsRiskLevel: "Moderate", significantRisksIdentified: true,
+    significantRiskAreas: ["Revenue","Management Override"],
+    fraudRiskFactorsPresent: false, managementOverrideRisk: true, noclarIndicator: false,
+    managementIntegrityConcern: false, goingConcernRiskLevel: "Moderate",
+    serviceOrganizationUsed: false, accountingSystemEnvironment: "Desktop Accounting Software",
+    itComplexity: "Moderate", ipeSystemReportsUsed: false, itgcTestingPlanned: false,
+    internalAuditFunctionExists: false, internalAuditReliancePlanned: false,
+    auditorsExpertUsed: false, managementExpertUsed: false,
+    multiLocationAudit: false, interimAuditPerformed: false,
+    applicableBusinessCycles: ["Revenue","Purchases","Payroll","Fixed Assets","Tax"],
+    controlRelianceByCycle: ["None"],
+    segregationOfDutiesConcern: false, priorYearDeficienciesUnresolved: false,
+    substantiveAnalyticalProceduresPlanned: true, externalConfirmationsRequired: true,
+    confirmationTypesRequired: ["Banks","Trade Debtors"],
+    samplingApproach: "Non-Statistical", stratificationRequired: false,
+    samplingUnit: "Invoice", selectionTechnique: "Haphazard",
+    incomeTaxRegistered: true, salesTaxRegistered: false,
+    fedApplicable: false, withholdingTaxAgentApplicable: true, salesTaxWithholdingApplicable: false,
+    deferredTaxApplicable: true, pendingTaxAssessmentsAppeals: false, atlFilerStatus: "Filer",
+    secpFilingApplicable: true, otherStatutoryDuesApplicable: ["EOBI","Gratuity"],
+    donorGrantRestrictionsApplicable: false, section42NpoComplianceApplicable: false,
+    cashBankSignificant: true, receivablesSignificant: true, inventorySignificant: true,
+    inventoryCountAttendanceRequired: true, inventoryHeldByThirdParties: false, slowMovingObsoleteInventoryRisk: false,
+    fixedAssetsSignificant: true, cwipSignificant: false, intangiblesSignificant: false,
+    borrowingsSignificant: true, covenantComplianceRisk: false, leaseAccountingApplicable: false,
+    revenueComplexity: "Moderate", longTermContractsExist: false,
+    provisionsContingenciesSignificant: false, relatedPartiesSignificant: true,
+    subsequentEventsSensitivity: "Moderate",
+    independenceThreatsIdentified: false, nonAuditServicesProvided: false,
+    partnerRotationIssue: false, feeDependenceOverdueFees: false,
+    eqcrRequired: false,
+    tcwgBoardExists: true, auditCommitteeExists: false, authorizedSignatoriesAvailable: true,
+    legalCounselExists: false, boardMinutesAvailable: true,
+    expectedOpinionStatus: "Unmodified Expected", kamApplicable: false,
+    eomOmConsideration: false, otherInformationApplicable: false,
+    goingConcernMaterialUncertaintyExpected: false, referenceToExpertComponentAuditorInReport: false,
+    reportLanguage: "English",
+    versionControlOnRevisedUploads: true, fsTbGlSourceForWpGeneration: "TB-Driven",
+    autoRegenerateWpsOnVariableChange: true, finalizationReviewGate: true,
+    archiveRetentionLogic: "Standard Firm Policy",
+  },
+  small: {
+    entityLegalForm: "Single Member Company", companyCategory: "Private Limited", entitySizeClassification: "Small",
+    ownershipStructure: "Family-Owned", operationalStatus: "Active", industrySectorDetailed: "Trading",
+    regulatedIndustryFlag: false,
+    financialStatementsType: "Standalone", reportingFrameworkDetailed: "IFRS for SMEs",
+    basisOfPreparation: "Historical Cost", comparativeInformationType: "Corresponding Figures",
+    priorYearFsStatus: "Reviewed", predecessorAuditorInvolved: false, changeInAccountingPolicyFlag: false, reclassificationRestatementFlag: false,
+    materialityBenchmark: "Revenue", specificMaterialityRequired: false,
+    overallFsRiskLevel: "Moderate", significantRisksIdentified: false,
+    fraudRiskFactorsPresent: false, managementOverrideRisk: true, noclarIndicator: false,
+    managementIntegrityConcern: false, goingConcernRiskLevel: "Moderate",
+    serviceOrganizationUsed: false, accountingSystemEnvironment: "Excel-Based",
+    itComplexity: "Low", ipeSystemReportsUsed: false, itgcTestingPlanned: false,
+    internalAuditFunctionExists: false, internalAuditReliancePlanned: false,
+    auditorsExpertUsed: false, managementExpertUsed: false,
+    multiLocationAudit: false, interimAuditPerformed: false,
+    applicableBusinessCycles: ["Revenue","Purchases","Payroll"],
+    controlRelianceByCycle: ["None"],
+    segregationOfDutiesConcern: true, priorYearDeficienciesUnresolved: false,
+    substantiveAnalyticalProceduresPlanned: true, externalConfirmationsRequired: false,
+    samplingApproach: "Key Item Testing", stratificationRequired: false,
+    samplingUnit: "Invoice", selectionTechnique: "Key Item",
+    incomeTaxRegistered: true, salesTaxRegistered: false,
+    fedApplicable: false, withholdingTaxAgentApplicable: false, salesTaxWithholdingApplicable: false,
+    deferredTaxApplicable: false, pendingTaxAssessmentsAppeals: false, atlFilerStatus: "Filer",
+    secpFilingApplicable: false, otherStatutoryDuesApplicable: ["EOBI"],
+    donorGrantRestrictionsApplicable: false, section42NpoComplianceApplicable: false,
+    cashBankSignificant: true, receivablesSignificant: true, inventorySignificant: false,
+    inventoryCountAttendanceRequired: false, inventoryHeldByThirdParties: false, slowMovingObsoleteInventoryRisk: false,
+    fixedAssetsSignificant: true, cwipSignificant: false, intangiblesSignificant: false,
+    borrowingsSignificant: false, covenantComplianceRisk: false, leaseAccountingApplicable: false,
+    revenueComplexity: "Low", longTermContractsExist: false,
+    provisionsContingenciesSignificant: false, relatedPartiesSignificant: true,
+    subsequentEventsSensitivity: "Low",
+    independenceThreatsIdentified: false, nonAuditServicesProvided: false,
+    partnerRotationIssue: false, feeDependenceOverdueFees: false,
+    eqcrRequired: false,
+    tcwgBoardExists: false, auditCommitteeExists: false, authorizedSignatoriesAvailable: true,
+    legalCounselExists: false, boardMinutesAvailable: false,
+    expectedOpinionStatus: "Unmodified Expected", kamApplicable: false,
+    eomOmConsideration: false, otherInformationApplicable: false,
+    goingConcernMaterialUncertaintyExpected: false, referenceToExpertComponentAuditorInReport: false,
+    reportLanguage: "English",
+    versionControlOnRevisedUploads: true, fsTbGlSourceForWpGeneration: "FS-Driven",
+    autoRegenerateWpsOnVariableChange: true, finalizationReviewGate: true,
+    archiveRetentionLogic: "Standard Firm Policy",
+  },
+  ngo: {
+    entityLegalForm: "Society", companyCategory: "Section 42", entitySizeClassification: "PIC",
+    ownershipStructure: "Donor-Controlled", operationalStatus: "Active", industrySectorDetailed: "NGO/NPO",
+    regulatedIndustryFlag: false,
+    financialStatementsType: "Standalone", reportingFrameworkDetailed: "Special Purpose",
+    basisOfPreparation: "Historical Cost", comparativeInformationType: "Corresponding Figures",
+    priorYearFsStatus: "Audited", predecessorAuditorInvolved: false, changeInAccountingPolicyFlag: false, reclassificationRestatementFlag: false,
+    materialityBenchmark: "Total Expenses", specificMaterialityRequired: true, specificMaterialityAreas: ["Compliance","Disclosures"],
+    overallFsRiskLevel: "Moderate", significantRisksIdentified: false,
+    fraudRiskFactorsPresent: false, managementOverrideRisk: true, noclarIndicator: false,
+    managementIntegrityConcern: false, goingConcernRiskLevel: "Moderate",
+    serviceOrganizationUsed: false, accountingSystemEnvironment: "Desktop Accounting Software",
+    itComplexity: "Low", ipeSystemReportsUsed: false, itgcTestingPlanned: false,
+    internalAuditFunctionExists: false, internalAuditReliancePlanned: false,
+    auditorsExpertUsed: false, managementExpertUsed: false,
+    multiLocationAudit: false, interimAuditPerformed: false,
+    applicableBusinessCycles: ["Grants/Donors","Purchases","Payroll","Fixed Assets"],
+    controlRelianceByCycle: ["None"],
+    segregationOfDutiesConcern: true, priorYearDeficienciesUnresolved: false,
+    substantiveAnalyticalProceduresPlanned: true, externalConfirmationsRequired: true,
+    confirmationTypesRequired: ["Banks","Loan Lenders"],
+    samplingApproach: "Non-Statistical", stratificationRequired: false,
+    samplingUnit: "Voucher", selectionTechnique: "Haphazard",
+    incomeTaxRegistered: true, salesTaxRegistered: false,
+    fedApplicable: false, withholdingTaxAgentApplicable: true, salesTaxWithholdingApplicable: false,
+    deferredTaxApplicable: false, pendingTaxAssessmentsAppeals: false, atlFilerStatus: "Filer",
+    secpFilingApplicable: true, otherStatutoryDuesApplicable: ["EOBI","Gratuity"],
+    donorGrantRestrictionsApplicable: true, section42NpoComplianceApplicable: true,
+    cashBankSignificant: true, receivablesSignificant: false, inventorySignificant: false,
+    inventoryCountAttendanceRequired: false, inventoryHeldByThirdParties: false, slowMovingObsoleteInventoryRisk: false,
+    fixedAssetsSignificant: true, cwipSignificant: false, intangiblesSignificant: false,
+    borrowingsSignificant: false, covenantComplianceRisk: false, leaseAccountingApplicable: false,
+    revenueComplexity: "Low", longTermContractsExist: false,
+    provisionsContingenciesSignificant: false, relatedPartiesSignificant: false,
+    subsequentEventsSensitivity: "Moderate",
+    independenceThreatsIdentified: false, nonAuditServicesProvided: false,
+    partnerRotationIssue: false, feeDependenceOverdueFees: false,
+    eqcrRequired: false,
+    tcwgBoardExists: true, auditCommitteeExists: false, authorizedSignatoriesAvailable: true,
+    legalCounselExists: false, boardMinutesAvailable: true,
+    expectedOpinionStatus: "Unmodified Expected", kamApplicable: false,
+    eomOmConsideration: false, otherInformationApplicable: true,
+    otherInformationSources: ["Donor Report","Annual Report"],
+    goingConcernMaterialUncertaintyExpected: false, referenceToExpertComponentAuditorInReport: false,
+    reportLanguage: "English",
+    versionControlOnRevisedUploads: true, fsTbGlSourceForWpGeneration: "FS-Driven",
+    autoRegenerateWpsOnVariableChange: true, finalizationReviewGate: true,
+    archiveRetentionLogic: "Donor Policy",
+  },
+};
 interface AnalysisResult {
   entity?: any; financials?: any; materiality?: any;
   risk_assessment?: any; key_audit_areas?: any[];
@@ -655,6 +915,14 @@ export default function WorkingPapers() {
   // ── Variable Template Download / Upload ────────────────────────────────────
   const [varTemplateUploading, setVarTemplateUploading] = useState(false);
   const varTemplateFileRef = useRef<HTMLInputElement>(null);
+  const [companyProfilePreset, setCompanyProfilePreset] = useState<CompanyProfile | "">("");
+
+  const applyProfileDefaults = useCallback((profile: CompanyProfile) => {
+    const defaults = PROFILE_DEFAULTS[profile];
+    if (!defaults) return;
+    setConfigValues(prev => ({ ...prev, ...defaults }));
+    toast({ title: `Profile Applied: ${COMPANY_PROFILE_LABELS[profile]}`, description: "Engagement variables pre-filled. Review and adjust in the Configure step." });
+  }, [toast]);
 
   const downloadVariableTemplate = useCallback(() => {
     const sectionOrder: Record<string, string> = {
@@ -675,9 +943,16 @@ export default function WorkingPapers() {
       system_controls: "15. System Controls / Regeneration / Archive",
     };
 
+    const profileVals = companyProfilePreset ? PROFILE_DEFAULTS[companyProfilePreset] : {};
+
     const rows = VARIABLE_DEFS.map(v => {
       let rec = "";
-      if (v.defaultValue !== undefined && v.defaultValue !== null) {
+      const profileVal = profileVals[v.key];
+      if (profileVal !== undefined && profileVal !== null) {
+        if (v.fieldType === "toggle") rec = profileVal ? "Yes" : "No";
+        else if (v.fieldType === "multi-select") rec = Array.isArray(profileVal) ? profileVal.join(" | ") : String(profileVal);
+        else rec = String(profileVal);
+      } else if (v.defaultValue !== undefined && v.defaultValue !== null) {
         rec = v.fieldType === "toggle" ? (v.defaultValue ? "Yes" : "No") : String(v.defaultValue);
       } else if (v.fieldType === "toggle") {
         rec = "No";
@@ -729,8 +1004,9 @@ export default function WorkingPapers() {
     instrWs["!cols"] = [{ wch: 80 }];
     XLSX.utils.book_append_sheet(wb, instrWs, "Instructions");
 
-    XLSX.writeFile(wb, "Engagement_Variable_Template.xlsx");
-  }, []);
+    const profileLabel = companyProfilePreset ? `_${COMPANY_PROFILE_LABELS[companyProfilePreset].replace(/\s*\/\s*/g, "_").replace(/\s+/g, "_")}` : "";
+    XLSX.writeFile(wb, `Engagement_Variable_Template${profileLabel}.xlsx`);
+  }, [companyProfilePreset]);
 
   const handleVariableTemplateUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1707,10 +1983,45 @@ export default function WorkingPapers() {
                         <div className="flex-1 min-w-0">
                           <h3 className="text-sm font-bold text-emerald-900">Engagement Variable Template</h3>
                           <p className="text-xs text-emerald-700 mt-1 leading-relaxed">
-                            Download the Excel template with all 121 engagement variables and their recommended responses.
-                            Fill in your answers, then upload the file to pre-populate the Configure step — all fields remain editable.
+                            Select your company profile to instantly pre-fill all 121 engagement variables with the recommended ISA-compliant defaults for that entity type.
                           </p>
                         </div>
+                      </div>
+
+                      {/* Company Profile Selector */}
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Company Profile</Label>
+                        <div className="flex gap-2">
+                          <Select
+                            value={companyProfilePreset}
+                            onValueChange={(val) => setCompanyProfilePreset(val as CompanyProfile)}
+                          >
+                            <SelectTrigger className="flex-1 rounded-xl border-emerald-300 bg-white focus:ring-emerald-500 text-sm h-10">
+                              <SelectValue placeholder="Select company type…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(Object.entries(COMPANY_PROFILE_LABELS) as [CompanyProfile, string][]).map(([key, label]) => (
+                                <SelectItem key={key} value={key}>{label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            onClick={() => companyProfilePreset && applyProfileDefaults(companyProfilePreset)}
+                            disabled={!companyProfilePreset}
+                            className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shrink-0 disabled:opacity-40"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Apply Defaults
+                          </Button>
+                        </div>
+                        {companyProfilePreset && (
+                          <p className="text-[11px] text-emerald-700 font-medium flex items-center gap-1.5 pt-0.5">
+                            <CheckCircle2 className="w-3 h-3 shrink-0" />
+                            {(() => {
+                              const counts: Record<CompanyProfile, number> = { pie: 85, large: 78, medium: 68, small: 55, ngo: 62 };
+                              return `${counts[companyProfilePreset] ?? 70} variables will be pre-filled for ${COMPANY_PROFILE_LABELS[companyProfilePreset]}`;
+                            })()}
+                          </p>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1723,7 +2034,9 @@ export default function WorkingPapers() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-bold text-slate-800">Download Template</p>
-                            <p className="text-[11px] text-slate-500 mt-0.5">Excel · 121 variables · recommended responses pre-filled</p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              {companyProfilePreset ? `Excel · ${COMPANY_PROFILE_LABELS[companyProfilePreset]} profile pre-filled` : "Excel · 121 variables · select a profile above"}
+                            </p>
                           </div>
                           <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0" />
                         </button>
