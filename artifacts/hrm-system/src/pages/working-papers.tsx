@@ -463,7 +463,7 @@ function DatePickerField({ value, onChange, placeholder }: { value: string; onCh
           {displayText || <span>{placeholder || "Pick a date"}</span>}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent className="w-auto p-0 rounded-xl shadow-lg border border-slate-200" align="start" sideOffset={4}>
         <Calendar
           mode="single"
           selected={selected}
@@ -594,19 +594,24 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
   const toggle = (g: string) => setOpenGroup(g === openGroup ? null : g);
 
   const GroupPanel = ({ id, label, icon: Icon, color, children }:
-    { id: string; label: string; icon: any; color: string; children: React.ReactNode }) => (
-    <div className={cn("border rounded-xl overflow-hidden", color)}>
-      <button className="w-full flex items-center justify-between p-3 text-left hover:bg-white/50 transition-colors"
-        onClick={() => toggle(id)}>
-        <div className="flex items-center gap-2">
-          <Icon className="w-4 h-4 text-slate-600" />
-          <span className="font-medium text-sm text-slate-800">{label}</span>
+    { id: string; label: string; icon: any; color: string; children: React.ReactNode }) => {
+    const isOpen = openGroup === id;
+    return (
+      <div className={cn("border rounded-xl", color)}>
+        <button className="w-full flex items-center justify-between p-3 text-left hover:bg-white/50 transition-colors"
+          onClick={() => toggle(id)}>
+          <div className="flex items-center gap-2">
+            <Icon className="w-4 h-4 text-slate-600" />
+            <span className="font-medium text-sm text-slate-800">{label}</span>
+          </div>
+          <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-200", isOpen && "rotate-180")} />
+        </button>
+        <div className={cn("overflow-hidden transition-all duration-200", isOpen ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0")}>
+          <div className="p-4 bg-white border-t border-slate-100">{children}</div>
         </div>
-        {openGroup === id ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-      </button>
-      {openGroup === id && <div className="p-4 bg-white border-t border-slate-100">{children}</div>}
-    </div>
-  );
+      </div>
+    );
+  };
 
   const Field = ({ label, children, span }: { label: string; children: React.ReactNode; span?: boolean }) => (
     <div className={cn("space-y-1", span ? "col-span-2" : "")}>
@@ -645,16 +650,16 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
             <DatePickerField value={vars.periodEnd} onChange={v => set("periodEnd", v)} placeholder="Period end" />
           </Field>
           <Field label="Engagement Partner">
-            <Input value={vars.engagementPartner} onChange={e => set("engagementPartner", e.target.value)} className="h-8 text-xs" placeholder="Partner name" />
+            <Input value={vars.engagementPartner} onChange={e => set("engagementPartner", e.target.value)} className="h-8 text-xs" placeholder="Partner name" maxLength={100} />
           </Field>
           <Field label="Preparer / Senior">
-            <Input value={vars.preparer} onChange={e => set("preparer", e.target.value)} className="h-8 text-xs" placeholder="Preparer name" />
+            <Input value={vars.preparer} onChange={e => set("preparer", e.target.value)} className="h-8 text-xs" placeholder="Preparer name" maxLength={100} />
           </Field>
           <Field label="Reviewer / Manager">
-            <Input value={vars.reviewer} onChange={e => set("reviewer", e.target.value)} className="h-8 text-xs" placeholder="Reviewer name" />
+            <Input value={vars.reviewer} onChange={e => set("reviewer", e.target.value)} className="h-8 text-xs" placeholder="Reviewer name" maxLength={100} />
           </Field>
           <Field label="Approver / Partner">
-            <Input value={vars.approver} onChange={e => set("approver", e.target.value)} className="h-8 text-xs" placeholder="Approver name" />
+            <Input value={vars.approver} onChange={e => set("approver", e.target.value)} className="h-8 text-xs" placeholder="Approver name" maxLength={100} />
           </Field>
         </div>
         <div className="mt-3 space-y-0">
@@ -669,7 +674,7 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
       <GroupPanel id="B" label="B. Entity Profile" icon={Building2} color="bg-violet-50 border-violet-200">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Entity Name *" span>
-            <Input value={vars.entityName} onChange={e => set("entityName", e.target.value)} className="h-8 text-xs" placeholder="Company name" />
+            <Input value={vars.entityName} onChange={e => set("entityName", e.target.value)} className="h-8 text-xs truncate" placeholder="Company name" maxLength={200} />
           </Field>
           <Field label="Legal Form">
             <Select value={vars.legalForm} onValueChange={v => set("legalForm", v)}>
@@ -696,10 +701,10 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
             </Select>
           </Field>
           <Field label="NTN">
-            <Input value={vars.ntn} onChange={e => set("ntn", e.target.value)} className="h-8 text-xs" placeholder="7-digit NTN" />
+            <Input value={vars.ntn} onChange={e => set("ntn", e.target.value)} className="h-8 text-xs" placeholder="7-digit NTN" maxLength={20} />
           </Field>
           <Field label="STRN (Sales Tax Reg. No.)">
-            <Input value={vars.strn} onChange={e => set("strn", e.target.value)} className="h-8 text-xs" placeholder="STRN / GST No." />
+            <Input value={vars.strn} onChange={e => set("strn", e.target.value)} className="h-8 text-xs" placeholder="STRN / GST No." maxLength={30} />
           </Field>
           <Field label="Listed Status">
             <Select value={vars.listedStatus} onValueChange={v => set("listedStatus", v)}>
@@ -741,7 +746,7 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
             </Select>
           </Field>
           <Field label="Accounting Software" span>
-            <Input value={vars.accountingSoftware} onChange={e => set("accountingSoftware", e.target.value)} className="h-8 text-xs" placeholder="e.g. SAP, Oracle, QuickBooks, Excel, Manual" />
+            <Input value={vars.accountingSoftware} onChange={e => set("accountingSoftware", e.target.value)} className="h-8 text-xs" placeholder="e.g. SAP, Oracle, QuickBooks, Excel, Manual" maxLength={100} />
           </Field>
         </div>
         <div className="mt-3 space-y-0">
