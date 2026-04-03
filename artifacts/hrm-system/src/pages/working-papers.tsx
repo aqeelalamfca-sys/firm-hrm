@@ -390,12 +390,12 @@ function DropZone({ files, onAdd, onRemove, onClassify }: { files: UploadedFile[
       {files.length > 0 && (
         <div className="space-y-2.5">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Uploaded Files ({files.length})</p>
-          <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-2xl overflow-hidden bg-white shadow-sm">
-            {files.map(f => {
+          <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-2xl bg-white shadow-sm">
+            {files.map((f, fi) => {
               const activeType = f.docType || f.classified || "";
               return (
               <motion.div key={f.id} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50/70 transition-colors group relative">
+                className={`flex items-center gap-3 px-5 py-3 hover:bg-slate-50/70 transition-colors group relative ${fi === 0 ? "rounded-t-2xl" : ""} ${fi === files.length - 1 ? "rounded-b-2xl" : ""}`}>
                 <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 shrink-0">
                   {fileIcon(f.file)}
                 </div>
