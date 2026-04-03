@@ -14,7 +14,7 @@ import {
   ChevronLeft, CheckSquare, Square,
   Globe, Users, Package, TrendingDown, DollarSign, Percent,
   Flag, Book, Clipboard, Award, BarChart, Info,
-  Plus, Eye, Link2
+  Plus, Eye, Link2, Target
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
