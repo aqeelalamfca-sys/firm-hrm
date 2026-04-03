@@ -2595,13 +2595,21 @@ export default function WorkingPapers() {
                                       <div>
                                         <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> Key Audit Areas</h4>
                                         <div className="space-y-3">
-                                          {(analysis.key_audit_areas || ["Revenue Recognition", "Inventory Valuation", "Property, Plant & Equipment"]).map((area, i) => (
+                                          {(analysis.key_audit_areas || ["Revenue Recognition", "Inventory Valuation", "Property, Plant & Equipment"]).map((area, i) => {
+                                            const areaName = typeof area === "object" && area !== null ? (area as any).area : String(area);
+                                            const riskLevel = typeof area === "object" && area !== null ? (area as any).risk_level : null;
+                                            const riskColor = riskLevel === "High" ? "bg-red-50 text-red-700 border-red-200" : riskLevel === "Medium" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-emerald-50 text-emerald-700 border-emerald-200";
+                                            return (
                                             <div key={i} className="flex items-center gap-3 p-3.5 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-blue-200 transition-colors">
                                               <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center font-mono font-bold text-xs">{i+1}</div>
-                                              <span className="text-sm font-bold text-slate-800">{area}</span>
-                                              <Badge className="ml-auto bg-amber-50 text-amber-700 border-amber-200 text-[10px] h-5">ISA 701</Badge>
+                                              <span className="text-sm font-bold text-slate-800">{areaName}</span>
+                                              {riskLevel
+                                                ? <Badge className={`ml-auto text-[10px] h-5 ${riskColor}`}>{riskLevel} Risk</Badge>
+                                                : <Badge className="ml-auto bg-amber-50 text-amber-700 border-amber-200 text-[10px] h-5">ISA 701</Badge>
+                                              }
                                             </div>
-                                          ))}
+                                            );
+                                          })}
                                         </div>
                                       </div>
                                       <div className="bg-blue-600 rounded-xl p-6 text-white shadow-xl">
