@@ -292,8 +292,14 @@ export function getDefaultValues(): Record<string, any> {
   const fmt = (y: number, m: number, day: number) => `${y}-${d2(m)}-${d2(day)}`;
 
   const defaults: Record<string, any> = {};
+
+  // All toggle variables default to true (comprehensive audit approach — user turns off what doesn't apply)
   for (const v of VARIABLE_DEFS) {
-    if (v.defaultValue !== undefined) defaults[v.key] = v.defaultValue;
+    if (v.fieldType === "toggle") {
+      defaults[v.key] = true;
+    } else if (v.defaultValue !== undefined) {
+      defaults[v.key] = v.defaultValue;
+    }
   }
 
   // Dynamic governance date defaults — all relative to June 30 FY year-end
