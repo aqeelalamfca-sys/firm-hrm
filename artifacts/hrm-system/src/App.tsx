@@ -154,6 +154,7 @@ function Router() {
         <Route path="/manage-meetings"><ProtectedRoute component={ManageMeetings} /></Route>
         <Route path="/settings"><ProtectedRoute component={Settings} /></Route>
         <Route path="/regulatory-updates"><ProtectedRoute component={RegulatoryUpdates} /></Route>
+        <Route path="/working-papers/:stepId"><ProtectedRoute component={WorkingPapers} /></Route>
         <Route path="/working-papers"><ProtectedRoute component={WorkingPapers} /></Route>
         <Route path="/"><ProtectedRoute component={Dashboard} /></Route>
         <Route component={NotFound} />

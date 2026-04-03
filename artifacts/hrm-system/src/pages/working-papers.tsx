@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
+import { useLocation, useParams } from "wouter";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -799,8 +800,12 @@ function WPCard({ wp, expanded, onToggle }: { wp: WorkingPaper; expanded: boolea
 export default function WorkingPapers() {
   const { token } = useAuth();
   const { toast } = useToast();
-
-  const [step, setStep] = useState(0);
+  const params = useParams<{ stepId?: string }>();
+  const [, navigate] = useLocation();
+  const STEP_NAMES = ["upload", "configure", "output"] as const;
+  const STEP_NAME_TO_ID: Record<string, number> = { upload: 0, configure: 1, output: 2 };
+  const step = STEP_NAME_TO_ID[params.stepId ?? "upload"] ?? 0;
+  const goToStep = (id: number) => navigate(`/working-papers/${STEP_NAMES[id] ?? "upload"}`);
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [instructions, setInstructions] = useState("");
 
@@ -1067,9 +1072,9 @@ export default function WorkingPapers() {
       // If draft restores to export step but no papers exist, fall back to generate step
       const restoredStep = d.step || 0;
       if (restoredStep > 2 || (restoredStep === 2 && (!d.workingPapers || d.workingPapers.length === 0))) {
-        setStep(2);
+        goToStep(2);
       } else if (restoredStep > 0) {
-        setStep(restoredStep);
+        goToStep(restoredStep);
       }
       setDraftLoaded(true);
     } catch {}
@@ -1078,7 +1083,7 @@ export default function WorkingPapers() {
 
   // Autosave draft to localStorage (debounced 1.5s)
   useEffect(() => {
-    if (!draftLoaded && step === 0) return;
+    if (!draftLoaded) return;
     const timer = setTimeout(() => {
       const draft = {
         entityName, ntn, secp, financialYear, periodStart, periodEnd,
@@ -1263,7 +1268,7 @@ export default function WorkingPapers() {
       applySmartDefaults(false);
     } finally {
       setExtracting(false);
-      setStep(1);
+      goToStep(1);
     }
   };
 
@@ -1518,7 +1523,7 @@ export default function WorkingPapers() {
       }
 
       setProgress(100);
-      setStep(2);
+      goToStep(2);
       toast({ title: "Analysis complete", description: "Review the results below, then click Generate Working Papers." });
     } catch (err: any) {
       toast({ title: "Analysis failed", description: err.message, variant: "destructive" });
@@ -1762,7 +1767,7 @@ export default function WorkingPapers() {
               return (
                 <React.Fragment key={s.id}>
                   <button
-                    onClick={() => step > s.id && setStep(s.id)}
+                    onClick={() => step > s.id && goToStep(s.id)}
                     disabled={step <= s.id}
                     className={`flex items-center gap-2.5 group transition-all ${step > s.id ? "cursor-pointer" : "cursor-default"}`}
                   >
@@ -2531,10 +2536,10 @@ export default function WorkingPapers() {
 
 
                     <div className="flex justify-between items-center pt-6 mt-2 border-t border-slate-100">
-                      <Button variant="ghost" onClick={() => setStep(0)} size="lg" className="h-11 px-5 font-bold text-slate-500 rounded-xl hover:bg-slate-100">
+                      <Button variant="ghost" onClick={() => goToStep(0)} size="lg" className="h-11 px-5 font-bold text-slate-500 rounded-xl hover:bg-slate-100">
                         <ChevronRight className="mr-2 w-4 h-4 rotate-180" /> Back to Upload
                       </Button>
-                      <Button onClick={() => setStep(2)} disabled={!entityName} size="lg" className="h-11 px-7 bg-blue-600 hover:bg-blue-700 font-bold rounded-xl group shadow-lg shadow-blue-200/60">
+                      <Button onClick={() => goToStep(2)} disabled={!entityName} size="lg" className="h-11 px-7 bg-blue-600 hover:bg-blue-700 font-bold rounded-xl group shadow-lg shadow-blue-200/60">
                         Continue to Output <ChevronRight className="ml-2 w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                       </Button>
                     </div>
@@ -2894,7 +2899,7 @@ export default function WorkingPapers() {
                         )}
 
                         <div className="flex justify-start">
-                          <Button variant="ghost" onClick={() => setStep(1)} disabled={analyzing} className="font-bold text-slate-500 rounded-xl px-6">
+                          <Button variant="ghost" onClick={() => goToStep(1)} disabled={analyzing} className="font-bold text-slate-500 rounded-xl px-6">
                             <ChevronRight className="mr-2 w-4 h-4 rotate-180" /> Back to Configure
                           </Button>
                         </div>
@@ -3359,7 +3364,7 @@ export default function WorkingPapers() {
 
                     <div className="flex justify-between items-center pb-12">
                       <Button variant="ghost" onClick={() => {
-                        setStep(0);
+                        goToStep(0);
                         setFiles([]);
                         setAnalysis(null);
                         setWorkingPapers([]);
