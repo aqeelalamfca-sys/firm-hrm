@@ -1,17 +1,20 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useLocation, useParams } from "wouter";
-import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload, FileText, Loader2, CheckCircle2, Download, ChevronRight,
   ChevronDown, ChevronUp, BookOpen, Shield, AlertTriangle, TrendingUp,
-  Building2, Calendar, Briefcase, X, Plus, Eye, RefreshCw,
-  BarChart2, FileCheck, ClipboardCheck, Star, Info, Sparkles,
-  FileSearch, Scale, Target, Layers, FileOutput, Check, Table,
-  Activity, GitMerge, Link2, FileSpreadsheet, Mail, Hash, Settings, LayoutGrid, TrendingDown,
-  Trash2, ListPlus, SplitSquareVertical, AlertCircle
+  Building2, Calendar, Briefcase, X, RefreshCw,
+  BarChart2, FileCheck, ClipboardCheck, Sparkles,
+  FileSearch, Scale, Layers, FileOutput, Check, Table2,
+  Activity, FileSpreadsheet, Hash, Settings2,
+  Trash2, AlertCircle, ArrowRight, Zap, Database,
+  Edit3, Save, RotateCcw, Lock, Unlock,
+  ChevronLeft, CheckSquare, Square,
+  Globe, Users, Package, TrendingDown, DollarSign, Percent,
+  Flag, Book, Clipboard, Award, BarChart, Info,
+  Plus, Eye, Link2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,3436 +22,2433 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
-import EngagementConfig from "@/components/engagement-config";
-import { getDefaultValues, validateAllMandatory, getAllTriggeredWPs, VARIABLE_DEFS, isFieldComplete, isVariableVisible } from "@/lib/engagement-variable-defs";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-interface UploadedFile { file: File; id: string; classified?: string; docType?: string; }
+// ─── TYPES ────────────────────────────────────────────────────────────────────
 
-const DOC_TYPES = [
-  "Financial Statements",
-  "Trial Balance",
-  "General Ledger",
-  "Bank Statement",
-  "Invoice / Sales Tax",
-  "Confirmation",
-  "Corporate Document",
-  "Tax Notice / Return",
-  "Board Minutes",
-  "Other Evidence",
-];
+interface UploadedFile { file: File; id: string; category: "fs" | "st"; }
 
-const DRAFT_KEY = "ana_wp_draft_v2";
-
-type CompanyProfile = "pie" | "large" | "medium" | "small" | "ngo";
-
-const COMPANY_PROFILE_LABELS: Record<CompanyProfile, string> = {
-  pie:    "PIE / Listed",
-  large:  "Large Private Ltd",
-  medium: "Medium Private Ltd",
-  small:  "Small / Micro",
-  ngo:    "NGO / Section 42",
-};
-
-// Recommended default values for each of the 5 company profiles
-const PROFILE_DEFAULTS: Record<CompanyProfile, Record<string, any>> = {
-  pie: {
-    entityLegalForm: "Company", companyCategory: "Listed", entitySizeClassification: "PIE",
-    ownershipStructure: "Local", operationalStatus: "Active", industrySectorDetailed: "Manufacturing",
-    regulatedIndustryFlag: true, regulatorType: ["SECP","FBR"],
-    financialStatementsType: "Consolidated", reportingFrameworkDetailed: "Full IFRS",
-    basisOfPreparation: "Historical Cost", comparativeInformationType: "Full Comparative FS",
-    priorYearFsStatus: "Audited", predecessorAuditorInvolved: false, changeInAccountingPolicyFlag: false, reclassificationRestatementFlag: false,
-    materialityBenchmark: "PBT", specificMaterialityRequired: true, specificMaterialityAreas: ["Related Parties","Directors' Remuneration","Revenue"],
-    overallFsRiskLevel: "High", significantRisksIdentified: true,
-    significantRiskAreas: ["Revenue","Management Override","Estimates","Related Parties","Tax"],
-    fraudRiskFactorsPresent: true, managementOverrideRisk: true, noclarIndicator: false,
-    managementIntegrityConcern: false, goingConcernRiskLevel: "Low",
-    serviceOrganizationUsed: true, serviceOrganizationType: ["Payroll Processor","ERP Hosting"],
-    accountingSystemEnvironment: "ERP", itComplexity: "High",
-    ipeSystemReportsUsed: true, itgcTestingPlanned: true,
-    internalAuditFunctionExists: true, internalAuditReliancePlanned: true,
-    auditorsExpertUsed: true, managementExpertUsed: true, expertType: ["Valuer","Actuary"],
-    multiLocationAudit: true, numberOfLocations: 5, interimAuditPerformed: true,
-    applicableBusinessCycles: ["Revenue","Purchases","Inventory","Payroll","Treasury","Fixed Assets","Financial Close","Tax"],
-    controlRelianceByCycle: ["Revenue","Payroll","Treasury"],
-    segregationOfDutiesConcern: false, priorYearDeficienciesUnresolved: false,
-    substantiveAnalyticalProceduresPlanned: true, externalConfirmationsRequired: true,
-    confirmationTypesRequired: ["Banks","Trade Debtors","Trade Creditors","Loan Lenders","Lawyers","Related Parties"],
-    samplingApproach: "Statistical", stratificationRequired: true,
-    samplingUnit: "Invoice", selectionTechnique: "Random",
-    incomeTaxRegistered: true, salesTaxRegistered: true, salesTaxJurisdiction: ["FBR","PRA"],
-    fedApplicable: false, withholdingTaxAgentApplicable: true, salesTaxWithholdingApplicable: true,
-    deferredTaxApplicable: true, pendingTaxAssessmentsAppeals: false, atlFilerStatus: "Filer",
-    secpFilingApplicable: true, otherStatutoryDuesApplicable: ["EOBI","WWF","WPPF","Gratuity"],
-    donorGrantRestrictionsApplicable: false, section42NpoComplianceApplicable: false,
-    cashBankSignificant: true, receivablesSignificant: true, inventorySignificant: true,
-    inventoryCountAttendanceRequired: true, inventoryHeldByThirdParties: false, slowMovingObsoleteInventoryRisk: true,
-    fixedAssetsSignificant: true, cwipSignificant: false, intangiblesSignificant: true,
-    borrowingsSignificant: true, covenantComplianceRisk: true, leaseAccountingApplicable: true,
-    revenueComplexity: "High", longTermContractsExist: false,
-    provisionsContingenciesSignificant: true, relatedPartiesSignificant: true,
-    subsequentEventsSensitivity: "High",
-    independenceThreatsIdentified: false, nonAuditServicesProvided: true,
-    partnerRotationIssue: false, feeDependenceOverdueFees: false,
-    eqcrRequired: true,
-    tcwgBoardExists: true, auditCommitteeExists: true, authorizedSignatoriesAvailable: true,
-    legalCounselExists: true, boardMinutesAvailable: true,
-    expectedOpinionStatus: "Unmodified Expected", kamApplicable: true,
-    eomOmConsideration: false, otherInformationApplicable: true,
-    otherInformationSources: ["Directors' Report","Annual Report","Chairman Review"],
-    goingConcernMaterialUncertaintyExpected: false, referenceToExpertComponentAuditorInReport: false,
-    reportLanguage: "English",
-    versionControlOnRevisedUploads: true, fsTbGlSourceForWpGeneration: "Both",
-    autoRegenerateWpsOnVariableChange: true, finalizationReviewGate: true,
-    archiveRetentionLogic: "PIE Policy",
-  },
-  large: {
-    entityLegalForm: "Company", companyCategory: "Private Limited", entitySizeClassification: "Large",
-    ownershipStructure: "Family-Owned", operationalStatus: "Active", industrySectorDetailed: "Manufacturing",
-    regulatedIndustryFlag: false,
-    financialStatementsType: "Standalone", reportingFrameworkDetailed: "Full IFRS",
-    basisOfPreparation: "Historical Cost", comparativeInformationType: "Full Comparative FS",
-    priorYearFsStatus: "Audited", predecessorAuditorInvolved: false, changeInAccountingPolicyFlag: false, reclassificationRestatementFlag: false,
-    materialityBenchmark: "PBT", specificMaterialityRequired: false,
-    overallFsRiskLevel: "High", significantRisksIdentified: true,
-    significantRiskAreas: ["Revenue","Management Override","Related Parties"],
-    fraudRiskFactorsPresent: false, managementOverrideRisk: true, noclarIndicator: false,
-    managementIntegrityConcern: false, goingConcernRiskLevel: "Low",
-    serviceOrganizationUsed: true, serviceOrganizationType: ["Payroll Processor"],
-    accountingSystemEnvironment: "ERP", itComplexity: "High",
-    ipeSystemReportsUsed: true, itgcTestingPlanned: true,
-    internalAuditFunctionExists: true, internalAuditReliancePlanned: false,
-    auditorsExpertUsed: false, managementExpertUsed: false,
-    multiLocationAudit: false, interimAuditPerformed: true,
-    applicableBusinessCycles: ["Revenue","Purchases","Inventory","Payroll","Treasury","Fixed Assets","Financial Close","Tax"],
-    controlRelianceByCycle: ["Revenue","Purchases"],
-    segregationOfDutiesConcern: false, priorYearDeficienciesUnresolved: false,
-    substantiveAnalyticalProceduresPlanned: true, externalConfirmationsRequired: true,
-    confirmationTypesRequired: ["Banks","Trade Debtors","Trade Creditors"],
-    samplingApproach: "Statistical", stratificationRequired: true,
-    samplingUnit: "Invoice", selectionTechnique: "Systematic",
-    incomeTaxRegistered: true, salesTaxRegistered: true, salesTaxJurisdiction: ["FBR"],
-    fedApplicable: false, withholdingTaxAgentApplicable: true, salesTaxWithholdingApplicable: false,
-    deferredTaxApplicable: true, pendingTaxAssessmentsAppeals: false, atlFilerStatus: "Filer",
-    secpFilingApplicable: true, otherStatutoryDuesApplicable: ["EOBI","WWF","Gratuity"],
-    donorGrantRestrictionsApplicable: false, section42NpoComplianceApplicable: false,
-    cashBankSignificant: true, receivablesSignificant: true, inventorySignificant: true,
-    inventoryCountAttendanceRequired: true, inventoryHeldByThirdParties: false, slowMovingObsoleteInventoryRisk: true,
-    fixedAssetsSignificant: true, cwipSignificant: false, intangiblesSignificant: false,
-    borrowingsSignificant: true, covenantComplianceRisk: false, leaseAccountingApplicable: true,
-    revenueComplexity: "Moderate", longTermContractsExist: false,
-    provisionsContingenciesSignificant: true, relatedPartiesSignificant: true,
-    subsequentEventsSensitivity: "Moderate",
-    independenceThreatsIdentified: false, nonAuditServicesProvided: false,
-    partnerRotationIssue: false, feeDependenceOverdueFees: false,
-    eqcrRequired: false,
-    tcwgBoardExists: true, auditCommitteeExists: true, authorizedSignatoriesAvailable: true,
-    legalCounselExists: true, boardMinutesAvailable: true,
-    expectedOpinionStatus: "Unmodified Expected", kamApplicable: false,
-    eomOmConsideration: false, otherInformationApplicable: false,
-    goingConcernMaterialUncertaintyExpected: false, referenceToExpertComponentAuditorInReport: false,
-    reportLanguage: "English",
-    versionControlOnRevisedUploads: true, fsTbGlSourceForWpGeneration: "TB-Driven",
-    autoRegenerateWpsOnVariableChange: true, finalizationReviewGate: true,
-    archiveRetentionLogic: "Standard Firm Policy",
-  },
-  medium: {
-    entityLegalForm: "Company", companyCategory: "Private Limited", entitySizeClassification: "Medium",
-    ownershipStructure: "Family-Owned", operationalStatus: "Active", industrySectorDetailed: "Services",
-    regulatedIndustryFlag: false,
-    financialStatementsType: "Standalone", reportingFrameworkDetailed: "IFRS for SMEs",
-    basisOfPreparation: "Historical Cost", comparativeInformationType: "Corresponding Figures",
-    priorYearFsStatus: "Audited", predecessorAuditorInvolved: false, changeInAccountingPolicyFlag: false, reclassificationRestatementFlag: false,
-    materialityBenchmark: "Revenue", specificMaterialityRequired: false,
-    overallFsRiskLevel: "Moderate", significantRisksIdentified: true,
-    significantRiskAreas: ["Revenue","Management Override"],
-    fraudRiskFactorsPresent: false, managementOverrideRisk: true, noclarIndicator: false,
-    managementIntegrityConcern: false, goingConcernRiskLevel: "Moderate",
-    serviceOrganizationUsed: false, accountingSystemEnvironment: "Desktop Accounting Software",
-    itComplexity: "Moderate", ipeSystemReportsUsed: false, itgcTestingPlanned: false,
-    internalAuditFunctionExists: false, internalAuditReliancePlanned: false,
-    auditorsExpertUsed: false, managementExpertUsed: false,
-    multiLocationAudit: false, interimAuditPerformed: false,
-    applicableBusinessCycles: ["Revenue","Purchases","Payroll","Fixed Assets","Tax"],
-    controlRelianceByCycle: ["None"],
-    segregationOfDutiesConcern: false, priorYearDeficienciesUnresolved: false,
-    substantiveAnalyticalProceduresPlanned: true, externalConfirmationsRequired: true,
-    confirmationTypesRequired: ["Banks","Trade Debtors"],
-    samplingApproach: "Non-Statistical", stratificationRequired: false,
-    samplingUnit: "Invoice", selectionTechnique: "Haphazard",
-    incomeTaxRegistered: true, salesTaxRegistered: false,
-    fedApplicable: false, withholdingTaxAgentApplicable: true, salesTaxWithholdingApplicable: false,
-    deferredTaxApplicable: true, pendingTaxAssessmentsAppeals: false, atlFilerStatus: "Filer",
-    secpFilingApplicable: true, otherStatutoryDuesApplicable: ["EOBI","Gratuity"],
-    donorGrantRestrictionsApplicable: false, section42NpoComplianceApplicable: false,
-    cashBankSignificant: true, receivablesSignificant: true, inventorySignificant: true,
-    inventoryCountAttendanceRequired: true, inventoryHeldByThirdParties: false, slowMovingObsoleteInventoryRisk: false,
-    fixedAssetsSignificant: true, cwipSignificant: false, intangiblesSignificant: false,
-    borrowingsSignificant: true, covenantComplianceRisk: false, leaseAccountingApplicable: false,
-    revenueComplexity: "Moderate", longTermContractsExist: false,
-    provisionsContingenciesSignificant: false, relatedPartiesSignificant: true,
-    subsequentEventsSensitivity: "Moderate",
-    independenceThreatsIdentified: false, nonAuditServicesProvided: false,
-    partnerRotationIssue: false, feeDependenceOverdueFees: false,
-    eqcrRequired: false,
-    tcwgBoardExists: true, auditCommitteeExists: false, authorizedSignatoriesAvailable: true,
-    legalCounselExists: false, boardMinutesAvailable: true,
-    expectedOpinionStatus: "Unmodified Expected", kamApplicable: false,
-    eomOmConsideration: false, otherInformationApplicable: false,
-    goingConcernMaterialUncertaintyExpected: false, referenceToExpertComponentAuditorInReport: false,
-    reportLanguage: "English",
-    versionControlOnRevisedUploads: true, fsTbGlSourceForWpGeneration: "TB-Driven",
-    autoRegenerateWpsOnVariableChange: true, finalizationReviewGate: true,
-    archiveRetentionLogic: "Standard Firm Policy",
-  },
-  small: {
-    entityLegalForm: "Single Member Company", companyCategory: "Private Limited", entitySizeClassification: "Small",
-    ownershipStructure: "Family-Owned", operationalStatus: "Active", industrySectorDetailed: "Trading",
-    regulatedIndustryFlag: false,
-    financialStatementsType: "Standalone", reportingFrameworkDetailed: "IFRS for SMEs",
-    basisOfPreparation: "Historical Cost", comparativeInformationType: "Corresponding Figures",
-    priorYearFsStatus: "Reviewed", predecessorAuditorInvolved: false, changeInAccountingPolicyFlag: false, reclassificationRestatementFlag: false,
-    materialityBenchmark: "Revenue", specificMaterialityRequired: false,
-    overallFsRiskLevel: "Moderate", significantRisksIdentified: false,
-    fraudRiskFactorsPresent: false, managementOverrideRisk: true, noclarIndicator: false,
-    managementIntegrityConcern: false, goingConcernRiskLevel: "Moderate",
-    serviceOrganizationUsed: false, accountingSystemEnvironment: "Excel-Based",
-    itComplexity: "Low", ipeSystemReportsUsed: false, itgcTestingPlanned: false,
-    internalAuditFunctionExists: false, internalAuditReliancePlanned: false,
-    auditorsExpertUsed: false, managementExpertUsed: false,
-    multiLocationAudit: false, interimAuditPerformed: false,
-    applicableBusinessCycles: ["Revenue","Purchases","Payroll"],
-    controlRelianceByCycle: ["None"],
-    segregationOfDutiesConcern: true, priorYearDeficienciesUnresolved: false,
-    substantiveAnalyticalProceduresPlanned: true, externalConfirmationsRequired: false,
-    samplingApproach: "Key Item Testing", stratificationRequired: false,
-    samplingUnit: "Invoice", selectionTechnique: "Key Item",
-    incomeTaxRegistered: true, salesTaxRegistered: false,
-    fedApplicable: false, withholdingTaxAgentApplicable: false, salesTaxWithholdingApplicable: false,
-    deferredTaxApplicable: false, pendingTaxAssessmentsAppeals: false, atlFilerStatus: "Filer",
-    secpFilingApplicable: false, otherStatutoryDuesApplicable: ["EOBI"],
-    donorGrantRestrictionsApplicable: false, section42NpoComplianceApplicable: false,
-    cashBankSignificant: true, receivablesSignificant: true, inventorySignificant: false,
-    inventoryCountAttendanceRequired: false, inventoryHeldByThirdParties: false, slowMovingObsoleteInventoryRisk: false,
-    fixedAssetsSignificant: true, cwipSignificant: false, intangiblesSignificant: false,
-    borrowingsSignificant: false, covenantComplianceRisk: false, leaseAccountingApplicable: false,
-    revenueComplexity: "Low", longTermContractsExist: false,
-    provisionsContingenciesSignificant: false, relatedPartiesSignificant: true,
-    subsequentEventsSensitivity: "Low",
-    independenceThreatsIdentified: false, nonAuditServicesProvided: false,
-    partnerRotationIssue: false, feeDependenceOverdueFees: false,
-    eqcrRequired: false,
-    tcwgBoardExists: false, auditCommitteeExists: false, authorizedSignatoriesAvailable: true,
-    legalCounselExists: false, boardMinutesAvailable: false,
-    expectedOpinionStatus: "Unmodified Expected", kamApplicable: false,
-    eomOmConsideration: false, otherInformationApplicable: false,
-    goingConcernMaterialUncertaintyExpected: false, referenceToExpertComponentAuditorInReport: false,
-    reportLanguage: "English",
-    versionControlOnRevisedUploads: true, fsTbGlSourceForWpGeneration: "FS-Driven",
-    autoRegenerateWpsOnVariableChange: true, finalizationReviewGate: true,
-    archiveRetentionLogic: "Standard Firm Policy",
-  },
-  ngo: {
-    entityLegalForm: "Society", companyCategory: "Section 42", entitySizeClassification: "PIC",
-    ownershipStructure: "Donor-Controlled", operationalStatus: "Active", industrySectorDetailed: "NGO/NPO",
-    regulatedIndustryFlag: false,
-    financialStatementsType: "Standalone", reportingFrameworkDetailed: "Special Purpose",
-    basisOfPreparation: "Historical Cost", comparativeInformationType: "Corresponding Figures",
-    priorYearFsStatus: "Audited", predecessorAuditorInvolved: false, changeInAccountingPolicyFlag: false, reclassificationRestatementFlag: false,
-    materialityBenchmark: "Total Expenses", specificMaterialityRequired: true, specificMaterialityAreas: ["Compliance","Disclosures"],
-    overallFsRiskLevel: "Moderate", significantRisksIdentified: false,
-    fraudRiskFactorsPresent: false, managementOverrideRisk: true, noclarIndicator: false,
-    managementIntegrityConcern: false, goingConcernRiskLevel: "Moderate",
-    serviceOrganizationUsed: false, accountingSystemEnvironment: "Desktop Accounting Software",
-    itComplexity: "Low", ipeSystemReportsUsed: false, itgcTestingPlanned: false,
-    internalAuditFunctionExists: false, internalAuditReliancePlanned: false,
-    auditorsExpertUsed: false, managementExpertUsed: false,
-    multiLocationAudit: false, interimAuditPerformed: false,
-    applicableBusinessCycles: ["Grants/Donors","Purchases","Payroll","Fixed Assets"],
-    controlRelianceByCycle: ["None"],
-    segregationOfDutiesConcern: true, priorYearDeficienciesUnresolved: false,
-    substantiveAnalyticalProceduresPlanned: true, externalConfirmationsRequired: true,
-    confirmationTypesRequired: ["Banks","Loan Lenders"],
-    samplingApproach: "Non-Statistical", stratificationRequired: false,
-    samplingUnit: "Voucher", selectionTechnique: "Haphazard",
-    incomeTaxRegistered: true, salesTaxRegistered: false,
-    fedApplicable: false, withholdingTaxAgentApplicable: true, salesTaxWithholdingApplicable: false,
-    deferredTaxApplicable: false, pendingTaxAssessmentsAppeals: false, atlFilerStatus: "Filer",
-    secpFilingApplicable: true, otherStatutoryDuesApplicable: ["EOBI","Gratuity"],
-    donorGrantRestrictionsApplicable: true, section42NpoComplianceApplicable: true,
-    cashBankSignificant: true, receivablesSignificant: false, inventorySignificant: false,
-    inventoryCountAttendanceRequired: false, inventoryHeldByThirdParties: false, slowMovingObsoleteInventoryRisk: false,
-    fixedAssetsSignificant: true, cwipSignificant: false, intangiblesSignificant: false,
-    borrowingsSignificant: false, covenantComplianceRisk: false, leaseAccountingApplicable: false,
-    revenueComplexity: "Low", longTermContractsExist: false,
-    provisionsContingenciesSignificant: false, relatedPartiesSignificant: false,
-    subsequentEventsSensitivity: "Moderate",
-    independenceThreatsIdentified: false, nonAuditServicesProvided: false,
-    partnerRotationIssue: false, feeDependenceOverdueFees: false,
-    eqcrRequired: false,
-    tcwgBoardExists: true, auditCommitteeExists: false, authorizedSignatoriesAvailable: true,
-    legalCounselExists: false, boardMinutesAvailable: true,
-    expectedOpinionStatus: "Unmodified Expected", kamApplicable: false,
-    eomOmConsideration: false, otherInformationApplicable: true,
-    otherInformationSources: ["Donor Report","Annual Report"],
-    goingConcernMaterialUncertaintyExpected: false, referenceToExpertComponentAuditorInReport: false,
-    reportLanguage: "English",
-    versionControlOnRevisedUploads: true, fsTbGlSourceForWpGeneration: "FS-Driven",
-    autoRegenerateWpsOnVariableChange: true, finalizationReviewGate: true,
-    archiveRetentionLogic: "Donor Policy",
-  },
-};
-interface AnalysisResult {
-  entity?: any; financials?: any; materiality?: any;
-  risk_assessment?: any; key_audit_areas?: any[];
-  documents_classified?: any[]; missing_data_flags?: string[];
-  assumptions_made?: string[];
-  analytical_procedures?: {
-    ratios?: Record<string, number>;
-    variance_analysis?: any[];
-    trend_analysis?: string;
-    analytical_conclusions?: string[];
-  };
-  reconciliation?: {
-    tb_vs_fs?: { status: string; difference: number; notes: string };
-    tb_vs_gl?: { status: string; difference: number; notes: string };
-    opening_vs_prior_year?: { status: string; difference: number; notes: string };
-    bank_reconciliation?: { status: string; difference: number; notes: string };
-    flags?: string[];
-  };
-  evidence_items?: Array<{ id: string; filename: string; type: string; description: string; pages_or_sheets?: string; date_received?: string }>;
-  internal_control_weaknesses?: Array<{ area: string; weakness: string; risk_level: string; recommendation: string }>;
-}
-interface WorkingPaper {
-  ref: string; title: string; section: string; section_label?: string;
-  isa_references: string[]; assertions?: string[]; objective?: string; scope?: string;
-  procedures?: any[]; summary_table?: any[]; key_findings?: string[];
-  auditor_conclusion?: string; risks_identified?: string[];
-  recommendations?: string[]; preparer?: string; reviewer?: string;
-  partner?: string; date_prepared?: string; status?: string;
-  evidence_refs?: string[]; cross_references?: string[];
-}
-interface EvidenceItem { ref: string; description: string; type: string; wp_refs?: string[]; }
-
-// ─── Financial Statement Types (from Mockup) ──────────────────────────────────
-interface FSBreakup {
-  id: string; label: string; cy: string; py: string;
-}
-interface FSLine {
-  id: string; label: string; cy: string; py: string;
-  bold?: boolean; subtotal?: boolean; indent?: boolean; spacer?: boolean;
-  isCustom?: boolean;
-  breakups?: FSBreakup[];
-}
-interface FSSection { id: string; title: string; color: string; lines: FSLine[]; }
-
-interface SalesTaxRow {
-  id: string;
-  periodFrom: string; periodTo: string;
-  invoiceDate: string; invoiceNo: string;
-  customerSupplier: string; ntnCnic: string; strn: string;
-  description: string; salesType: string;
-  taxableValue: string; salesTaxRate: string; salesTaxAmount: string;
-  furtherTaxRate: string; furtherTaxAmount: string;
-  fedRate: string; fedAmount: string;
-  jurisdiction: string; inputOutput: string;
-  adjustment: string; netTax: string;
+interface VariableMatrix {
+  // A. Engagement Profile
+  engagementType: string; yearEnd: string; periodStart: string; periodEnd: string;
+  firstYearAudit: boolean; recurringEngagement: boolean; groupAudit: boolean;
+  componentAuditor: boolean; engagementPartner: string; eqcrRequired: boolean;
+  preparer: string; reviewer: string; approver: string;
+  // B. Entity Profile
+  entityName: string; legalForm: string; incorporationStatus: string;
+  ntn: string; strn: string; listedStatus: string; pie: boolean;
+  industry: string; numberOfLocations: number;
+  branchOperations: boolean; foreignOperations: boolean; relatedPartiesExist: boolean;
+  // C. Financial Reporting
+  framework: string; currency: string; booksMaintained: boolean;
+  accountingSoftware: string; tbAvailable: boolean; glAvailable: boolean;
+  priorYearFsAvailable: boolean; auditAdjustmentsExpected: boolean;
+  // D. Tax & Regulatory
+  incomeTaxApplicable: boolean; salesTaxApplicable: boolean;
+  provincialSalesTax: string; fedApplicable: boolean; whtApplicable: boolean;
+  taxAuditExposure: boolean; deferredTaxApplicable: boolean;
+  // E. FS Components
+  hasCashBank: boolean; hasReceivables: boolean; hasInventory: boolean;
+  hasFixedAssets: boolean; hasIntangibles: boolean; hasInvestments: boolean;
+  hasLoansAdvances: boolean; hasPayables: boolean; hasBorrowings: boolean;
+  hasLeaseLiabilities: boolean; hasProvisions: boolean; hasContingentLiabilities: boolean;
+  hasShareCapital: boolean; hasReserves: boolean; hasRetainedEarnings: boolean;
+  hasMultipleRevenue: boolean; hasCostOfSales: boolean; hasOperatingExpenses: boolean;
+  hasFinanceCost: boolean; hasOtherIncome: boolean;
+  // F. Risk Assessment
+  fraudRiskIndicators: boolean; goingConcernIssue: boolean;
+  significantEstimates: boolean; complexTransactions: boolean; relatedPartyRisk: boolean;
+  revenueRecognitionRisk: boolean; internalControlStrength: string;
+  itSystemReliance: boolean; manualAccounting: boolean;
+  // G. Audit Approach
+  auditApproach: string; samplingMethod: string; materialityBasis: string;
+  performanceMaterialityPct: number; useOfExperts: boolean; externalConfirmations: boolean;
+  // H. Sales Tax Data
+  stPeriodFrom: string; stPeriodTo: string;
+  outputTax: number; inputTax: number; stAdjustments: number; refundClaimed: boolean;
+  // I. Document Availability
+  bankStatementsAvailable: boolean; invoicesAvailable: boolean;
+  contractsAvailable: boolean; priorYearWPsAvailable: boolean;
+  // J. Output Control
+  generateTB: boolean; generateGL: boolean; generateWPs: boolean;
+  detailLevel: string; outputFormat: string;
 }
 
-const SALES_TAX_COLS: { key: keyof SalesTaxRow; label: string; width: string; type?: string }[] = [
-  { key: "periodFrom", label: "Period From", width: "110px", type: "date" },
-  { key: "periodTo", label: "Period To", width: "110px", type: "date" },
-  { key: "invoiceDate", label: "Invoice Date", width: "110px", type: "date" },
-  { key: "invoiceNo", label: "Invoice No.", width: "100px" },
-  { key: "customerSupplier", label: "Customer / Supplier", width: "180px" },
-  { key: "ntnCnic", label: "NTN / CNIC", width: "120px" },
-  { key: "strn", label: "STRN", width: "120px" },
-  { key: "description", label: "Description", width: "180px" },
-  { key: "salesType", label: "Sales Type", width: "110px" },
-  { key: "taxableValue", label: "Taxable Value", width: "120px" },
-  { key: "salesTaxRate", label: "ST Rate %", width: "90px" },
-  { key: "salesTaxAmount", label: "ST Amount", width: "110px" },
-  { key: "furtherTaxRate", label: "FT Rate %", width: "90px" },
-  { key: "furtherTaxAmount", label: "FT Amount", width: "110px" },
-  { key: "fedRate", label: "FED Rate %", width: "90px" },
-  { key: "fedAmount", label: "FED Amount", width: "110px" },
-  { key: "jurisdiction", label: "Province / Jurisdiction", width: "140px" },
-  { key: "inputOutput", label: "Input / Output", width: "110px" },
-  { key: "adjustment", label: "Adj / DN / CN", width: "120px" },
-  { key: "netTax", label: "Net Tax", width: "110px" },
-];
+interface TBAccount {
+  account_code: string; account_name: string; fs_head: string;
+  classification: string; debit_total: number; credit_total: number;
+  balance_dr: number; balance_cr: number; fs_mapping: string;
+  source: "Extracted" | "Derived" | "Estimated" | "User-confirmed";
+  confidence: number; notes: string;
+}
 
-const emptySalesTaxRow = (): SalesTaxRow => ({
-  id: `st_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-  periodFrom: "", periodTo: "", invoiceDate: "", invoiceNo: "",
-  customerSupplier: "", ntnCnic: "", strn: "", description: "", salesType: "",
-  taxableValue: "", salesTaxRate: "", salesTaxAmount: "",
-  furtherTaxRate: "", furtherTaxAmount: "", fedRate: "", fedAmount: "",
-  jurisdiction: "", inputOutput: "", adjustment: "", netTax: "",
-});
+interface GLEntry {
+  date: string; voucher_no: string; account_code: string;
+  account_name: string; narration: string; debit: number; credit: number; ref: string;
+}
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-const ENGAGEMENT_TYPES = [
-  "Statutory Audit", "Internal Audit", "Tax Audit", "Special Purpose Audit",
-  "Review Engagement", "Compilation Engagement", "Due Diligence",
-];
+interface GLAccount {
+  account_code: string; account_name: string; group: string;
+  type: string; opening_balance: number; closing_balance: number;
+  entries: GLEntry[]; source: string;
+}
 
-const WP_GROUPS = [
-  { prefix: "A", label: "Pre-Engagement & Acceptance", color: "bg-violet-100 text-violet-700 border-violet-200", refs: ["A1", "A2", "A3", "A4", "A5", "A6"] },
-  { prefix: "B", label: "Planning", color: "bg-blue-100 text-blue-700 border-blue-200", refs: ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10"] },
-  { prefix: "C", label: "Data & FS Integration", color: "bg-sky-100 text-sky-700 border-sky-200", refs: ["C1", "C2", "C3", "C4", "C5", "C6"] },
-  { prefix: "D", label: "Internal Controls & ToC", color: "bg-red-100 text-red-700 border-red-200", refs: ["D1", "D2", "D3", "D4", "D5"] },
-  { prefix: "E", label: "Substantive Testing", color: "bg-emerald-100 text-emerald-700 border-emerald-200", refs: ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10"] },
-  { prefix: "F", label: "Special Areas", color: "bg-teal-100 text-teal-700 border-teal-200", refs: ["F1", "F2", "F3", "F4", "F5", "F6"] },
-  { prefix: "G", label: "Completion & Finalization", color: "bg-amber-100 text-amber-700 border-amber-200", refs: ["G1", "G2", "G3", "G4", "G5", "G6", "G7"] },
-  { prefix: "H", label: "Reporting", color: "bg-indigo-100 text-indigo-700 border-indigo-200", refs: ["H1", "H2", "H3", "H4", "H5"] },
-  { prefix: "I", label: "Quality Control & Review", color: "bg-purple-100 text-purple-700 border-purple-200", refs: ["I1", "I2", "I3", "I4"] },
-  { prefix: "J", label: "Tax & Regulatory (Pakistan)", color: "bg-orange-100 text-orange-700 border-orange-200", refs: ["J1", "J2", "J3", "J4", "J5"] },
-  { prefix: "K", label: "Final Output & Archive", color: "bg-green-100 text-green-700 border-green-200", refs: ["K1", "K2", "K3"] },
-];
+interface WPProcedure {
+  no: string; procedure: string; finding: string;
+  conclusion: "Satisfactory" | "Note Required" | "Matters Arising";
+  evidence_ref: string;
+}
 
-const ALL_WP_REFS = WP_GROUPS.flatMap(g => g.refs);
+interface WPDoc {
+  ref: string; title: string; section: string; section_label: string;
+  isa_references: string[]; assertions: string[]; objective: string;
+  scope: string; procedures: WPProcedure[];
+  summary_table: { item: string; value: string; comment: string }[] | null;
+  key_findings: string[]; auditor_conclusion: string;
+  risks_identified: string[]; recommendations: string[];
+  evidence_refs: string[]; cross_references: string[];
+  status: "Draft" | "Review" | "Approved";
+  prepared_by: string; reviewed_by: string; approved_by: string;
+  prepared_date: string; reviewed_date: string;
+  source: "Extracted" | "Derived" | "Estimated" | "User-confirmed";
+  isOpen?: boolean; isEditing?: boolean;
+}
 
-const WP_PAPER_NAMES: Record<string, string> = {
-  A1: "Engagement Letter", A2: "Independence Declaration", A3: "Ethics & Conflict Check", A4: "AML / Client Risk Profile", A5: "Predecessor Auditor Communication", A6: "Engagement Risk Assessment",
-  B1: "Understanding the Entity & Environment", B2: "Risk Assessment (ISA 315)", B3: "Fraud Risk (ISA 240)", B4: "Materiality Determination", B5: "Audit Strategy Memo", B6: "Audit Plan", B7: "Analytical Procedures – Planning", B8: "Group Audit Instructions (ISA 600)", B9: "Related Party Identification", B10: "Laws & Regulations (ISA 250)",
-  C1: "Financial Statements Extraction", C2: "Trial Balance Mapping", C3: "TB ↔ FS Reconciliation", C4: "Opening Balances (ISA 510)", C5: "Lead Schedules – BS", C6: "Lead Schedules – PL",
-  D1: "Internal Control Evaluation", D2: "Walkthroughs & Narratives", D3: "Tests of Controls", D4: "IT General Controls Review", D5: "Control Deficiency Log",
-  E1: "Cash & Bank – Substantive", E2: "Trade Receivables – Substantive", E3: "Inventory – Substantive", E4: "PPE & Intangibles – Substantive", E5: "Trade Payables – Substantive", E6: "Revenue Testing (ISA 240/500)", E7: "Expenses Testing", E8: "Equity & Reserves – Substantive", E9: "Tax Provisions – Substantive", E10: "Other Balances – Substantive",
-  F1: "Related Party Transactions (ISA 550)", F2: "Going Concern (ISA 570)", F3: "Subsequent Events (ISA 560)", F4: "Accounting Estimates (ISA 540)", F5: "Litigation & Claims", F6: "Segment Reporting / Other Special",
-  G1: "Summary of Misstatements", G2: "Adjusting Journal Entries", G3: "Final Analytical Procedures (ISA 520)", G4: "Engagement Completion Checklist", G5: "Going Concern – Final Assessment", G6: "Subsequent Events – Final Update", G7: "Management Representations (ISA 580)",
-  H1: "Opinion Assessment", H2: "Auditor's Report Draft", H3: "Key Audit Matters (KAMs)", H4: "Emphasis of Matter / Other", H5: "Other Information (ISA 720)",
-  I1: "EQCR Report", I2: "Review Notes Log", I3: "Consultation Record", I4: "File Completion Memo",
-  J1: "Income Tax Computation", J2: "Deferred Tax Working", J3: "Sales Tax Review", J4: "WHT Compliance Check", J5: "Super Tax Calculation",
-  K1: "Signed Audit Opinion", K2: "Engagement Close-Out", K3: "Archive & Retention",
-};
+interface ExtractedData {
+  entity: any; financials: any; taxData: any;
+  tbLines: any[]; glSummary: any[]; flags: string[];
+  documents_found: any[]; extractionLog: string[];
+  analysis: any; confidenceScores: Record<string, number>;
+  assumptions: string[]; missingData: string[];
+}
+
+interface WPSession {
+  vars: VariableMatrix;
+  extractedData: ExtractedData | null;
+  trialBalance: TBAccount[];
+  glEntries: GLEntry[];
+  glAccounts: GLAccount[];
+  chartOfAccounts: any[];
+  tbSummary: { is_balanced: boolean; total_debit: number; total_credit: number; gl_entries: number; tb_accounts: number; };
+  workingPapers: WPDoc[];
+  selectedPapers: string[];
+  draftSavedAt: string | null;
+}
+
+// ─── CONSTANTS ─────────────────────────────────────────────────────────────────
 
 const STEPS = [
-  { id: 0, label: "Upload", shortLabel: "Upload", icon: Upload },
-  { id: 1, label: "Configure", shortLabel: "Configure", icon: Settings },
-  { id: 2, label: "Output", shortLabel: "Output", icon: Sparkles },
+  { id: 0, slug: "upload",          label: "Upload Documents",     icon: Upload },
+  { id: 1, slug: "variables",       label: "Engagement Variables", icon: Settings2 },
+  { id: 2, slug: "extraction",      label: "AI Extraction",        icon: Sparkles },
+  { id: 3, slug: "trial-balance",   label: "Trial Balance",        icon: Table2 },
+  { id: 4, slug: "general-ledger",  label: "General Ledger",       icon: BookOpen },
+  { id: 5, slug: "working-papers",  label: "Working Papers",       icon: FileText },
+  { id: 6, slug: "export",          label: "Export",               icon: Download },
 ];
 
-const AUDIT_PHASES: { prefix: string; label: string; papers: number; description: string }[] = [
-  { prefix: "A", label: "Pre-Engagement & Acceptance", papers: 6, description: "Engagement letter, independence, ethics, AML, conflict & risk profiling" },
-  { prefix: "B", label: "Planning", papers: 10, description: "Entity understanding, risk, fraud, materiality, strategy, plan & analytics" },
-  { prefix: "C", label: "Data & FS Integration", papers: 6, description: "FS extraction, mapping, TB reconciliation, opening balances & lead schedules" },
-  { prefix: "D", label: "Internal Controls & ToC", papers: 5, description: "IC evaluation, walkthroughs, test of controls, IT review & deficiency log" },
-  { prefix: "E", label: "Substantive Testing", papers: 10, description: "Cash, receivables, inventory, PPE, payables, revenue, expenses, equity, tax & provisions" },
-  { prefix: "F", label: "Special Areas", papers: 6, description: "Related parties, going concern, subsequent events, estimates, laws & litigation" },
-  { prefix: "G", label: "Completion & Finalization", papers: 7, description: "Misstatements, AJE, final analytics, checklist, going concern, events & reps" },
-  { prefix: "H", label: "Reporting", papers: 5, description: "Opinion assessment, auditor's report, KAMs, EoM & other information" },
-  { prefix: "I", label: "Quality Control & Review", papers: 4, description: "EQCR, review notes, consultation & file completion" },
-  { prefix: "J", label: "Tax & Regulatory (Pakistan)", papers: 5, description: "Income tax, deferred tax, sales tax, WHT & super tax" },
-  { prefix: "K", label: "Final Output", papers: 3, description: "Signed opinion, engagement close & archive" },
+const WP_INDEX_FULL: { section: string; color: string; icon: any; papers: { code: string; title: string; trigger: string; standard: string }[] }[] = [
+  {
+    section: "A — Pre-Engagement & Acceptance", color: "bg-blue-50 border-blue-200", icon: ClipboardCheck,
+    papers: [
+      { code: "A1", title: "Client Acceptance Checklist", trigger: "New client", standard: "ISA 210, ISQM 1" },
+      { code: "A2", title: "Continuance Evaluation", trigger: "Existing client", standard: "ISQM 1" },
+      { code: "A3", title: "Engagement Letter", trigger: "All", standard: "ISA 210" },
+      { code: "A4", title: "Independence Declaration", trigger: "All", standard: "IESBA Code" },
+      { code: "A5", title: "Conflict of Interest Assessment", trigger: "All", standard: "IESBA" },
+      { code: "A6", title: "Client Risk Profiling", trigger: "High-risk entity", standard: "ISA 220" },
+      { code: "A7", title: "AML / KYC Documentation", trigger: "Regulated entities", standard: "AMLA 2010" },
+      { code: "A8", title: "Terms of Engagement Approval", trigger: "All", standard: "ISA 210" },
+    ],
+  },
+  {
+    section: "B — Planning File", color: "bg-violet-50 border-violet-200", icon: BarChart,
+    papers: [
+      { code: "B1", title: "Understanding the Entity & Environment", trigger: "All", standard: "ISA 315" },
+      { code: "B2", title: "Industry Analysis", trigger: "All", standard: "ISA 315" },
+      { code: "B3", title: "Business Model & Revenue Streams", trigger: "All", standard: "ISA 315" },
+      { code: "B4", title: "Internal Control Understanding", trigger: "All", standard: "ISA 315" },
+      { code: "B5", title: "Risk Assessment Matrix", trigger: "All", standard: "ISA 315" },
+      { code: "B6", title: "Fraud Risk Assessment", trigger: "All", standard: "ISA 240" },
+      { code: "B7", title: "Laws & Regulations Compliance Review", trigger: "All", standard: "ISA 250" },
+      { code: "B8", title: "Related Party Assessment", trigger: "Related parties", standard: "ISA 550" },
+      { code: "B9", title: "IT Environment Assessment", trigger: "IT reliance", standard: "ISA 315" },
+      { code: "B10", title: "Going Concern Assessment (Initial)", trigger: "All", standard: "ISA 570" },
+      { code: "B11", title: "Engagement Strategy", trigger: "All", standard: "ISA 300" },
+      { code: "B12", title: "Audit Plan", trigger: "All", standard: "ISA 300" },
+      { code: "B13", title: "Materiality Calculation", trigger: "All", standard: "ISA 320" },
+      { code: "B14", title: "Performance Materiality", trigger: "All", standard: "ISA 320" },
+      { code: "B15", title: "Sampling Plan", trigger: "All", standard: "ISA 530" },
+      { code: "B16", title: "Analytical Procedures (Planning)", trigger: "All", standard: "ISA 520" },
+    ],
+  },
+  {
+    section: "C — Trial Balance & Financials", color: "bg-green-50 border-green-200", icon: Table2,
+    papers: [
+      { code: "C1", title: "Extracted Financial Statements", trigger: "Upload", standard: "ISA 500" },
+      { code: "C2", title: "AI Generated Trial Balance", trigger: "No TB uploaded", standard: "ISA 500" },
+      { code: "C3", title: "Trial Balance (Final)", trigger: "All", standard: "ISA 500" },
+      { code: "C4", title: "TB vs FS Reconciliation", trigger: "All", standard: "ISA 500" },
+      { code: "C5", title: "Prior Year vs Current Year Comparison", trigger: "All", standard: "ISA 510" },
+      { code: "C6", title: "Lead Schedules (All Heads)", trigger: "All", standard: "ISA 330" },
+      { code: "C7", title: "Chart of Accounts Mapping", trigger: "AI process", standard: "ISA 315" },
+    ],
+  },
+  {
+    section: "D — General Ledger & Data Analytics", color: "bg-cyan-50 border-cyan-200", icon: Database,
+    papers: [
+      { code: "D1", title: "AI Generated General Ledger", trigger: "No GL uploaded", standard: "ISA 500" },
+      { code: "D2", title: "GL Summary by Account", trigger: "All", standard: "ISA 500" },
+      { code: "D3", title: "Transaction Trend Analysis", trigger: "All", standard: "ISA 520" },
+      { code: "D4", title: "Journal Entry Testing", trigger: "All", standard: "ISA 240" },
+      { code: "D5", title: "Unusual Transactions Identification", trigger: "All", standard: "ISA 240" },
+      { code: "D6", title: "Cut-off Testing", trigger: "All", standard: "ISA 330" },
+    ],
+  },
+  {
+    section: "E — Substantive Working Papers", color: "bg-orange-50 border-orange-200", icon: FileSearch,
+    papers: [
+      { code: "E1", title: "Cash & Bank Testing", trigger: "Has Cash & Bank", standard: "ISA 505" },
+      { code: "E2", title: "Bank Reconciliation", trigger: "Has Cash & Bank", standard: "ISA 500" },
+      { code: "E3", title: "Receivables Aging & Testing", trigger: "Has Receivables", standard: "ISA 330" },
+      { code: "E4", title: "Debtor Confirmations", trigger: "External confirmations", standard: "ISA 505" },
+      { code: "E5", title: "Inventory Observation & Valuation", trigger: "Has Inventory", standard: "ISA 501" },
+      { code: "E6", title: "Fixed Asset Register Testing", trigger: "Has Fixed Assets", standard: "ISA 540" },
+      { code: "E7", title: "Depreciation Testing", trigger: "Has Fixed Assets", standard: "IAS 16" },
+      { code: "E8", title: "Intangible Asset Testing", trigger: "Has Intangibles", standard: "IAS 38" },
+      { code: "E9", title: "Investment Valuation", trigger: "Has Investments", standard: "IFRS 9" },
+      { code: "E10", title: "Payables Testing", trigger: "Has Payables", standard: "ISA 330" },
+      { code: "E11", title: "Creditor Confirmations", trigger: "External confirmations", standard: "ISA 505" },
+      { code: "E12", title: "Borrowings Verification", trigger: "Has Borrowings", standard: "ISA 540" },
+      { code: "E13", title: "Interest Calculation", trigger: "Has Finance Cost", standard: "ISA 540" },
+      { code: "E14", title: "Provisions & Estimates", trigger: "Has Provisions", standard: "IAS 37" },
+      { code: "E15", title: "Contingent Liabilities Review", trigger: "Has Contingent Liabilities", standard: "ISA 501" },
+      { code: "E16", title: "Share Capital Verification", trigger: "Has Share Capital", standard: "Companies Act" },
+      { code: "E17", title: "Reserves & Retained Earnings", trigger: "Has Reserves", standard: "IAS 1" },
+      { code: "E18", title: "Revenue Testing", trigger: "All", standard: "ISA 240" },
+      { code: "E19", title: "Cost of Sales Testing", trigger: "Has Cost of Sales", standard: "ISA 330" },
+      { code: "E20", title: "Expense Testing", trigger: "Has Operating Expenses", standard: "ISA 330" },
+      { code: "E21", title: "Analytical Procedures", trigger: "All", standard: "ISA 520" },
+    ],
+  },
+  {
+    section: "F — Taxation Working Papers", color: "bg-yellow-50 border-yellow-200", icon: DollarSign,
+    papers: [
+      { code: "F1", title: "Income Tax Computation", trigger: "Income Tax applicable", standard: "ITO 2001" },
+      { code: "F2", title: "Deferred Tax Calculation", trigger: "Deferred Tax applicable", standard: "IAS 12" },
+      { code: "F3", title: "Sales Tax Reconciliation", trigger: "Sales Tax applicable", standard: "Sales Tax Act" },
+      { code: "F4", title: "Output vs Input Tax Analysis", trigger: "Sales Tax applicable", standard: "STA 1990" },
+      { code: "F5", title: "Withholding Tax Compliance", trigger: "WHT applicable", standard: "ITO 2001" },
+      { code: "F6", title: "Tax Exposure Assessment", trigger: "Tax audit risk", standard: "ISA 250" },
+    ],
+  },
+  {
+    section: "G — Test of Controls", color: "bg-pink-50 border-pink-200", icon: Shield,
+    papers: [
+      { code: "G1", title: "Control Design Evaluation", trigger: "Controls approach", standard: "ISA 315" },
+      { code: "G2", title: "Control Operating Effectiveness", trigger: "Controls approach", standard: "ISA 330" },
+      { code: "G3", title: "Walkthrough Documentation", trigger: "Controls approach", standard: "ISA 315" },
+      { code: "G4", title: "Control Deficiency Log", trigger: "Controls approach", standard: "ISA 265" },
+    ],
+  },
+  {
+    section: "H — Completion & Finalization", color: "bg-red-50 border-red-200", icon: CheckCircle2,
+    papers: [
+      { code: "H1", title: "Misstatements Summary", trigger: "All", standard: "ISA 450" },
+      { code: "H2", title: "Adjusting Entries", trigger: "All", standard: "ISA 450" },
+      { code: "H3", title: "Final Analytical Review", trigger: "All", standard: "ISA 520" },
+      { code: "H4", title: "Going Concern Final Assessment", trigger: "All", standard: "ISA 570" },
+      { code: "H5", title: "Subsequent Events Review", trigger: "All", standard: "ISA 560" },
+      { code: "H6", title: "Management Representation Letter", trigger: "All", standard: "ISA 580" },
+      { code: "H7", title: "Disclosure Checklist", trigger: "All", standard: "IFRS / Companies Act" },
+      { code: "H8", title: "Audit Conclusion Memo", trigger: "All", standard: "ISA 700" },
+    ],
+  },
+  {
+    section: "I — Reporting File", color: "bg-indigo-50 border-indigo-200", icon: FileOutput,
+    papers: [
+      { code: "I1", title: "Draft Audit Report", trigger: "All", standard: "ISA 700" },
+      { code: "I2", title: "Modified Opinion (if any)", trigger: "Modified opinion", standard: "ISA 705" },
+      { code: "I3", title: "Emphasis of Matter", trigger: "Emphasis needed", standard: "ISA 706" },
+      { code: "I4", title: "Key Audit Matters", trigger: "Listed entity", standard: "ISA 701" },
+      { code: "I5", title: "Other Information Review", trigger: "All", standard: "ISA 720" },
+    ],
+  },
+  {
+    section: "J — Quality Control & Review", color: "bg-teal-50 border-teal-200", icon: Award,
+    papers: [
+      { code: "J1", title: "Engagement Quality Review Checklist", trigger: "EQCR required", standard: "ISQM 2" },
+      { code: "J2", title: "Partner Review Notes", trigger: "All", standard: "ISA 220" },
+      { code: "J3", title: "Manager Review Notes", trigger: "All", standard: "ISA 220" },
+      { code: "J4", title: "Documentation Completion Checklist", trigger: "All", standard: "ISA 230" },
+    ],
+  },
+  {
+    section: "K — Client Communication", color: "bg-slate-50 border-slate-200", icon: Users,
+    papers: [
+      { code: "K1", title: "Management Letter", trigger: "All", standard: "ISA 265" },
+      { code: "K2", title: "Internal Control Weakness Letter", trigger: "Deficiencies found", standard: "ISA 265" },
+      { code: "K3", title: "Communication with TCWG", trigger: "All", standard: "ISA 260" },
+    ],
+  },
+  {
+    section: "L — Inspection / QCR File", color: "bg-emerald-50 border-emerald-200", icon: FileCheck,
+    papers: [
+      { code: "L1", title: "QCR Checklist", trigger: "All", standard: "ICAP / ISQM" },
+      { code: "L2", title: "Regulatory Compliance Checklist", trigger: "Listed / SECP", standard: "SECP" },
+      { code: "L3", title: "Audit File Index", trigger: "All", standard: "ISA 230" },
+      { code: "L4", title: "Archiving Documentation", trigger: "All", standard: "ISA 230" },
+    ],
+  },
+  {
+    section: "AI — AI Working Paper Controls", color: "bg-purple-50 border-purple-200", icon: Sparkles,
+    papers: [
+      { code: "AI1", title: "Data Extraction Log (OCR Output)", trigger: "All", standard: "AI Process" },
+      { code: "AI2", title: "Assumption Register", trigger: "All", standard: "AI Process" },
+      { code: "AI3", title: "TB Reconstruction Logic", trigger: "No TB uploaded", standard: "AI Process" },
+      { code: "AI4", title: "GL Reconstruction Logic", trigger: "No GL uploaded", standard: "AI Process" },
+      { code: "AI5", title: "Risk Flag Summary", trigger: "All", standard: "AI Process" },
+      { code: "AI6", title: "Missing Data Report", trigger: "All", standard: "AI Process" },
+      { code: "AI7", title: "AI Confidence Score Sheet", trigger: "All", standard: "AI Process" },
+    ],
+  },
 ];
 
-const INITIAL_BS: FSSection[] = [
-  {
-    id: "nca", title: "NON-CURRENT ASSETS", color: "bg-blue-600",
-    lines: [
-      { id: "ppe", label: "Property, Plant & Equipment", cy: "1,847,200", py: "1,623,400" },
-      { id: "cwip", label: "Capital Work-in-Progress", cy: "234,500", py: "189,300" },
-      { id: "rou", label: "Right-of-Use Assets", cy: "45,600", py: "52,100" },
-      { id: "ia", label: "Intangible Assets", cy: "12,300", py: "14,800" },
-      { id: "lti", label: "Long-term Investments", cy: "89,400", py: "78,900" },
-      { id: "ltd", label: "Long-term Deposits & Prepayments", cy: "23,100", py: "18,700" },
-      { id: "nca_tot", label: "Total Non-Current Assets", cy: "2,252,100", py: "1,977,200", bold: true, subtotal: true },
-    ],
-  },
-  {
-    id: "ca", title: "CURRENT ASSETS", color: "bg-sky-500",
-    lines: [
-      { id: "stores", label: "Stores, Spare Parts & Loose Tools", cy: "67,800", py: "58,400" },
-      { id: "stock", label: "Stock-in-Trade", cy: "234,100", py: "198,700" },
-      { id: "td", label: "Trade Debts", cy: "183,400", py: "156,300" },
-      { id: "la", label: "Loans & Advances", cy: "34,200", py: "28,900" },
-      { id: "prepay", label: "Short-term Prepayments", cy: "12,400", py: "9,800" },
-      { id: "orecv", label: "Other Receivables", cy: "23,700", py: "19,400" },
-      { id: "taxref", label: "Tax Refunds Due from Government", cy: "18,900", py: "15,200" },
-      { id: "cash", label: "Cash & Bank Balances", cy: "21,300", py: "34,700" },
-      { id: "ca_tot", label: "Total Current Assets", cy: "595,800", py: "521,400", bold: true, subtotal: true },
-    ],
-  },
-  {
-    id: "ta", title: "TOTAL ASSETS", color: "bg-slate-800",
-    lines: [
-      { id: "ta_tot", label: "TOTAL ASSETS", cy: "2,847,900", py: "2,498,600", bold: true, subtotal: true },
-    ],
-  },
-  {
-    id: "eq", title: "EQUITY", color: "bg-emerald-600",
-    lines: [
-      { id: "sc", label: "Share Capital (Authorized & Issued)", cy: "500,000", py: "500,000" },
-      { id: "sp", label: "Share Premium", cy: "150,000", py: "150,000" },
-      { id: "gr", label: "General Reserve", cy: "320,000", py: "280,000" },
-      { id: "up", label: "Unappropriated Profit", cy: "487,300", py: "402,100" },
-      { id: "eq_tot", label: "Total Equity", cy: "1,457,300", py: "1,332,100", bold: true, subtotal: true },
-    ],
-  },
-  {
-    id: "ncl", title: "NON-CURRENT LIABILITIES", color: "bg-orange-500",
-    lines: [
-      { id: "ltf", label: "Long-term Financing", cy: "487,600", py: "523,400" },
-      { id: "ll", label: "Lease Liabilities (Non-Current)", cy: "38,900", py: "44,200" },
-      { id: "dtl", label: "Deferred Tax Liability", cy: "134,700", py: "118,300" },
-      { id: "srb", label: "Staff Retirement Benefits", cy: "89,400", py: "82,600" },
-      { id: "ncl_tot", label: "Total Non-Current Liabilities", cy: "750,600", py: "768,500", bold: true, subtotal: true },
-    ],
-  },
-  {
-    id: "cl", title: "CURRENT LIABILITIES", color: "bg-red-500",
-    lines: [
-      { id: "tp", label: "Trade & Other Payables", cy: "287,400", py: "234,600" },
-      { id: "al", label: "Accrued Liabilities & Provisions", cy: "134,500", py: "98,700" },
-      { id: "stb", label: "Short-term Borrowings", cy: "123,400", py: "45,200" },
-      { id: "cltf", label: "Current Portion of Long-term Financing", cy: "67,400", py: "56,300" },
-      { id: "stp", label: "Sales Tax Payable", cy: "18,900", py: "12,400" },
-      { id: "itp", label: "Income Tax Payable", cy: "8,400", py: "6,800" },
-      { id: "cl_tot", label: "Total Current Liabilities", cy: "640,000", py: "454,000", bold: true, subtotal: true },
-    ],
-  },
-  {
-    id: "tel", title: "TOTAL EQUITY & LIABILITIES", color: "bg-slate-800",
-    lines: [
-      { id: "tel_tot", label: "TOTAL EQUITY & LIABILITIES", cy: "2,847,900", py: "2,498,600", bold: true, subtotal: true },
-    ],
-  },
-];
+const DEFAULT_VARS: VariableMatrix = {
+  engagementType: "Statutory Audit", yearEnd: "", periodStart: "", periodEnd: "",
+  firstYearAudit: false, recurringEngagement: true, groupAudit: false,
+  componentAuditor: false, engagementPartner: "", eqcrRequired: false,
+  preparer: "", reviewer: "", approver: "",
+  entityName: "", legalForm: "Private Limited Company", incorporationStatus: "SECP Registered",
+  ntn: "", strn: "", listedStatus: "Unlisted", pie: false,
+  industry: "Manufacturing / Trading", numberOfLocations: 1,
+  branchOperations: false, foreignOperations: false, relatedPartiesExist: false,
+  framework: "IFRS", currency: "PKR", booksMaintained: true,
+  accountingSoftware: "", tbAvailable: false, glAvailable: false,
+  priorYearFsAvailable: true, auditAdjustmentsExpected: false,
+  incomeTaxApplicable: true, salesTaxApplicable: true,
+  provincialSalesTax: "None", fedApplicable: false, whtApplicable: true,
+  taxAuditExposure: false, deferredTaxApplicable: true,
+  hasCashBank: true, hasReceivables: true, hasInventory: false,
+  hasFixedAssets: true, hasIntangibles: false, hasInvestments: false,
+  hasLoansAdvances: false, hasPayables: true, hasBorrowings: false,
+  hasLeaseLiabilities: false, hasProvisions: true, hasContingentLiabilities: false,
+  hasShareCapital: true, hasReserves: true, hasRetainedEarnings: true,
+  hasMultipleRevenue: false, hasCostOfSales: true, hasOperatingExpenses: true,
+  hasFinanceCost: false, hasOtherIncome: false,
+  fraudRiskIndicators: false, goingConcernIssue: false,
+  significantEstimates: true, complexTransactions: false, relatedPartyRisk: false,
+  revenueRecognitionRisk: false, internalControlStrength: "Moderate",
+  itSystemReliance: false, manualAccounting: false,
+  auditApproach: "Substantive", samplingMethod: "Judgmental",
+  materialityBasis: "Revenue", performanceMaterialityPct: 75,
+  useOfExperts: false, externalConfirmations: true,
+  stPeriodFrom: "", stPeriodTo: "", outputTax: 0, inputTax: 0, stAdjustments: 0, refundClaimed: false,
+  bankStatementsAvailable: false, invoicesAvailable: false,
+  contractsAvailable: false, priorYearWPsAvailable: false,
+  generateTB: true, generateGL: true, generateWPs: true,
+  detailLevel: "Full Audit File", outputFormat: "All",
+};
 
-const INITIAL_PL: FSSection[] = [
-  {
-    id: "rev", title: "REVENUE", color: "bg-blue-600",
-    lines: [
-      { id: "sales", label: "Net Sales / Revenue from Contracts", cy: "1,234,200", py: "1,142,800" },
-      { id: "cos", label: "Cost of Sales", cy: "(813,900)", py: "(770,100)" },
-      { id: "gp", label: "GROSS PROFIT", cy: "420,300", py: "372,700", bold: true, subtotal: true },
-    ],
-  },
-  {
-    id: "opex", title: "OPERATING EXPENSES", color: "bg-orange-500",
-    lines: [
-      { id: "dse", label: "Distribution & Selling Expenses", cy: "(78,400)", py: "(68,900)" },
-      { id: "adm", label: "Administrative & General Expenses", cy: "(56,700)", py: "(48,300)" },
-      { id: "ooe", label: "Other Operating Expenses", cy: "(23,400)", py: "(18,700)" },
-      { id: "ebit", label: "OPERATING PROFIT (EBIT)", cy: "261,800", py: "236,800", bold: true, subtotal: true },
-    ],
-  },
-  {
-    id: "finoi", title: "FINANCE & OTHER INCOME", color: "bg-purple-600",
-    lines: [
-      { id: "fc", label: "Finance Costs", cy: "(47,300)", py: "(43,200)" },
-      { id: "oi", label: "Other Income / Gain on Disposal", cy: "12,400", py: "8,900" },
-      { id: "pbt", label: "PROFIT BEFORE TAX", cy: "226,900", py: "202,500", bold: true, subtotal: true },
-    ],
-  },
-  {
-    id: "tax", title: "TAXATION", color: "bg-red-500",
-    lines: [
-      { id: "cur_tax", label: "Current Tax Expense", cy: "(29,800)", py: "(26,400)" },
-      { id: "def_tax", label: "Deferred Tax (Charge)/Credit", cy: "(9,800)", py: "(9,400)" },
-      { id: "tax_tot", label: "Total Income Tax Expense", cy: "(39,600)", py: "(35,800)", bold: true, subtotal: true },
-      { id: "pat", label: "PROFIT AFTER TAX", cy: "187,300", py: "166,700", bold: true, subtotal: true },
-    ],
-  },
-  {
-    id: "oci", title: "OTHER COMPREHENSIVE INCOME", color: "bg-teal-600",
-    lines: [
-      { id: "act", label: "Actuarial Gains/(Losses) on Defined Benefits", cy: "(2,100)", py: "1,800" },
-      { id: "fx", label: "Exchange Differences on Foreign Operations", cy: "0", py: "0" },
-      { id: "tci", label: "TOTAL COMPREHENSIVE INCOME", cy: "185,200", py: "168,500", bold: true, subtotal: true },
-    ],
-  },
-];
+const DRAFT_KEY = "ana_wp_v3";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function fmtPKR(n: number | string | undefined | null) {
-  if (n === undefined || n === null || n === "") return "—";
-  if (typeof n === "string") return n;
-  return `PKR ${Number(n).toLocaleString("en-PK")}`;
-}
+// ─── HELPERS ───────────────────────────────────────────────────────────────────
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-function RiskBadge({ level }: { level: string }) {
-  const map: Record<string, string> = { High: "bg-red-100 text-red-700", Medium: "bg-amber-100 text-amber-700", Low: "bg-green-100 text-green-700" };
-  return <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tight ${map[level] || "bg-slate-100 text-slate-600"}`}>{level}</span>;
-}
+const fmtPKR = (n: number) => `PKR ${(n || 0).toLocaleString("en-PK")}`;
 
-function classifyFile(filename: string): string {
-  const n = filename.toLowerCase();
-  if (n.includes("trial_balance") || n.includes("trial balance") || /\btb\b/.test(n)) return "Trial Balance";
-  if (n.includes("general_ledger") || n.includes("general ledger") || /\bgl\b/.test(n)) return "General Ledger";
-  if (n.includes("bank") || n.includes("statement") || n.includes("brs")) return "Bank Statement";
-  if (n.includes("financial") || n.includes("balance_sheet") || n.includes("balance sheet") || n.includes("pnl") || n.includes("income") || /\bfs\b/.test(n)) return "Financial Statements";
-  if (n.includes("contract") || n.includes("agreement") || n.includes("deed")) return "Contract";
-  if (n.includes("confirm") || n.includes("circularize") || n.includes("circular")) return "Confirmation";
-  if (n.includes("board") || n.includes("minutes") || n.includes("resolution")) return "Board Minutes";
-  if (n.includes("tax") || n.includes("fbr") || n.includes("return")) return "Tax Return";
-  if (n.includes("invoice") || n.includes("voucher")) return "Invoice / Voucher";
-  if (n.includes("payroll") || n.includes("salary")) return "Payroll";
-  if (n.includes("fixed_asset") || n.includes("fixed asset") || n.includes("ppe")) return "Fixed Asset Register";
-  const ext = filename.split(".").pop()?.toLowerCase() || "";
-  if (ext === "xlsx" || ext === "xls" || ext === "csv") return "Spreadsheet";
-  if (ext === "pdf") return "PDF Document";
-  if (ext === "docx" || ext === "doc") return "Word Document";
-  if (ext === "jpg" || ext === "jpeg" || ext === "png") return "Scanned Image";
-  return "Supporting Document";
-}
+type DataSource = "Extracted" | "Derived" | "Estimated" | "User-confirmed";
 
-function DropZone({ files, onAdd, onRemove, onClassify }: { files: UploadedFile[]; onAdd: (f: FileList) => void; onRemove: (id: string) => void; onClassify?: (id: string, t: string) => void }) {
-  const [drag, setDrag] = useState(false);
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const onDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault(); setDrag(false);
-    if (e.dataTransfer.files) onAdd(e.dataTransfer.files);
-  }, [onAdd]);
-
-  const fileIcon = (f: File) => {
-    if (f.type.includes("pdf")) return <FileText className="w-5 h-5 text-red-500" />;
-    if (f.type.includes("excel") || f.type.includes("spreadsheet")) return <Table className="w-5 h-5 text-emerald-500" />;
-    if (f.type.includes("word") || f.type.includes("officedocument")) return <FileSpreadsheet className="w-5 h-5 text-blue-500" />;
-    return <FileText className="w-5 h-5 text-slate-400" />;
+function SourceBadge({ source }: { source: DataSource }) {
+  const cfg: Record<DataSource, { cls: string; label: string }> = {
+    "Extracted":      { cls: "bg-blue-100 text-blue-800 border-blue-200",    label: "Extracted" },
+    "Derived":        { cls: "bg-green-100 text-green-800 border-green-200",  label: "Derived" },
+    "Estimated":      { cls: "bg-amber-100 text-amber-800 border-amber-200",  label: "Estimated" },
+    "User-confirmed": { cls: "bg-purple-100 text-purple-800 border-purple-200", label: "Confirmed" },
   };
-
+  const c = cfg[source] || cfg["Estimated"];
   return (
-    <div className="space-y-4">
-      <div
-        onDragOver={e => { e.preventDefault(); setDrag(true); }}
-        onDragLeave={() => setDrag(false)}
-        onDrop={onDrop}
-        onClick={() => inputRef.current?.click()}
-        className={`relative border-2 border-dashed rounded-2xl py-14 px-8 text-center cursor-pointer transition-all overflow-hidden group
-          ${drag
-            ? "border-blue-400 bg-blue-50/60 shadow-inner"
-            : "border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/20 hover:shadow-sm"}`}
-      >
-        <div className={`absolute inset-0 transition-opacity duration-300 pointer-events-none ${drag ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-          style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(59,130,246,0.06) 0%, transparent 70%)" }} />
-        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5 transition-all shadow-sm
-          ${drag ? "bg-blue-500 shadow-blue-200" : "bg-gradient-to-br from-blue-500 to-blue-600 shadow-blue-200 group-hover:scale-105"}`}>
-          <Upload className="w-6 h-6 text-white" />
-        </div>
-        <p className="text-base font-bold text-slate-800">Drop your audit documents here</p>
-        <p className="text-sm text-slate-400 mt-1.5 font-medium">PDF · Excel · CSV · Word · Images · Emails — up to 20 files</p>
-        <div className="flex items-center justify-center gap-1.5 mt-4">
-          {["PDF", "XLSX", "CSV", "DOCX", "JPG", "EML"].map(ext => (
-            <span key={ext} className="text-[10px] font-black text-slate-400 border border-slate-200 rounded-md px-2 py-1 font-mono tracking-wider bg-slate-50">{ext}</span>
-          ))}
-        </div>
-        <button className="mt-6 text-xs font-bold text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-xl px-5 py-2.5 transition-colors">Browse Files</button>
-        <input ref={inputRef} type="file" multiple className="hidden"
-          accept=".pdf,.xlsx,.xls,.csv,.txt,.docx,.doc,.jpg,.jpeg,.png,.webp,.eml"
-          onChange={e => e.target.files && onAdd(e.target.files)} />
-      </div>
+    <span className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border", c.cls)}>
+      {source === "Extracted" && <FileSearch className="w-2.5 h-2.5" />}
+      {source === "Derived"   && <Link2 className="w-2.5 h-2.5" />}
+      {source === "Estimated" && <Sparkles className="w-2.5 h-2.5" />}
+      {source === "User-confirmed" && <Check className="w-2.5 h-2.5" />}
+      {c.label}
+    </span>
+  );
+}
 
-      {files.length > 0 && (
-        <div className="space-y-2.5">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Uploaded Files ({files.length})</p>
-          <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-2xl bg-white shadow-sm">
-            {files.map((f, fi) => {
-              const activeType = f.docType || f.classified || "";
-              return (
-              <motion.div key={f.id} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-                className={`flex items-center gap-3 px-5 py-3 hover:bg-slate-50/70 transition-colors group relative ${fi === 0 ? "rounded-t-2xl" : ""} ${fi === files.length - 1 ? "rounded-b-2xl" : ""}`}>
-                <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 shrink-0">
-                  {fileIcon(f.file)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 truncate">{f.file.name}</p>
-                  <p className="text-[11px] text-slate-400 font-medium">{(f.file.size / 1024).toFixed(0)} KB</p>
-                </div>
-                {/* Classification badge / dropdown */}
-                <div className="relative shrink-0">
-                  <button
-                    onClick={e => { e.stopPropagation(); setOpenMenu(openMenu === f.id ? null : f.id); }}
-                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all flex items-center gap-1 ${
-                      activeType ? "bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100" : "bg-slate-50 text-slate-400 border-slate-200 hover:border-blue-300"
-                    }`}
-                  >
-                    {activeType || "Classify"}
-                    <ChevronDown className="w-3 h-3" />
-                  </button>
-                  {openMenu === f.id && (
-                    <div className="absolute right-0 top-7 z-30 w-48 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
-                      {DOC_TYPES.map(dt => (
-                        <button key={dt} onClick={e => { e.stopPropagation(); onClassify?.(f.id, dt); setOpenMenu(null); }}
-                          className={`w-full text-left text-xs font-semibold px-4 py-2.5 hover:bg-blue-50 transition-colors ${activeType === dt ? "text-blue-600 bg-blue-50" : "text-slate-700"}`}
-                        >{dt}</button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <button onClick={e => { e.stopPropagation(); onRemove(f.id); }} className="w-7 h-7 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100 shrink-0">
-                  <X className="w-4 h-4" />
-                </button>
-              </motion.div>
-            );})}
-          </div>
-        </div>
-      )}
+function ConfidenceBadge({ pct }: { pct: number }) {
+  const color = pct >= 80 ? "text-green-700 bg-green-50" : pct >= 50 ? "text-amber-700 bg-amber-50" : "text-red-700 bg-red-50";
+  return <span className={cn("inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded", color)}>{pct}%</span>;
+}
+
+function StatusBadge({ status }: { status: "Draft" | "Review" | "Approved" }) {
+  const cfg = {
+    Draft:    "bg-slate-100 text-slate-700 border-slate-200",
+    Review:   "bg-blue-100 text-blue-700 border-blue-200",
+    Approved: "bg-green-100 text-green-700 border-green-200",
+  };
+  return <span className={cn("inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border", cfg[status])}>{status}</span>;
+}
+
+function SectionHeader({ icon: Icon, title, subtitle, color }: { icon: any; title: string; subtitle?: string; color?: string }) {
+  return (
+    <div className={cn("flex items-center gap-3 mb-4 p-3 rounded-lg border", color || "bg-slate-50 border-slate-200")}>
+      <div className="p-2 rounded-md bg-white shadow-sm"><Icon className="w-4 h-4 text-slate-600" /></div>
+      <div>
+        <h3 className="font-semibold text-slate-800 text-sm">{title}</h3>
+        {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+      </div>
     </div>
   );
 }
 
-function WPCard({ wp, expanded, onToggle }: { wp: WorkingPaper; expanded: boolean; onToggle: () => void }) {
-  const wpLetter = (wp.ref || "").replace(/[0-9\-]/g, "");
-  const group = WP_GROUPS.find(g => g.prefix === wpLetter);
-
+function YesNoToggle({ label, value, onChange, hint }: { label: string; value: boolean; onChange: (v: boolean) => void; hint?: string }) {
   return (
-    <motion.div layout className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-3">
-      <button onClick={onToggle} className="w-full flex items-center gap-4 p-4 hover:bg-slate-50/50 transition-colors text-left">
-        <div className={`text-[10px] font-bold px-2 py-1 rounded-lg border shadow-sm shrink-0 ${group?.color || "bg-slate-100 text-slate-600 border-slate-200"}`}>{wp.ref}</div>
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-slate-900 text-sm">{wp.title}</p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[11px] font-medium text-slate-400 truncate max-w-[200px]">{wp.isa_references?.join(" · ")}</span>
-            {wp.assertions && wp.assertions.length > 0 && (
-              <div className="flex gap-1">
-                {wp.assertions.slice(0, 2).map(a => <span key={a} className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0 rounded-full font-bold border border-blue-100">{a}</span>)}
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
-          {wp.evidence_refs && wp.evidence_refs.length > 0 && (
-            <div className="flex items-center gap-1">
-              <Link2 className="w-3 h-3 text-purple-400" />
-              <span className="text-[10px] font-bold text-purple-600">{wp.evidence_refs.length} refs</span>
-            </div>
-          )}
-          <Badge variant="outline" className={`text-[10px] font-bold h-6 px-2 ${wp.status === "Final" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-blue-50 text-blue-700 border-blue-200"}`}>{wp.status || "Draft"}</Badge>
-          {expanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-        </div>
-      </button>
-
-      <AnimatePresence>
-        {expanded && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }} className="overflow-hidden bg-slate-50/30 border-t border-slate-100">
-            <div className="p-5 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Target className="w-3 h-3" /> Audit Objective</h4>
-                  <p className="text-sm text-slate-700 font-medium leading-relaxed">{wp.objective || "No objective defined."}</p>
-                </div>
-                <div>
-                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Layers className="w-3 h-3" /> Audit Scope</h4>
-                  <p className="text-sm text-slate-700 font-medium leading-relaxed">{wp.scope || "Full substantive testing of recorded balances."}</p>
-                </div>
-              </div>
-
-              {wp.procedures && wp.procedures.length > 0 && (
-                <div>
-                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><ClipboardCheck className="w-3.5 h-3.5" /> Procedures & Findings</h4>
-                  <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm bg-white">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-slate-50 border-b border-slate-200">
-                        <tr>
-                          <th className="p-3 font-bold text-slate-500 w-10">#</th>
-                          <th className="p-3 font-bold text-slate-500">Audit Procedure Performed</th>
-                          <th className="p-3 font-bold text-slate-500">Findings / Results</th>
-                          <th className="p-3 font-bold text-slate-500 w-32 text-center">Conclusion</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {wp.procedures.map((p: any, i: number) => (
-                          <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="p-3 font-mono font-bold text-blue-600">{p.no || i + 1}</td>
-                            <td className="p-3 text-slate-700 font-medium leading-relaxed">{p.procedure || p.desc}</td>
-                            <td className="p-3 text-slate-600">{p.finding || "No exceptions noted."}</td>
-                            <td className="p-3 text-center">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${p.conclusion === "Satisfactory" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
-                                {p.conclusion || "Satisfactory"}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {wp.auditor_conclusion && (
-                <div className="bg-white border border-emerald-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
-                  <h4 className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Auditor's Conclusion</h4>
-                  <p className="text-sm text-slate-800 font-bold leading-relaxed">{wp.auditor_conclusion}</p>
-                </div>
-              )}
-
-              <div className="pt-4 border-t border-slate-200 flex flex-wrap gap-8 items-center text-[11px] font-bold uppercase tracking-tight text-slate-400">
-                <div className="flex items-center gap-2"><span>Prepared:</span> <span className="text-slate-900">{wp.preparer || "System Gen"}</span></div>
-                <div className="flex items-center gap-2"><span>Reviewed:</span> <span className="text-slate-900">{wp.reviewer || "Senior Manager"}</span></div>
-                <div className="flex items-center gap-2"><span>Partner:</span> <span className="text-slate-900">{wp.partner || "Engagement Partner"}</span></div>
-                <div className="ml-auto text-slate-500">{wp.date_prepared || "July 2024"}</div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+    <div className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+      <div>
+        <span className="text-sm text-slate-700">{label}</span>
+        {hint && <p className="text-xs text-slate-400">{hint}</p>}
+      </div>
+      <Switch checked={value} onCheckedChange={onChange} />
+    </div>
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-export default function WorkingPapers() {
-  const { token } = useAuth();
-  const { toast } = useToast();
-  const params = useParams<{ stepId?: string }>();
-  const [, navigate] = useLocation();
-  const STEP_NAMES = ["upload", "configure", "output"] as const;
-  const STEP_NAME_TO_ID: Record<string, number> = { upload: 0, configure: 1, output: 2 };
-  const step = STEP_NAME_TO_ID[params.stepId ?? "upload"] ?? 0;
-  const goToStep = (id: number) => navigate(`/working-papers/${STEP_NAMES[id] ?? "upload"}`);
-  const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [instructions, setInstructions] = useState("");
+// ─── STEP 0: UPLOAD ────────────────────────────────────────────────────────────
 
-  // Production state
-  const [entityName, setEntityName] = useState("");
-  const [engagementType, setEngagementType] = useState("Statutory Audit");
-  const [financialYear, setFinancialYear] = useState("Year ended June 30, 2024");
-  const [firmName, setFirmName] = useState("ANA & Co. Chartered Accountants");
-  const [selectedPapers, setSelectedPapers] = useState<string[]>(ALL_WP_REFS);
-  const [selectedPhases, setSelectedPhases] = useState<string[]>(WP_GROUPS.map(g => g.prefix));
+function UploadStep({ fsFiles, stFiles, onFsAdd, onStAdd, onFsRemove, onStRemove, onContinue }:
+  { fsFiles: File[]; stFiles: File[]; onFsAdd: (f: File[]) => void; onStAdd: (f: File[]) => void;
+    onFsRemove: (i: number) => void; onStRemove: (i: number) => void; onContinue: () => void }) {
 
-  // New mockup state
-  const [ntn, setNtn] = useState("");
-  const [secp, setSecp] = useState("");
-  const [registeredAddress, setRegisteredAddress] = useState("");
-  const [bsData, setBsData] = useState<FSSection[]>(INITIAL_BS);
-  const [plData, setPlData] = useState<FSSection[]>(INITIAL_PL);
-  const [expandedFsSections, setExpandedFsSections] = useState<string[]>(["nca", "ca", "rev"]);
-  const [activeFsTab, setActiveFsTab] = useState<"bs" | "pl">("bs");
-  const [fsExpanded, setFsExpanded] = useState(true);
-  const [expandedWPGroups, setExpandedWPGroups] = useState<string[]>(["A"]);
-  const [expandedWPCards, setExpandedWPCards] = useState<string[]>([]);
-  const [analysisTab, setAnalysisTab] = useState<"summary" | "ratios" | "reconciliation" | "evidence" | "ic">("summary");
+  const fsRef = useRef<HTMLInputElement>(null);
+  const stRef = useRef<HTMLInputElement>(null);
 
-  // ── Audit Period ─────────────────────────────────────────────────────────────
-  const [periodStart, setPeriodStart] = useState("");
-  const [periodEnd, setPeriodEnd] = useState("");
-  const [periodSuggested, setPeriodSuggested] = useState(false);
-
-  // ── Extended Variables (A-K System) ─────────────────────────────────────────
-  const [strn, setStrn] = useState("");
-  const [industry, setIndustry] = useState("");
-
-  const [stPeriodFrom, setStPeriodFrom] = useState("");
-  const [stPeriodTo, setStPeriodTo] = useState("");
-  const [stTaxType, setStTaxType] = useState("Sales Tax");
-  const [stJurisdiction, setStJurisdiction] = useState("FBR");
-  const [stReturnPeriod, setStReturnPeriod] = useState("Monthly");
-  const [salesTaxRows, setSalesTaxRows] = useState<SalesTaxRow[]>([]);
-  const [stUploading, setStUploading] = useState(false);
-  const stFileRef = useRef<HTMLInputElement>(null);
-
-  const [glData, setGlData] = useState<any[]>([]);
-  const [tbData2, setTbData2] = useState<any[]>([]);
-  const [coaData, setCoaData] = useState<any[]>([]);
-  const [glTbSummary, setGlTbSummary] = useState<any>(null);
-  const [generatingGlTb, setGeneratingGlTb] = useState(false);
-  const [glTbTab, setGlTbTab] = useState<"gl" | "tb" | "coa">("gl");
-  const [entityType, setEntityType] = useState("Private Limited");
-  const [framework, setFramework] = useState("IFRS");
-  const [listedStatus, setListedStatus] = useState("Unlisted");
-  const [firstYearAudit, setFirstYearAudit] = useState(false);
-  const [goingConcernFlag, setGoingConcernFlag] = useState(false);
-  const [controlReliance, setControlReliance] = useState("Partial");
-  const [significantRiskAreas, setSignificantRiskAreas] = useState<string[]>([]);
-  const [currency, setCurrency] = useState("PKR");
-  const [newClient, setNewClient] = useState(false);
-  const [groupAuditFlag, setGroupAuditFlag] = useState(false);
-  const [internalAuditExists, setInternalAuditExists] = useState(false);
-
-  // ── Ethics & Independence (Variable Group D) ─────────────────────────────
-  const [independenceConfirmed, setIndependenceConfirmed] = useState(true);
-  const [conflictCheck, setConflictCheck] = useState(true);
-  const [eqcrRequired, setEqcrRequired] = useState(false);
-
-  // ── Sampling Variables (Variable Group N) ─────────────────────────────────
-  const [samplingMethod, setSamplingMethod] = useState("Statistical");
-  const [confidenceLevel, setConfidenceLevel] = useState("95%");
-
-  // ── Special Area Flags (Variable Group O) ─────────────────────────────────
-  const [relatedPartyFlag, setRelatedPartyFlag] = useState(false);
-  const [subsequentEventsFlag, setSubsequentEventsFlag] = useState(false);
-  const [estimatesFlag, setEstimatesFlag] = useState(false);
-  const [litigationFlag, setLitigationFlag] = useState(false);
-  const [expertRequired, setExpertRequired] = useState(false);
-
-  // ── Tax & Regulatory Variables (Variable Group P) ─────────────────────────
-  const [currentTaxApplicable, setCurrentTaxApplicable] = useState(true);
-  const [deferredTaxApplicable, setDeferredTaxApplicable] = useState(true);
-  const [whtExposure, setWhtExposure] = useState(true);
-  const [salesTaxRegistered, setSalesTaxRegistered] = useState(true);
-  const [superTaxApplicable, setSuperTaxApplicable] = useState(false);
-
-  // ── Engagement Timeline (Key Deadlines) ─────────────────────────────────────
-  const [planningDeadline, setPlanningDeadline] = useState("");
-  const [fieldworkStart, setFieldworkStart] = useState("");
-  const [fieldworkEnd, setFieldworkEnd] = useState("");
-  const [reportingDeadline, setReportingDeadline] = useState("");
-  const [reportDate, setReportDate] = useState("");
-  const [filingDeadline, setFilingDeadline] = useState("");
-  const [archiveDate, setArchiveDate] = useState("");
-
-  // ── Engagement Team (Preparer / Reviewer / Approver) ─────────────────────
-  const [preparer, setPreparer] = useState("");
-  const [reviewer, setReviewer] = useState("");
-  const [approver, setApprover] = useState("");
-  const [users, setUsers] = useState<Array<{id: number; name: string; role?: string; email?: string}>>([]);
-
-  const [configValues, setConfigValues] = useState<Record<string, any>>(() => getDefaultValues());
-
-  // ── Draft persistence & stale-data tracking ──────────────────────────────────
-  const [draftLoaded, setDraftLoaded] = useState(false);
-  const [configChangedAfterAnalysis, setConfigChangedAfterAnalysis] = useState(false);
-  const [profileApplied, setProfileApplied] = useState(false);
-
-  const handleConfigChange = useCallback((key: string, value: any) => {
-    setConfigValues(prev => ({ ...prev, [key]: value }));
-    setConfigChangedAfterAnalysis(true);
+  const handleDrop = useCallback((e: React.DragEvent, cb: (f: File[]) => void) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length) cb(files);
   }, []);
 
-  // ── Variable Template ────────────────────────────────────────────────────
-  const [companyProfilePreset, setCompanyProfilePreset] = useState<CompanyProfile | "">("");
-
-  const applyProfileDefaults = useCallback((profile: CompanyProfile) => {
-    const defaults = PROFILE_DEFAULTS[profile];
-    if (!defaults) return;
-    setConfigValues(prev => ({ ...prev, ...defaults }));
-    setProfileApplied(true);
-    toast({ title: `Profile Applied: ${COMPANY_PROFILE_LABELS[profile]}`, description: "Engagement variables pre-filled. Review and adjust below." });
-  }, [toast]);
-
-
-  useEffect(() => {
-    const prev = document.title;
-    document.title = "Pakistan Audit Working Paper Generator | ANA & Co. Chartered Accountants";
-    return () => { document.title = prev; };
-  }, []);
-
-  useEffect(() => {
-    if (!token) return;
-    fetch("/api/users", { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(data => {
-        const list = Array.isArray(data) ? data : (data.users || []);
-        setUsers(list.map((u: any) => ({ id: u.id, name: u.name || u.username || u.email, role: u.role, email: u.email })));
-      })
-      .catch(() => {});
-  }, [token]);
-
-  // ── Auto-suggest period start/end from Financial Year text ───────────────────
-  useEffect(() => {
-    if (!financialYear.trim()) return;
-    // Try to find a closing date from common patterns
-    // "Year ended June 30, 2024" | "Year ended 30 June 2024" | "2024-06-30" | "June 30, 2024"
-    const MONTHS: Record<string, number> = {
-      january:1,february:2,march:3,april:4,may:5,june:6,
-      july:7,august:8,september:9,october:10,november:11,december:12,
-      jan:1,feb:2,mar:3,apr:4,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12,
-    };
-    let endDate: Date | null = null;
-
-    // ISO: YYYY-MM-DD anywhere in string
-    const isoMatch = financialYear.match(/(\d{4})-(\d{2})-(\d{2})/);
-    if (isoMatch) {
-      endDate = new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
-    }
-
-    if (!endDate) {
-      // "Month DD, YYYY" or "DD Month YYYY"
-      const fy = financialYear.toLowerCase();
-      for (const [mon, num] of Object.entries(MONTHS)) {
-        // Pattern: month name, then optional day + year
-        const m1 = new RegExp(`${mon}\\s+(\\d{1,2})[,\\s]+(\\d{4})`).exec(fy);
-        if (m1) { endDate = new Date(Number(m1[2]), num - 1, Number(m1[1])); break; }
-        // Pattern: day then month name then year
-        const m2 = new RegExp(`(\\d{1,2})\\s+${mon}\\s+(\\d{4})`).exec(fy);
-        if (m2) { endDate = new Date(Number(m2[2]), num - 1, Number(m2[1])); break; }
-      }
-    }
-
-    if (!endDate || isNaN(endDate.getTime())) return;
-
-    // period end = closing date; period start = same day+1 one year before
-    const startDate = new Date(endDate);
-    startDate.setFullYear(startDate.getFullYear() - 1);
-    startDate.setDate(startDate.getDate() + 1);
-
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
-    setPeriodEnd(fmt(endDate));
-    setPeriodStart(fmt(startDate));
-    setPeriodSuggested(true);
-  }, [financialYear]);
-
-  // Auto-extraction state
-  const [extracting, setExtracting] = useState(false);
-  const [autoFilled, setAutoFilled] = useState(false);
-
-  // API/Processing state
-  const [analyzing, setAnalyzing] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [exportingExcel, setExportingExcel] = useState(false);
-  const [exportingDocx, setExportingDocx] = useState(false);
-  const [exportingConfirmations, setExportingConfirmations] = useState(false);
-  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
-  const [workingPapers, setWorkingPapers] = useState<WorkingPaper[]>([]);
-  const [evidenceIndex, setEvidenceIndex] = useState<EvidenceItem[]>([]);
-  const [generationMeta, setGenerationMeta] = useState<any>(null);
-  const [progress, setProgress] = useState(0);
-  const [progressMsg, setProgressMsg] = useState("");
-  const [completedPhases, setCompletedPhases] = useState<string[]>([]);
-  const [activePhaseLabel, setActivePhaseLabel] = useState("");
-
-  const addFiles = useCallback((fl: FileList) => {
-    const newFiles = Array.from(fl).map(f => ({ file: f, id: `${f.name}-${Date.now()}-${Math.random()}`, classified: classifyFile(f.name) }));
-    setFiles(prev => [...prev, ...newFiles]);
-    setConfigChangedAfterAnalysis(true);
-  }, []);
-
-  const removeFile = useCallback((id: string) => {
-    setFiles(prev => prev.filter(f => f.id !== id));
-    setConfigChangedAfterAnalysis(true);
-  }, []);
-
-  const classifyFileDoc = useCallback((id: string, docType: string) => {
-    setFiles(prev => prev.map(f => f.id === id ? { ...f, docType } : f));
-  }, []);
-
-  // ── localStorage draft persistence ──────────────────────────────────────────
-  // Load draft on mount
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(DRAFT_KEY);
-      if (!raw) return;
-      const d = JSON.parse(raw);
-      if (d.entityName) setEntityName(d.entityName);
-      if (d.ntn) setNtn(d.ntn);
-      if (d.secp) setSecp(d.secp);
-      if (d.financialYear) setFinancialYear(d.financialYear);
-      if (d.periodStart) setPeriodStart(d.periodStart);
-      if (d.periodEnd) setPeriodEnd(d.periodEnd);
-      if (d.engagementType) setEngagementType(d.engagementType);
-      if (d.entityType) setEntityType(d.entityType);
-      if (d.framework) setFramework(d.framework);
-      if (d.listedStatus) setListedStatus(d.listedStatus);
-      if (d.currency) setCurrency(d.currency);
-      if (d.strn) setStrn(d.strn);
-      if (d.industry) setIndustry(d.industry);
-      if (d.registeredAddress) setRegisteredAddress(d.registeredAddress);
-      if (d.firmName) setFirmName(d.firmName);
-      if (d.planningDeadline) setPlanningDeadline(d.planningDeadline);
-      if (d.fieldworkStart) setFieldworkStart(d.fieldworkStart);
-      if (d.fieldworkEnd) setFieldworkEnd(d.fieldworkEnd);
-      if (d.reportingDeadline) setReportingDeadline(d.reportingDeadline);
-      if (d.reportDate) setReportDate(d.reportDate);
-      if (d.filingDeadline) setFilingDeadline(d.filingDeadline);
-      if (d.archiveDate) setArchiveDate(d.archiveDate);
-      if (d.stPeriodFrom) setStPeriodFrom(d.stPeriodFrom);
-      if (d.stPeriodTo) setStPeriodTo(d.stPeriodTo);
-      if (d.stTaxType) setStTaxType(d.stTaxType);
-      if (d.stJurisdiction) setStJurisdiction(d.stJurisdiction);
-      if (d.stReturnPeriod) setStReturnPeriod(d.stReturnPeriod);
-      if (d.preparer) setPreparer(d.preparer);
-      if (d.reviewer) setReviewer(d.reviewer);
-      if (d.approver) setApprover(d.approver);
-      if (d.instructions) setInstructions(d.instructions);
-      if (d.configValues && typeof d.configValues === "object") setConfigValues(d.configValues);
-      if (d.bsData && d.bsData.length > 0) setBsData(d.bsData);
-      if (d.plData && d.plData.length > 0) setPlData(d.plData);
-      if (d.salesTaxRows && d.salesTaxRows.length > 0) setSalesTaxRows(d.salesTaxRows);
-      if (d.workingPapers && d.workingPapers.length > 0) setWorkingPapers(d.workingPapers);
-      if (d.evidenceIndex && d.evidenceIndex.length > 0) setEvidenceIndex(d.evidenceIndex);
-      if (d.generationMeta && typeof d.generationMeta === "object") setGenerationMeta(d.generationMeta);
-      // If draft restores to export step but no papers exist, fall back to generate step
-      const restoredStep = d.step || 0;
-      if (restoredStep > 2 || (restoredStep === 2 && (!d.workingPapers || d.workingPapers.length === 0))) {
-        goToStep(2);
-      } else if (restoredStep > 0) {
-        goToStep(restoredStep);
-      }
-      setDraftLoaded(true);
-    } catch {}
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Autosave draft to localStorage (debounced 1.5s)
-  useEffect(() => {
-    if (!draftLoaded) return;
-    const timer = setTimeout(() => {
-      const draft = {
-        entityName, ntn, secp, financialYear, periodStart, periodEnd,
-        engagementType, entityType, framework, listedStatus, currency,
-        strn, industry, registeredAddress, firmName,
-        planningDeadline, fieldworkStart, fieldworkEnd, reportingDeadline,
-        reportDate, filingDeadline, archiveDate,
-        stPeriodFrom, stPeriodTo, stTaxType, stJurisdiction, stReturnPeriod,
-        preparer, reviewer, approver, instructions,
-        configValues, bsData, plData, salesTaxRows, step,
-        workingPapers, evidenceIndex, generationMeta,
-      };
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [
-    entityName, ntn, secp, financialYear, periodStart, periodEnd,
-    engagementType, entityType, framework, listedStatus, currency,
-    strn, industry, registeredAddress, firmName,
-    planningDeadline, fieldworkStart, fieldworkEnd, reportingDeadline,
-    reportDate, filingDeadline, archiveDate,
-    stPeriodFrom, stPeriodTo, stTaxType, stJurisdiction, stReturnPeriod,
-    preparer, reviewer, approver, instructions,
-    configValues, bsData, plData, salesTaxRows, step,
-    workingPapers, evidenceIndex, generationMeta, draftLoaded,
-  ]);
-
-  // ── Sync selectedPhases → selectedPapers ────────────────────────────────
-  useEffect(() => {
-    setSelectedPapers(WP_GROUPS.filter(g => selectedPhases.includes(g.prefix)).flatMap(g => g.refs));
-  }, [selectedPhases]);
-
-  // ── Auto-extract entity + financials from uploaded docs ──────────────────
-  const fmtFS = (n: number | null | undefined) =>
-    n != null ? Number(n).toLocaleString("en-PK") : "";
-
-  // ── Smart Defaults Engine ────────────────────────────────────────────────────
-  // Computes the most recent June 30 year-end and fills all empty fields.
-  // NEVER overwrites: entityName, ntn, secp, registeredAddress, firmName, team.
-  const applySmartDefaults = useCallback((showToast = true) => {
-    const today = new Date();
-    const curYear = today.getFullYear();
-    const curMonth = today.getMonth() + 1; // 1-12
-
-    // June year-end: if today is Jan–Jun, last FY ended June 30 of prior calendar year
-    const fyEndYear = curMonth <= 6 ? curYear - 1 : curYear;
-    const fyStartYear = fyEndYear - 1;
-
-    const d2 = (n: number) => String(n).padStart(2, "0");
-    const fmt = (y: number, m: number, day: number) => `${y}-${d2(m)}-${d2(day)}`;
-
-    // Period & year label (only fill if still empty)
-    setFinancialYear(prev => prev || `Year ended June 30, ${fyEndYear}`);
-    setPeriodStart(prev => prev || fmt(fyStartYear, 7, 1));
-    setPeriodEnd(prev => prev || fmt(fyEndYear, 6, 30));
-    setPeriodSuggested(true);
-
-    // Key deadlines (all relative to fyEndYear June 30) — fill only if empty
-    setPlanningDeadline(prev => prev || fmt(fyEndYear, 4, 1));
-    setFieldworkStart(prev => prev || fmt(fyEndYear, 5, 15));
-    setFieldworkEnd(prev => prev || fmt(fyEndYear, 7, 31));
-    setReportingDeadline(prev => prev || fmt(fyEndYear, 9, 30));
-    setReportDate(prev => prev || fmt(fyEndYear, 9, 30));
-    setFilingDeadline(prev => prev || fmt(fyEndYear, 10, 31));
-    // Archive = report date + 60 days → approx Nov 29 of fyEndYear
-    setArchiveDate(prev => prev || fmt(fyEndYear, 11, 29));
-
-    // Sales tax period defaults (fill if empty)
-    setStPeriodFrom(prev => prev || fmt(fyStartYear, 7, 1));
-    setStPeriodTo(prev => prev || fmt(fyEndYear, 6, 30));
-
-    // Classification & framework (fill if still at blank/initial)
-    setEngagementType(prev => prev || "Statutory Audit");
-    setEntityType(prev => prev || "Private Limited");
-    setFramework(prev => prev || "IFRS");
-    setListedStatus(prev => prev || "Unlisted");
-    setCurrency(prev => prev || "PKR");
-    setControlReliance(prev => prev || "Partial");
-    setSamplingMethod(prev => prev || "Statistical");
-    setConfidenceLevel(prev => prev || "95%");
-
-    // Large-company risk flags — always set to true (user can override)
-    setSignificantRiskAreas(prev =>
-      prev.length > 0 ? prev : ["Revenue", "Receivables", "Inventory", "Fixed Assets", "Related Parties"]
-    );
-    setInternalAuditExists(true);
-    setRelatedPartyFlag(true);
-    setSubsequentEventsFlag(true);
-    setEstimatesFlag(true);
-
-    // Tax & regulatory — standard Pakistan defaults
-    setCurrentTaxApplicable(true);
-    setDeferredTaxApplicable(true);
-    setWhtExposure(true);
-    setSalesTaxRegistered(true);
-    setSuperTaxApplicable(false);
-
-    // Ethics & independence
-    setIndependenceConfirmed(true);
-    setConflictCheck(true);
-
-    // Governance dates in configValues (only fill if still empty)
-    setConfigValues(prev => ({
-      ...prev,
-      engagementAcceptanceDate:         prev.engagementAcceptanceDate         || fmt(fyEndYear, 6, 30),
-      managementFsApprovalDate:         prev.managementFsApprovalDate         || fmt(fyEndYear, 9, 30),
-      boardAuditCommitteeApprovalDate:  prev.boardAuditCommitteeApprovalDate  || fmt(fyEndYear, 10, 31),
-      subsequentEventsReviewCutoffDate: prev.subsequentEventsReviewCutoffDate || fmt(fyEndYear, 9, 30),
-    }));
-
-    if (showToast) {
-      toast({
-        title: "Smart defaults applied",
-        description: `Engagement pre-populated for June 30, ${fyEndYear} year-end (Large Company – ISA/IFRS). Review and adjust as needed.`,
-      });
-    }
-  }, [toast]);
-
-  const handleExtractAndNext = async () => {
-    setExtracting(true);
-    try {
-      const fd = new FormData();
-      files.forEach(f => fd.append("files", f.file));
-      const res = await fetch("/api/working-papers/extract-entity", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      if (res.ok) {
-        const d = await res.json();
-        // Only fill identity fields if AI found them (exclusion rule: never auto-fill name, NTN, SECP, address, firm, team)
-        if (d.entity_name)        setEntityName(d.entity_name);
-        if (d.ntn)                setNtn(d.ntn);
-        if (d.secp)               setSecp(d.secp);
-        if (d.financial_year)     setFinancialYear(d.financial_year);
-        if (d.registered_address) setRegisteredAddress(d.registered_address);
-        if (d.engagement_type)    setEngagementType(d.engagement_type);
-
-        const fn = d.financials || {};
-        const patchBS = (secId: string, lineId: string, cy: number | null, py?: number | null) => {
-          setBsData(prev => prev.map(s => s.id === secId ? {
-            ...s, lines: s.lines.map(l => l.id === lineId ? {
-              ...l,
-              ...(cy != null ? { cy: fmtFS(cy) } : {}),
-              ...(py != null ? { py: fmtFS(py) } : {}),
-            } : l)
-          } : s));
-        };
-        const patchPL = (secId: string, lineId: string, cy: number | null, py?: number | null) => {
-          setPlData(prev => prev.map(s => s.id === secId ? {
-            ...s, lines: s.lines.map(l => l.id === lineId ? {
-              ...l,
-              ...(cy != null ? { cy: fmtFS(cy) } : {}),
-              ...(py != null ? { py: fmtFS(py) } : {}),
-            } : l)
-          } : s));
-        };
-
-        patchBS("nca",  "ppe",    fn.fixed_assets,        null);
-        patchBS("ca",   "stock",  fn.inventory,            null);
-        patchBS("ca",   "td",     fn.trade_receivables,    null);
-        patchBS("ca",   "cash",   fn.cash_and_bank,        null);
-        patchBS("ta",   "ta_tot", fn.total_assets,         fn.prior_year_total_assets);
-        patchBS("eq",   "eq_tot", fn.equity,               null);
-        patchBS("cl",   "tp",     fn.trade_payables,       null);
-
-        patchPL("rev", "sales",  fn.revenue,              fn.prior_year_revenue);
-        patchPL("rev", "gp",     fn.gross_profit,         null);
-        patchPL("tax", "pat",    fn.net_profit,           fn.prior_year_net_profit);
-
-        const gotSomething = !!(d.entity_name || d.ntn || fn.revenue || fn.total_assets);
-        setAutoFilled(gotSomething);
-      }
-      // Always apply smart defaults after extraction (fills any gaps the AI left)
-      applySmartDefaults(false);
-      toast({
-        title: "Engagement pre-populated",
-        description: "AI extraction complete. Smart defaults applied for any missing fields. Review and adjust in Configure.",
-      });
-    } catch (err: any) {
-      toast({ title: "Auto-extraction incomplete", description: "Applying smart defaults for all engagement fields. Fill in entity details manually.", variant: "default" });
-      applySmartDefaults(false);
-    } finally {
-      setExtracting(false);
-      goToStep(1);
-    }
-  };
-
-  const updateBsLine = (secId: string, lineId: string, field: "cy" | "py", val: string) => {
-    setBsData(prev => prev.map(s => s.id === secId
-      ? { ...s, lines: s.lines.map(l => l.id === lineId ? { ...l, [field]: val } : l) }
-      : s
-    ));
-  };
-  const updatePlLine = (secId: string, lineId: string, field: "cy" | "py", val: string) => {
-    setPlData(prev => prev.map(s => s.id === secId
-      ? { ...s, lines: s.lines.map(l => l.id === lineId ? { ...l, [field]: val } : l) }
-      : s
-    ));
-  };
-
-  const updateSalesTaxRow = (rowId: string, field: keyof SalesTaxRow, val: string) => {
-    setSalesTaxRows(prev => prev.map(r => r.id === rowId ? { ...r, [field]: val } : r));
-  };
-
-  const handleSTDownloadTemplate = () => {
-    const headers = SALES_TAX_COLS.map(c => c.label);
-    const csvContent = headers.join(",") + "\n";
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "sales_tax_template.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleSTUploadExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setStUploading(true);
-    try {
-      const colMap: Record<string, keyof SalesTaxRow> = {
-        "period from": "periodFrom", "period to": "periodTo",
-        "invoice date": "invoiceDate", "invoice no.": "invoiceNo", "invoice no": "invoiceNo",
-        "customer / supplier name": "customerSupplier", "customer / supplier": "customerSupplier",
-        "ntn / cnic": "ntnCnic", "strn": "strn", "description": "description",
-        "sales type": "salesType", "taxable value": "taxableValue",
-        "sales tax rate": "salesTaxRate", "st rate %": "salesTaxRate",
-        "sales tax amount": "salesTaxAmount", "st amount": "salesTaxAmount",
-        "further tax rate": "furtherTaxRate", "ft rate %": "furtherTaxRate",
-        "further tax amount": "furtherTaxAmount", "ft amount": "furtherTaxAmount",
-        "fed rate": "fedRate", "fed rate %": "fedRate",
-        "fed amount": "fedAmount",
-        "province / tax jurisdiction": "jurisdiction", "province / jurisdiction": "jurisdiction",
-        "input tax / output tax": "inputOutput", "input / output": "inputOutput",
-        "adjustment / debit note / credit note": "adjustment", "adj / dn / cn": "adjustment",
-        "net tax": "netTax",
-      };
-
-      const arrayBuffer = await file.arrayBuffer();
-      const XLSX = await import("xlsx");
-      const workbook = XLSX.read(arrayBuffer, { type: "array" });
-      const sheetName = workbook.SheetNames[0];
-      if (!sheetName) { toast({ title: "Empty file", description: "The uploaded file has no sheets.", variant: "destructive" }); return; }
-      const sheet = workbook.Sheets[sheetName];
-      const rawData: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" }) as string[][];
-
-      if (rawData.length < 2) { toast({ title: "Empty file", description: "The uploaded file contains no data rows.", variant: "destructive" }); return; }
-      const headers = (rawData[0] as string[]).map(h => String(h ?? "").trim().toLowerCase());
-      const headerMap: (keyof SalesTaxRow | null)[] = headers.map(h => colMap[h] || null);
-      const rows: SalesTaxRow[] = [];
-      for (let i = 1; i < rawData.length; i++) {
-        const vals = (rawData[i] as string[]).map(v => String(v ?? "").trim());
-        const row = emptySalesTaxRow();
-        headerMap.forEach((field, idx) => { if (field && field !== "id" && vals[idx]) (row as any)[field] = vals[idx]; });
-        const hasData = Object.entries(row).some(([k, v]) => k !== "id" && v);
-        if (hasData) rows.push(row);
-      }
-      if (rows.length > 0) {
-        setSalesTaxRows(prev => [...prev, ...rows]);
-        toast({ title: "Sales Tax Data Imported", description: `${rows.length} row(s) loaded from "${file.name}".` });
-      } else {
-        toast({ title: "No data mapped", description: "Could not map any rows from the uploaded file. Check column headers match the template.", variant: "destructive" });
-      }
-    } catch (err: any) {
-      toast({ title: "Upload failed", description: err?.message || "Could not parse the uploaded file.", variant: "destructive" });
-    } finally {
-      setStUploading(false);
-      if (stFileRef.current) stFileRef.current.value = "";
-    }
-  };
-
-  const handleGenerateGlTb = async () => {
-    setGeneratingGlTb(true);
-    try {
-      const res = await fetch("/api/working-papers/generate-gl-tb", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ entityName, industry, financialYear, bsData, plData, ntn, strn, engagementType, framework }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      setGlData(data.general_ledger || []);
-      setTbData2(data.trial_balance || []);
-      setCoaData(data.chart_of_accounts || []);
-      setGlTbSummary(data.summary || null);
-      toast({ title: "GL & Trial Balance Generated", description: `${data.summary?.gl_entries || 0} GL entries, ${data.summary?.tb_accounts || 0} TB accounts. ${data.summary?.is_balanced ? "Balanced" : "Check balance"}.` });
-    } catch (err: any) {
-      toast({ title: "GL/TB Generation Failed", description: err.message, variant: "destructive" });
-    } finally {
-      setGeneratingGlTb(false);
-    }
-  };
-
-  const fmtPKR = (n: number) => n != null ? `PKR ${Number(n).toLocaleString("en-PK")}` : "";
-
-  const addFsRow = (tab: "bs" | "pl", secId: string) => {
-    const setter = tab === "bs" ? setBsData : setPlData;
-    const uid = `custom_${Date.now()}`;
-    setter(prev => prev.map(s => {
-      if (s.id !== secId) return s;
-      const subtotalIdx = s.lines.findIndex(l => l.subtotal);
-      const newLine: FSLine = { id: uid, label: "", cy: "", py: "", isCustom: true };
-      const updated = [...s.lines];
-      if (subtotalIdx >= 0) updated.splice(subtotalIdx, 0, newLine);
-      else updated.push(newLine);
-      return { ...s, lines: updated };
-    }));
-  };
-
-  const removeFsRow = (tab: "bs" | "pl", secId: string, lineId: string) => {
-    const setter = tab === "bs" ? setBsData : setPlData;
-    setter(prev => prev.map(s => s.id === secId
-      ? { ...s, lines: s.lines.filter(l => l.id !== lineId) }
-      : s
-    ));
-  };
-
-  const updateFsLabel = (tab: "bs" | "pl", secId: string, lineId: string, label: string) => {
-    const setter = tab === "bs" ? setBsData : setPlData;
-    setter(prev => prev.map(s => s.id === secId
-      ? { ...s, lines: s.lines.map(l => l.id === lineId ? { ...l, label } : l) }
-      : s
-    ));
-  };
-
-  const addBreakup = (tab: "bs" | "pl", secId: string, lineId: string) => {
-    const setter = tab === "bs" ? setBsData : setPlData;
-    const uid = `brk_${Date.now()}`;
-    setter(prev => prev.map(s => s.id === secId
-      ? { ...s, lines: s.lines.map(l => l.id === lineId
-        ? { ...l, breakups: [...(l.breakups || []), { id: uid, label: "", cy: "", py: "" }] }
-        : l
+  const DropZone = ({ label, files, inputRef, onAdd, onRemove, icon: Icon, accent }:
+    { label: string; files: File[]; inputRef: React.RefObject<HTMLInputElement>; onAdd: (f: File[]) => void;
+      onRemove: (i: number) => void; icon: any; accent: string }) => (
+    <div className="flex-1">
+      <div
+        className={cn("border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors hover:border-opacity-80", accent)}
+        onDragOver={e => e.preventDefault()}
+        onDrop={e => handleDrop(e, onAdd)}
+        onClick={() => inputRef.current?.click()}
+      >
+        <Icon className="w-10 h-10 mx-auto mb-2 opacity-60 text-slate-500" />
+        <p className="font-semibold text-slate-700 text-sm">{label}</p>
+        <p className="text-xs text-slate-500 mt-1">PDF, scanned PDF, images, Excel — drag & drop or click</p>
+        <input ref={inputRef} type="file" multiple accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png,.tiff,.tif"
+          className="hidden" onChange={e => { if (e.target.files) onAdd(Array.from(e.target.files)); e.target.value = ""; }} />
+      </div>
+      {files.length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          {files.map((f, i) => (
+            <div key={i} className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2">
+              <FileText className="w-4 h-4 text-slate-400 shrink-0" />
+              <span className="text-xs text-slate-700 flex-1 truncate">{f.name}</span>
+              <span className="text-xs text-slate-400">{(f.size / 1024).toFixed(0)} KB</span>
+              <button onClick={e => { e.stopPropagation(); onRemove(i); }} className="p-0.5 hover:text-red-500 text-slate-400"><X className="w-3.5 h-3.5" /></button>
+            </div>
+          ))}
+        </div>
       )}
-      : s
-    ));
-  };
+    </div>
+  );
 
-  const removeBreakup = (tab: "bs" | "pl", secId: string, lineId: string, brkId: string) => {
-    const setter = tab === "bs" ? setBsData : setPlData;
-    setter(prev => prev.map(s => s.id === secId
-      ? { ...s, lines: s.lines.map(l => l.id === lineId
-        ? { ...l, breakups: (l.breakups || []).filter(b => b.id !== brkId) }
-        : l
-      )}
-      : s
-    ));
-  };
-
-  const updateBreakup = (tab: "bs" | "pl", secId: string, lineId: string, brkId: string, field: "label" | "cy" | "py", val: string) => {
-    const setter = tab === "bs" ? setBsData : setPlData;
-    setter(prev => prev.map(s => s.id === secId
-      ? { ...s, lines: s.lines.map(l => l.id === lineId
-        ? { ...l, breakups: (l.breakups || []).map(b => b.id === brkId ? { ...b, [field]: val } : b) }
-        : l
-      )}
-      : s
-    ));
-  };
-
-  const [expandedBreakups, setExpandedBreakups] = useState<string[]>([]);
-  const toggleBreakupExpand = (lineId: string) => {
-    setExpandedBreakups(prev => prev.includes(lineId) ? prev.filter(x => x !== lineId) : [...prev, lineId]);
-  };
-
-  const togglePaperSelection = (ref: string) => {
-    setSelectedPapers(prev => prev.includes(ref) ? prev.filter(r => r !== ref) : [...prev, ref]);
-  };
-
-  const toggleGroupSelection = (refs: string[]) => {
-    const allSelected = refs.every(r => selectedPapers.includes(r));
-    setSelectedPapers(prev => allSelected ? prev.filter(r => !refs.includes(r)) : [...new Set([...prev, ...refs])]);
-  };
-
-  const toggleWPGroupExpand = (prefix: string) => {
-    setExpandedWPGroups(prev => prev.includes(prefix) ? prev.filter(p => p !== prefix) : [...prev, prefix]);
-  };
-
-  const toggleWPCardExpand = (ref: string) => {
-    setExpandedWPCards(prev => prev.includes(ref) ? prev.filter(r => r !== ref) : [...prev, ref]);
-  };
-
-  // ── Production API Handlers (KEPT EXACTLY) ──────────────────────────────────
-  const handleAnalyze = async () => {
-    if (files.length === 0) {
-      toast({ title: "No files", description: "Upload at least one document first.", variant: "destructive" });
-      return;
-    }
-    if (!entityName.trim()) {
-      toast({ title: "Entity name required", description: "Please enter the entity name in the Configure step before running analysis.", variant: "destructive" });
-      return;
-    }
-    setAnalyzing(true);
-    setProgress(10);
-    setProgressMsg("Uploading documents...");
-
-    const formData = new FormData();
-    files.forEach(f => formData.append("files", f.file));
-    formData.append("fileClassifications", JSON.stringify(files.map(f => ({ name: f.file.name, docType: f.docType || f.classified || "Other" }))));
-    formData.append("entityName", entityName);
-    formData.append("ntn", ntn);
-    formData.append("secp", secp);
-    formData.append("engagementType", engagementType);
-    formData.append("financialYear", financialYear);
-    formData.append("firmName", firmName);
-    formData.append("instructions", instructions);
-    formData.append("bsData", JSON.stringify(bsData));
-    formData.append("plData", JSON.stringify(plData));
-    formData.append("configValues", JSON.stringify(configValues));
-    formData.append("salesTaxRows", JSON.stringify(salesTaxRows));
-    formData.append("periodStart", periodStart);
-    formData.append("periodEnd", periodEnd);
-
-    try {
-      setProgress(40);
-      setProgressMsg("Sending documents to AI engine...");
-
-      const res = await fetch("/api/working-papers/analyze", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}` },
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error(await res.text());
-
-      setProgress(80);
-      setProgressMsg("Processing AI response...");
-
-      const data = await res.json();
-
-      if (data.analysis) {
-        setAnalysis(data.analysis);
-        setConfigChangedAfterAnalysis(false);
-      } else if (data.success === false || data.error) {
-        throw new Error(data.error || "Analysis returned no data");
-      }
-
-      setProgress(100);
-      goToStep(2);
-      toast({ title: "Analysis complete", description: "Review the results below, then click Generate Working Papers." });
-    } catch (err: any) {
-      toast({ title: "Analysis failed", description: err.message, variant: "destructive" });
-    } finally {
-      setAnalyzing(false);
-    }
-  };
-
-  const handleGenerate = async () => {
-    if (!analysis) return;
-    setGenerating(true);
-    setProgress(5);
-    setProgressMsg("Initializing working paper generator...");
-    setCompletedPhases([]);
-    setActivePhaseLabel(AUDIT_PHASES[0].label);
-
-    // Drive phase-by-phase progress on the frontend while the API runs
-    let phaseIdx = 0;
-    const phaseInterval = setInterval(() => {
-      if (phaseIdx < AUDIT_PHASES.length) {
-        const done = AUDIT_PHASES[phaseIdx].prefix;
-        setCompletedPhases(prev => [...prev, done]);
-        const nextLabel = phaseIdx + 1 < AUDIT_PHASES.length ? AUDIT_PHASES[phaseIdx + 1].label : "Finalising...";
-        setActivePhaseLabel(nextLabel);
-        setProgress(5 + Math.round(((phaseIdx + 1) / AUDIT_PHASES.length) * 82));
-        setProgressMsg(`Generating ${AUDIT_PHASES[phaseIdx].label} papers...`);
-        phaseIdx++;
-      }
-    }, 2200);
-
-    try {
-      const res = await fetch("/api/working-papers/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({
-          analysis,
-          selectedPapers,
-          entityName,
-          engagementType,
-          financialYear,
-          firmName,
-          ntn,
-          secp,
-          strn,
-          industry,
-          entityType,
-          framework,
-          listedStatus,
-          firstYearAudit,
-          goingConcernFlag,
-          controlReliance,
-          significantRiskAreas,
-          registeredAddress,
-          periodStart,
-          periodEnd,
-          currency,
-          newClient,
-          groupAuditFlag,
-          internalAuditExists,
-          independenceConfirmed,
-          conflictCheck,
-          eqcrRequired,
-          samplingMethod,
-          confidenceLevel,
-          relatedPartyFlag,
-          subsequentEventsFlag,
-          estimatesFlag,
-          litigationFlag,
-          expertRequired,
-          currentTaxApplicable,
-          deferredTaxApplicable,
-          whtExposure,
-          salesTaxRegistered,
-          superTaxApplicable,
-          preparer,
-          reviewer,
-          approver,
-          planningDeadline,
-          fieldworkStart,
-          fieldworkEnd,
-          reportingDeadline,
-          reportDate,
-          filingDeadline,
-          archiveDate,
-          bsData,
-          plData,
-          salesTaxRows,
-          configValues,
-        }),
-      });
-
-      clearInterval(phaseInterval);
-
-      if (!res.ok) throw new Error(await res.text());
-
-      // Backend returns plain JSON — read it directly (not SSE)
-      const data = await res.json();
-      const papers: WorkingPaper[] = data.working_papers ?? data.workingPapers ?? [];
-      const evidence: EvidenceItem[] = data.evidence_index ?? data.evidenceIndex ?? [];
-
-      setWorkingPapers(papers);
-      setEvidenceIndex(evidence);
-      if (data.meta) setGenerationMeta(data.meta);
-
-      // Mark all phases done
-      setCompletedPhases(AUDIT_PHASES.map(p => p.prefix));
-      setActivePhaseLabel("");
-      setProgress(100);
-      setProgressMsg("All working papers generated successfully.");
-      toast({ title: "Generation complete", description: `${papers.length} working papers generated across 11 audit phases (A-K). Review below then export.` });
-    } catch (err: any) {
-      clearInterval(phaseInterval);
-      toast({ title: "Generation failed", description: err.message, variant: "destructive" });
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const handleExport = async () => {
-    setExporting(true);
-    try {
-      const res = await fetch("/api/working-papers/export-pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ workingPapers, evidenceIndex, meta: generationMeta, analysis, entityName, financialYear, bsData, plData, salesTaxRows }),
-      });
-      if (!res.ok) throw new Error("Export failed");
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = `Audit_WP_${entityName.replace(/\s+/g, "_")}.pdf`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err: any) {
-      toast({ title: "Export failed", description: err.message, variant: "destructive" });
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const handleExportExcel = async () => {
-    setExportingExcel(true);
-    try {
-      const res = await fetch("/api/working-papers/export-excel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ workingPapers, evidenceIndex, meta: generationMeta, analysis, entityName, financialYear, bsData, plData, salesTaxRows }),
-      });
-      if (!res.ok) throw new Error("Excel export failed");
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = `Audit_WP_${entityName.replace(/\s+/g, "_")}.xlsx`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err: any) {
-      toast({ title: "Excel export failed", description: err.message, variant: "destructive" });
-    } finally {
-      setExportingExcel(false);
-    }
-  };
-
-  const handleExportDocx = async () => {
-    setExportingDocx(true);
-    try {
-      const res = await fetch("/api/working-papers/export-docx", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ workingPapers, evidenceIndex, meta: generationMeta, analysis, entityName, financialYear, bsData, plData, salesTaxRows }),
-      });
-      if (!res.ok) throw new Error("DOCX export failed");
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = `Audit_WP_${entityName.replace(/\s+/g, "_")}.docx`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err: any) {
-      toast({ title: "DOCX export failed", description: err.message, variant: "destructive" });
-    } finally {
-      setExportingDocx(false);
-    }
-  };
-
-  const handleExportConfirmations = async () => {
-    setExportingConfirmations(true);
-    try {
-      const res = await fetch("/api/working-papers/generate-confirmations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ analysis, bsData, plData, salesTaxRows, meta: { entity: entityName, financial_year: financialYear, firm_name: firmName, ...generationMeta } }),
-      });
-      if (!res.ok) throw new Error("Confirmations generation failed");
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = `Confirmations_${entityName.replace(/\s+/g, "_")}.pdf`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err: any) {
-      toast({ title: "Generation failed", description: err.message, variant: "destructive" });
-    } finally {
-      setExportingConfirmations(false);
-    }
-  };
-
-  // ── Render Logic ────────────────────────────────────────────────────────────
-  const uniqueSections = Array.from(new Set(workingPapers.map(wp => wp.section || "Uncategorized")));
-  const sectionPapers = (sec: string) => workingPapers.filter(wp => (wp.section || "Uncategorized") === sec);
+  const canContinue = fsFiles.length > 0;
 
   return (
-    <div className="flex flex-col min-h-screen font-sans text-slate-900" style={{ background: "linear-gradient(160deg, #f0f4ff 0%, #f8fafc 40%, #fafafa 100%)" }}>
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div className="text-center mb-6">
+        <h2 className="text-xl font-bold text-slate-800">Upload Documents</h2>
+        <p className="text-sm text-slate-500 mt-1">Upload your Financial Statements and Sales Tax Returns. AI will do the rest automatically.</p>
+      </div>
 
-      {/* ── TOP BAR ───────────────────────────────────────────────────────── */}
-      <header className="h-16 flex items-center justify-between px-8 bg-white/95 backdrop-blur-sm border-b border-slate-200/80 sticky top-0 z-20 shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-600 shadow-sm shadow-blue-200">
-            <BookOpen className="w-4 h-4 text-white" />
-          </div>
-          <div className="flex items-center gap-1.5 text-sm">
-            <span className="font-semibold text-slate-800">Audit Working Papers</span>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
-            <span className="font-medium text-blue-600">{STEPS[step].label}</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ANA & Co. · Chartered Accountants</span>
-          <div className="w-1 h-1 rounded-full bg-slate-300" />
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ISA 200–720</span>
-        </div>
-      </header>
+      <div className="flex flex-col md:flex-row gap-4">
+        <DropZone label="Financial Statements" files={fsFiles} inputRef={fsRef} onAdd={onFsAdd} onRemove={onFsRemove}
+          icon={BarChart2} accent="border-blue-300 bg-blue-50 hover:bg-blue-100" />
+        <DropZone label="Sales Tax Returns" files={stFiles} inputRef={stRef} onAdd={onStAdd} onRemove={onStRemove}
+          icon={DollarSign} accent="border-green-300 bg-green-50 hover:bg-green-100" />
+      </div>
 
-      {/* ── STEP WIZARD ───────────────────────────────────────────────────── */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200/60 px-8 py-4 sticky top-16 z-10">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex items-center gap-0">
-            {STEPS.map((s, i) => {
-              const isCompleted = step > s.id;
-              const isCurrent   = step === s.id;
-              const isLast      = i === STEPS.length - 1;
-              return (
-                <React.Fragment key={s.id}>
-                  <button
-                    onClick={() => step > s.id && goToStep(s.id)}
-                    disabled={step <= s.id}
-                    className={`flex items-center gap-2.5 group transition-all ${step > s.id ? "cursor-pointer" : "cursor-default"}`}
-                  >
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all duration-300 shrink-0
-                      ${isCompleted ? "bg-blue-600 border-blue-600 text-white shadow-sm shadow-blue-200"
-                        : isCurrent  ? "bg-white border-blue-600 text-blue-600 shadow-sm shadow-blue-100 ring-4 ring-blue-50"
-                        : "bg-white border-slate-200 text-slate-400"}`}
-                    >
-                      {isCompleted ? <Check className="w-3.5 h-3.5" /> : s.id + 1}
-                    </div>
-                    <div className="hidden sm:block">
-                      <p className={`text-xs font-bold leading-none transition-colors ${isCurrent ? "text-blue-700" : isCompleted ? "text-slate-600" : "text-slate-400"}`}>
-                        {s.shortLabel}
-                      </p>
-                      {isCurrent && <p className="text-[9px] text-blue-500 font-medium mt-0.5 leading-none">{s.label}</p>}
-                    </div>
-                  </button>
-                  {!isLast && (
-                    <div className={`flex-1 h-[2px] mx-3 rounded-full transition-all duration-500 ${isCompleted ? "bg-blue-500" : "bg-slate-200"}`} />
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </div>
+      {!canContinue && (
+        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-700">Please upload at least one Financial Statements file to continue.</p>
+        </div>
+      )}
+
+      <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+        <Info className="w-5 h-5 text-slate-400 shrink-0" />
+        <div className="text-xs text-slate-500 space-y-1">
+          <p><strong>Supported:</strong> PDF, scanned PDF (OCR applied), Excel, JPG, PNG, TIFF</p>
+          <p><strong>No TB or GL required</strong> — AI generates both from your Financial Statements</p>
+          <p><strong>Privacy:</strong> Files are processed securely and not stored permanently</p>
         </div>
       </div>
 
-      <div className="px-8 py-8">
-        <div className="max-w-5xl mx-auto pb-28">
-            <AnimatePresence mode="wait">
-              <motion.div key={step} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.3 }}>
-                
-                {/* STEP 0: UPLOAD documents */}
-                {step === 0 && (
-                  <div className="space-y-8">
-                    {/* Hero Header */}
-                    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                      <div className="relative px-8 pt-8 pb-6 overflow-hidden" style={{ background: "linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%)" }}>
-                        <div className="absolute top-0 right-0 w-72 h-72 rounded-full opacity-10" style={{ background: "radial-gradient(circle, #fff 0%, transparent 70%)", transform: "translate(30%, -30%)" }} />
-                        <div className="absolute bottom-0 left-0 w-48 h-48 rounded-full opacity-5" style={{ background: "radial-gradient(circle, #fff 0%, transparent 70%)", transform: "translate(-30%, 30%)" }} />
-                        <div className="relative z-10 flex items-start justify-between gap-6">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-3">
-                              <span className="text-[10px] font-black text-blue-200 uppercase tracking-[0.2em]">Step 1 of 3</span>
-                              <div className="h-px flex-1 max-w-[40px] bg-blue-400/40" />
-                              <span className="text-[10px] font-bold text-blue-300 uppercase tracking-widest">ISA 230</span>
-                            </div>
-                            <h2 className="text-2xl font-black text-white leading-tight">Upload Audit Documents</h2>
-                            <p className="text-sm text-blue-200 mt-2 leading-relaxed max-w-xl">Upload Trial Balance, Financial Statements, bank statements, contracts, and confirmations. The AI engine will auto-structure and generate ISA-compliant working papers from Acceptance through EQCR.</p>
-                          </div>
-                          <div className="hidden md:flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 shrink-0 mt-1">
-                            <Upload className="w-7 h-7 text-white" />
-                          </div>
-                        </div>
-                        <div className="relative z-10 flex flex-wrap gap-2 mt-5">
-                          {["TB / GL", "Financial Statements", "Bank Statements", "Contracts", "Confirmations", "Board Minutes", "Tax Returns"].map(tag => (
-                            <span key={tag} className="text-[10px] font-bold text-blue-100 border border-blue-400/30 bg-white/10 rounded-full px-2.5 py-1 uppercase tracking-wide backdrop-blur-sm">{tag}</span>
-                          ))}
-                        </div>
-                      </div>
+      <div className="flex justify-end">
+        <Button disabled={!canContinue} onClick={onContinue} className="gap-2">
+          Continue to Variables <ArrowRight className="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── STEP 1: VARIABLES ─────────────────────────────────────────────────────────
+
+function VariablesStep({ vars, onChange, onContinue, onBack }:
+  { vars: VariableMatrix; onChange: (v: VariableMatrix) => void; onContinue: () => void; onBack: () => void }) {
+
+  const [openGroup, setOpenGroup] = useState<string | null>("A");
+  const set = (field: keyof VariableMatrix, val: any) => onChange({ ...vars, [field]: val });
+  const toggle = (g: string) => setOpenGroup(g === openGroup ? null : g);
+
+  const GroupPanel = ({ id, label, icon: Icon, color, children }:
+    { id: string; label: string; icon: any; color: string; children: React.ReactNode }) => (
+    <div className={cn("border rounded-xl overflow-hidden", color)}>
+      <button className="w-full flex items-center justify-between p-3 text-left hover:bg-white/50 transition-colors"
+        onClick={() => toggle(id)}>
+        <div className="flex items-center gap-2">
+          <Icon className="w-4 h-4 text-slate-600" />
+          <span className="font-medium text-sm text-slate-800">{label}</span>
+        </div>
+        {openGroup === id ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+      </button>
+      {openGroup === id && <div className="p-4 bg-white border-t border-slate-100">{children}</div>}
+    </div>
+  );
+
+  const Field = ({ label, children, span }: { label: string; children: React.ReactNode; span?: boolean }) => (
+    <div className={cn("space-y-1", span ? "col-span-2" : "")}>
+      <Label className="text-xs text-slate-600">{label}</Label>
+      {children}
+    </div>
+  );
+
+  const canContinue = vars.entityName.trim() !== "" && vars.yearEnd !== "";
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-3">
+      <div className="text-center mb-4">
+        <h2 className="text-xl font-bold text-slate-800">Engagement Variables</h2>
+        <p className="text-sm text-slate-500 mt-1">Review and confirm engagement variables. AI will pre-fill these from uploaded documents.</p>
+      </div>
+
+      {/* A. Engagement Profile */}
+      <GroupPanel id="A" label="A. Engagement Profile" icon={Briefcase} color="bg-blue-50 border-blue-200">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Engagement Type *">
+            <Select value={vars.engagementType} onValueChange={v => set("engagementType", v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["Statutory Audit","Review Engagement","Agreed Upon Procedures","Compilation"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Year End *">
+            <Input type="date" value={vars.yearEnd} onChange={e => set("yearEnd", e.target.value)} className="h-8 text-xs" />
+          </Field>
+          <Field label="Period From">
+            <Input type="date" value={vars.periodStart} onChange={e => set("periodStart", e.target.value)} className="h-8 text-xs" />
+          </Field>
+          <Field label="Period To">
+            <Input type="date" value={vars.periodEnd} onChange={e => set("periodEnd", e.target.value)} className="h-8 text-xs" />
+          </Field>
+          <Field label="Engagement Partner">
+            <Input value={vars.engagementPartner} onChange={e => set("engagementPartner", e.target.value)} className="h-8 text-xs" placeholder="Partner name" />
+          </Field>
+          <Field label="Preparer / Senior">
+            <Input value={vars.preparer} onChange={e => set("preparer", e.target.value)} className="h-8 text-xs" placeholder="Preparer name" />
+          </Field>
+          <Field label="Reviewer / Manager">
+            <Input value={vars.reviewer} onChange={e => set("reviewer", e.target.value)} className="h-8 text-xs" placeholder="Reviewer name" />
+          </Field>
+          <Field label="Approver / Partner">
+            <Input value={vars.approver} onChange={e => set("approver", e.target.value)} className="h-8 text-xs" placeholder="Approver name" />
+          </Field>
+        </div>
+        <div className="mt-3 space-y-0">
+          <YesNoToggle label="First Year Audit" value={vars.firstYearAudit} onChange={v => set("firstYearAudit", v)} hint="ISA 510 applies" />
+          <YesNoToggle label="Recurring Engagement" value={vars.recurringEngagement} onChange={v => set("recurringEngagement", v)} hint="ISQM 1 continuance" />
+          <YesNoToggle label="Group Audit" value={vars.groupAudit} onChange={v => set("groupAudit", v)} hint="ISA 600 applies" />
+          <YesNoToggle label="EQCR Required" value={vars.eqcrRequired} onChange={v => set("eqcrRequired", v)} hint="ISQM 2 — for PIE or complex engagements" />
+        </div>
+      </GroupPanel>
+
+      {/* B. Entity Profile */}
+      <GroupPanel id="B" label="B. Entity Profile" icon={Building2} color="bg-violet-50 border-violet-200">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Entity Name *" span>
+            <Input value={vars.entityName} onChange={e => set("entityName", e.target.value)} className="h-8 text-xs" placeholder="Company name" />
+          </Field>
+          <Field label="Legal Form">
+            <Select value={vars.legalForm} onValueChange={v => set("legalForm", v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["Private Limited Company","Public Limited Company","SMC-Private Limited","LLP","Partnership","AOP","Sole Proprietor","NGO/NPO","Trust"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Incorporation Status">
+            <Select value={vars.incorporationStatus} onValueChange={v => set("incorporationStatus", v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["SECP Registered","Unregistered","Under Incorporation"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Industry">
+            <Select value={vars.industry} onValueChange={v => set("industry", v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["Manufacturing / Trading","Services","Financial Services","NGO / NPO","Real Estate","Textile","Construction","Healthcare","Education","Other"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="NTN">
+            <Input value={vars.ntn} onChange={e => set("ntn", e.target.value)} className="h-8 text-xs" placeholder="7-digit NTN" />
+          </Field>
+          <Field label="STRN (Sales Tax Reg. No.)">
+            <Input value={vars.strn} onChange={e => set("strn", e.target.value)} className="h-8 text-xs" placeholder="STRN / GST No." />
+          </Field>
+          <Field label="Listed Status">
+            <Select value={vars.listedStatus} onValueChange={v => set("listedStatus", v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["Listed (PSX)","Unlisted"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="No. of Locations">
+            <Input type="number" min={1} value={vars.numberOfLocations} onChange={e => set("numberOfLocations", Number(e.target.value))} className="h-8 text-xs" />
+          </Field>
+        </div>
+        <div className="mt-3 space-y-0">
+          <YesNoToggle label="Public Interest Entity (PIE)" value={vars.pie} onChange={v => set("pie", v)} hint="Listed / regulated / financial sector" />
+          <YesNoToggle label="Branch Operations" value={vars.branchOperations} onChange={v => set("branchOperations", v)} />
+          <YesNoToggle label="Foreign Operations" value={vars.foreignOperations} onChange={v => set("foreignOperations", v)} hint="ISA 600 — component auditor may apply" />
+          <YesNoToggle label="Related Parties Exist" value={vars.relatedPartiesExist} onChange={v => set("relatedPartiesExist", v)} hint="ISA 550, IAS 24" />
+        </div>
+      </GroupPanel>
+
+      {/* C. Financial Reporting */}
+      <GroupPanel id="C" label="C. Financial Reporting" icon={BookOpen} color="bg-green-50 border-green-200">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Reporting Framework">
+            <Select value={vars.framework} onValueChange={v => set("framework", v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["IFRS","IFRS for SMEs","Local GAAP / Companies Act"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Functional Currency">
+            <Select value={vars.currency} onValueChange={v => set("currency", v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["PKR","USD","GBP","AED","EUR"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Accounting Software" span>
+            <Input value={vars.accountingSoftware} onChange={e => set("accountingSoftware", e.target.value)} className="h-8 text-xs" placeholder="e.g. SAP, Oracle, QuickBooks, Excel, Manual" />
+          </Field>
+        </div>
+        <div className="mt-3 space-y-0">
+          <YesNoToggle label="Books Maintained" value={vars.booksMaintained} onChange={v => set("booksMaintained", v)} hint="Are proper books of account maintained?" />
+          <YesNoToggle label="Trial Balance Available" value={vars.tbAvailable} onChange={v => set("tbAvailable", v)} hint="If No — AI will generate TB from FS" />
+          <YesNoToggle label="General Ledger Available" value={vars.glAvailable} onChange={v => set("glAvailable", v)} hint="If No — AI will reconstruct GL" />
+          <YesNoToggle label="Prior Year FS Available" value={vars.priorYearFsAvailable} onChange={v => set("priorYearFsAvailable", v)} hint="ISA 510 — opening balances" />
+          <YesNoToggle label="Audit Adjustments Expected" value={vars.auditAdjustmentsExpected} onChange={v => set("auditAdjustmentsExpected", v)} hint="ISA 450" />
+        </div>
+      </GroupPanel>
+
+      {/* D. Tax & Regulatory */}
+      <GroupPanel id="D" label="D. Tax & Regulatory" icon={DollarSign} color="bg-yellow-50 border-yellow-200">
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <Field label="Provincial Sales Tax">
+            <Select value={vars.provincialSalesTax} onValueChange={v => set("provincialSalesTax", v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["None","PRA (Punjab)","SRB (Sindh)","KPRA (KPK)","BRA (Balochistan)"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+        <div className="space-y-0">
+          <YesNoToggle label="Income Tax Applicable" value={vars.incomeTaxApplicable} onChange={v => set("incomeTaxApplicable", v)} hint="ITO 2001" />
+          <YesNoToggle label="Sales Tax Applicable (Federal)" value={vars.salesTaxApplicable} onChange={v => set("salesTaxApplicable", v)} hint="STA 1990 — 17% standard rate" />
+          <YesNoToggle label="Federal Excise Duty (FED)" value={vars.fedApplicable} onChange={v => set("fedApplicable", v)} hint="FED Act 2005" />
+          <YesNoToggle label="Withholding Tax (WHT)" value={vars.whtApplicable} onChange={v => set("whtApplicable", v)} hint="ITO 2001 Sec 148/149/153" />
+          <YesNoToggle label="Deferred Tax Applicable" value={vars.deferredTaxApplicable} onChange={v => set("deferredTaxApplicable", v)} hint="IAS 12" />
+          <YesNoToggle label="Tax Audit Exposure" value={vars.taxAuditExposure} onChange={v => set("taxAuditExposure", v)} hint="Prior FBR notices or pending assessments" />
+        </div>
+      </GroupPanel>
+
+      {/* E. FS Components */}
+      <GroupPanel id="E" label="E. Financial Statement Components" icon={Layers} color="bg-orange-50 border-orange-200">
+        <div className="space-y-3">
+          <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Assets</p>
+          <div className="grid grid-cols-2 gap-0">
+            {([
+              ["hasCashBank","Cash & Bank","ISA 505"],["hasReceivables","Receivables","ISA 330"],
+              ["hasInventory","Inventory","ISA 501"],["hasFixedAssets","Fixed Assets","IAS 16"],
+              ["hasIntangibles","Intangible Assets","IAS 38"],["hasInvestments","Investments","IFRS 9"],
+              ["hasLoansAdvances","Loans & Advances","ISA 540"],
+            ] as [keyof VariableMatrix, string, string][]).map(([k, l, s]) => (
+              <YesNoToggle key={k} label={l} value={vars[k] as boolean} onChange={v => set(k, v)} hint={s} />
+            ))}
+          </div>
+          <Separator />
+          <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Liabilities</p>
+          <div className="grid grid-cols-2 gap-0">
+            {([
+              ["hasPayables","Trade Payables","ISA 330"],["hasBorrowings","Borrowings","ISA 540"],
+              ["hasLeaseLiabilities","Lease Liabilities","IFRS 16"],["hasProvisions","Provisions","IAS 37"],
+              ["hasContingentLiabilities","Contingent Liabilities","ISA 501"],
+            ] as [keyof VariableMatrix, string, string][]).map(([k, l, s]) => (
+              <YesNoToggle key={k} label={l} value={vars[k] as boolean} onChange={v => set(k, v)} hint={s} />
+            ))}
+          </div>
+          <Separator />
+          <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Equity & Income Statement</p>
+          <div className="grid grid-cols-2 gap-0">
+            {([
+              ["hasShareCapital","Share Capital","Companies Act"],["hasReserves","Reserves","IAS 1"],
+              ["hasRetainedEarnings","Retained Earnings","IAS 1"],["hasMultipleRevenue","Multiple Revenue Streams","IFRS 15"],
+              ["hasCostOfSales","Cost of Sales","ISA 330"],["hasOperatingExpenses","Operating Expenses","ISA 330"],
+              ["hasFinanceCost","Finance Cost","IAS 23"],["hasOtherIncome","Other Income","ISA 520"],
+            ] as [keyof VariableMatrix, string, string][]).map(([k, l, s]) => (
+              <YesNoToggle key={k} label={l} value={vars[k] as boolean} onChange={v => set(k, v)} hint={s} />
+            ))}
+          </div>
+        </div>
+      </GroupPanel>
+
+      {/* F. Risk Assessment */}
+      <GroupPanel id="F" label="F. Risk Assessment" icon={Shield} color="bg-red-50 border-red-200">
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <Field label="Internal Control Strength" span>
+            <Select value={vars.internalControlStrength} onValueChange={v => set("internalControlStrength", v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["Strong","Moderate","Weak"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+        <div className="space-y-0">
+          <YesNoToggle label="Fraud Risk Indicators" value={vars.fraudRiskIndicators} onChange={v => set("fraudRiskIndicators", v)} hint="ISA 240 — management override, revenue recognition" />
+          <YesNoToggle label="Going Concern Issue" value={vars.goingConcernIssue} onChange={v => set("goingConcernIssue", v)} hint="ISA 570 — doubt about entity's ability to continue" />
+          <YesNoToggle label="Significant Estimates" value={vars.significantEstimates} onChange={v => set("significantEstimates", v)} hint="ISA 540 — fair value, provisions, impairment" />
+          <YesNoToggle label="Complex Transactions" value={vars.complexTransactions} onChange={v => set("complexTransactions", v)} hint="ISA 315 — unusual or one-off transactions" />
+          <YesNoToggle label="Related Party Risk" value={vars.relatedPartyRisk} onChange={v => set("relatedPartyRisk", v)} hint="ISA 550 — arm's length concerns" />
+          <YesNoToggle label="Revenue Recognition Risk" value={vars.revenueRecognitionRisk} onChange={v => set("revenueRecognitionRisk", v)} hint="ISA 240, IFRS 15" />
+          <YesNoToggle label="IT System Reliance" value={vars.itSystemReliance} onChange={v => set("itSystemReliance", v)} hint="ISA 315 — IT general controls" />
+          <YesNoToggle label="Manual Accounting" value={vars.manualAccounting} onChange={v => set("manualAccounting", v)} hint="ISA 315 — higher error risk" />
+        </div>
+      </GroupPanel>
+
+      {/* G. Audit Approach */}
+      <GroupPanel id="G" label="G. Audit Approach" icon={Target} color="bg-cyan-50 border-cyan-200">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Audit Approach">
+            <Select value={vars.auditApproach} onValueChange={v => set("auditApproach", v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["Substantive Only","Controls + Substantive"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Sampling Method">
+            <Select value={vars.samplingMethod} onValueChange={v => set("samplingMethod", v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["Judgmental","Random","Systematic (Interval)"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Materiality Basis">
+            <Select value={vars.materialityBasis} onValueChange={v => set("materialityBasis", v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["Revenue","Total Assets","Net Profit","Equity"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Performance Materiality %">
+            <Input type="number" min={50} max={90} value={vars.performanceMaterialityPct} onChange={e => set("performanceMaterialityPct", Number(e.target.value))} className="h-8 text-xs" />
+          </Field>
+        </div>
+        <div className="mt-3 space-y-0">
+          <YesNoToggle label="Use of Experts Required" value={vars.useOfExperts} onChange={v => set("useOfExperts", v)} hint="ISA 620" />
+          <YesNoToggle label="External Confirmations Required" value={vars.externalConfirmations} onChange={v => set("externalConfirmations", v)} hint="ISA 505" />
+        </div>
+      </GroupPanel>
+
+      {/* H. Sales Tax Data */}
+      <GroupPanel id="H" label="H. Sales Tax Data" icon={Hash} color="bg-pink-50 border-pink-200">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="ST Period From">
+            <Input type="date" value={vars.stPeriodFrom} onChange={e => set("stPeriodFrom", e.target.value)} className="h-8 text-xs" />
+          </Field>
+          <Field label="ST Period To">
+            <Input type="date" value={vars.stPeriodTo} onChange={e => set("stPeriodTo", e.target.value)} className="h-8 text-xs" />
+          </Field>
+          <Field label="Output Tax (PKR)">
+            <Input type="number" value={vars.outputTax || ""} onChange={e => set("outputTax", Number(e.target.value))} className="h-8 text-xs" placeholder="0" />
+          </Field>
+          <Field label="Input Tax (PKR)">
+            <Input type="number" value={vars.inputTax || ""} onChange={e => set("inputTax", Number(e.target.value))} className="h-8 text-xs" placeholder="0" />
+          </Field>
+          <Field label="Adjustments (PKR)">
+            <Input type="number" value={vars.stAdjustments || ""} onChange={e => set("stAdjustments", Number(e.target.value))} className="h-8 text-xs" placeholder="0" />
+          </Field>
+        </div>
+        <div className="mt-3">
+          <YesNoToggle label="Sales Tax Refund Claimed" value={vars.refundClaimed} onChange={v => set("refundClaimed", v)} />
+        </div>
+      </GroupPanel>
+
+      {/* I. Document Availability */}
+      <GroupPanel id="I" label="I. Document Availability" icon={FileCheck} color="bg-teal-50 border-teal-200">
+        <div className="space-y-0">
+          <YesNoToggle label="Bank Statements Available" value={vars.bankStatementsAvailable} onChange={v => set("bankStatementsAvailable", v)} />
+          <YesNoToggle label="Invoices / Tax Invoices Available" value={vars.invoicesAvailable} onChange={v => set("invoicesAvailable", v)} />
+          <YesNoToggle label="Contracts / Agreements Available" value={vars.contractsAvailable} onChange={v => set("contractsAvailable", v)} />
+          <YesNoToggle label="Prior Year Working Papers Available" value={vars.priorYearWPsAvailable} onChange={v => set("priorYearWPsAvailable", v)} />
+        </div>
+      </GroupPanel>
+
+      {/* J. Output Control */}
+      <GroupPanel id="J" label="J. Output Control" icon={FileOutput} color="bg-slate-50 border-slate-300">
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <Field label="Detail Level">
+            <Select value={vars.detailLevel} onValueChange={v => set("detailLevel", v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["Summary","Detailed","Full Audit File"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Export Format">
+            <Select value={vars.outputFormat} onValueChange={v => set("outputFormat", v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["All (Word + Excel + PDF)","Word Only","Excel Only","PDF Only"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+        <div className="space-y-0">
+          <YesNoToggle label="Generate Trial Balance" value={vars.generateTB} onChange={v => set("generateTB", v)} />
+          <YesNoToggle label="Generate General Ledger" value={vars.generateGL} onChange={v => set("generateGL", v)} />
+          <YesNoToggle label="Generate Working Papers" value={vars.generateWPs} onChange={v => set("generateWPs", v)} />
+        </div>
+      </GroupPanel>
+
+      {!canContinue && (
+        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-700">Entity Name and Year End are required before running AI Extraction.</p>
+        </div>
+      )}
+
+      <div className="flex justify-between pt-2">
+        <Button variant="outline" onClick={onBack} className="gap-2"><ChevronLeft className="w-4 h-4" /> Back</Button>
+        <Button disabled={!canContinue} onClick={onContinue} className="gap-2">
+          Run AI Extraction <Sparkles className="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── STEP 2: EXTRACTION PREVIEW ────────────────────────────────────────────────
+
+function ExtractionStep({ extractedData, vars, onContinue, onBack, onRerun }:
+  { extractedData: ExtractedData | null; vars: VariableMatrix;
+    onContinue: () => void; onBack: () => void; onRerun: () => void }) {
+
+  const [openSection, setOpenSection] = useState<string>("entity");
+
+  if (!extractedData) {
+    return (
+      <div className="max-w-3xl mx-auto text-center py-16">
+        <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-500" />
+        <p className="text-slate-600 font-medium">Running AI Extraction...</p>
+        <p className="text-sm text-slate-400 mt-1">OCR reading files · Extracting financial data · Running analysis</p>
+      </div>
+    );
+  }
+
+  const { entity, financials, taxData, flags, assumptions, missingData, extractionLog, confidenceScores, analysis } = extractedData;
+
+  const SectionToggle = ({ id, label, icon: Icon }: { id: string; label: string; icon: any }) => (
+    <button onClick={() => setOpenSection(id === openSection ? "" : id)}
+      className={cn("flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+        id === openSection ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")}>
+      <Icon className="w-3.5 h-3.5" />{label}
+    </button>
+  );
+
+  const DataRow = ({ label, value, source, confidence }: { label: string; value: any; source?: DataSource; confidence?: number }) => (
+    <div className="flex items-start gap-3 py-1.5 border-b border-slate-50 last:border-0">
+      <span className="text-xs text-slate-500 w-36 shrink-0">{label}</span>
+      <span className="text-xs text-slate-800 flex-1 font-medium">{value ?? <span className="text-red-400 italic">Not found</span>}</span>
+      {source && <SourceBadge source={source} />}
+      {confidence !== undefined && <ConfidenceBadge pct={confidence} />}
+    </div>
+  );
+
+  const mat = analysis?.materiality || {};
+  const risks = analysis?.risk_assessment || {};
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-4">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">AI Extraction Preview</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Review what AI extracted. All data is tagged by confidence level.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={onRerun} className="gap-2"><RefreshCw className="w-3.5 h-3.5" /> Re-extract</Button>
+      </div>
+
+      {/* Navigation tabs */}
+      <div className="flex flex-wrap gap-2">
+        <SectionToggle id="entity" label="Entity Info" icon={Building2} />
+        <SectionToggle id="financials" label="Financials" icon={BarChart2} />
+        <SectionToggle id="tax" label="Tax Data" icon={DollarSign} />
+        <SectionToggle id="materiality" label="Materiality" icon={Scale} />
+        <SectionToggle id="risks" label="Risk Assessment" icon={Shield} />
+        <SectionToggle id="flags" label="Flags & Assumptions" icon={Flag} />
+        <SectionToggle id="log" label="Extraction Log" icon={Clipboard} />
+      </div>
+
+      {/* Entity Info */}
+      {openSection === "entity" && (
+        <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-1">
+          <SectionHeader icon={Building2} title="Entity Information" color="bg-blue-50 border-blue-200" />
+          <DataRow label="Entity Name" value={entity?.entity_name || vars.entityName} source="Extracted" confidence={confidenceScores?.entity_name || 90} />
+          <DataRow label="Legal Form" value={entity?.legal_form || vars.legalForm} source="Extracted" />
+          <DataRow label="NTN" value={entity?.ntn || vars.ntn} source="Extracted" />
+          <DataRow label="STRN" value={entity?.strn || vars.strn} source="Extracted" />
+          <DataRow label="Financial Year" value={entity?.financial_year || vars.yearEnd} source="Extracted" />
+          <DataRow label="Engagement Type" value={entity?.engagement_type || vars.engagementType} source="Extracted" />
+          <DataRow label="Framework" value={entity?.reporting_framework || vars.framework} source="Extracted" />
+          <DataRow label="Industry" value={entity?.industry || vars.industry} source="Extracted" />
+          <DataRow label="Registered Address" value={entity?.registered_address} source="Extracted" />
+          <DataRow label="Bankers" value={Array.isArray(entity?.bankers) ? entity.bankers.join(", ") : entity?.bankers} source="Extracted" />
+          <DataRow label="Directors" value={Array.isArray(entity?.directors) ? entity.directors.join(", ") : entity?.directors} source="Extracted" />
+          <DataRow label="Auditors" value={entity?.auditors} source="Extracted" />
+        </div>
+      )}
+
+      {/* Financials */}
+      {openSection === "financials" && (
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <SectionHeader icon={BarChart2} title="Extracted Financial Data" color="bg-violet-50 border-violet-200" />
+          <div className="grid grid-cols-2 gap-x-6">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 mb-2 uppercase">Balance Sheet</p>
+              {[
+                ["Total Assets", financials?.total_assets],["Fixed Assets", financials?.fixed_assets],
+                ["Inventory", financials?.inventory],["Trade Receivables", financials?.trade_receivables],
+                ["Cash & Bank", financials?.cash_and_bank],["Total Liabilities", financials?.total_liabilities],
+                ["Trade Payables", financials?.trade_payables],["Borrowings", financials?.borrowings],
+                ["Equity", financials?.equity],["Share Capital", financials?.share_capital],
+                ["Retained Earnings", financials?.retained_earnings],
+              ].map(([l, v]) => (
+                <DataRow key={l as string} label={l as string} value={v ? fmtPKR(Number(v)) : null} source={v ? "Extracted" : "Estimated"} />
+              ))}
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 mb-2 uppercase">Income Statement</p>
+              {[
+                ["Revenue", financials?.revenue],["Gross Profit", financials?.gross_profit],
+                ["Operating Expenses", financials?.operating_expenses],["Finance Cost", financials?.finance_cost],
+                ["Net Profit", financials?.net_profit],["Tax Expense", financials?.tax_expense],
+                ["Prior Year Revenue", financials?.prior_year_revenue],["Prior Year Net Profit", financials?.prior_year_net_profit],
+              ].map(([l, v]) => (
+                <DataRow key={l as string} label={l as string} value={v ? fmtPKR(Number(v)) : null} source={v ? "Extracted" : "Estimated"} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tax Data */}
+      {openSection === "tax" && (
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <SectionHeader icon={DollarSign} title="Tax Data" color="bg-yellow-50 border-yellow-200" />
+          <DataRow label="Advance Tax (Sec 147)" value={taxData?.advance_tax ? fmtPKR(Number(taxData.advance_tax)) : null} source="Extracted" />
+          <DataRow label="WHT Deducted" value={taxData?.wht_deducted ? fmtPKR(Number(taxData.wht_deducted)) : null} source="Extracted" />
+          <DataRow label="Output Tax (GST)" value={taxData?.output_tax ? fmtPKR(Number(taxData.output_tax)) : null} source="Extracted" />
+          <DataRow label="Input Tax (GST)" value={taxData?.input_tax ? fmtPKR(Number(taxData.input_tax)) : null} source="Extracted" />
+          <DataRow label="Net Tax Payable" value={taxData?.net_tax_payable ? fmtPKR(Number(taxData.net_tax_payable)) : null} source="Derived" />
+          <DataRow label="Deferred Tax" value={taxData?.deferred_tax ? fmtPKR(Number(taxData.deferred_tax)) : null} source="Extracted" />
+          <DataRow label="Current Tax Provision" value={taxData?.current_tax_provision ? fmtPKR(Number(taxData.current_tax_provision)) : null} source="Extracted" />
+          <DataRow label="Effective Tax Rate" value={analysis?.tax_analysis?.effective_tax_rate ? `${(analysis.tax_analysis.effective_tax_rate * 100).toFixed(1)}%` : null} source="Derived" />
+        </div>
+      )}
+
+      {/* Materiality */}
+      {openSection === "materiality" && (
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <SectionHeader icon={Scale} title="Materiality (ISA 320)" color="bg-green-50 border-green-200" />
+          <DataRow label="Basis" value={mat?.basis} source="Derived" />
+          <DataRow label="Benchmark Amount" value={mat?.benchmark_amount ? fmtPKR(Number(mat.benchmark_amount)) : null} source="Extracted" />
+          <DataRow label="Percentage Used" value={mat?.percentage_used ? `${mat.percentage_used}%` : null} source="Derived" />
+          <DataRow label="Overall Materiality (OM)" value={mat?.overall_materiality ? fmtPKR(Number(mat.overall_materiality)) : null} source="Derived" confidence={95} />
+          <DataRow label="Performance Materiality (PM)" value={mat?.performance_materiality ? fmtPKR(Number(mat.performance_materiality)) : null} source="Derived" confidence={95} />
+          <DataRow label="Trivial Threshold" value={mat?.trivial_threshold ? fmtPKR(Number(mat.trivial_threshold)) : null} source="Derived" />
+          <DataRow label="Justification" value={mat?.justification} source="Derived" />
+        </div>
+      )}
+
+      {/* Risk Assessment */}
+      {openSection === "risks" && (
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <SectionHeader icon={Shield} title="Risk Assessment (ISA 315)" color="bg-red-50 border-red-200" />
+          <DataRow label="Overall Risk" value={risks?.overall_risk} source="Derived" />
+          <DataRow label="Inherent Risk" value={risks?.inherent_risk_level} source="Derived" />
+          <DataRow label="Control Risk" value={risks?.control_risk_level} source="Derived" />
+          {Array.isArray(risks?.significant_risks) && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold text-slate-600 mb-2">Significant Risks</p>
+              <div className="space-y-2">
+                {risks.significant_risks.slice(0, 8).map((r: any, i: number) => (
+                  <div key={i} className="p-2 bg-red-50 border border-red-100 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-medium text-red-800">{r.area || r.risk_area}</span>
+                      <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-medium",
+                        r.risk_level === "High" ? "bg-red-200 text-red-800" : r.risk_level === "Medium" ? "bg-amber-200 text-amber-800" : "bg-green-200 text-green-800")}>
+                        {r.risk_level || r.level}
+                      </span>
                     </div>
-
-                    {/* Draft restore banner */}
-                    {draftLoaded && (
-                      <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-3">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <p className="text-sm font-semibold text-emerald-800 flex-1">Previous engagement restored from autosave — all fields are editable.</p>
-                        <button onClick={() => { localStorage.removeItem(DRAFT_KEY); setDraftLoaded(false); }} className="text-[11px] font-bold text-emerald-600 hover:text-emerald-800 underline shrink-0">Clear</button>
-                      </div>
-                    )}
-
-                    <DropZone files={files} onAdd={addFiles} onRemove={removeFile} onClassify={classifyFileDoc} />
-
-                    {/* ── Working Paper Category Selection ─────────────── */}
-                    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center">
-                            <Layers className="w-4 h-4 text-violet-600" />
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-bold text-slate-900">Working Paper Categories</h3>
-                            <p className="text-[11px] text-slate-400 font-medium mt-0.5">Select the audit phases to include · {selectedPhases.length} of {WP_GROUPS.length} phases selected</p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => setSelectedPhases(WP_GROUPS.map(g => g.prefix))} className="text-[11px] font-bold text-blue-600 hover:text-blue-800 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors">All</button>
-                          <button onClick={() => setSelectedPhases([])} className="text-[11px] font-bold text-slate-500 hover:text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">None</button>
-                        </div>
-                      </div>
-                      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                        {WP_GROUPS.map(g => {
-                          const isOn = selectedPhases.includes(g.prefix);
-                          return (
-                            <button key={g.prefix}
-                              onClick={() => setSelectedPhases(prev => isOn ? prev.filter(p => p !== g.prefix) : [...prev, g.prefix])}
-                              className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${isOn ? "bg-blue-50 border-blue-200" : "bg-slate-50 border-slate-100 opacity-60 hover:opacity-80"}`}
-                            >
-                              <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 border-2 transition-all ${isOn ? "bg-blue-600 border-blue-600" : "border-slate-300 bg-white"}`}>
-                                {isOn && <Check className="w-3.5 h-3.5 text-white" />}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${g.color}`}>{g.prefix}</span>
-                                  <span className="text-xs font-bold text-slate-700 truncate">{g.label}</span>
-                                </div>
-                                <p className="text-[10px] text-slate-400 mt-0.5">{g.refs.length} papers</p>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <Label className="text-xs font-bold text-slate-700 uppercase tracking-widest flex items-center gap-2"><Sparkles className="w-3.5 h-3.5 text-blue-500" /> Special Context / Instructions</Label>
-                      <Textarea 
-                        placeholder="Add specific focus areas, materiality considerations, or known issues the AI should prioritize during analysis..."
-                        className="min-h-[120px] rounded-xl border-slate-200 focus:ring-blue-500 focus:border-blue-500 text-sm leading-relaxed"
-                        value={instructions}
-                        onChange={e => setInstructions(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="flex justify-end pt-4">
-                      <Button onClick={handleExtractAndNext} disabled={files.length === 0 || extracting} size="lg" className="h-12 px-8 bg-blue-600 hover:bg-blue-700 font-bold rounded-xl group">
-                        {extracting ? (
-                          <><Loader2 className="mr-2 w-4 h-4 animate-spin" /> AI Extracting Data…</>
-                        ) : (
-                          <><Sparkles className="mr-2 w-4 h-4" /> Extract & Configure <ChevronRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" /></>
-                        )}
-                      </Button>
-                    </div>
+                    <p className="text-xs text-red-700">{r.description || r.risk_description}</p>
                   </div>
-                )}
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
-                {/* STEP 1: CONFIGURE Engagement */}
-                {step === 1 && (
-                  <div className="space-y-6">
-                    {/* Hero Header */}
-                    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                      <div className="relative px-8 pt-7 pb-5 overflow-hidden" style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #1e3a5f 100%)" }}>
-                        <div className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)", transform: "translate(30%, -30%)" }} />
-                        <div className="relative z-10 flex items-start justify-between gap-6">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-3">
-                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Step 2 of 3</span>
-                              <div className="h-px flex-1 max-w-[40px] bg-slate-600" />
-                              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">ISA 315 · ISA 300</span>
-                            </div>
-                            <h2 className="text-2xl font-black text-white leading-tight">Configure Engagement</h2>
-                            <p className="text-sm text-slate-400 mt-1.5 leading-relaxed max-w-xl">Entity particulars, audit team, timeline, financial statements, and engagement variables. This data drives materiality, risk assessment, and procedure selection across all 11 audit phases.</p>
-                          </div>
-                          <div className="hidden md:flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 shrink-0 mt-1">
-                            <Settings className="w-7 h-7 text-slate-300" />
-                          </div>
-                        </div>
-                        <div className="relative z-10 mt-4 flex items-center gap-3 flex-wrap">
-                          {autoFilled && (
-                            <div className="flex items-center gap-2 text-[11px] font-semibold text-emerald-300 bg-emerald-900/30 border border-emerald-700/30 rounded-lg px-3 py-2">
-                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                              Fields auto-filled from uploaded documents — review and edit as needed
-                            </div>
-                          )}
-                          <button
-                            onClick={() => applySmartDefaults(true)}
-                            className="flex items-center gap-2 text-[11px] font-bold text-indigo-300 bg-indigo-900/30 border border-indigo-700/40 rounded-lg px-3 py-2 hover:bg-indigo-800/40 transition-colors"
-                          >
-                            <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                            Apply Smart Defaults (June Year-End · Large Entity)
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+      {/* Flags & Assumptions */}
+      {openSection === "flags" && (
+        <div className="space-y-4">
+          {flags && flags.length > 0 && (
+            <div className="bg-white border border-amber-200 rounded-xl p-4">
+              <SectionHeader icon={AlertTriangle} title="Flags & Exceptions" color="bg-amber-50 border-amber-200" />
+              <div className="space-y-1">
+                {flags.map((f, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs text-amber-800 py-1">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                    <span>{f}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {missingData && missingData.length > 0 && (
+            <div className="bg-white border border-red-200 rounded-xl p-4">
+              <SectionHeader icon={AlertCircle} title="Missing Data" color="bg-red-50 border-red-200" />
+              <div className="space-y-1">
+                {missingData.map((m, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs text-red-700 py-1">
+                    <X className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
+                    <span>{m}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {assumptions && assumptions.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <SectionHeader icon={Info} title="AI Assumptions Register" color="bg-slate-50 border-slate-200" />
+              <div className="space-y-1">
+                {assumptions.map((a, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs text-slate-700 py-1">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5" />
+                    <span>{a}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
-                    {/* ── Engagement Variable Template ─────────────────── */}
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-5 space-y-4">
-                      <div className="flex items-start gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
-                          <FileSpreadsheet className="w-5 h-5 text-emerald-700" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-bold text-emerald-900">Engagement Variable Template</h3>
-                          <p className="text-xs text-emerald-700 mt-1 leading-relaxed">
-                            Select your company profile to instantly pre-fill all 121 engagement variables with ISA-compliant defaults for that entity type — then review and adjust below.
-                          </p>
-                        </div>
-                      </div>
+      {/* Extraction Log */}
+      {openSection === "log" && (
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <SectionHeader icon={Clipboard} title="Extraction Log (AI Process)" color="bg-slate-50 border-slate-200" />
+          <div className="space-y-1 max-h-64 overflow-y-auto">
+            {(extractionLog || []).map((log, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs text-slate-600 py-0.5">
+                <Check className="w-3 h-3 text-green-500 shrink-0 mt-0.5" />
+                <span>{log}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-                      {profileApplied && (
-                        <div className="flex items-center gap-2.5 bg-emerald-100 border border-emerald-300 rounded-lg px-4 py-2.5">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
-                          <p className="text-xs font-bold text-emerald-800">
-                            Preset applied — all 121 variables pre-filled for <span className="font-black">{COMPANY_PROFILE_LABELS[companyProfilePreset as CompanyProfile]}</span>. Review and adjust in the sections below.
-                          </p>
-                          <button onClick={() => setProfileApplied(false)} className="ml-auto text-emerald-600 hover:text-emerald-800 shrink-0">
-                            <span className="text-[11px] font-bold">✕</span>
-                          </button>
-                        </div>
-                      )}
+      <div className="flex justify-between pt-2">
+        <Button variant="outline" onClick={onBack} className="gap-2"><ChevronLeft className="w-4 h-4" /> Back</Button>
+        <Button onClick={onContinue} className="gap-2">Generate Trial Balance <ArrowRight className="w-4 h-4" /></Button>
+      </div>
+    </div>
+  );
+}
 
-                      <div className="space-y-2">
-                        <Label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Company Profile</Label>
-                        <div className="flex gap-2">
-                          <Select
-                            value={companyProfilePreset}
-                            onValueChange={(val) => { setCompanyProfilePreset(val as CompanyProfile); setProfileApplied(false); }}
-                          >
-                            <SelectTrigger className="flex-1 rounded-xl border-emerald-300 bg-white focus:ring-emerald-500 text-sm h-10">
-                              <SelectValue placeholder="Select company type…" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(Object.entries(COMPANY_PROFILE_LABELS) as [CompanyProfile, string][]).map(([key, label]) => (
-                                <SelectItem key={key} value={key}>{label}</SelectItem>
+// ─── STEP 3: TRIAL BALANCE ─────────────────────────────────────────────────────
+
+function TrialBalanceStep({ accounts, summary, onContinue, onBack, onRegenerate, onAccountChange }:
+  { accounts: TBAccount[]; summary: any; onContinue: () => void; onBack: () => void;
+    onRegenerate: () => void; onAccountChange: (accounts: TBAccount[]) => void }) {
+
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterClass, setFilterClass] = useState("All");
+
+  const filtered = useMemo(() => {
+    return accounts.filter(a => {
+      const q = searchQ.toLowerCase();
+      const matchQ = !q || a.account_name.toLowerCase().includes(q) || a.account_code.toLowerCase().includes(q);
+      const matchC = filterClass === "All" || a.classification === filterClass;
+      return matchQ && matchC;
+    });
+  }, [accounts, searchQ, filterClass]);
+
+  const classes = useMemo(() => ["All", ...Array.from(new Set(accounts.map(a => a.classification).filter(Boolean)))], [accounts]);
+
+  const updateAccount = (idx: number, field: keyof TBAccount, val: any) => {
+    const updated = [...accounts];
+    const realIdx = accounts.indexOf(filtered[idx]);
+    if (realIdx >= 0) {
+      (updated[realIdx] as any)[field] = val;
+      // Recompute balance
+      if (field === "debit_total" || field === "credit_total") {
+        const dr = Number(updated[realIdx].debit_total);
+        const cr = Number(updated[realIdx].credit_total);
+        updated[realIdx].balance_dr = dr > cr ? dr - cr : 0;
+        updated[realIdx].balance_cr = cr > dr ? cr - dr : 0;
+        updated[realIdx].source = "User-confirmed";
+      }
+      onAccountChange(updated);
+    }
+  };
+
+  const totalDr = accounts.reduce((s, a) => s + (a.balance_dr || 0), 0);
+  const totalCr = accounts.reduce((s, a) => s + (a.balance_cr || 0), 0);
+  const isBalanced = Math.abs(totalDr - totalCr) < 1;
+
+  if (accounts.length === 0) {
+    return (
+      <div className="max-w-3xl mx-auto text-center py-16">
+        <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-500" />
+        <p className="text-slate-600 font-medium">Generating Trial Balance...</p>
+        <p className="text-sm text-slate-400 mt-1">AI is building a reconciled trial balance from your financial data</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-4">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">Trial Balance</h2>
+          <p className="text-sm text-slate-500 mt-0.5">{accounts.length} accounts · Click any cell to edit · Source tags show AI confidence</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border",
+            isBalanced ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200")}>
+            {isBalanced ? <Check className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+            {isBalanced ? "Balanced" : "Out of Balance"}
+          </div>
+          <Button variant="outline" size="sm" onClick={onRegenerate} className="gap-1.5"><RefreshCw className="w-3.5 h-3.5" /> Regenerate</Button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex gap-2 flex-wrap">
+        <Input placeholder="Search accounts..." value={searchQ} onChange={e => setSearchQ(e.target.value)} className="h-8 text-xs max-w-48" />
+        <Select value={filterClass} onValueChange={setFilterClass}>
+          <SelectTrigger className="h-8 text-xs w-44"><SelectValue /></SelectTrigger>
+          <SelectContent>{classes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+        </Select>
+        <div className="flex items-center gap-3 ml-auto text-xs text-slate-500">
+          <span>Total Dr: <strong className="text-slate-800">{fmtPKR(totalDr)}</strong></span>
+          <span>Total Cr: <strong className="text-slate-800">{fmtPKR(totalCr)}</strong></span>
+          {!isBalanced && <span className="text-red-600 font-medium">Diff: {fmtPKR(Math.abs(totalDr - totalCr))}</span>}
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="border border-slate-200 rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="text-left px-3 py-2 font-semibold text-slate-600 w-16">Code</th>
+                <th className="text-left px-3 py-2 font-semibold text-slate-600">Account Name</th>
+                <th className="text-left px-3 py-2 font-semibold text-slate-600 w-28">Classification</th>
+                <th className="text-left px-3 py-2 font-semibold text-slate-600 w-20">Source</th>
+                <th className="text-right px-3 py-2 font-semibold text-slate-600 w-28">Debit Total</th>
+                <th className="text-right px-3 py-2 font-semibold text-slate-600 w-28">Credit Total</th>
+                <th className="text-right px-3 py-2 font-semibold text-slate-600 w-28">Balance Dr</th>
+                <th className="text-right px-3 py-2 font-semibold text-slate-600 w-28">Balance Cr</th>
+                <th className="px-3 py-2 w-8"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((a, i) => (
+                <tr key={i} className={cn("border-b border-slate-100 hover:bg-slate-50 transition-colors", editingIdx === i && "bg-blue-50")}>
+                  <td className="px-3 py-1.5 font-mono text-slate-600">{a.account_code}</td>
+                  <td className="px-3 py-1.5">
+                    {editingIdx === i
+                      ? <Input value={a.account_name} className="h-6 text-xs py-0" onChange={e => updateAccount(i, "account_name", e.target.value)} />
+                      : <span className="font-medium text-slate-800">{a.account_name}</span>}
+                  </td>
+                  <td className="px-3 py-1.5 text-slate-500">{a.classification}</td>
+                  <td className="px-3 py-1.5"><SourceBadge source={a.source || "Estimated"} /></td>
+                  <td className="px-3 py-1.5 text-right">
+                    {editingIdx === i
+                      ? <Input type="number" value={a.debit_total} className="h-6 text-xs py-0 text-right" onChange={e => updateAccount(i, "debit_total", Number(e.target.value))} />
+                      : <span className="font-mono">{(a.debit_total || 0).toLocaleString("en-PK")}</span>}
+                  </td>
+                  <td className="px-3 py-1.5 text-right">
+                    {editingIdx === i
+                      ? <Input type="number" value={a.credit_total} className="h-6 text-xs py-0 text-right" onChange={e => updateAccount(i, "credit_total", Number(e.target.value))} />
+                      : <span className="font-mono">{(a.credit_total || 0).toLocaleString("en-PK")}</span>}
+                  </td>
+                  <td className="px-3 py-1.5 text-right">
+                    {a.balance_dr > 0 ? <span className="font-semibold text-slate-800 font-mono">{(a.balance_dr).toLocaleString("en-PK")}</span> : <span className="text-slate-300">—</span>}
+                  </td>
+                  <td className="px-3 py-1.5 text-right">
+                    {a.balance_cr > 0 ? <span className="font-semibold text-slate-800 font-mono">{(a.balance_cr).toLocaleString("en-PK")}</span> : <span className="text-slate-300">—</span>}
+                  </td>
+                  <td className="px-3 py-1.5">
+                    <button onClick={() => setEditingIdx(editingIdx === i ? null : i)} className="p-0.5 text-slate-400 hover:text-blue-600">
+                      {editingIdx === i ? <Save className="w-3.5 h-3.5" /> : <Edit3 className="w-3.5 h-3.5" />}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="bg-slate-50 font-semibold border-t-2 border-slate-300">
+                <td colSpan={6} className="px-3 py-2 text-slate-700 text-xs">GRAND TOTAL</td>
+                <td className="px-3 py-2 text-right text-xs font-mono">{totalDr.toLocaleString("en-PK")}</td>
+                <td className="px-3 py-2 text-right text-xs font-mono">{totalCr.toLocaleString("en-PK")}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-3">
+        {[
+          { label: "Accounts", value: accounts.length, icon: Hash },
+          { label: "GL Entries", value: summary?.gl_entries || 0, icon: BookOpen },
+          { label: "Total Dr Balance", value: fmtPKR(totalDr), icon: TrendingUp },
+          { label: "Balanced", value: isBalanced ? "Yes ✓" : "No ✗", icon: Scale, err: !isBalanced },
+        ].map((s, i) => (
+          <div key={i} className={cn("p-3 rounded-xl border text-center", s.err ? "bg-red-50 border-red-200" : "bg-white border-slate-200")}>
+            <s.icon className={cn("w-4 h-4 mx-auto mb-1", s.err ? "text-red-500" : "text-slate-400")} />
+            <p className="text-xs text-slate-500">{s.label}</p>
+            <p className={cn("text-sm font-bold", s.err ? "text-red-700" : "text-slate-800")}>{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex justify-between pt-2">
+        <Button variant="outline" onClick={onBack} className="gap-2"><ChevronLeft className="w-4 h-4" /> Back</Button>
+        <Button onClick={onContinue} className="gap-2">Review General Ledger <ArrowRight className="w-4 h-4" /></Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── STEP 4: GENERAL LEDGER ────────────────────────────────────────────────────
+
+function GeneralLedgerStep({ glAccounts, glEntries, onContinue, onBack }:
+  { glAccounts: GLAccount[]; glEntries: GLEntry[]; onContinue: () => void; onBack: () => void }) {
+
+  const [openAccount, setOpenAccount] = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState("");
+
+  const filteredAccounts = useMemo(() => {
+    const q = searchQ.toLowerCase();
+    return glAccounts.filter(a => !q || a.account_name.toLowerCase().includes(q) || a.account_code.toLowerCase().includes(q));
+  }, [glAccounts, searchQ]);
+
+  if (glAccounts.length === 0 && glEntries.length === 0) {
+    return (
+      <div className="max-w-3xl mx-auto text-center py-16">
+        <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-500" />
+        <p className="text-slate-600 font-medium">Building General Ledger...</p>
+        <p className="text-sm text-slate-400 mt-1">Reconstructing transaction history from financial data</p>
+      </div>
+    );
+  }
+
+  const sourceAccounts: GLAccount[] = glAccounts.length > 0 ? glAccounts : [];
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-4">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">General Ledger</h2>
+          <p className="text-sm text-slate-500 mt-0.5">{glEntries.length} journal entries across {sourceAccounts.length || "all"} accounts</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <SourceBadge source="Estimated" />
+          <span className="text-xs text-slate-500">AI-reconstructed from financial data</span>
+        </div>
+      </div>
+
+      <Input placeholder="Search accounts..." value={searchQ} onChange={e => setSearchQ(e.target.value)} className="h-8 text-xs max-w-64" />
+
+      <div className="space-y-2">
+        {(filteredAccounts.length > 0 ? filteredAccounts : glEntries.length > 0 ? [{ account_code: "ALL", account_name: "All Journal Entries", group: "All", type: "All", opening_balance: 0, closing_balance: 0, entries: glEntries, source: "Estimated" }] : []).map((account, ai) => {
+          const acctEntries = account.entries?.length > 0 ? account.entries : glEntries.filter(e => e.account_code === account.account_code);
+          const isOpen = openAccount === account.account_code;
+          const totalDr = acctEntries.reduce((s, e) => s + (e.debit || 0), 0);
+          const totalCr = acctEntries.reduce((s, e) => s + (e.credit || 0), 0);
+
+          return (
+            <div key={ai} className="border border-slate-200 rounded-xl overflow-hidden">
+              <button onClick={() => setOpenAccount(isOpen ? null : account.account_code)}
+                className="w-full flex items-center justify-between p-3 bg-white hover:bg-slate-50 text-left transition-colors">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-mono text-slate-500 w-12">{account.account_code}</span>
+                  <span className="text-sm font-semibold text-slate-800">{account.account_name}</span>
+                  <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{account.type || account.group}</span>
+                  {acctEntries.length > 0 && <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{acctEntries.length} entries</span>}
+                </div>
+                <div className="flex items-center gap-4 text-xs">
+                  <span className="text-slate-500">Dr: <strong className="text-slate-800">{totalDr.toLocaleString("en-PK")}</strong></span>
+                  <span className="text-slate-500">Cr: <strong className="text-slate-800">{totalCr.toLocaleString("en-PK")}</strong></span>
+                  <span className="text-slate-500">Closing: <strong className={cn(totalDr >= totalCr ? "text-blue-700" : "text-red-700")}>{Math.abs(totalDr - totalCr).toLocaleString("en-PK")} {totalDr >= totalCr ? "Dr" : "Cr"}</strong></span>
+                  {isOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                </div>
+              </button>
+
+              {isOpen && acctEntries.length > 0 && (
+                <div className="border-t border-slate-100 overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-slate-50">
+                        <th className="text-left px-3 py-1.5 text-slate-500 font-medium">Date</th>
+                        <th className="text-left px-3 py-1.5 text-slate-500 font-medium">Voucher</th>
+                        <th className="text-left px-3 py-1.5 text-slate-500 font-medium flex-1">Narration</th>
+                        <th className="text-right px-3 py-1.5 text-slate-500 font-medium w-28">Debit</th>
+                        <th className="text-right px-3 py-1.5 text-slate-500 font-medium w-28">Credit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {acctEntries.map((e, ei) => (
+                        <tr key={ei} className="border-b border-slate-50 hover:bg-slate-50">
+                          <td className="px-3 py-1.5 text-slate-600">{e.date}</td>
+                          <td className="px-3 py-1.5 font-mono text-slate-500">{e.voucher_no}</td>
+                          <td className="px-3 py-1.5 text-slate-700 max-w-sm truncate">{e.narration}</td>
+                          <td className="px-3 py-1.5 text-right font-mono">{e.debit > 0 ? e.debit.toLocaleString("en-PK") : "—"}</td>
+                          <td className="px-3 py-1.5 text-right font-mono">{e.credit > 0 ? e.credit.toLocaleString("en-PK") : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-50 font-semibold border-t border-slate-200">
+                        <td colSpan={3} className="px-3 py-1.5 text-slate-600">Total</td>
+                        <td className="px-3 py-1.5 text-right font-mono">{totalDr.toLocaleString("en-PK")}</td>
+                        <td className="px-3 py-1.5 text-right font-mono">{totalCr.toLocaleString("en-PK")}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex justify-between pt-2">
+        <Button variant="outline" onClick={onBack} className="gap-2"><ChevronLeft className="w-4 h-4" /> Back</Button>
+        <Button onClick={onContinue} className="gap-2">Generate Working Papers <ArrowRight className="w-4 h-4" /></Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── STEP 5: WORKING PAPERS ────────────────────────────────────────────────────
+
+function WorkingPapersStep({ papers, selectedPapers, vars, onContinue, onBack, onRegenerate,
+  onPaperStatusChange, onSelectPaper, onUnselectPaper }:
+  { papers: WPDoc[]; selectedPapers: string[]; vars: VariableMatrix;
+    onContinue: () => void; onBack: () => void; onRegenerate: () => void;
+    onPaperStatusChange: (ref: string, status: "Draft" | "Review" | "Approved") => void;
+    onSelectPaper: (code: string) => void; onUnselectPaper: (code: string) => void }) {
+
+  const [openSection, setOpenSection] = useState<string | null>("A");
+  const [openPaper, setOpenPaper] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"papers" | "select">("papers");
+
+  if (papers.length === 0) {
+    return (
+      <div className="max-w-3xl mx-auto text-center py-16">
+        <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-500" />
+        <p className="text-slate-600 font-medium">Generating Working Papers...</p>
+        <p className="text-sm text-slate-400 mt-1">AI is writing ISA-compliant working papers using all extracted data</p>
+        <p className="text-xs text-slate-400 mt-1">This may take 2-3 minutes for a full audit file</p>
+      </div>
+    );
+  }
+
+  const papersMap = Object.fromEntries(papers.map(p => [p.ref, p]));
+  const approvedCount = papers.filter(p => p.status === "Approved").length;
+  const reviewCount = papers.filter(p => p.status === "Review").length;
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-4">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">Working Papers</h2>
+          <p className="text-sm text-slate-500 mt-0.5">{papers.length} papers generated · {approvedCount} approved · {reviewCount} under review</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setViewMode(viewMode === "papers" ? "select" : "papers")} className="gap-1.5">
+            {viewMode === "papers" ? <><CheckSquare className="w-3.5 h-3.5" /> Select Papers</> : <><FileText className="w-3.5 h-3.5" /> View Papers</>}
+          </Button>
+          <Button variant="outline" size="sm" onClick={onRegenerate} className="gap-1.5"><RefreshCw className="w-3.5 h-3.5" /> Regenerate</Button>
+        </div>
+      </div>
+
+      {/* Summary Stats */}
+      <div className="grid grid-cols-4 gap-3">
+        {[
+          { label: "Total Papers", value: papers.length, icon: FileText },
+          { label: "Approved", value: approvedCount, icon: CheckCircle2 },
+          { label: "Under Review", value: reviewCount, icon: Eye },
+          { label: "Draft", value: papers.length - approvedCount - reviewCount, icon: Edit3 },
+        ].map((s, i) => (
+          <div key={i} className="p-3 bg-white border border-slate-200 rounded-xl text-center">
+            <s.icon className="w-4 h-4 mx-auto mb-1 text-slate-400" />
+            <p className="text-xs text-slate-500">{s.label}</p>
+            <p className="text-sm font-bold text-slate-800">{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Select Papers Mode */}
+      {viewMode === "select" && (
+        <div className="space-y-3">
+          <p className="text-xs text-slate-500">Select which working papers to include in the export. Currently selected: {selectedPapers.length} papers.</p>
+          {WP_INDEX_FULL.map((group, gi) => {
+            const letter = group.section.split("—")[0].trim().split(" ")[0];
+            return (
+              <div key={gi} className={cn("border rounded-xl p-3", group.color)}>
+                <p className="text-xs font-semibold text-slate-700 mb-2">{group.section}</p>
+                <div className="grid grid-cols-2 gap-1">
+                  {group.papers.map(p => {
+                    const isSelected = selectedPapers.includes(p.code);
+                    const isGenerated = !!papersMap[p.code];
+                    return (
+                      <button key={p.code} onClick={() => isSelected ? onUnselectPaper(p.code) : onSelectPaper(p.code)}
+                        className={cn("flex items-center gap-2 p-1.5 rounded-lg text-xs text-left transition-colors",
+                          isSelected ? "bg-blue-600 text-white" : "bg-white text-slate-700 hover:bg-slate-50 border border-slate-200")}>
+                        {isSelected ? <CheckSquare className="w-3.5 h-3.5 shrink-0" /> : <Square className="w-3.5 h-3.5 shrink-0 text-slate-400" />}
+                        <span className="font-mono text-[10px] opacity-70 shrink-0">{p.code}</span>
+                        <span className="truncate">{p.title}</span>
+                        {isGenerated && <span className="ml-auto shrink-0 w-2 h-2 rounded-full bg-green-400"></span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Papers View Mode */}
+      {viewMode === "papers" && (
+        <div className="space-y-3">
+          {WP_INDEX_FULL.map((group, gi) => {
+            const letter = group.section.split("—")[0].trim().split(" ")[0];
+            const groupPapers = papers.filter(p => p.ref.startsWith(letter));
+            if (groupPapers.length === 0) return null;
+            const isOpen = openSection === letter;
+
+            return (
+              <div key={gi} className={cn("border rounded-xl overflow-hidden", group.color)}>
+                <button onClick={() => setOpenSection(isOpen ? null : letter)}
+                  className="w-full flex items-center justify-between p-3 text-left hover:bg-white/30 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <group.icon className="w-4 h-4 text-slate-600" />
+                    <span className="font-semibold text-sm text-slate-800">{group.section}</span>
+                    <span className="text-xs text-slate-500 bg-white/60 px-2 py-0.5 rounded-full">{groupPapers.length} papers</span>
+                  </div>
+                  {isOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                </button>
+
+                {isOpen && (
+                  <div className="bg-white border-t border-white/60 divide-y divide-slate-100">
+                    {groupPapers.map((wp, wi) => {
+                      const isPaperOpen = openPaper === wp.ref;
+                      return (
+                        <div key={wi}>
+                          <button onClick={() => setOpenPaper(isPaperOpen ? null : wp.ref)}
+                            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition-colors">
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs font-mono font-semibold text-slate-500 w-10">{wp.ref}</span>
+                              <span className="text-sm font-medium text-slate-800">{wp.title}</span>
+                              <StatusBadge status={wp.status || "Draft"} />
+                              {wp.isa_references?.slice(0,2).map((isa, j) => (
+                                <span key={j} className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded hidden md:inline">{isa}</span>
                               ))}
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            onClick={() => companyProfilePreset && applyProfileDefaults(companyProfilePreset)}
-                            disabled={!companyProfilePreset}
-                            className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shrink-0 disabled:opacity-40"
-                          >
-                            <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Apply Defaults
-                          </Button>
-                        </div>
-                        {companyProfilePreset && !profileApplied && (
-                          <p className="text-[11px] text-emerald-700 font-medium flex items-center gap-1.5 pt-0.5">
-                            <CheckCircle2 className="w-3 h-3 shrink-0" />
-                            {(() => {
-                              const counts: Record<CompanyProfile, number> = { pie: 85, large: 78, medium: 68, small: 55, ngo: 62 };
-                              return `${counts[companyProfilePreset] ?? 70} variables will be pre-filled for ${COMPANY_PROFILE_LABELS[companyProfilePreset]}`;
-                            })()}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm divide-y divide-slate-100/80 overflow-hidden">
-
-                      {/* ── Entity & Firm Details ──────────────────────────── */}
-                      <div className="p-8 space-y-6">
-                        <div className="flex items-center gap-3 pb-5 border-b border-slate-100">
-                          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0 shadow-sm shadow-blue-200">
-                            <Building2 className="w-4.5 h-4.5 text-white" style={{ width: "18px", height: "18px" }} />
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-bold text-slate-900">Entity & Firm Details</h3>
-                            <p className="text-xs text-slate-500 mt-0.5">Client identification, NTN, SECP registration and audit firm</p>
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">Company / Entity Name <span className="text-red-500">*</span></Label>
-                            <Input value={entityName} onChange={e => setEntityName(e.target.value)} placeholder="e.g. Pak Textile Mills Ltd." className="h-11 rounded-xl font-medium" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">NTN Number</Label>
-                            <Input value={ntn} onChange={e => setNtn(e.target.value)} placeholder="e.g. 1234567-8" className="h-11 rounded-xl font-mono" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">SECP Registration #</Label>
-                            <Input value={secp} onChange={e => setSecp(e.target.value)} placeholder="e.g. K-123456" className="h-11 rounded-xl font-mono" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">Financial Year / Period</Label>
-                            <Input value={financialYear} onChange={e => { setFinancialYear(e.target.value); setPeriodSuggested(false); }} placeholder="Year ended June 30, 2024" className="h-11 rounded-xl font-medium" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">
-                              Period Start Date
-                              {periodSuggested && periodStart && <span className="ml-1.5 text-[9px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5 align-middle">suggested</span>}
-                            </Label>
-                            <Input type="date" value={periodStart} onChange={e => { setPeriodStart(e.target.value); setPeriodSuggested(false); }} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">
-                              Period End Date
-                              {periodSuggested && periodEnd && <span className="ml-1.5 text-[9px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5 align-middle">suggested</span>}
-                            </Label>
-                            <Input type="date" value={periodEnd} onChange={e => { setPeriodEnd(e.target.value); setPeriodSuggested(false); }} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">Engagement Type</Label>
-                            <Select value={engagementType} onValueChange={setEngagementType}>
-                              <SelectTrigger className="h-11 rounded-xl font-medium">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {ENGAGEMENT_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">Audit Firm Name</Label>
-                            <Input value={firmName} onChange={e => setFirmName(e.target.value)} className="h-11 rounded-xl font-medium" />
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-2 pt-2">
-                          <Label className="text-xs font-bold text-slate-600 ml-1">Registered Address</Label>
-                          <Input value={registeredAddress} onChange={e => setRegisteredAddress(e.target.value)} placeholder="Principal place of business..." className="h-11 rounded-xl font-medium" />
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                          <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">STRN (Sales Tax Reg.)</Label>
-                            <Input value={strn} onChange={e => setStrn(e.target.value)} placeholder="e.g. 32-00-1234-567-89" className="h-11 rounded-xl font-mono" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">Industry / Sector</Label>
-                            <Input value={industry} onChange={e => setIndustry(e.target.value)} placeholder="e.g. Textile Manufacturing" className="h-11 rounded-xl font-medium" />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* ── Engagement Team ──────────────────────────────── */}
-                      <div className="p-8 space-y-6">
-                        <div className="flex items-center gap-3 pb-5 border-b border-slate-100">
-                          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-sm shadow-indigo-200">
-                            <Briefcase className="w-[18px] h-[18px] text-white" />
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-bold text-slate-900">Engagement Team</h3>
-                            <p className="text-xs text-slate-500 mt-0.5">Preparer, reviewer and approving partner — sign-offs applied automatically</p>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          <div className="space-y-1.5">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">Preparer <span className="font-normal text-slate-400">(Associate / Senior)</span></Label>
-                            <Select value={preparer} onValueChange={setPreparer}>
-                              <SelectTrigger className="h-10 rounded-xl text-sm">
-                                <SelectValue placeholder="Select preparer..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {users.length > 0 ? (
-                                  users.map(u => <SelectItem key={u.id} value={u.name}>{u.name}{u.role ? ` — ${u.role}` : ""}</SelectItem>)
-                                ) : (
-                                  <>
-                                    <SelectItem value="Audit Associate">Audit Associate</SelectItem>
-                                    <SelectItem value="Audit Senior">Audit Senior</SelectItem>
-                                    <SelectItem value="Semi-Senior">Semi-Senior</SelectItem>
-                                  </>
-                                )}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">Reviewer <span className="font-normal text-slate-400">(Manager)</span></Label>
-                            <Select value={reviewer} onValueChange={setReviewer}>
-                              <SelectTrigger className="h-10 rounded-xl text-sm">
-                                <SelectValue placeholder="Select reviewer..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {users.length > 0 ? (
-                                  users.map(u => <SelectItem key={u.id} value={u.name}>{u.name}{u.role ? ` — ${u.role}` : ""}</SelectItem>)
-                                ) : (
-                                  <>
-                                    <SelectItem value="Audit Manager">Audit Manager</SelectItem>
-                                    <SelectItem value="Senior Manager">Senior Manager</SelectItem>
-                                  </>
-                                )}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">Approver <span className="font-normal text-slate-400">(Partner / EQCR)</span></Label>
-                            <Select value={approver} onValueChange={setApprover}>
-                              <SelectTrigger className="h-10 rounded-xl text-sm">
-                                <SelectValue placeholder="Select approver..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {users.length > 0 ? (
-                                  users.map(u => <SelectItem key={u.id} value={u.name}>{u.name}{u.role ? ` — ${u.role}` : ""}</SelectItem>)
-                                ) : (
-                                  <>
-                                    <SelectItem value="Engagement Partner">Engagement Partner</SelectItem>
-                                    <SelectItem value="EQCR Partner">EQCR Partner</SelectItem>
-                                  </>
-                                )}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        {preparer && reviewer && approver && (
-                          <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            Team assigned — WPs will include sign-offs automatically
-                          </div>
-                        )}
-                      </div>
-
-                      {/* ── Key Deadlines ──────────────────────────────── */}
-                      <div className="p-8 space-y-6">
-                        <div className="flex items-center gap-3 pb-5 border-b border-slate-100">
-                          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shrink-0 shadow-sm shadow-emerald-200">
-                            <Calendar className="w-[18px] h-[18px] text-white" />
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-bold text-slate-900">Key Deadlines</h3>
-                            <p className="text-xs text-slate-500 mt-0.5">Planning, fieldwork, reporting and archive dates — ISA 230 compliance</p>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-                          <div className="space-y-1.5">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">Planning Deadline <span className="text-red-500">*</span></Label>
-                            <Input type="date" value={planningDeadline} onChange={e => setPlanningDeadline(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">Fieldwork Start</Label>
-                            <Input type="date" value={fieldworkStart} onChange={e => setFieldworkStart(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">Fieldwork End</Label>
-                            <Input type="date" value={fieldworkEnd} onChange={e => setFieldworkEnd(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">Reporting Deadline <span className="text-red-500">*</span></Label>
-                            <Input type="date" value={reportingDeadline} onChange={e => setReportingDeadline(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
-                          <div className="space-y-1.5">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">Report Date</Label>
-                            <Input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                            <p className="text-[10px] text-slate-400 ml-1">Date of auditor's report</p>
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">Filing Deadline</Label>
-                            <Input type="date" value={filingDeadline} onChange={e => setFilingDeadline(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                            <p className="text-[10px] text-slate-400 ml-1">SECP / regulatory filing deadline</p>
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs font-bold text-slate-600 ml-1">Archive Date</Label>
-                            <Input type="date" value={archiveDate} onChange={e => setArchiveDate(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-11 rounded-xl font-mono text-sm cursor-pointer" />
-                            <p className="text-[10px] text-slate-400 ml-1">ISA 230 — File assembly deadline (60 days post-report)</p>
-                          </div>
-                        </div>
-
-                        {planningDeadline && fieldworkStart && fieldworkEnd && reportingDeadline && (
-                          <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2.5">
-                            <CheckCircle2 className="w-4 h-4" />
-                            Timeline set — working papers will receive phase-appropriate dates automatically
-                          </div>
-                        )}
-                      </div>
-
-                      {/* ── Financial Statement (FS) Data ── */}
-                      <div className="p-0">
-                        <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-sky-600 text-white flex items-center justify-center shadow-sm shadow-sky-200">
-                              <Table className="w-[18px] h-[18px]" />
                             </div>
-                            <div>
-                              <h3 className="text-sm font-bold text-slate-900">Financial Statement Data</h3>
-                              <p className="text-xs text-slate-500 mt-0.5">Balance sheet and P&L with current and prior year figures</p>
+                            <div className="flex items-center gap-2">
+                              <Select value={wp.status || "Draft"} onValueChange={v => onPaperStatusChange(wp.ref, v as any)}>
+                                <SelectTrigger className="h-6 text-xs w-24 border-0 bg-transparent p-0 focus:ring-0" onClick={e => e.stopPropagation()}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent><SelectItem value="Draft">Draft</SelectItem><SelectItem value="Review">Review</SelectItem><SelectItem value="Approved">Approved</SelectItem></SelectContent>
+                              </Select>
+                              {isPaperOpen ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
                             </div>
-                          </div>
-                          <div className="flex bg-white border border-slate-200 rounded-lg p-1">
-                            <button onClick={() => setActiveFsTab("bs")} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeFsTab === "bs" ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>Balance Sheet</button>
-                            <button onClick={() => setActiveFsTab("pl")} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeFsTab === "pl" ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>Profit & Loss</button>
-                          </div>
-                        </div>
+                          </button>
 
-                        <div className="p-0">
-                          {(activeFsTab === "bs" ? bsData : plData).map((sec) => (
-                            <div key={sec.id} className="border-b border-slate-100 last:border-0">
-                              <div className="px-6 pt-5 pb-1 flex items-center gap-2">
-                                <div className={`w-1.5 h-6 rounded-full ${sec.color}`}></div>
-                                <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{sec.title}</span>
+                          {isPaperOpen && (
+                            <div className="px-4 pb-4 pt-2 bg-slate-50/50 border-t border-slate-100">
+                              {/* Header */}
+                              <div className="grid grid-cols-3 gap-4 mb-4">
+                                <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                  <p className="text-[10px] text-slate-400 uppercase font-medium mb-1">Objective</p>
+                                  <p className="text-xs text-slate-700">{wp.objective}</p>
+                                </div>
+                                <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                  <p className="text-[10px] text-slate-400 uppercase font-medium mb-1">Scope</p>
+                                  <p className="text-xs text-slate-700">{wp.scope}</p>
+                                </div>
+                                <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                  <p className="text-[10px] text-slate-400 uppercase font-medium mb-1">Sign-off</p>
+                                  <div className="space-y-0.5 text-xs text-slate-600">
+                                    <p>Prepared: <strong>{wp.prepared_by || vars.preparer || "—"}</strong></p>
+                                    <p>Reviewed: <strong>{wp.reviewed_by || vars.reviewer || "—"}</strong></p>
+                                    <p>Approved: <strong>{wp.approved_by || vars.approver || "—"}</strong></p>
+                                    <p>Date: <strong>{wp.prepared_date || new Date().toLocaleDateString("en-PK")}</strong></p>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="px-6 pb-4">
-                                <table className="w-full text-xs">
-                                  <thead>
-                                    <tr className="text-slate-400 border-b border-slate-50">
-                                      <th className="font-bold text-left py-2 w-[45%]">Line Item</th>
-                                      <th className="font-bold text-right py-2 w-[22%]">Current Year</th>
-                                      <th className="font-bold text-right py-2 w-[22%]">Prior Year</th>
-                                      <th className="py-2 w-[11%]"></th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {sec.lines.map(line => (
-                                      <React.Fragment key={line.id}>
-                                        <tr className={`${line.bold ? 'font-bold bg-slate-50/50' : ''} group`}>
-                                          <td className={`py-2 px-1 ${line.indent ? 'pl-6' : ''}`}>
-                                            {line.isCustom ? (
-                                              <input
-                                                value={line.label}
-                                                onChange={e => updateFsLabel(activeFsTab, sec.id, line.id, e.target.value)}
-                                                placeholder="Enter line item name..."
-                                                className="w-full bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none text-xs placeholder:text-slate-300"
-                                                autoFocus
-                                              />
-                                            ) : (
-                                              <span className="flex items-center gap-1">
-                                                {line.label}
-                                                {(line.breakups && line.breakups.length > 0) && (
-                                                  <span className="text-[9px] text-blue-500 font-bold">({line.breakups.length})</span>
-                                                )}
-                                              </span>
-                                            )}
-                                          </td>
-                                          <td className="py-2 px-1">
-                                            <input 
-                                              value={line.cy} 
-                                              onChange={e => activeFsTab === "bs" ? updateBsLine(sec.id, line.id, "cy", e.target.value) : updatePlLine(sec.id, line.id, "cy", e.target.value)}
-                                              className={`w-full text-right bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono ${line.bold ? 'font-bold' : ''}`}
-                                            />
-                                          </td>
-                                          <td className="py-2 px-1">
-                                            <input 
-                                              value={line.py} 
-                                              onChange={e => activeFsTab === "bs" ? updateBsLine(sec.id, line.id, "py", e.target.value) : updatePlLine(sec.id, line.id, "py", e.target.value)}
-                                              className={`w-full text-right bg-transparent border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono ${line.bold ? 'font-bold' : ''}`}
-                                            />
-                                          </td>
-                                          <td className="py-2 px-1">
-                                            {!line.subtotal && (
-                                              <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                  onClick={() => {
-                                                    addBreakup(activeFsTab, sec.id, line.id);
-                                                    if (!expandedBreakups.includes(line.id)) toggleBreakupExpand(line.id);
-                                                  }}
-                                                  title="Add breakup"
-                                                  className="p-1 rounded hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"
-                                                >
-                                                  <SplitSquareVertical className="w-3 h-3" />
-                                                </button>
-                                                {(line.breakups && line.breakups.length > 0) && (
-                                                  <button
-                                                    onClick={() => toggleBreakupExpand(line.id)}
-                                                    title={expandedBreakups.includes(line.id) ? "Collapse breakups" : "Expand breakups"}
-                                                    className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                                                  >
-                                                    {expandedBreakups.includes(line.id) ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                                                  </button>
-                                                )}
-                                                {line.isCustom && (
-                                                  <button
-                                                    onClick={() => removeFsRow(activeFsTab, sec.id, line.id)}
-                                                    title="Remove row"
-                                                    className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-                                                  >
-                                                    <Trash2 className="w-3 h-3" />
-                                                  </button>
-                                                )}
-                                              </div>
-                                            )}
-                                          </td>
+
+                              {/* Procedures */}
+                              {wp.procedures && wp.procedures.length > 0 && (
+                                <div className="mb-4">
+                                  <p className="text-xs font-semibold text-slate-600 mb-2">Audit Procedures</p>
+                                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                    <table className="w-full text-xs">
+                                      <thead>
+                                        <tr className="bg-slate-50 border-b border-slate-200">
+                                          <th className="text-left px-3 py-1.5 text-slate-500 font-medium w-10">#</th>
+                                          <th className="text-left px-3 py-1.5 text-slate-500 font-medium">Procedure</th>
+                                          <th className="text-left px-3 py-1.5 text-slate-500 font-medium">Finding</th>
+                                          <th className="text-left px-3 py-1.5 text-slate-500 font-medium w-24">Conclusion</th>
+                                          <th className="text-left px-3 py-1.5 text-slate-500 font-medium w-20">Evidence</th>
                                         </tr>
-                                        {(line.breakups && line.breakups.length > 0 && expandedBreakups.includes(line.id)) && (
-                                          <>
-                                            {line.breakups.map(brk => (
-                                              <tr key={brk.id} className="bg-blue-50/30 group/brk">
-                                                <td className="py-1.5 pl-8 pr-1">
-                                                  <div className="flex items-center gap-1">
-                                                    <span className="text-blue-400 text-[10px]">┗</span>
-                                                    <input
-                                                      value={brk.label}
-                                                      onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "label", e.target.value)}
-                                                      placeholder="Breakup description..."
-                                                      className="flex-1 bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none text-[11px] text-slate-600 placeholder:text-slate-300"
-                                                    />
-                                                  </div>
-                                                </td>
-                                                <td className="py-1.5 px-1">
-                                                  <input
-                                                    value={brk.cy}
-                                                    onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "cy", e.target.value)}
-                                                    placeholder="0"
-                                                    className="w-full text-right bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono text-[11px] text-slate-600 placeholder:text-slate-300"
-                                                  />
-                                                </td>
-                                                <td className="py-1.5 px-1">
-                                                  <input
-                                                    value={brk.py}
-                                                    onChange={e => updateBreakup(activeFsTab, sec.id, line.id, brk.id, "py", e.target.value)}
-                                                    placeholder="0"
-                                                    className="w-full text-right bg-transparent border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded px-1 transition-all outline-none font-mono text-[11px] text-slate-600 placeholder:text-slate-300"
-                                                  />
-                                                </td>
-                                                <td className="py-1.5 px-1">
-                                                  <button
-                                                    onClick={() => removeBreakup(activeFsTab, sec.id, line.id, brk.id)}
-                                                    className="p-1 rounded opacity-0 group-hover/brk:opacity-100 hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all"
-                                                  >
-                                                    <Trash2 className="w-3 h-3" />
-                                                  </button>
-                                                </td>
-                                              </tr>
-                                            ))}
-                                          </>
-                                        )}
-                                      </React.Fragment>
-                                    ))}
-                                  </tbody>
-                                </table>
-                                <button
-                                  onClick={() => addFsRow(activeFsTab, sec.id)}
-                                  className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-blue-500 hover:text-blue-700 transition-colors px-1 py-1 rounded hover:bg-blue-50"
-                                >
-                                  <Plus className="w-3 h-3" /> Add Row
-                                </button>
+                                      </thead>
+                                      <tbody>
+                                        {wp.procedures.map((proc, pi) => (
+                                          <tr key={pi} className="border-b border-slate-50 hover:bg-white">
+                                            <td className="px-3 py-2 text-slate-400">{proc.no}</td>
+                                            <td className="px-3 py-2 text-slate-700">{proc.procedure}</td>
+                                            <td className="px-3 py-2 text-slate-600">{proc.finding}</td>
+                                            <td className="px-3 py-2">
+                                              <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-medium",
+                                                proc.conclusion === "Satisfactory" ? "bg-green-100 text-green-700" :
+                                                proc.conclusion === "Note Required" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700")}>
+                                                {proc.conclusion}
+                                              </span>
+                                            </td>
+                                            <td className="px-3 py-2 font-mono text-slate-500 text-[10px]">{proc.evidence_ref}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Summary Table */}
+                              {wp.summary_table && wp.summary_table.length > 0 && (
+                                <div className="mb-4">
+                                  <p className="text-xs font-semibold text-slate-600 mb-2">Summary</p>
+                                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                    <table className="w-full text-xs">
+                                      <thead><tr className="bg-slate-50"><th className="text-left px-3 py-1.5 text-slate-500">Item</th><th className="text-left px-3 py-1.5 text-slate-500">Value</th><th className="text-left px-3 py-1.5 text-slate-500">Comment</th></tr></thead>
+                                      <tbody>{wp.summary_table.map((r, ri) => <tr key={ri} className="border-b border-slate-50"><td className="px-3 py-1.5 font-medium text-slate-700">{r.item}</td><td className="px-3 py-1.5 text-slate-800">{r.value}</td><td className="px-3 py-1.5 text-slate-500">{r.comment}</td></tr>)}</tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Conclusion & Findings */}
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-green-50 border border-green-100 rounded-lg p-3">
+                                  <p className="text-[10px] font-semibold text-green-700 uppercase mb-1">Auditor Conclusion</p>
+                                  <p className="text-xs text-green-800">{wp.auditor_conclusion}</p>
+                                </div>
+                                {wp.key_findings?.length > 0 && (
+                                  <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+                                    <p className="text-[10px] font-semibold text-amber-700 uppercase mb-1">Key Findings</p>
+                                    <ul className="text-xs text-amber-800 space-y-0.5">
+                                      {wp.key_findings.map((f, fi) => <li key={fi} className="flex items-start gap-1"><span className="shrink-0">•</span>{f}</li>)}
+                                    </ul>
+                                  </div>
+                                )}
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
 
-                    </div>
-
-                    {/* ── 121 Engagement Configuration Variables (flat) ── */}
-                    <div className="mt-8">
-                      <EngagementConfig
-                        values={configValues}
-                        onChange={handleConfigChange}
-                        users={users}
-                      />
-                    </div>
-
-                    {/* ── Sales Tax Data ──────────────────────────────── */}
-                    <div className="mt-6 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-8 space-y-6">
-                      <div className="flex items-center gap-3 pb-5 border-b border-slate-100">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center shrink-0 shadow-sm shadow-amber-200">
-                          <FileSpreadsheet className="w-[18px] h-[18px] text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-bold text-slate-900">Sales Tax Data</h3>
-                            {salesTaxRows.length > 0 && (
-                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">{salesTaxRows.length} rows</span>
-                            )}
-                          </div>
-                          <p className="text-xs text-slate-500 mt-0.5">FBR / SRB / PRA sales tax ledger for the engagement period</p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                        <div className="space-y-1.5">
-                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Period From</Label>
-                          <Input type="date" value={stPeriodFrom} onChange={e => setStPeriodFrom(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-10 rounded-lg font-mono text-sm cursor-pointer" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Period To</Label>
-                          <Input type="date" value={stPeriodTo} onChange={e => setStPeriodTo(e.target.value)} onClick={e => (e.target as HTMLInputElement).showPicker?.()} className="h-10 rounded-lg font-mono text-sm cursor-pointer" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Tax Type</Label>
-                          <Select value={stTaxType} onValueChange={setStTaxType}>
-                            <SelectTrigger className="h-10 rounded-lg text-sm font-medium"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Sales Tax">Sales Tax</SelectItem>
-                              <SelectItem value="FED">Federal Excise Duty (FED)</SelectItem>
-                              <SelectItem value="Further Tax">Further Tax</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Jurisdiction</Label>
-                          <Select value={stJurisdiction} onValueChange={setStJurisdiction}>
-                            <SelectTrigger className="h-10 rounded-lg text-sm font-medium"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="FBR">FBR (Federal)</SelectItem>
-                              <SelectItem value="PRA">PRA (Punjab)</SelectItem>
-                              <SelectItem value="SRB">SRB (Sindh)</SelectItem>
-                              <SelectItem value="KPRA">KPRA (KP)</SelectItem>
-                              <SelectItem value="BRA">BRA (Balochistan)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Return Period</Label>
-                          <Select value={stReturnPeriod} onValueChange={setStReturnPeriod}>
-                            <SelectTrigger className="h-10 rounded-lg text-sm font-medium"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Monthly">Monthly</SelectItem>
-                              <SelectItem value="Quarterly">Quarterly</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 pt-2">
-                        <input ref={stFileRef} type="file" accept=".csv,.xlsx,.xls" onChange={handleSTUploadExcel} className="hidden" />
-                        <Button variant="outline" size="sm" onClick={() => stFileRef.current?.click()} disabled={stUploading} className="rounded-lg font-bold text-xs gap-2">
-                          {stUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                          Upload Excel / CSV
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={handleSTDownloadTemplate} className="rounded-lg font-bold text-xs gap-2">
-                          <Download className="w-3.5 h-3.5" /> Download Standard Template
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => setSalesTaxRows(prev => [...prev, emptySalesTaxRow()])} className="rounded-lg font-bold text-xs gap-2 text-blue-600 border-blue-200 hover:bg-blue-50">
-                          <Plus className="w-3.5 h-3.5" /> Add Row
-                        </Button>
-                      </div>
-
-                      {salesTaxRows.length > 0 && (
-                        <div className="border border-slate-200 rounded-xl overflow-hidden">
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-xs">
-                              <thead>
-                                <tr className="bg-slate-50 border-b border-slate-200">
-                                  <th className="px-2 py-2.5 text-left font-bold text-slate-500 uppercase tracking-wider text-[9px] w-8">#</th>
-                                  {SALES_TAX_COLS.map(col => (
-                                    <th key={col.key} className="px-2 py-2.5 text-left font-bold text-slate-500 uppercase tracking-wider text-[9px] whitespace-nowrap" style={{ minWidth: col.width }}>{col.label}</th>
-                                  ))}
-                                  <th className="px-2 py-2.5 w-8"></th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {salesTaxRows.map((row, idx) => (
-                                  <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                                    <td className="px-2 py-1 text-slate-400 font-mono">{idx + 1}</td>
-                                    {SALES_TAX_COLS.map(col => (
-                                      <td key={col.key} className="px-1 py-0.5">
-                                        <input
-                                          type={col.type || "text"}
-                                          value={(row as any)[col.key]}
-                                          onChange={e => updateSalesTaxRow(row.id, col.key, e.target.value)}
-                                          className="w-full px-1.5 py-1.5 text-xs border border-transparent hover:border-slate-200 focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded outline-none bg-transparent font-medium"
-                                          style={{ minWidth: col.width }}
-                                        />
-                                      </td>
-                                    ))}
-                                    <td className="px-1 py-1">
-                                      <button onClick={() => setSalesTaxRows(prev => prev.filter(r => r.id !== row.id))} className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors">
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                          <div className="bg-slate-50 border-t border-slate-200 px-4 py-2.5 flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-slate-500">{salesTaxRows.length} row(s) · {salesTaxRows.filter(r => r.netTax).length} with net tax</span>
-                            <div className="flex gap-2">
-                              <Button variant="ghost" size="sm" onClick={() => setSalesTaxRows(prev => [...prev, emptySalesTaxRow()])} className="text-[10px] font-bold text-blue-600 h-7 px-2 gap-1">
-                                <Plus className="w-3 h-3" /> Add Row
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => { if (confirm("Clear all sales tax rows?")) setSalesTaxRows([]); }} className="text-[10px] font-bold text-red-500 h-7 px-2 gap-1">
-                                <Trash2 className="w-3 h-3" /> Clear All
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {salesTaxRows.length === 0 && (
-                        <div className="border border-dashed border-slate-200 rounded-xl p-8 text-center">
-                          <FileSpreadsheet className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-                          <p className="text-sm text-slate-400 font-medium">No sales tax data yet</p>
-                          <p className="text-[11px] text-slate-400 mt-1">Upload an Excel/CSV file or add rows manually</p>
-                        </div>
-                      )}
-                    </div>
-
-
-                    <div className="flex justify-between items-center pt-6 mt-2 border-t border-slate-100">
-                      <Button variant="ghost" onClick={() => goToStep(0)} size="lg" className="h-11 px-5 font-bold text-slate-500 rounded-xl hover:bg-slate-100">
-                        <ChevronRight className="mr-2 w-4 h-4 rotate-180" /> Back to Upload
-                      </Button>
-                      <Button onClick={() => goToStep(2)} disabled={!entityName} size="lg" className="h-11 px-7 bg-blue-600 hover:bg-blue-700 font-bold rounded-xl group shadow-lg shadow-blue-200/60">
-                        Continue to Output <ChevronRight className="ml-2 w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* STEP 2: ANALYSE / Results */}
-                {step === 2 && (
-                  <div className="space-y-8">
-                    {/* Hero Header */}
-                    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                      <div className="relative px-8 pt-7 pb-5 overflow-hidden" style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #1e3a8a 100%)" }}>
-                        <div className="absolute top-0 right-0 w-72 h-72 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #60a5fa 0%, transparent 70%)", transform: "translate(30%, -30%)" }} />
-                        <div className="relative z-10 flex items-start justify-between gap-6">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-3">
-                              <span className="text-[10px] font-black text-blue-300 uppercase tracking-[0.2em]">Step 3 of 3</span>
-                              <div className="h-px flex-1 max-w-[40px] bg-blue-700" />
-                              <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">ISA 200–720 · ISQM 1&2</span>
-                            </div>
-                            <h2 className="text-2xl font-black text-white leading-tight">Output</h2>
-                            <p className="text-sm text-blue-200 mt-1.5 leading-relaxed max-w-xl">AI analysis, General Ledger & Trial Balance, ISA-compliant working papers (A–K), and final export — all in one place.</p>
-                          </div>
-                          <div className="hidden md:flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 shrink-0 mt-1">
-                            <Sparkles className="w-7 h-7 text-blue-200" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Stale data warning */}
-                    {analysis && configChangedAfterAnalysis && !analyzing && (
-                      <div className="flex items-center gap-4 bg-amber-50 border border-amber-300 rounded-xl px-5 py-4 shadow-sm">
-                        <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
-                          <AlertTriangle className="w-5 h-5 text-amber-600" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-bold text-amber-900">Configuration Changed Since Last Analysis</p>
-                          <p className="text-xs text-amber-700 mt-0.5">Files, financial statements, or engagement variables have been modified. Re-run analysis to ensure working papers reflect current data.</p>
-                        </div>
-                        <Button size="sm" onClick={handleAnalyze} className="bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shrink-0 gap-2">
-                          <RefreshCw className="w-3.5 h-3.5" /> Re-run Analysis
-                        </Button>
-                      </div>
-                    )}
-
-                    {!analysis && !analyzing ? (
-                      <div className="space-y-6">
-                        {/* Pre-analysis summary card */}
-                        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
-                          <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <ClipboardCheck className="w-3.5 h-3.5" /> Engagement Summary — Ready for Analysis
-                          </h3>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 text-center">
-                              <p className="text-2xl font-black text-blue-600">{files.length}</p>
-                              <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-1">Files Uploaded</p>
-                              <p className="text-[10px] text-blue-400 mt-0.5">{files.filter(f => f.docType || f.classified).length} classified</p>
-                            </div>
-                            <div className="bg-violet-50 rounded-xl p-4 border border-violet-100 text-center">
-                              <p className="text-sm font-black text-violet-700 truncate">{entityName || "—"}</p>
-                              <p className="text-[10px] font-bold text-violet-500 uppercase tracking-widest mt-1">Entity</p>
-                              <p className="text-[10px] text-violet-400 mt-0.5">{engagementType}</p>
-                            </div>
-                            <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 text-center">
-                              <p className="text-sm font-black text-emerald-700">{financialYear.replace("Year ended ", "") || "—"}</p>
-                              <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mt-1">Financial Year</p>
-                              <p className="text-[10px] text-emerald-400 mt-0.5">{framework}</p>
-                            </div>
-                            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 text-center">
-                              <p className="text-2xl font-black text-slate-700">{selectedPapers.length}</p>
-                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Papers Selected</p>
-                              <p className="text-[10px] text-slate-400 mt-0.5">{AUDIT_PHASES.length} phases</p>
-                            </div>
-                          </div>
-                          {(!entityName || files.length === 0) && (
-                            <div className="mt-4 flex items-center gap-2 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                              {!entityName ? "Entity name is required — go back to Configure and enter it." : "Upload at least one document before running analysis."}
+                              {/* Evidence & Cross Refs */}
+                              {(wp.evidence_refs?.length > 0 || wp.cross_references?.length > 0) && (
+                                <div className="flex gap-4 mt-3 text-xs text-slate-500">
+                                  {wp.evidence_refs?.length > 0 && <span>Evidence: {wp.evidence_refs.join(", ")}</span>}
+                                  {wp.cross_references?.length > 0 && <span>Cross-ref: {wp.cross_references.join(", ")}</span>}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-                        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm flex flex-col items-center justify-center py-16 text-center space-y-6">
-                          <div className="w-24 h-24 bg-violet-50 rounded-full flex items-center justify-center relative">
-                            <div className="absolute inset-0 bg-violet-400/15 rounded-full animate-ping" style={{ animationDuration: "2s" }}></div>
-                            <Sparkles className="w-10 h-10 text-violet-600" />
-                          </div>
-                          <div>
-                            <h3 className="text-xl font-bold text-slate-900">Ready to Analyse</h3>
-                            <p className="text-slate-500 mt-2 max-w-xl mx-auto leading-relaxed text-sm">Click below to run the AI audit analysis engine — materiality, risk, assertions, IC weaknesses, and analytical procedures will be generated automatically.</p>
-                          </div>
-                          <Button onClick={handleAnalyze} size="lg" className="h-12 px-8 bg-violet-600 hover:bg-violet-700 font-bold rounded-xl group shadow-lg shadow-violet-200">
-                            Run AI Audit Analysis <Sparkles className="ml-2.5 w-4 h-4 group-hover:rotate-12 transition-transform" />
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-8">
-                        <div>
-                          <h2 className="text-xl font-bold text-slate-900">Audit Analysis Results</h2>
-                          <p className="text-slate-500 mt-1.5 text-sm">Comprehensive insights derived from your uploaded documents and financial statements.</p>
-                        </div>
-
-                        {analyzing && (
-                          <div className="bg-white rounded-xl p-8 border border-slate-200 shadow-sm space-y-6">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-bold text-blue-600 uppercase tracking-widest flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> {progressMsg}</span>
-                              <span className="text-sm font-black text-slate-900">{progress}%</span>
-                            </div>
-                            <Progress value={progress} className="h-3 rounded-full bg-slate-100" />
-                            <p className="text-xs text-slate-400 text-center font-medium">This may take up to 60 seconds depending on document volume...</p>
-                          </div>
-                        )}
-
-                        {analysis && (
-                          <>
-                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                              <div className="flex border-b border-slate-100 overflow-x-auto scrollbar-thin scrollbar-hidden">
-                                {[
-                                  { id: "summary", label: "Executive Summary", icon: FileText },
-                                  { id: "ratios", label: "Analytical Procedures", icon: BarChart2 },
-                                  { id: "reconciliation", label: "Reconciliation", icon: GitMerge },
-                                  { id: "evidence", label: "Evidence Items", icon: Link2 },
-                                  { id: "ic", label: "IC Weaknesses", icon: AlertTriangle },
-                                ].map(tab => (
-                                  <button
-                                    key={tab.id}
-                                    onClick={() => setAnalysisTab(tab.id as any)}
-                                    className={`flex items-center gap-2 px-6 py-4 text-sm font-bold whitespace-nowrap transition-all border-b-2 ${analysisTab === tab.id ? "border-blue-600 text-blue-600 bg-blue-50/30" : "border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
-                                  >
-                                    <tab.icon className="w-4 h-4" />
-                                    {tab.label}
-                                  </button>
-                                ))}
-                              </div>
-
-                              <div className="p-8">
-                                {analysisTab === "summary" && (
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div className="space-y-6">
-                                      <div>
-                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Building2 className="w-3.5 h-3.5" /> Entity Context</h4>
-                                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
-                                          <p className="text-sm text-slate-700 leading-relaxed font-medium">{analysis.entity?.context || "Strategic business review indicates steady growth in export markets."}</p>
-                                          <div className="grid grid-cols-2 gap-4 pt-2">
-                                            <div>
-                                              <p className="text-[10px] text-slate-400 font-bold uppercase">Main Activity</p>
-                                              <p className="text-xs font-bold text-slate-800">{analysis.entity?.main_activity || "Manufacturing & Export"}</p>
-                                            </div>
-                                            <div>
-                                              <p className="text-[10px] text-slate-400 font-bold uppercase">Risk Profile</p>
-                                              <p className="text-xs font-bold text-blue-600">Moderate / Stable</p>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Scale className="w-3.5 h-3.5" /> Materiality Determination</h4>
-                                        <div className="grid grid-cols-2 gap-4">
-                                          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Overall Materiality</p>
-                                            <p className="text-lg font-black text-slate-900">{fmtPKR(analysis.materiality?.overall)}</p>
-                                            <p className="text-[10px] text-slate-500 font-bold mt-1">Based on {analysis.materiality?.benchmark || "5% of PBT"}</p>
-                                          </div>
-                                          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Performance Mat.</p>
-                                            <p className="text-lg font-black text-slate-900">{fmtPKR(analysis.materiality?.performance)}</p>
-                                            <p className="text-[10px] text-slate-500 font-bold mt-1">75% of Overall</p>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    <div className="space-y-6">
-                                      <div>
-                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> Key Audit Areas</h4>
-                                        <div className="space-y-3">
-                                          {(analysis.key_audit_areas || ["Revenue Recognition", "Inventory Valuation", "Property, Plant & Equipment"]).map((area, i) => {
-                                            const areaName = typeof area === "object" && area !== null ? (area as any).area : String(area);
-                                            const riskLevel = typeof area === "object" && area !== null ? (area as any).risk_level : null;
-                                            const riskColor = riskLevel === "High" ? "bg-red-50 text-red-700 border-red-200" : riskLevel === "Medium" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-emerald-50 text-emerald-700 border-emerald-200";
-                                            return (
-                                            <div key={i} className="flex items-center gap-3 p-3.5 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-blue-200 transition-colors">
-                                              <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center font-mono font-bold text-xs">{i+1}</div>
-                                              <span className="text-sm font-bold text-slate-800">{areaName}</span>
-                                              {riskLevel
-                                                ? <Badge className={`ml-auto text-[10px] h-5 ${riskColor}`}>{riskLevel} Risk</Badge>
-                                                : <Badge className="ml-auto bg-amber-50 text-amber-700 border-amber-200 text-[10px] h-5">ISA 701</Badge>
-                                              }
-                                            </div>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                      <div className="bg-blue-600 rounded-xl p-6 text-white shadow-xl">
-                                        <h4 className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-3">AI Auditor Insights</h4>
-                                        <p className="text-sm font-medium leading-relaxed italic">"Risk assessment suggests focus on revenue cut-off and classification of non-current liabilities. Variance in admin expenses requires detailed substantive testing."</p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {analysisTab === "ratios" && (
-                                  <div className="space-y-6">
-                                    <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm bg-white">
-                                      <table className="w-full text-xs text-left">
-                                        <thead className="bg-slate-50 border-b border-slate-200">
-                                          <tr>
-                                            <th className="p-4 font-bold text-slate-500">Financial Ratio / KPI</th>
-                                            <th className="p-4 font-bold text-slate-500 text-right">Current Year</th>
-                                            <th className="p-4 font-bold text-slate-500 text-right">Variance</th>
-                                            <th className="p-4 font-bold text-slate-500">Trend</th>
-                                            <th className="p-4 font-bold text-slate-500">Auditor's Assessment</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                          {Object.entries(analysis.analytical_procedures?.ratios || { "Gross Margin": 0.34, "Net Margin": 0.15, "Current Ratio": 1.84, "Quick Ratio": 1.12 }).map(([name, val], i) => (
-                                            <tr key={name} className="hover:bg-slate-50/50 transition-colors">
-                                              <td className="p-4 font-bold text-slate-800">{name}</td>
-                                              <td className="p-4 text-right font-mono font-bold text-slate-900">{typeof val === 'number' ? (val < 1 ? (val * 100).toFixed(1) + "%" : val.toFixed(2)) : val}</td>
-                                              <td className="p-4 text-right">
-                                                <span className={`font-mono font-bold ${i % 2 === 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                  {i % 2 === 0 ? "+" : "-"}{(Math.random() * 5).toFixed(1)}%
-                                                </span>
-                                              </td>
-                                              <td className="p-4">
-                                                {i % 2 === 0 ? <TrendingUp className="w-4 h-4 text-emerald-500" /> : <TrendingDown className="w-4 h-4 text-rose-500" />}
-                                              </td>
-                                              <td className="p-4 text-slate-600 font-medium">
-                                                {i === 0 ? "Satisfactory. In line with industry average." : i === 1 ? "Investigate increase in administrative expenses." : "Liquidity position remains stable."}
-                                              </td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                    <div className="bg-slate-900 rounded-xl p-6 text-white">
-                                      <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Trend Analysis Conclusion</h4>
-                                      <p className="text-sm font-medium text-slate-300 leading-relaxed">{analysis.analytical_procedures?.trend_analysis || "Stable revenue growth with improving gross margins. Liquidity ratios are within acceptable limits, though receivables aging has increased."}</p>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {analysisTab === "reconciliation" && (
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {[
-                                      { label: "Trial Balance vs. Financial Statements", key: "tb_vs_fs", icon: Table },
-                                      { label: "Opening vs. Prior Year Closing", key: "opening_vs_prior_year", icon: LayoutGrid },
-                                      { label: "Bank Reconciliation Statement", key: "bank_reconciliation", icon: Building2 },
-                                      { label: "General Ledger vs. Trial Balance", key: "tb_vs_gl", icon: GitMerge },
-                                    ].map(item => {
-                                      const data = (analysis.reconciliation as any)?.[item.key] || { status: "Verified", difference: 0, notes: "No variances identified." };
-                                      return (
-                                        <div key={item.key} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:border-blue-200 transition-colors">
-                                          <div className="flex items-center justify-between mb-4">
-                                            <div className="flex items-center gap-2">
-                                              <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center">
-                                                <item.icon className="w-4 h-4 text-slate-400" />
-                                              </div>
-                                              <span className="text-xs font-bold text-slate-800">{item.label}</span>
-                                            </div>
-                                            <Badge className={`text-[9px] font-bold h-5 ${data.status === "Verified" || data.difference === 0 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>
-                                              {data.status || "Verified"}
-                                            </Badge>
-                                          </div>
-                                          <div className="space-y-2">
-                                            <div className="flex items-center justify-between">
-                                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Difference</span>
-                                              <span className={`text-sm font-mono font-bold ${data.difference !== 0 ? 'text-red-600' : 'text-emerald-600'}`}>{fmtPKR(data.difference)}</span>
-                                            </div>
-                                            <p className="text-xs text-slate-500 font-medium pt-1 border-t border-slate-50">{data.notes}</p>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-
-                                {analysisTab === "evidence" && (
-                                  <div className="space-y-4">
-                                    {(analysis.evidence_items || []).length > 0 ? (
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {analysis.evidence_items?.map((e, i) => (
-                                          <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex items-start gap-3">
-                                            <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center shrink-0 border border-purple-100">
-                                              <Link2 className="w-5 h-5 text-purple-600" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                              <p className="text-xs font-bold text-slate-900 truncate">{e.filename}</p>
-                                              <p className="text-[10px] text-slate-500 font-medium mt-0.5 line-clamp-2">{e.description}</p>
-                                              <div className="flex items-center gap-2 mt-2">
-                                                <Badge className="bg-purple-50 text-purple-700 border-purple-100 text-[9px] h-4">{e.type}</Badge>
-                                                <span className="text-[9px] font-bold text-slate-400">{e.pages_or_sheets}</span>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <div className="flex flex-col items-center justify-center py-12 text-slate-400 space-y-3 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-                                        <Link2 className="w-8 h-8 opacity-20" />
-                                        <p className="text-sm font-bold">No evidence items extracted yet.</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-
-                                {analysisTab === "ic" && (
-                                  <div className="space-y-4">
-                                    {(analysis.internal_control_weaknesses || []).length > 0 ? (
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {analysis.internal_control_weaknesses?.map((w, i) => (
-                                          <div key={i} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3 relative overflow-hidden group hover:border-blue-200 transition-colors">
-                                            <div className={`absolute top-0 left-0 w-1.5 h-full ${w.risk_level === "High" ? "bg-red-500" : w.risk_level === "Medium" ? "bg-amber-500" : "bg-emerald-500"}`}></div>
-                                            <div className="flex items-center justify-between">
-                                              <span className="text-xs font-black text-slate-900 uppercase tracking-widest">{w.area}</span>
-                                              <RiskBadge level={w.risk_level} />
-                                            </div>
-                                            <p className="text-sm text-slate-700 font-bold leading-relaxed">{w.weakness}</p>
-                                            <div className="pt-3 border-t border-slate-50">
-                                              <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1">Recommendation</p>
-                                              <p className="text-xs text-slate-600 font-medium leading-relaxed">{w.recommendation}</p>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <div className="flex flex-col items-center justify-center py-12 text-slate-400 space-y-3 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-                                        <Shield className="w-8 h-8 opacity-20" />
-                                        <p className="text-sm font-bold">No internal control weaknesses identified.</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="bg-gradient-to-r from-slate-900 to-blue-950 rounded-xl border border-blue-900/40 p-6 shadow-lg relative overflow-hidden">
-                              <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/10 rounded-full -mr-20 -mt-20 blur-2xl" />
-                              <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
-                                <div className="flex-1">
-                                  <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Analysis Complete</p>
-                                  <h3 className="text-lg font-extrabold text-white flex items-center gap-2">
-                                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                                    Ready to Generate Working Papers
-                                  </h3>
-                                  <p className="text-slate-400 mt-1.5 text-sm font-medium">
-                                    {selectedPapers.length} papers selected across {AUDIT_PHASES.length} phases — proceed to the Generate step to produce your ISA-compliant audit file.
-                                  </p>
-                                </div>
-                                <div className="flex items-center gap-2 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 shrink-0">
-                                  <ChevronDown className="w-4 h-4" /> Continue below to generate
-                                </div>
-                              </div>
-                            </div>
-                          </>
-                        )}
-
-                        <div className="flex justify-start">
-                          <Button variant="ghost" onClick={() => goToStep(1)} disabled={analyzing} className="font-bold text-slate-500 rounded-xl px-6">
-                            <ChevronRight className="mr-2 w-4 h-4 rotate-180" /> Back to Configure
-                          </Button>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })}
                   </div>
                 )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-                {/* ── GL & TB Generation ────────────────────────────── */}
-                {step === 2 && (
-                  <div className="space-y-6">
-                    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                      <div className="p-6 space-y-5">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shrink-0 shadow-sm shadow-emerald-200">
-                              <Table className="w-[18px] h-[18px] text-white" />
-                            </div>
-                            <div>
-                              <h3 className="text-sm font-bold text-slate-900">General Ledger & Trial Balance</h3>
-                              <p className="text-xs text-slate-500 mt-0.5">AI-generated with Pakistan COA codes, narrations & industry-specific transactions — GL and TB are 100% matched</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {glTbSummary && <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">Generated</span>}
-                            <Button onClick={handleGenerateGlTb} disabled={generatingGlTb} className="rounded-xl font-bold gap-2 bg-emerald-600 hover:bg-emerald-700">
-                              {generatingGlTb ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> {glTbSummary ? "Re-generate" : "Generate GL & TB"}</>}
-                            </Button>
-                          </div>
-                        </div>
+      <div className="flex justify-between pt-2">
+        <Button variant="outline" onClick={onBack} className="gap-2"><ChevronLeft className="w-4 h-4" /> Back</Button>
+        <Button onClick={onContinue} className="gap-2">Export Audit File <ArrowRight className="w-4 h-4" /></Button>
+      </div>
+    </div>
+  );
+}
 
-                        {glTbSummary && (
-                          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                            <div className="bg-slate-50 rounded-lg p-3 text-center border border-slate-100">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">GL Entries</p>
-                              <p className="text-lg font-black text-slate-800">{glTbSummary.gl_entries}</p>
-                            </div>
-                            <div className="bg-slate-50 rounded-lg p-3 text-center border border-slate-100">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">TB Accounts</p>
-                              <p className="text-lg font-black text-slate-800">{glTbSummary.tb_accounts}</p>
-                            </div>
-                            <div className="bg-slate-50 rounded-lg p-3 text-center border border-slate-100">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">Total Debit</p>
-                              <p className="text-sm font-bold text-slate-800">{fmtPKR(glTbSummary.total_debit)}</p>
-                            </div>
-                            <div className="bg-slate-50 rounded-lg p-3 text-center border border-slate-100">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">Total Credit</p>
-                              <p className="text-sm font-bold text-slate-800">{fmtPKR(glTbSummary.total_credit)}</p>
-                            </div>
-                            <div className={`rounded-lg p-3 text-center border ${glTbSummary.is_balanced ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">Status</p>
-                              <p className={`text-sm font-black ${glTbSummary.is_balanced ? 'text-emerald-600' : 'text-red-600'}`}>
-                                {glTbSummary.is_balanced ? '✓ Balanced' : '✗ Unbalanced'}
-                              </p>
-                            </div>
-                          </div>
-                        )}
+// ─── STEP 6: EXPORT ────────────────────────────────────────────────────────────
 
-                        {glData.length > 0 && (
-                          <div className="rounded-xl border border-slate-200 overflow-hidden">
-                            <button onClick={() => setExpandedWPGroups(prev => prev.includes("__gl__") ? prev.filter(p => p !== "__gl__") : [...prev, "__gl__"])}
-                              className="w-full flex items-center justify-between px-5 py-3.5 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
-                            >
-                              <span className="text-xs font-bold text-slate-700">General Ledger ({glData.length} entries)</span>
-                              {expandedWPGroups.includes("__gl__") ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                            </button>
-                            <AnimatePresence>
-                              {expandedWPGroups.includes("__gl__") && (
-                                <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
-                                  <div className="overflow-x-auto">
-                                    <table className="w-full text-[11px]">
-                                      <thead className="bg-slate-50 border-b border-slate-200">
-                                        <tr>{["Date","Account","Narration","Debit","Credit","Ref"].map(h => <th key={h} className="px-3 py-2 text-left font-bold text-slate-500 uppercase tracking-widest text-[10px]">{h}</th>)}</tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-slate-100">
-                                        {glData.slice(0, 50).map((row: any, i: number) => (
-                                          <tr key={i} className="hover:bg-slate-50">
-                                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{row.date}</td>
-                                            <td className="px-3 py-2 font-medium text-slate-800">{row.account}</td>
-                                            <td className="px-3 py-2 text-slate-500 max-w-[200px] truncate">{row.narration}</td>
-                                            <td className="px-3 py-2 text-right font-mono text-emerald-700">{row.debit ? fmtPKR(row.debit) : ""}</td>
-                                            <td className="px-3 py-2 text-right font-mono text-red-600">{row.credit ? fmtPKR(row.credit) : ""}</td>
-                                            <td className="px-3 py-2 text-slate-400">{row.ref}</td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        )}
+function ExportStep({ onBack, onExport, exporting, session }:
+  { onBack: () => void; onExport: (fmt: string) => void; exporting: string | null; session: WPSession }) {
 
-                        {tbData2.length > 0 && (
-                          <div className="rounded-xl border border-slate-200 overflow-hidden">
-                            <button onClick={() => setExpandedWPGroups(prev => prev.includes("__tb__") ? prev.filter(p => p !== "__tb__") : [...prev, "__tb__"])}
-                              className="w-full flex items-center justify-between px-5 py-3.5 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
-                            >
-                              <span className="text-xs font-bold text-slate-700">Trial Balance ({tbData2.length} accounts)</span>
-                              {expandedWPGroups.includes("__tb__") ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                            </button>
-                            <AnimatePresence>
-                              {expandedWPGroups.includes("__tb__") && (
-                                <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
-                                  <div className="overflow-x-auto">
-                                    <table className="w-full text-[11px]">
-                                      <thead className="bg-slate-50 border-b border-slate-200">
-                                        <tr>{["Code","Account","Opening","Debit","Credit","Closing","Type"].map(h => <th key={h} className="px-3 py-2 text-left font-bold text-slate-500 uppercase tracking-widest text-[10px]">{h}</th>)}</tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-slate-100">
-                                        {tbData2.map((row: any, i: number) => (
-                                          <tr key={i} className="hover:bg-slate-50">
-                                            <td className="px-3 py-2 font-mono text-[10px] text-slate-500">{row.code}</td>
-                                            <td className="px-3 py-2 font-medium text-slate-800">{row.account}</td>
-                                            <td className="px-3 py-2 text-right font-mono text-slate-600">{row.opening ? fmtPKR(row.opening) : "—"}</td>
-                                            <td className="px-3 py-2 text-right font-mono text-emerald-700">{row.debit ? fmtPKR(row.debit) : "—"}</td>
-                                            <td className="px-3 py-2 text-right font-mono text-red-600">{row.credit ? fmtPKR(row.credit) : "—"}</td>
-                                            <td className="px-3 py-2 text-right font-mono font-bold text-slate-800">{row.closing ? fmtPKR(row.closing) : "—"}</td>
-                                            <td className="px-3 py-2 text-[10px] text-slate-400">{row.type}</td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
+  const stats = [
+    { label: "Working Papers", value: session.workingPapers.length },
+    { label: "TB Accounts", value: session.trialBalance.length },
+    { label: "GL Entries", value: session.glEntries.length },
+    { label: "Risk Flags", value: session.extractedData?.flags?.length || 0 },
+  ];
 
-                {/* ── Working Papers Generation ─────────────────────── */}
-                {step === 2 && (
-                  <div className="space-y-8">
-                    {/* Working Papers section card header */}
-                    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                      <div className="px-6 py-4 flex items-center gap-3 border-b border-slate-100">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shrink-0 shadow-sm shadow-emerald-200">
-                          <Sparkles className="w-[18px] h-[18px] text-white" />
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-bold text-slate-900">Working Papers</h3>
-                          <p className="text-xs text-slate-500 mt-0.5">ISA 200–720 · ISQM 1&2 · Phases A–K · {selectedPapers.length} papers selected</p>
-                        </div>
-                      </div>
-                    </div>
+  const approved = session.workingPapers.filter(p => p.status === "Approved").length;
+  const total = session.workingPapers.length;
 
-                    {workingPapers.length === 0 ? (
-                      generating ? (
-                        /* ─── Phase-by-phase progress ───────────────────────────────────────── */
-                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 space-y-8">
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2.5">
-                                <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                                <span className="font-bold text-blue-700 text-sm">{progressMsg}</span>
-                              </div>
-                              <span className="text-2xl font-black text-slate-900">{progress}%</span>
-                            </div>
-                            <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                              <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-700 ease-out" style={{ width: `${progress}%` }} />
-                            </div>
-                            <p className="text-xs font-medium text-slate-400">
-                              {completedPhases.length} of {AUDIT_PHASES.length} phases complete
-                              {activePhaseLabel ? ` · Processing: ${activePhaseLabel}` : " · Finalising..."}
-                            </p>
-                          </div>
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div className="text-center mb-4">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+          <CheckCircle2 className="w-8 h-8 text-green-600" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-800">Audit File Ready</h2>
+        <p className="text-sm text-slate-500 mt-1">Your complete AI-generated audit working papers are ready for export.</p>
+      </div>
 
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                            {AUDIT_PHASES.map(phase => {
-                              const isDone    = completedPhases.includes(phase.prefix);
-                              const isActive  = activePhaseLabel === phase.label;
-                              return (
-                                <div key={phase.prefix}
-                                  className={`rounded-xl p-4 border transition-all duration-500 ${
-                                    isDone   ? "bg-emerald-50 border-emerald-200 shadow-sm" :
-                                    isActive ? "bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-300" :
-                                               "bg-slate-50 border-slate-100"
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className={`text-[10px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${
-                                      isDone   ? "bg-emerald-100 text-emerald-700" :
-                                      isActive ? "bg-blue-100 text-blue-700" :
-                                                 "bg-slate-100 text-slate-400"
-                                    }`}>{phase.prefix}</span>
-                                    {isDone   ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> :
-                                     isActive ? <Loader2 className="w-4 h-4 text-blue-500 animate-spin" /> : null}
-                                  </div>
-                                  <p className={`text-xs font-bold leading-tight ${isDone ? "text-emerald-700" : isActive ? "text-blue-700" : "text-slate-400"}`}>{phase.label}</p>
-                                  <p className={`text-[10px] mt-1 leading-tight ${isDone ? "text-emerald-500" : "text-slate-300"}`}>{phase.description}</p>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ) : (
-                        /* ─── Idle: Ready to Generate ───────────────────────────────────────── */
-                        <div className="space-y-6">
-                          {/* Readiness Card */}
-                          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                              <ClipboardCheck className="w-3.5 h-3.5" /> Engagement Ready for Generation
-                            </p>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 text-center">
-                                <p className="text-2xl font-black text-emerald-700">{selectedPapers.length}</p>
-                                <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mt-1">Papers Selected</p>
-                                <p className="text-[10px] text-emerald-400 mt-0.5">{WP_GROUPS.length} phases</p>
-                              </div>
-                              <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 text-center">
-                                <p className="text-sm font-black text-blue-700 truncate">{entityName || "—"}</p>
-                                <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-1">Entity</p>
-                                <p className="text-[10px] text-blue-400 mt-0.5">{engagementType}</p>
-                              </div>
-                              <div className="bg-violet-50 rounded-xl p-4 border border-violet-100 text-center">
-                                <p className="text-sm font-black text-violet-700">{financialYear.replace("Year ended ", "") || "—"}</p>
-                                <p className="text-[10px] font-bold text-violet-500 uppercase tracking-widest mt-1">Financial Year</p>
-                              </div>
-                              <div className="bg-amber-50 rounded-xl p-4 border border-amber-100 text-center">
-                                <p className="text-2xl font-black text-amber-700">{analysis ? "✓" : "—"}</p>
-                                <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mt-1">AI Analysis</p>
-                                <p className="text-[10px] text-amber-400 mt-0.5">{analysis ? "Complete" : "Not run"}</p>
-                              </div>
-                            </div>
-                            {!entityName && (
-                              <div className="mt-4 flex items-center gap-2 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                                Entity name is required — go back to Configure and enter it.
-                              </div>
-                            )}
-                          </div>
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-3">
+        {stats.map((s, i) => (
+          <div key={i} className="p-3 bg-white border border-slate-200 rounded-xl text-center">
+            <p className="text-xl font-bold text-slate-800">{s.value}</p>
+            <p className="text-xs text-slate-500">{s.label}</p>
+          </div>
+        ))}
+      </div>
 
-                          {/* Generate Button Card */}
-                          <div className="bg-white rounded-xl p-10 border border-slate-200 shadow-sm text-center space-y-6">
-                            <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto relative">
-                              <div className="absolute inset-0 bg-blue-400/10 rounded-full animate-ping" style={{ animationDuration: "2.5s" }} />
-                              <Sparkles className="w-10 h-10 text-blue-600" />
-                            </div>
-                            <div className="max-w-lg mx-auto space-y-3">
-                              <h3 className="text-2xl font-extrabold text-slate-800">
-                                Generate {selectedPapers.length} Working Papers
-                              </h3>
-                              <p className="text-slate-500 font-medium leading-relaxed text-sm">
-                                Fully cross-referenced, ISA-compliant working papers — Phases A through K — with prepared-by, reviewed-by, and partner sign-offs on every paper.
-                              </p>
-                            </div>
-                            <Button onClick={handleGenerate} disabled={selectedPapers.length === 0} size="lg" className="h-14 px-10 bg-blue-600 hover:bg-blue-700 text-base font-bold shadow-none rounded-xl group disabled:opacity-50 gap-2">
-                              <Sparkles className="w-5 h-5 group-hover:rotate-12 transition-transform" /> Generate Working Papers
-                            </Button>
-                          </div>
-                        </div>
-                      )
-                    ) : (
-                      <>
-                        <div className="bg-emerald-600 rounded-xl p-4 text-white shadow-lg flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
-                              <CheckCircle2 className="w-5 h-5" />
-                            </div>
-                            <span className="font-bold">{workingPapers.length} Working Papers Generated · ISA 200-720 Compliant</span>
-                          </div>
-                          <Badge className="bg-white/20 text-white border-white/20 font-bold uppercase tracking-widest text-[10px]">Ready for Review</Badge>
-                        </div>
+      {/* Review status */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold text-slate-700">Review Status</p>
+          <span className="text-xs text-slate-500">{approved}/{total} papers approved</span>
+        </div>
+        <Progress value={total > 0 ? (approved / total) * 100 : 0} className="h-2 mb-2" />
+        {approved < total && (
+          <p className="text-xs text-amber-600">{total - approved} papers still in Draft / Review. You can still export — all papers are included.</p>
+        )}
+      </div>
 
-                        {/* Evidence Index (from Production) */}
-                        {evidenceIndex.length > 0 && (
-                          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                            <button onClick={() => setExpandedWPGroups(prev => prev.includes("__evidence__") ? prev.filter(p => p !== "__evidence__") : [...prev, "__evidence__"])}
-                              className="w-full flex items-center gap-3 p-5 hover:bg-slate-50/50 transition-colors text-left"
-                            >
-                              <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center border border-purple-100">
-                                <Link2 className="w-5 h-5 text-purple-600" />
-                              </div>
-                              <div className="flex-1">
-                                <h3 className="font-bold text-slate-900">Audit Evidence Index</h3>
-                                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">ISA 230 / ISA 500 · {evidenceIndex.length} items</p>
-                              </div>
-                              {expandedWPGroups.includes("__evidence__") ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                            </button>
-                            <AnimatePresence>
-                              {expandedWPGroups.includes("__evidence__") && (
-                                <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden bg-slate-50/30">
-                                  <div className="p-6">
-                                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                                      <table className="w-full text-xs text-left">
-                                        <thead className="bg-slate-50 border-b border-slate-200">
-                                          <tr>
-                                            <th className="p-3 font-bold text-slate-500 w-20">Ref</th>
-                                            <th className="p-3 font-bold text-slate-500">Document Description</th>
-                                            <th className="p-3 font-bold text-slate-500 w-32">Type</th>
-                                            <th className="p-3 font-bold text-slate-500">Cross-Refs</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                          {evidenceIndex.map((e, i) => (
-                                            <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                                              <td className="p-3 font-mono font-bold text-purple-700">{e.ref}</td>
-                                              <td className="p-3 text-slate-700 font-medium">{e.description}</td>
-                                              <td className="p-3">
-                                                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-100 text-[9px]">{e.type}</Badge>
-                                              </td>
-                                              <td className="p-3 text-slate-400 font-bold font-mono">{(e.wp_refs || []).join(", ") || "—"}</td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        )}
+      {/* Export Options */}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          {
+            fmt: "excel", label: "Excel Workbook", icon: FileSpreadsheet, desc: "Trial Balance, GL, Analytics",
+            color: "bg-green-50 border-green-200 hover:bg-green-100",
+          },
+          {
+            fmt: "docx", label: "Word Document", icon: FileText, desc: "Complete Working Papers file",
+            color: "bg-blue-50 border-blue-200 hover:bg-blue-100",
+          },
+          {
+            fmt: "pdf", label: "PDF Report", icon: FileOutput, desc: "Print-ready audit file",
+            color: "bg-red-50 border-red-200 hover:bg-red-100",
+          },
+        ].map(exp => (
+          <button key={exp.fmt} onClick={() => onExport(exp.fmt)} disabled={!!exporting}
+            className={cn("flex flex-col items-center gap-2 p-5 rounded-xl border-2 transition-colors cursor-pointer", exp.color, exporting === exp.fmt && "opacity-70")}>
+            {exporting === exp.fmt
+              ? <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+              : <exp.icon className="w-8 h-8 text-slate-600" />}
+            <p className="font-semibold text-sm text-slate-800">{exp.label}</p>
+            <p className="text-xs text-slate-500 text-center">{exp.desc}</p>
+          </button>
+        ))}
+      </div>
 
-                        <div className="space-y-4">
-                          {uniqueSections.map(section => {
-                            const papers = sectionPapers(section);
-                            if (!papers.length) return null;
-                            const wpLetter = (papers[0]?.ref || "").replace(/[0-9\-]/g, "");
-                            const group = WP_GROUPS.find(g => g.prefix === wpLetter);
-                            const isOpen = expandedWPGroups.includes(section);
-                            
-                            return (
-                              <div key={section} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                                <button onClick={() => toggleWPGroupExpand(section)} className="w-full flex items-center gap-4 p-5 hover:bg-slate-50/50 transition-colors text-left">
-                                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-sm shrink-0 ${group?.color || "bg-slate-100 text-slate-600 border-slate-200"}`}>
-                                    <span className="font-bold text-sm">{group?.prefix || "WP"}</span>
-                                  </div>
-                                  <div className="flex-1">
-                                    <h3 className="font-bold text-slate-900">{section}</h3>
-                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{papers.length} Audit Papers</p>
-                                  </div>
-                                  {isOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                                </button>
-                                <AnimatePresence>
-                                  {isOpen && (
-                                    <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden bg-slate-50/20">
-                                      <div className="p-4 space-y-1">
-                                        {papers.map(wp => (
-                                          <WPCard 
-                                            key={wp.ref} 
-                                            wp={wp} 
-                                            expanded={expandedWPCards.includes(wp.ref)} 
-                                            onToggle={() => toggleWPCardExpand(wp.ref)} 
-                                          />
-                                        ))}
-                                      </div>
-                                    </motion.div>
-                                  )}
-                                </AnimatePresence>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </>
-                    )}
+      {/* Export All */}
+      <Button className="w-full gap-2" size="lg" onClick={() => onExport("all")} disabled={!!exporting}>
+        {exporting === "all" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+        Export Complete Audit Package (All Formats)
+      </Button>
 
-                  </div>
-                )}
+      <div className="flex items-start gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+        <Lock className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+        <div className="text-xs text-slate-500">
+          <p>All exported files include: entity name, financial year, engagement partner, and ANA & Co. branding.</p>
+          <p className="mt-1">AI-estimated values are marked as <strong>Estimated</strong> in all exports. User-confirmed values are marked as <strong>Confirmed</strong>.</p>
+        </div>
+      </div>
 
-                {/* ── Export & Finalize ──────────────────────────────── */}
-                {step === 2 && (
-                  <div className="space-y-8">
-                    {/* Export section card header */}
-                    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                      <div className="px-6 py-4 flex items-center gap-3 border-b border-slate-100">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center shrink-0 shadow-sm shadow-yellow-200">
-                          <FileOutput className="w-[18px] h-[18px] text-white" />
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-bold text-slate-900">Export & Finalize</h3>
-                          <p className="text-xs text-slate-500 mt-0.5">Download working papers · Excel, Word, PDF, or Confirmations bundle</p>
-                        </div>
-                      </div>
-                    </div>
+      <div className="flex justify-start">
+        <Button variant="outline" onClick={onBack} className="gap-2"><ChevronLeft className="w-4 h-4" /> Back to Working Papers</Button>
+      </div>
+    </div>
+  );
+}
 
-                    <div className="bg-[#0F172A] rounded-xl p-8 text-white relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/20 rounded-full -mr-48 -mt-48 blur-[100px]"></div>
-                      <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-600/10 rounded-full -ml-32 -mb-32 blur-[80px]"></div>
-                      
-                      <div className="relative z-10 space-y-8">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                          <div>
-                            <div className="flex items-center gap-3 mb-2">
-                              <Badge className="bg-emerald-500 text-white border-0 font-bold text-[10px] uppercase h-6">Engagement Ready</Badge>
-                              <span className="text-blue-400 font-bold text-xs">ISA 230 Compliant</span>
-                            </div>
-                            <h3 className="text-3xl font-black">{entityName || "Audit Engagement"}</h3>
-                            <p className="text-slate-400 mt-1 font-medium">{financialYear} · {workingPapers.length} Generated Papers</p>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center min-w-[100px]">
-                              <p className="text-[10px] font-bold text-slate-500 uppercase">Compliance</p>
-                              <p className="text-xl font-black text-emerald-400">100%</p>
-                            </div>
-                            <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center min-w-[100px]">
-                              <p className="text-[10px] font-bold text-slate-500 uppercase">Evidence</p>
-                              <p className="text-xl font-black text-blue-400">{evidenceIndex.length}</p>
-                            </div>
-                          </div>
-                        </div>
+// ─── STEP INDICATOR ────────────────────────────────────────────────────────────
 
-                        {workingPapers.length === 0 && (
-                          <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-5 py-4 mb-2">
-                            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
-                            <div>
-                              <p className="text-amber-300 font-bold text-sm">No working papers generated yet.</p>
-                              <p className="text-amber-400/70 text-xs mt-0.5">Please go back to the Generate step and generate working papers before downloading.</p>
-                            </div>
-                            <Button size="sm" variant="outline" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="ml-auto border-amber-500/40 text-amber-300 hover:bg-amber-500/10 shrink-0">
-                              Scroll up to Generate
-                            </Button>
-                          </div>
-                        )}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {[
-                            { id: "excel", label: "Microsoft Excel File", ext: ".xlsx", desc: "Complete workbook with automated cross-references and section tabs.", icon: Table, color: "emerald", handler: handleExportExcel, loading: exportingExcel, needsPapers: true },
-                            { id: "docx", label: "Microsoft Word File", ext: ".docx", desc: "Professional report format suitable for management deliverables.", icon: FileSpreadsheet, color: "sky", handler: handleExportDocx, loading: exportingDocx, needsPapers: true },
-                            { id: "pdf", label: "Adobe PDF File", ext: ".pdf", desc: "Final archived copy with high-fidelity formatting and sign-offs.", icon: FileText, color: "rose", handler: handleExport, loading: exporting, needsPapers: true },
-                            { id: "confirmations", label: "Confirmations Bundle", ext: ".pdf", desc: "Automated generation of bank, debtor, and creditor confirmation letters.", icon: Mail, color: "violet", handler: handleExportConfirmations, loading: exportingConfirmations, needsPapers: false },
-                          ].map(card => (
-                            <button
-                              key={card.id}
-                              onClick={card.handler}
-                              disabled={card.loading || (card.needsPapers && workingPapers.length === 0)}
-                              className="group bg-white/5 border border-white/10 hover:bg-white/[0.08] hover:border-white/20 rounded-xl p-6 transition-all text-left relative overflow-hidden"
-                            >
-                              <div className="flex items-center gap-4">
-                                <div className={`w-14 h-14 rounded-xl bg-${card.color}-500/20 flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                                  <card.icon className={`w-7 h-7 text-${card.color}-400`} />
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between">
-                                    <h4 className="font-bold text-lg">{card.label}</h4>
-                                    <span className={`text-[10px] font-black text-${card.color}-400 uppercase`}>{card.ext}</span>
-                                  </div>
-                                  <p className="text-slate-400 text-xs mt-1 leading-relaxed">{card.desc}</p>
-                                </div>
-                              </div>
-                              <div className="mt-6 flex items-center justify-between">
-                                {card.loading ? (
-                                  <div className="flex items-center gap-2 text-blue-400 text-[10px] font-bold uppercase tracking-widest animate-pulse">
-                                    <Loader2 className="w-3 h-3 animate-spin" /> Preparing Download...
-                                  </div>
-                                ) : (
-                                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest group-hover:text-white transition-colors">Download Now</span>
-                                )}
-                                <div className={`w-8 h-8 rounded-full bg-${card.color}-500/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity`}>
-                                  <Download className={`w-4 h-4 text-${card.color}-400`} />
-                                </div>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
+function StepIndicator({ currentStep }: { currentStep: number }) {
+  return (
+    <div className="w-full overflow-x-auto">
+      <div className="flex items-center min-w-max gap-0 mb-6">
+        {STEPS.map((s, i) => {
+          const done = i < currentStep;
+          const active = i === currentStep;
+          return (
+            <div key={i} className="flex items-center">
+              <div className="flex items-center gap-1.5">
+                <div className={cn("w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 transition-colors",
+                  done ? "bg-green-500 text-white" : active ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-500")}>
+                  {done ? <Check className="w-3.5 h-3.5" /> : i + 1}
+                </div>
+                <span className={cn("text-xs font-medium whitespace-nowrap", active ? "text-blue-700" : done ? "text-green-700" : "text-slate-400")}>{s.label}</span>
+              </div>
+              {i < STEPS.length - 1 && (
+                <div className={cn("w-8 h-0.5 mx-2 transition-colors shrink-0", done ? "bg-green-400" : "bg-slate-200")} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
-                    <div className="flex justify-between items-center pb-12">
-                      <Button variant="ghost" onClick={() => {
-                        goToStep(0);
-                        setFiles([]);
-                        setAnalysis(null);
-                        setWorkingPapers([]);
-                        setEvidenceIndex([]);
-                        setGenerationMeta(null);
-                        setEntityName("");
-                        setNtn("");
-                        setSecp("");
-                        setStrn("");
-                        setInstructions("");
-                        setRegisteredAddress("");
-                        setEngagementType("Statutory Audit");
-                        setFinancialYear("Year ended June 30, 2024");
-                        setBsData(INITIAL_BS);
-                        setPlData(INITIAL_PL);
-                        setSalesTaxRows([]);
-                        setConfigValues(getDefaultValues());
-                        setSelectedPapers(ALL_WP_REFS);
-                        setPreparer("");
-                        setReviewer("");
-                        setApprover("");
-                        setPlanningDeadline("");
-                        setFieldworkStart("");
-                        setFieldworkEnd("");
-                        setReportingDeadline("");
-                        setReportDate("");
-                        setFilingDeadline("");
-                        setArchiveDate("");
-                        setPeriodStart("");
-                        setPeriodEnd("");
-                        setIndustry("");
-                        setEntityType("Private Limited");
-                        setFramework("IFRS");
-                        setListedStatus("Unlisted");
-                        setFirstYearAudit(false);
-                        setGoingConcernFlag(false);
-                        setControlReliance("Partial");
-                        setSignificantRiskAreas([]);
-                        setCurrency("PKR");
-                        setNewClient(false);
-                        setGroupAuditFlag(false);
-                        setInternalAuditExists(false);
-                        setIndependenceConfirmed(true);
-                        setConflictCheck(true);
-                        setEqcrRequired(false);
-                        setSamplingMethod("Statistical");
-                        setConfidenceLevel("95%");
-                        setRelatedPartyFlag(false);
-                        setSubsequentEventsFlag(false);
-                        setEstimatesFlag(false);
-                        setLitigationFlag(false);
-                        setExpertRequired(false);
-                        setCurrentTaxApplicable(true);
-                        setDeferredTaxApplicable(true);
-                        setWhtExposure(true);
-                        setSalesTaxRegistered(true);
-                        setSuperTaxApplicable(false);
-                        setStPeriodFrom("");
-                        setStPeriodTo("");
-                        setAutoFilled(false);
-                        setProgress(0);
-                        setProgressMsg("");
-                        setCompletedPhases([]);
-                        setActivePhaseLabel("");
-                        setExpandedFsSections(["nca", "ca", "rev"]);
-                        setActiveFsTab("bs");
-                        setGlData([]);
-                        setTbData2([]);
-                        setCoaData([]);
-                        setGlTbSummary(null);
-                        setConfigChangedAfterAnalysis(false);
-                        setDraftLoaded(false);
-                        localStorage.removeItem(DRAFT_KEY);
-                        toast({ title: "Engagement reset", description: "All fields have been cleared. Ready for a new engagement." });
-                      }} className="font-bold text-slate-500 rounded-xl px-6 h-12">
-                        <RefreshCw className="w-4 h-4 mr-2" /> Start New Engagement
-                      </Button>
-                      <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">ISA 230 Compliant · Secure Archive Active</p>
-                    </div>
-                  </div>
-                )}
+// ─── MAIN COMPONENT ────────────────────────────────────────────────────────────
 
-              </motion.div>
-            </AnimatePresence>
+export default function WorkingPapers() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const params = useParams<{ stepId?: string }>();
+
+  const stepSlug = params.stepId || "upload";
+  const currentStep = STEPS.findIndex(s => s.slug === stepSlug);
+  const stepIdx = Math.max(0, currentStep);
+
+  const goToStep = useCallback((n: number) => {
+    if (n >= 0 && n < STEPS.length) {
+      navigate(`/working-papers/${STEPS[n].slug}`);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [navigate]);
+
+  // ─ Files (in-memory only — not serializable) ─
+  const fsFilesRef = useRef<File[]>([]);
+  const stFilesRef = useRef<File[]>([]);
+  const [fsFilesList, setFsFilesList] = useState<File[]>([]);
+  const [stFilesList, setStFilesList] = useState<File[]>([]);
+
+  // ─ Session State ─
+  const [session, setSession] = useState<WPSession>(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return { ...getDefaultSession(), ...parsed };
+      }
+    } catch {}
+    return getDefaultSession();
+  });
+
+  function getDefaultSession(): WPSession {
+    return {
+      vars: { ...DEFAULT_VARS },
+      extractedData: null,
+      trialBalance: [],
+      glEntries: [],
+      glAccounts: [],
+      chartOfAccounts: [],
+      tbSummary: { is_balanced: false, total_debit: 0, total_credit: 0, gl_entries: 0, tb_accounts: 0 },
+      workingPapers: [],
+      selectedPapers: computeDefaultSelectedPapers({ ...DEFAULT_VARS }),
+      draftSavedAt: null,
+    };
+  }
+
+  // ─ Save Draft ─
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const toSave = { ...session, draftSavedAt: new Date().toISOString() };
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(toSave));
+      } catch {}
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [session]);
+
+  // ─ Loading States ─
+  const [extracting, setExtracting] = useState(false);
+  const [generatingTB, setGeneratingTB] = useState(false);
+  const [generatingWPs, setGeneratingWPs] = useState(false);
+  const [exporting, setExporting] = useState<string | null>(null);
+  const [wpGenProgress, setWpGenProgress] = useState(0);
+
+  // ─ Derived ─
+  const token = (user as any)?.token || "";
+
+  function computeDefaultSelectedPapers(v: VariableMatrix): string[] {
+    const selected: string[] = [];
+    for (const group of WP_INDEX_FULL) {
+      for (const p of group.papers) {
+        selected.push(p.code);
+      }
+    }
+    return selected;
+  }
+
+  // ─ HANDLER: Run AI Extraction ─
+  const handleExtract = useCallback(async () => {
+    const fsFiles = fsFilesRef.current;
+    const stFiles = stFilesRef.current;
+
+    if (fsFiles.length === 0) {
+      toast({ title: "No files", description: "Please upload Financial Statements first.", variant: "destructive" });
+      goToStep(0);
+      return;
+    }
+
+    setExtracting(true);
+
+    try {
+      // Step 1: Extract entity + financial data
+      const fd1 = new FormData();
+      [...fsFiles, ...stFiles].forEach(f => fd1.append("files", f));
+      fd1.append("entityName", session.vars.entityName);
+      fd1.append("financialYear", session.vars.yearEnd ? `Year ended ${session.vars.yearEnd}` : "");
+      fd1.append("engagementType", session.vars.engagementType);
+      fd1.append("classifications", JSON.stringify(
+        [...fsFiles.map(f => [f.name, "Financial Statements"]),
+         ...stFiles.map(f => [f.name, "Sales Tax Return"])
+        ].reduce((acc, [k, v]) => ({ ...acc, [k as string]: v }), {})
+      ));
+
+      const r1 = await fetch("/api/working-papers/extract-entity", {
+        method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd1,
+      });
+      if (!r1.ok) throw new Error(`Extraction failed: ${r1.status}`);
+      const extraction = await r1.json();
+
+      // Step 2: Full analysis (ISA 315 risk, materiality, ratios)
+      const fd2 = new FormData();
+      [...fsFiles, ...stFiles].forEach(f => fd2.append("files", f));
+      fd2.append("entityName", extraction.entity?.entity_name || session.vars.entityName);
+      fd2.append("financialYear", extraction.entity?.financial_year || session.vars.yearEnd);
+      fd2.append("engagementType", session.vars.engagementType);
+      fd2.append("instructions", `Framework: ${session.vars.framework}. Industry: ${session.vars.industry}. Materiality basis: ${session.vars.materialityBasis}. Performance materiality: ${session.vars.performanceMaterialityPct}%.`);
+
+      const r2 = await fetch("/api/working-papers/analyze", {
+        method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd2,
+      });
+      if (!r2.ok) throw new Error(`Analysis failed: ${r2.status}`);
+      const analysis = await r2.json();
+
+      // Build extractedData from both responses
+      const extractedData: ExtractedData = {
+        entity: { ...extraction.entity, ...analysis.entity },
+        financials: { ...extraction.financials, ...analysis.financials },
+        taxData: extraction.tax_data || {},
+        tbLines: extraction.tb_lines || [],
+        glSummary: extraction.gl_summary || [],
+        flags: [...(extraction.flags || []), ...(analysis.flags || [])],
+        documents_found: extraction.documents_found || [],
+        extractionLog: [
+          `Processed ${fsFiles.length} Financial Statement file(s)`,
+          `Processed ${stFiles.length} Sales Tax Return file(s)`,
+          `Entity identified: ${extraction.entity?.entity_name || "Unknown"}`,
+          `Framework: ${session.vars.framework}`,
+          `Financial year: ${extraction.entity?.financial_year || session.vars.yearEnd}`,
+          `Risk assessment: ${analysis.risk_assessment?.overall_risk || "Medium"}`,
+          `Materiality computed: ${analysis.materiality?.overall_materiality ? fmtPKR(analysis.materiality.overall_materiality) : "Pending"}`,
+          ...(analysis.ratios ? ["Financial ratios: " + Object.keys(analysis.ratios).length + " computed"] : []),
+        ],
+        analysis,
+        confidenceScores: extraction.confidence_scores || {},
+        assumptions: extraction.assumptions || analysis.assumptions || [],
+        missingData: extraction.missing_data || [],
+      };
+
+      // Auto-fill variables from extraction
+      const updatedVars: VariableMatrix = {
+        ...session.vars,
+        entityName: extractedData.entity?.entity_name || session.vars.entityName,
+        ntn: extractedData.entity?.ntn || session.vars.ntn,
+        strn: extractedData.entity?.strn || session.vars.strn,
+        legalForm: extractedData.entity?.legal_form || session.vars.legalForm,
+        industry: extractedData.entity?.industry || session.vars.industry,
+      };
+
+      setSession(s => ({ ...s, extractedData, vars: updatedVars }));
+      toast({ title: "AI Extraction Complete", description: "Financial data extracted and analysed." });
+
+    } catch (err: any) {
+      toast({ title: "Extraction failed", description: err.message, variant: "destructive" });
+      setExtracting(false);
+      return;
+    }
+
+    setExtracting(false);
+  }, [session.vars, token, toast, goToStep]);
+
+  // ─ HANDLER: Generate TB + GL ─
+  const handleGenerateTBGL = useCallback(async () => {
+    if (!session.extractedData) {
+      toast({ title: "Run extraction first", description: "Please complete Step 2 before generating the Trial Balance.", variant: "destructive" });
+      return;
+    }
+
+    setGeneratingTB(true);
+
+    try {
+      const fin = session.extractedData.financials || {};
+      const bsData = fin.bs_sections || [];
+      const plData = fin.pl_sections || [];
+
+      const body = {
+        entityName: session.vars.entityName,
+        industry: session.vars.industry,
+        financialYear: session.vars.yearEnd ? `Year ended ${session.vars.yearEnd}` : "Year ended June 30, 2024",
+        ntn: session.vars.ntn,
+        strn: session.vars.strn,
+        engagementType: session.vars.engagementType,
+        framework: session.vars.framework,
+        bsData: bsData.length ? bsData : [
+          { lines: [
+            { label: "Total Assets", cy: fin.total_assets || 0, py: fin.prior_year_total_assets || 0 },
+            { label: "Fixed Assets", cy: fin.fixed_assets || 0, py: 0 },
+            { label: "Inventory", cy: fin.inventory || 0, py: 0 },
+            { label: "Trade Receivables", cy: fin.trade_receivables || 0, py: 0 },
+            { label: "Cash & Bank", cy: fin.cash_and_bank || 0, py: 0 },
+            { label: "Total Liabilities", cy: fin.total_liabilities || 0, py: 0 },
+            { label: "Trade Payables", cy: fin.trade_payables || 0, py: 0 },
+            { label: "Equity", cy: fin.equity || 0, py: 0 },
+            { label: "Share Capital", cy: fin.share_capital || 0, py: 0 },
+            { label: "Retained Earnings", cy: fin.retained_earnings || 0, py: 0 },
+          ]}
+        ],
+        plData: plData.length ? plData : [
+          { lines: [
+            { label: "Revenue", cy: fin.revenue || 0, py: fin.prior_year_revenue || 0 },
+            { label: "Cost of Sales", cy: fin.cost_of_sales || 0, py: 0 },
+            { label: "Gross Profit", cy: fin.gross_profit || 0, py: 0 },
+            { label: "Operating Expenses", cy: fin.operating_expenses || 0, py: 0 },
+            { label: "Finance Cost", cy: fin.finance_cost || 0, py: 0 },
+            { label: "Net Profit", cy: fin.net_profit || 0, py: fin.prior_year_net_profit || 0 },
+            { label: "Tax Expense", cy: fin.tax_expense || 0, py: 0 },
+          ]}
+        ],
+      };
+
+      const res = await fetch("/api/working-papers/generate-gl-tb", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) throw new Error(`GL/TB generation failed: ${res.status}`);
+      const data = await res.json();
+
+      const tb: TBAccount[] = (data.trial_balance || []).map((a: any) => ({
+        account_code: a.account_code || "",
+        account_name: a.account_name || "",
+        fs_head: a.fs_head || "",
+        classification: a.classification || a.type || "",
+        debit_total: Number(a.debit_total) || 0,
+        credit_total: Number(a.credit_total) || 0,
+        balance_dr: Number(a.balance_dr) || 0,
+        balance_cr: Number(a.balance_cr) || 0,
+        fs_mapping: a.fs_mapping || "",
+        source: "Estimated" as DataSource,
+        confidence: 70,
+        notes: "",
+      }));
+
+      const glEntries: GLEntry[] = data.general_ledger || [];
+
+      // Build GL accounts from entries
+      const accountMap = new Map<string, GLAccount>();
+      for (const entry of glEntries) {
+        if (!accountMap.has(entry.account_code)) {
+          accountMap.set(entry.account_code, {
+            account_code: entry.account_code,
+            account_name: entry.account_name,
+            group: "",
+            type: "",
+            opening_balance: 0,
+            closing_balance: 0,
+            entries: [],
+            source: "Estimated",
+          });
+        }
+        accountMap.get(entry.account_code)!.entries.push(entry);
+      }
+
+      // Link COA data
+      for (const coa of (data.chart_of_accounts || [])) {
+        if (accountMap.has(coa.code)) {
+          const a = accountMap.get(coa.code)!;
+          a.group = coa.group || coa.sub_group || "";
+          a.type = coa.type || "";
+        }
+      }
+
+      const glAccounts = Array.from(accountMap.values());
+
+      setSession(s => ({
+        ...s,
+        trialBalance: tb,
+        glEntries,
+        glAccounts,
+        chartOfAccounts: data.chart_of_accounts || [],
+        tbSummary: {
+          is_balanced: data.summary?.is_balanced ?? Math.abs((data.summary?.total_debit || 0) - (data.summary?.total_credit || 0)) < 1,
+          total_debit: data.summary?.total_debit || 0,
+          total_credit: data.summary?.total_credit || 0,
+          gl_entries: data.summary?.gl_entries || glEntries.length,
+          tb_accounts: data.summary?.tb_accounts || tb.length,
+        },
+      }));
+
+      toast({ title: "Trial Balance Generated", description: `${tb.length} accounts · ${glEntries.length} GL entries` });
+
+    } catch (err: any) {
+      toast({ title: "Generation failed", description: err.message, variant: "destructive" });
+    }
+
+    setGeneratingTB(false);
+  }, [session, token, toast]);
+
+  // ─ HANDLER: Generate Working Papers ─
+  const handleGenerateWPs = useCallback(async () => {
+    if (!session.extractedData) {
+      toast({ title: "Run extraction first", variant: "destructive" });
+      return;
+    }
+
+    setGeneratingWPs(true);
+    setWpGenProgress(10);
+
+    try {
+      const analysis = session.extractedData.analysis || {};
+      const fin = session.extractedData.financials || {};
+      const v = session.vars;
+
+      const papersToGenerate = session.selectedPapers.filter(p => {
+        // Filter based on variable triggers
+        if (p.startsWith("F") && !v.salesTaxApplicable) return !["F3","F4"].includes(p);
+        if (p === "B8" && !v.relatedPartiesExist) return false;
+        if (p === "B9" && !v.itSystemReliance) return false;
+        if (["G1","G2","G3","G4"].includes(p) && v.auditApproach === "Substantive Only") return false;
+        if (p === "J1" && !v.eqcrRequired) return false;
+        if (p === "E5" && !v.hasInventory) return false;
+        if (p === "E8" && !v.hasIntangibles) return false;
+        if (p === "E9" && !v.hasInvestments) return false;
+        if (p === "E12" && !v.hasBorrowings) return false;
+        if (p === "E14" && !v.hasProvisions) return false;
+        if (p === "E15" && !v.hasContingentLiabilities) return false;
+        return true;
+      });
+
+      setWpGenProgress(20);
+
+      const res = await fetch("/api/working-papers/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          analysis,
+          selectedPapers: papersToGenerate,
+          // Entity variables
+          entityName: v.entityName,
+          industry: v.industry,
+          engagementType: v.engagementType,
+          financialYear: v.yearEnd ? `Year ended ${v.yearEnd}` : analysis.entity?.financial_year || "",
+          framework: v.framework,
+          listedStatus: v.listedStatus,
+          entityType: v.legalForm,
+          ntn: v.ntn,
+          strn: v.strn,
+          currency: v.currency,
+          periodStart: v.periodStart,
+          periodEnd: v.periodEnd,
+          // Team
+          preparer: v.preparer,
+          reviewer: v.reviewer,
+          approver: v.approver,
+          engagementPartner: v.engagementPartner,
+          firmName: "ANA & Co. Chartered Accountants",
+          // Flags
+          firstYearAudit: v.firstYearAudit,
+          eqcrRequired: v.eqcrRequired,
+          relatedPartyFlag: v.relatedPartiesExist || v.relatedPartyRisk,
+          estimatesFlag: v.significantEstimates,
+          litigationFlag: v.hasContingentLiabilities,
+          expertRequired: v.useOfExperts,
+          goingConcernFlag: v.goingConcernIssue,
+          // Tax
+          currentTaxApplicable: v.incomeTaxApplicable,
+          deferredTaxApplicable: v.deferredTaxApplicable,
+          whtExposure: v.whtApplicable,
+          salesTaxRegistered: v.salesTaxApplicable,
+          independenceConfirmed: true,
+          conflictCheck: true,
+          // Audit approach
+          samplingMethod: v.samplingMethod,
+          auditApproach: v.auditApproach,
+          // Financial data fallback
+          bsData: [{ lines: [
+            { label: "Total Assets", cy: fin.total_assets || 0, py: 0 },
+            { label: "Total Liabilities", cy: fin.total_liabilities || 0, py: 0 },
+            { label: "Equity", cy: fin.equity || 0, py: 0 },
+          ]}],
+          plData: [{ lines: [
+            { label: "Revenue", cy: fin.revenue || 0, py: fin.prior_year_revenue || 0 },
+            { label: "Net Profit", cy: fin.net_profit || 0, py: fin.prior_year_net_profit || 0 },
+          ]}],
+        }),
+      });
+
+      setWpGenProgress(60);
+
+      if (!res.ok) throw new Error(`Working papers generation failed: ${res.status}`);
+      const data = await res.json();
+
+      setWpGenProgress(90);
+
+      const wps: WPDoc[] = (data.working_papers || []).map((wp: any) => ({
+        ...wp,
+        status: "Draft" as const,
+        prepared_by: v.preparer || "Audit Senior",
+        reviewed_by: v.reviewer || "Audit Manager",
+        approved_by: v.approver || "Engagement Partner",
+        prepared_date: new Date().toLocaleDateString("en-PK"),
+        reviewed_date: "",
+        source: "Estimated" as DataSource,
+        isOpen: false,
+        isEditing: false,
+      }));
+
+      setSession(s => ({ ...s, workingPapers: wps }));
+      setWpGenProgress(100);
+      toast({ title: "Working Papers Generated", description: `${wps.length} ISA-compliant papers created.` });
+
+    } catch (err: any) {
+      toast({ title: "Generation failed", description: err.message, variant: "destructive" });
+    }
+
+    setGeneratingWPs(false);
+    setWpGenProgress(0);
+  }, [session, token, toast]);
+
+  // ─ HANDLER: Export ─
+  const handleExport = useCallback(async (fmt: string) => {
+    if (!session.extractedData && session.workingPapers.length === 0) {
+      toast({ title: "Nothing to export", variant: "destructive" });
+      return;
+    }
+
+    const doExport = async (format: string) => {
+      setExporting(format);
+      try {
+        const endpoint = format === "excel" ? "export-excel" : format === "docx" ? "export-docx" : "export-pdf";
+        const res = await fetch(`/api/working-papers/${endpoint}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            entityName: session.vars.entityName,
+            financialYear: session.vars.yearEnd ? `Year ended ${session.vars.yearEnd}` : "",
+            engagementType: session.vars.engagementType,
+            preparer: session.vars.preparer,
+            reviewer: session.vars.reviewer,
+            approver: session.vars.approver,
+            trialBalance: session.trialBalance,
+            generalLedger: session.glEntries,
+            workingPapers: session.workingPapers,
+            analysis: session.extractedData?.analysis || {},
+            bsData: [], plData: [],
+          }),
+        });
+
+        if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+        const blob = await res.blob();
+        const ext = format === "excel" ? "xlsx" : format === "docx" ? "docx" : "pdf";
+        const safeName = session.vars.entityName.replace(/[^a-z0-9]/gi, "_").toLowerCase() || "audit_file";
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = `${safeName}_working_papers.${ext}`; a.click();
+        URL.revokeObjectURL(url);
+        toast({ title: `${format.toUpperCase()} exported`, description: "Download started." });
+      } catch (err: any) {
+        toast({ title: "Export failed", description: err.message, variant: "destructive" });
+      }
+      setExporting(null);
+    };
+
+    if (fmt === "all") {
+      for (const f of ["excel","docx","pdf"]) await doExport(f);
+    } else {
+      await doExport(fmt);
+    }
+  }, [session, token, toast]);
+
+  // ─ Step transitions with side-effects ─
+  const handleStepContinue = useCallback(async (from: number) => {
+    if (from === 0) {
+      goToStep(1);
+    } else if (from === 1) {
+      goToStep(2);
+      if (!session.extractedData && !extracting) {
+        await handleExtract();
+      }
+    } else if (from === 2) {
+      goToStep(3);
+      if (session.trialBalance.length === 0 && !generatingTB) {
+        await handleGenerateTBGL();
+      }
+    } else if (from === 3) {
+      goToStep(4);
+    } else if (from === 4) {
+      goToStep(5);
+      if (session.workingPapers.length === 0 && !generatingWPs) {
+        await handleGenerateWPs();
+      }
+    } else if (from === 5) {
+      goToStep(6);
+    }
+  }, [goToStep, session, extracting, generatingTB, generatingWPs, handleExtract, handleGenerateTBGL, handleGenerateWPs]);
+
+  const updateVars = (v: VariableMatrix) => setSession(s => ({ ...s, vars: v, selectedPapers: computeDefaultSelectedPapers(v) }));
+  const updateTBAccounts = (accounts: TBAccount[]) => setSession(s => ({ ...s, trialBalance: accounts }));
+  const updatePaperStatus = (ref: string, status: "Draft" | "Review" | "Approved") => {
+    setSession(s => ({ ...s, workingPapers: s.workingPapers.map(p => p.ref === ref ? { ...p, status } : p) }));
+  };
+  const selectPaper = (code: string) => setSession(s => ({ ...s, selectedPapers: [...new Set([...s.selectedPapers, code])] }));
+  const unselectPaper = (code: string) => setSession(s => ({ ...s, selectedPapers: s.selectedPapers.filter(p => p !== code) }));
+
+  const handleRerunExtraction = async () => {
+    setSession(s => ({ ...s, extractedData: null }));
+    await handleExtract();
+  };
+
+  const handleRerunTBGL = async () => {
+    setSession(s => ({ ...s, trialBalance: [], glEntries: [], glAccounts: [] }));
+    await handleGenerateTBGL();
+  };
+
+  const handleRerunWPs = async () => {
+    setSession(s => ({ ...s, workingPapers: [] }));
+    await handleGenerateWPs();
+  };
+
+  // ─ Redirect /working-papers to /working-papers/upload ─
+  useEffect(() => {
+    if (!params.stepId) {
+      navigate("/working-papers/upload", { replace: true });
+    }
+  }, [params.stepId, navigate]);
+
+  // ─ Page title ─
+  const pageTitle = session.vars.entityName
+    ? `Working Papers — ${session.vars.entityName}`
+    : "AI Working Paper Generator";
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-1">
+            <h1 className="text-2xl font-bold text-slate-900">{pageTitle}</h1>
+            <div className="flex items-center gap-2">
+              {session.extractedData && (
+                <span className="text-xs text-green-600 bg-green-50 border border-green-200 px-2 py-1 rounded-full flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Data extracted
+                </span>
+              )}
+              {session.draftSavedAt && (
+                <span className="text-xs text-slate-400">Draft saved {new Date(session.draftSavedAt).toLocaleTimeString("en-PK", { hour: "2-digit", minute: "2-digit" })}</span>
+              )}
+              <Button variant="ghost" size="sm" className="gap-1 text-xs text-slate-500"
+                onClick={() => { if (confirm("Reset all data and start over?")) { setSession(getDefaultSession()); fsFilesRef.current = []; stFilesRef.current = []; setFsFilesList([]); setStFilesList([]); navigate("/working-papers/upload"); } }}>
+                <RotateCcw className="w-3.5 h-3.5" /> Reset
+              </Button>
+            </div>
+          </div>
+          <p className="text-sm text-slate-500">Upload Financial Statements & Sales Tax Returns — AI generates TB, GL, and all working papers automatically</p>
+        </div>
+
+        {/* Step Indicator */}
+        <StepIndicator currentStep={stepIdx} />
+
+        {/* Step Content */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+
+          {/* STEP 0: Upload */}
+          {stepIdx === 0 && (
+            <UploadStep
+              fsFiles={fsFilesList}
+              stFiles={stFilesList}
+              onFsAdd={files => { fsFilesRef.current = [...fsFilesRef.current, ...files]; setFsFilesList([...fsFilesRef.current]); }}
+              onStAdd={files => { stFilesRef.current = [...stFilesRef.current, ...files]; setStFilesList([...stFilesRef.current]); }}
+              onFsRemove={i => { fsFilesRef.current.splice(i, 1); setFsFilesList([...fsFilesRef.current]); }}
+              onStRemove={i => { stFilesRef.current.splice(i, 1); setStFilesList([...stFilesRef.current]); }}
+              onContinue={() => handleStepContinue(0)}
+            />
+          )}
+
+          {/* STEP 1: Variables */}
+          {stepIdx === 1 && (
+            <VariablesStep
+              vars={session.vars}
+              onChange={updateVars}
+              onContinue={() => handleStepContinue(1)}
+              onBack={() => goToStep(0)}
+            />
+          )}
+
+          {/* STEP 2: Extraction */}
+          {stepIdx === 2 && (
+            extracting ? (
+              <div className="text-center py-16">
+                <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-500" />
+                <p className="text-slate-600 font-medium">Running AI Extraction...</p>
+                <p className="text-sm text-slate-400 mt-1">OCR reading files · Extracting financial data · Running ISA 315 analysis</p>
+                <p className="text-xs text-slate-400 mt-1">This takes 30-60 seconds depending on document complexity</p>
+              </div>
+            ) : (
+              <ExtractionStep
+                extractedData={session.extractedData}
+                vars={session.vars}
+                onContinue={() => handleStepContinue(2)}
+                onBack={() => goToStep(1)}
+                onRerun={handleRerunExtraction}
+              />
+            )
+          )}
+
+          {/* STEP 3: Trial Balance */}
+          {stepIdx === 3 && (
+            generatingTB ? (
+              <div className="text-center py-16">
+                <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-500" />
+                <p className="text-slate-600 font-medium">Generating Trial Balance & General Ledger...</p>
+                <p className="text-sm text-slate-400 mt-1">Building 80–100 journal entries with Pakistan COA coding</p>
+              </div>
+            ) : (
+              <TrialBalanceStep
+                accounts={session.trialBalance}
+                summary={session.tbSummary}
+                onContinue={() => handleStepContinue(3)}
+                onBack={() => goToStep(2)}
+                onRegenerate={handleRerunTBGL}
+                onAccountChange={updateTBAccounts}
+              />
+            )
+          )}
+
+          {/* STEP 4: General Ledger */}
+          {stepIdx === 4 && (
+            <GeneralLedgerStep
+              glAccounts={session.glAccounts}
+              glEntries={session.glEntries}
+              onContinue={() => handleStepContinue(4)}
+              onBack={() => goToStep(3)}
+            />
+          )}
+
+          {/* STEP 5: Working Papers */}
+          {stepIdx === 5 && (
+            generatingWPs ? (
+              <div className="text-center py-16">
+                <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-500" />
+                <p className="text-slate-600 font-medium">Generating Working Papers...</p>
+                <p className="text-sm text-slate-400 mt-1">Writing ISA-compliant audit documentation for {session.selectedPapers.length} papers</p>
+                {wpGenProgress > 0 && <Progress value={wpGenProgress} className="h-2 max-w-xs mx-auto mt-4" />}
+                <p className="text-xs text-slate-400 mt-2">This may take 2-4 minutes for a full audit file</p>
+              </div>
+            ) : (
+              <WorkingPapersStep
+                papers={session.workingPapers}
+                selectedPapers={session.selectedPapers}
+                vars={session.vars}
+                onContinue={() => handleStepContinue(5)}
+                onBack={() => goToStep(4)}
+                onRegenerate={handleRerunWPs}
+                onPaperStatusChange={updatePaperStatus}
+                onSelectPaper={selectPaper}
+                onUnselectPaper={unselectPaper}
+              />
+            )
+          )}
+
+          {/* STEP 6: Export */}
+          {stepIdx === 6 && (
+            <ExportStep
+              onBack={() => goToStep(5)}
+              onExport={handleExport}
+              exporting={exporting}
+              session={session}
+            />
+          )}
         </div>
       </div>
     </div>

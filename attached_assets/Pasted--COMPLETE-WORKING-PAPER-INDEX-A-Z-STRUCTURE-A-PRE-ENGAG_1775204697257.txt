@@ -1,0 +1,133 @@
+🔷 COMPLETE WORKING PAPER INDEX (A–Z STRUCTURE)
+🔶 A. PRE-ENGAGEMENT & ACCEPTANCE FILE
+WP Code	Working Paper	Trigger	Standard
+A1	Client Acceptance Checklist	New client	ISA 210, ISQM 1
+A2	Continuance Evaluation	Existing client	ISQM 1
+A3	Engagement Letter	All	ISA 210
+A4	Independence Declaration	All	IESBA Code
+A5	Conflict of Interest Assessment	All	IESBA
+A6	Client Risk Profiling	High-risk entity	ISA 220
+A7	AML / KYC Documentation	Regulated entities	Local laws
+A8	Terms of Engagement Approval	All	ISA 210
+🔶 B. PLANNING FILE
+WP Code	Working Paper	Trigger	Standard
+B1	Understanding the Entity & Environment	All	ISA 315
+B2	Industry Analysis	All	ISA 315
+B3	Business Model & Revenue Streams	All	ISA 315
+B4	Internal Control Understanding	All	ISA 315
+B5	Risk Assessment Matrix	All	ISA 315
+B6	Fraud Risk Assessment	All	ISA 240
+B7	Laws & Regulations Compliance Review	All	ISA 250
+B8	Related Party Assessment	If applicable	ISA 550
+B9	IT Environment Assessment	If applicable	ISA 315
+B10	Going Concern Assessment (Initial)	All	ISA 570
+B11	Engagement Strategy	All	ISA 300
+B12	Audit Plan	All	ISA 300
+B13	Materiality Calculation	All	ISA 320
+B14	Performance Materiality	All	ISA 320
+B15	Sampling Plan	All	ISA 530
+B16	Analytical Procedures (Planning)	All	ISA 520
+🔶 C. TRIAL BALANCE & FINANCIALS
+WP Code	Working Paper	Trigger	Standard
+C1	Extracted Financial Statements	Upload	ISA 500
+C2	AI Generated Trial Balance	No TB uploaded	ISA 500
+C3	Trial Balance (Final)	All	ISA 500
+C4	TB vs FS Reconciliation	All	ISA 500
+C5	Prior Year vs Current Year Comparison	All	ISA 510
+C6	Lead Schedules (All Heads)	All	ISA 330
+C7	Chart of Accounts Mapping	AI process	ISA 315
+🔶 D. GENERAL LEDGER & DATA ANALYTICS
+WP Code	Working Paper	Trigger	Standard
+D1	AI Generated General Ledger	No GL uploaded	ISA 500
+D2	GL Summary by Account	All	ISA 500
+D3	Transaction Trend Analysis	All	ISA 520
+D4	Journal Entry Testing	All	ISA 240
+D5	Unusual Transactions Identification	All	ISA 240
+D6	Cut-off Testing	All	ISA 330
+🔶 E. SUBSTANTIVE WORKING PAPERS (BY AREA)
+🔹 Assets
+WP Code	Working Paper	Standard
+E1	Cash & Bank Testing	ISA 505
+E2	Bank Reconciliation	ISA 500
+E3	Receivables Aging & Testing	ISA 330
+E4	Debtor Confirmations	ISA 505
+E5	Inventory Observation & Valuation	ISA 501
+E6	Fixed Asset Register Testing	ISA 540
+E7	Depreciation Testing	IAS 16
+E8	Intangible Asset Testing	IAS 38
+E9	Investment Valuation	IFRS 9
+🔹 Liabilities
+WP Code	Working Paper	Standard
+E10	Payables Testing	ISA 330
+E11	Creditor Confirmations	ISA 505
+E12	Borrowings Verification	ISA 540
+E13	Interest Calculation	ISA 540
+E14	Provisions & Estimates	IAS 37
+E15	Contingent Liabilities Review	ISA 501
+🔹 Equity
+WP Code	Working Paper	Standard
+E16	Share Capital Verification	Companies Act
+E17	Reserves & Retained Earnings	IAS 1
+🔹 Income Statement
+WP Code	Working Paper	Standard
+E18	Revenue Testing	ISA 240
+E19	Cost of Sales Testing	ISA 330
+E20	Expense Testing	ISA 330
+E21	Analytical Procedures	ISA 520
+🔶 F. TAXATION WORKING PAPERS
+WP Code	Working Paper	Standard
+F1	Income Tax Computation	ITO 2001
+F2	Deferred Tax Calculation	IAS 12
+F3	Sales Tax Reconciliation	Sales Tax Act
+F4	Output vs Input Tax Analysis	—
+F5	Withholding Tax Compliance	ITO
+F6	Tax Exposure Assessment	—
+🔶 G. TEST OF CONTROLS (IF APPLICABLE)
+WP Code	Working Paper	Standard
+G1	Control Design Evaluation	ISA 315
+G2	Control Operating Effectiveness	ISA 330
+G3	Walkthrough Documentation	ISA 315
+G4	Control Deficiency Log	ISA 265
+🔶 H. COMPLETION & FINALIZATION FILE
+WP Code	Working Paper	Standard
+H1	Misstatements Summary	ISA 450
+H2	Adjusting Entries	ISA 450
+H3	Final Analytical Review	ISA 520
+H4	Going Concern Final Assessment	ISA 570
+H5	Subsequent Events Review	ISA 560
+H6	Management Representation Letter	ISA 580
+H7	Disclosure Checklist	IFRS / Companies Act
+H8	Audit Conclusion Memo	ISA 700
+🔶 I. REPORTING FILE
+WP Code	Working Paper	Standard
+I1	Draft Audit Report	ISA 700
+I2	Modified Opinion (if any)	ISA 705
+I3	Emphasis of Matter	ISA 706
+I4	Key Audit Matters	ISA 701
+I5	Other Information Review	ISA 720
+🔶 J. QUALITY CONTROL & REVIEW FILE
+WP Code	Working Paper	Standard
+J1	Engagement Quality Review Checklist	ISQM 2
+J2	Partner Review Notes	ISA 220
+J3	Manager Review Notes	ISA 220
+J4	Documentation Completion Checklist	ISA 230
+🔶 K. CLIENT COMMUNICATION FILE
+WP Code	Working Paper	Standard
+K1	Management Letter	ISA 265
+K2	Internal Control Weakness Letter	ISA 265
+K3	Communication with TCWG	ISA 260
+🔶 L. INSPECTION / QCR FILE
+WP Code	Working Paper	Standard
+L1	QCR Checklist	ICAP / ISQM
+L2	Regulatory Compliance Checklist	SECP
+L3	Audit File Index	ISA 230
+L4	Archiving Documentation	ISA 230
+🔷 AI-SPECIFIC WORKING PAPERS (IMPORTANT FOR YOUR SYSTEM)
+WP Code	Working Paper
+AI1	Data Extraction Log (OCR Output)
+AI2	Assumption Register
+AI3	TB Reconstruction Logic
+AI4	GL Reconstruction Logic
+AI5	Risk Flag Summary
+AI6	Missing Data Report
+AI7	AI Confidence Score Sheet

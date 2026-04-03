@@ -934,17 +934,19 @@ router.post("/generate", async (req: Request, res: Response) => {
   const risks = analysis.risk_assessment || {};
 
   const allPapers = [
-    "A1", "A2", "A3", "A4", "A5", "A6",
-    "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10",
-    "C1", "C2", "C3", "C4", "C5", "C6",
-    "D1", "D2", "D3", "D4", "D5",
-    "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10",
+    "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8",
+    "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10", "B11", "B12", "B13", "B14", "B15", "B16",
+    "C1", "C2", "C3", "C4", "C5", "C6", "C7",
+    "D1", "D2", "D3", "D4", "D5", "D6",
+    "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13", "E14", "E15", "E16", "E17", "E18", "E19", "E20", "E21",
     "F1", "F2", "F3", "F4", "F5", "F6",
     "G1", "G2", "G3", "G4", "G5", "G6", "G7",
     "H1", "H2", "H3", "H4", "H5",
     "I1", "I2", "I3", "I4",
     "J1", "J2", "J3", "J4", "J5",
     "K1", "K2", "K3",
+    "L1", "L2", "L3", "L4",
+    "AI1", "AI2", "AI3", "AI4", "AI5", "AI6", "AI7",
   ];
   const papersToGenerate = selectedPapers?.length > 0 ? selectedPapers : allPapers;
 
@@ -1016,6 +1018,17 @@ router.post("/generate", async (req: Request, res: Response) => {
     "K1": { title: "Signed Audit Opinion", section: "Final Output & Archive", isa: "ISA 700, ISA 720", description: "Final signed audit report with all required elements." },
     "K2": { title: "Engagement Completion & Close", section: "Final Output & Archive", isa: "ISA 230, ISQM 1", description: "Engagement completion procedures, final partner review, and close." },
     "K3": { title: "Archive & Retention", section: "Final Output & Archive", isa: "ISA 230", description: "File archival per ISA 230 with retention schedule and access controls." },
+    "L1": { title: "QCR Checklist", section: "Inspection / QCR File", isa: "ICAP / ISQM 1", description: "Engagement quality review checklist per ICAP QCR requirements." },
+    "L2": { title: "Regulatory Compliance Checklist", section: "Inspection / QCR File", isa: "SECP / Companies Act 2017", description: "SECP regulatory compliance checklist for listed / regulated entities." },
+    "L3": { title: "Audit File Index", section: "Inspection / QCR File", isa: "ISA 230", description: "Complete index of audit file with WP references, preparer, and dates." },
+    "L4": { title: "Archiving Documentation", section: "Inspection / QCR File", isa: "ISA 230", description: "File archiving procedures, assembly date, 60-day locking, and access controls." },
+    "AI1": { title: "Data Extraction Log (OCR Output)", section: "AI Working Paper Controls", isa: "ISA 230, AI Process", description: "Log of all data extracted by AI OCR from uploaded documents, with confidence scores." },
+    "AI2": { title: "Assumption Register", section: "AI Working Paper Controls", isa: "AI Process", description: "Register of all AI assumptions made during TB reconstruction, GL estimation, and analysis." },
+    "AI3": { title: "TB Reconstruction Logic", section: "AI Working Paper Controls", isa: "AI Process", description: "Detailed logic and methodology used by AI to construct the Trial Balance from FS data." },
+    "AI4": { title: "GL Reconstruction Logic", section: "AI Working Paper Controls", isa: "AI Process", description: "Detailed logic and methodology used by AI to reconstruct General Ledger transaction history." },
+    "AI5": { title: "Risk Flag Summary", section: "AI Working Paper Controls", isa: "AI Process, ISA 315", description: "Summary of all risk flags identified by AI during data extraction and analysis." },
+    "AI6": { title: "Missing Data Report", section: "AI Working Paper Controls", isa: "AI Process", description: "Report of data items that could not be extracted and AI's handling approach." },
+    "AI7": { title: "AI Confidence Score Sheet", section: "AI Working Paper Controls", isa: "AI Process", description: "Confidence scores for all AI-generated values: Extracted / Derived / Estimated categories." },
   };
 
   const ap = analysis.analytical_procedures || {};
@@ -1131,7 +1144,7 @@ Return JSON: { "working_papers": [...] }`;
     (papersToGenerate as string[]).filter((p: string) => /^[A-D]/.test(p)),
     (papersToGenerate as string[]).filter((p: string) => /^E/.test(p)),
     (papersToGenerate as string[]).filter((p: string) => /^[F-H]/.test(p)),
-    (papersToGenerate as string[]).filter((p: string) => /^[I-K]/.test(p)),
+    (papersToGenerate as string[]).filter((p: string) => /^[I-L]/.test(p) || /^AI/.test(p)),
   ];
   for (const bg of batchGroups) {
     if (bg.length > 0) batches.push(bg);

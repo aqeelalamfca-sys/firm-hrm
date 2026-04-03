@@ -1,0 +1,144 @@
+Build a production-grade “AI Working Paper Generator” for statutory audit engagements.
+
+Core objective:
+The user will upload only:
+1) Financial Statements
+2) Sales Tax Returns
+3) Manual input variables
+
+Everything else must be done by AI automatically, step by step.
+
+Required workflow:
+Step 1 — Upload
+- Allow upload of PDF, scanned PDF, image, and Excel files for:
+  - Financial Statements
+  - Sales Tax Returns
+- Use OCR where needed
+- Extract all readable data from uploaded files
+- Store extracted raw text + structured values
+
+Step 2 — Variable Input
+- Show a clean variable input form for only key engagement variables
+- Variables must be editable by user before generation
+- Include dropdown / checkbox / text fields as relevant
+- Example variables:
+  - Client name
+  - Reporting period / year end
+  - Entity type
+  - Legal form
+  - Industry
+  - Audit framework
+  - Financial reporting framework
+  - Listed / unlisted
+  - New client / existing client
+  - Sales tax applicable yes/no
+  - Branches / locations
+  - Related parties yes/no
+  - Inventory yes/no
+  - Fixed assets yes/no
+  - Borrowings yes/no
+  - Receivables / payables material yes/no
+  - Going concern concern yes/no
+  - Fraud risk indicators yes/no
+  - Any other key variables needed to trigger working papers
+
+Step 3 — AI Extraction and Analysis
+After upload + variable selection, AI must automatically:
+- Read complete financial statements
+- Read complete sales tax returns
+- Extract year-wise and note-wise figures
+- Identify statement of financial position, profit and loss, equity, cash flow, notes
+- Extract tax-related values from sales tax returns
+- Detect missing or inconsistent information
+- Map figures into structured audit data
+
+Step 4 — AI Auto-Generate Trial Balance
+AI must generate a draft Trial Balance from uploaded financial statements and extracted data:
+- Account head
+- Account code (AI-generated if missing)
+- Debit
+- Credit
+- Closing balance
+- Grouping / lead schedule mapping
+- Flag assumptions clearly where exact TB is not available
+
+Step 5 — AI Auto-Generate General Ledger
+AI must generate a draft General Ledger from available uploaded data and accounting logic:
+- Ledger by account head
+- Opening balance
+- Transactions / movement reconstruction where possible
+- Closing balance
+- Cross-link with TB
+- Clearly mark AI-estimated / reconstructed items
+- Maintain transparency audit trail of assumptions
+
+Step 6 — AI Generate Working Papers
+Based on uploaded files + variables + extracted data, generate complete working papers step by step, including at minimum:
+- Engagement setup / client profile
+- Planning file
+- Understanding the entity
+- Risk assessment
+- Materiality and performance materiality
+- Analytical procedures
+- Lead schedules
+- TB and FS mapping
+- Assertions by area
+- Sales tax review working papers
+- Substantive procedures
+- Test of details templates
+- Test of controls templates where triggered
+- Sampling sheets
+- Disclosure checklist
+- Completion and finalization papers
+- Conclusion and reviewer notes sections
+
+Step 7 — Output Rules
+Generate outputs in a structured and review-ready format:
+- TB
+- GL
+- Working papers
+- All papers linked to extracted figures and selected variables
+- Show source references from uploaded documents
+- Show assumptions separately
+- Mark missing support / exceptions / risk flags
+- Make all output editable before final export
+
+Critical logic:
+- User should NOT be required to upload TB or GL separately
+- User uploads Financial Statements and Sales Tax Returns only
+- User inputs only key variables
+- AI performs all remaining tasks automatically
+- AI must proceed in sequence and not skip steps
+- AI must show progress stage-by-stage
+- AI must preserve traceability from uploaded document → extracted data → TB/GL → working papers
+
+UI requirements:
+- Very simple step-based interface
+- Step 1: Upload Financial Statements + Sales Tax Returns
+- Step 2: Input Variables
+- Step 3: AI Processing Preview
+- Step 4: Review TB
+- Step 5: Review GL
+- Step 6: Review Working Papers
+- Step 7: Export
+
+Technical requirements:
+- OCR for scanned files
+- Structured extraction engine
+- AI reasoning layer for mapping and reconstruction
+- Clear confidence flags
+- Editable tables
+- Save draft and resume
+- Error handling for incomplete uploads
+- Full audit trail of AI actions
+
+Important compliance rule:
+- Never present guessed data as confirmed data
+- All AI-created TB/GL lines must be marked as:
+  - Extracted
+  - Derived
+  - Estimated
+  - User-confirmed
+
+Final expected result:
+A complete AI-driven working paper generator where the user only uploads Financial Statements and Sales Tax Returns, enters a few variables, and the system automatically generates draft Trial Balance, draft General Ledger, and complete working papers step by step.

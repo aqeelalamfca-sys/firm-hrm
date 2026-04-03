@@ -1,0 +1,105 @@
+OBJECTIVE:
+Completely overwrite the existing Working Paper Generator and rebuild a new AI-driven system based only on:
+1) Uploaded Financial Statements + Sales Tax Returns
+2) User-selected Variables
+3) AI-generated TB, GL, and Working Papers
+
+STEP 1 — REMOVE EXISTING LOGIC
+- Delete all old working paper flows, hardcoded templates, duplicate buttons, and manual TB/GL dependencies
+- Remove any requirement for user-uploaded TB or GL
+- Clean UI to a strict step-based flow
+
+STEP 2 — DEFINE CORE DATA STRUCTURE
+- Create central JSON schema:
+  {
+    variables: {},
+    extracted_data: {},
+    trial_balance: {},
+    general_ledger: {},
+    working_papers: {}
+  }
+
+STEP 3 — BUILD STEP-BASED UI
+- Step 1: Upload (Financial Statements + Sales Tax Returns only)
+- Step 2: Variables Form (editable, dropdown-based)
+- Step 3: AI Extraction Preview
+- Step 4: Trial Balance (AI-generated, editable)
+- Step 5: General Ledger (AI-generated, editable)
+- Step 6: Working Papers (auto-generated, structured)
+- Step 7: Export
+
+STEP 4 — VARIABLE ENGINE
+- Implement full variable matrix
+- Each variable must:
+  - Trigger working papers
+  - Control audit procedures
+  - Influence risk and materiality
+- Store variables in structured JSON
+
+STEP 5 — AI EXTRACTION ENGINE
+- Apply OCR + parsing on uploaded files
+- Extract:
+  - FS line items
+  - Notes
+  - Tax data
+- Map extracted data into structured format
+- Flag missing/inconsistent data
+
+STEP 6 — TB GENERATION ENGINE
+- Generate Trial Balance from extracted FS
+- Auto-create account codes and groupings
+- Tag each line as:
+  - Extracted / Derived / Estimated
+- Link TB to FS
+
+STEP 7 — GL GENERATION ENGINE
+- Reconstruct General Ledger using:
+  - Extracted data
+  - Accounting logic
+- Show movement, opening, closing balances
+- Mark AI assumptions clearly
+
+STEP 8 — WORKING PAPER ENGINE
+- Build full A–L working paper structure
+- Auto-trigger based on variables
+- Each WP must include:
+  - Objective
+  - Procedure
+  - Source (linked to FS/TB/GL)
+  - Result
+  - Conclusion
+- Auto-populate with AI analysis
+
+STEP 9 — AI CONTROL LAYER
+- Maintain:
+  - Assumption Register
+  - Data Extraction Log
+  - Risk Flags
+  - Confidence Score
+- Never treat estimated data as confirmed
+
+STEP 10 — LINKING & TRACEABILITY
+- Ensure full linkage:
+  FS → Extracted Data → TB → GL → Working Papers
+- Enable click-through references
+
+STEP 11 — REVIEW & EDIT CONTROL
+- Make all outputs editable
+- Add:
+  - Prepared by
+  - Reviewed by
+  - Approved by
+  - Time stamps
+
+STEP 12 — EXPORT ENGINE
+- Generate:
+  - Excel (TB, analytics)
+  - Word (working papers)
+  - PDF (final file)
+- Merge into a complete audit file
+
+FINAL RULES:
+- User inputs only FS + Sales Tax + Variables
+- AI performs all remaining tasks
+- No broken flow, no duplication
+- Fully ISA-compliant, Pakistan-ready

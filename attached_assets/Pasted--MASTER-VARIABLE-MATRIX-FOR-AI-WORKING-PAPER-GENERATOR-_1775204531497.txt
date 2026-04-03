@@ -1,0 +1,117 @@
+🔷 MASTER VARIABLE MATRIX (FOR AI WORKING PAPER GENERATOR)
+A. ENGAGEMENT PROFILE VARIABLES
+Variable Name	Type	Options	Mandatory	Standard Ref
+Engagement Type	Dropdown	Statutory Audit, Review, Agreed Procedures, Compilation	Yes	ISA 200, 210
+Engagement Year End	Date	—	Yes	ISA 700
+Reporting Period	Date Range	—	Yes	ISA 700
+First Year Audit	Yes/No	—	Yes	ISA 510
+Recurring Engagement	Yes/No	—	Yes	ISQM 1
+Group Audit	Yes/No	—	Optional	ISA 600
+Component Auditor Involved	Yes/No	—	Optional	ISA 600
+Engagement Partner	Text	—	Yes	ISA 220
+EQCR Required	Yes/No	—	Yes	ISQM 2
+Preparer / Reviewer / Approver	Text	—	Yes	ISA 230
+B. ENTITY PROFILE VARIABLES
+Variable Name	Type	Options	Mandatory	Standard Ref
+Entity Name	Text	—	Yes	—
+Legal Form	Dropdown	Company, SMC, LLP, Partnership, AOP, Sole Proprietor, NGO, NPO, Trust	Yes	Companies Act 2017
+Incorporation Status	Dropdown	SECP Registered, Unregistered	Yes	Companies Act
+NTN	Text	—	Yes	FBR
+STRN	Text	—	Optional	Sales Tax Act
+Listed Status	Dropdown	Listed, Unlisted	Yes	ISA 700
+Public Interest Entity (PIE)	Yes/No	—	Yes	ICAP
+Industry	Dropdown	Manufacturing, Trading, Services, Financial, NGO, Other	Yes	ISA 315
+Number of Locations	Numeric	—	Optional	ISA 315
+Branch Operations	Yes/No	—	Optional	ISA 600
+Foreign Operations	Yes/No	—	Optional	ISA 600
+Related Parties Exist	Yes/No	—	Yes	ISA 550
+C. FINANCIAL REPORTING VARIABLES
+Variable Name	Type	Options	Mandatory	Standard Ref
+Financial Reporting Framework	Dropdown	IFRS, IFRS for SMEs, Local GAAP	Yes	ISA 200
+Functional Currency	Dropdown	PKR, USD, AED, etc.	Yes	IAS 21
+Books Maintained	Yes/No	—	Yes	ISA 315
+Accounting Software	Text	SAP, Oracle, Excel, Manual	Optional	ISA 315
+Trial Balance Available	Yes/No	—	No (AI generates if No)	ISA 500
+General Ledger Available	Yes/No	—	No	ISA 500
+Prior Year FS Available	Yes/No	—	Yes	ISA 510
+Audit Adjustments Expected	Yes/No	—	Optional	ISA 450
+D. TAX & REGULATORY VARIABLES
+Variable Name	Type	Options	Mandatory	Standard Ref
+Income Tax Applicable	Yes/No	—	Yes	Income Tax Ordinance
+Sales Tax Applicable	Yes/No	—	Yes	Sales Tax Act
+Provincial Sales Tax	Dropdown	PRA, SRB, KPRA, BRA, None	Optional	Provincial Laws
+FED Applicable	Yes/No	—	Optional	FED Act
+Withholding Tax Applicable	Yes/No	—	Yes	ITO
+Tax Audit Exposure	Yes/No	—	Optional	FBR
+Deferred Tax Applicable	Yes/No	—	Yes	IAS 12
+E. FINANCIAL STATEMENT COMPONENT VARIABLES (DRIVERS OF TB/GL & WPs)
+Assets
+Variable	Type	Mandatory	Ref
+Cash & Bank	Yes/No	Yes	ISA 500
+Receivables	Yes/No	Yes	ISA 330
+Inventory	Yes/No	Yes	ISA 501
+Fixed Assets	Yes/No	Yes	ISA 540
+Intangible Assets	Yes/No	Optional	IAS 38
+Investments	Yes/No	Optional	IFRS 9
+Loans & Advances	Yes/No	Optional	ISA 540
+Liabilities
+Variable	Type	Mandatory	Ref
+Payables	Yes/No	Yes	ISA 330
+Borrowings	Yes/No	Yes	ISA 540
+Lease Liabilities	Yes/No	Optional	IFRS 16
+Provisions	Yes/No	Yes	IAS 37
+Contingent Liabilities	Yes/No	Yes	ISA 501
+Equity
+Variable	Type	Mandatory	Ref
+Share Capital	Yes/No	Yes	Companies Act
+Reserves	Yes/No	Yes	IAS 1
+Retained Earnings	Yes/No	Yes	IAS 1
+Income Statement
+Variable	Type	Mandatory	Ref
+Revenue Streams	Dropdown	Single / Multiple	Yes
+Cost of Sales	Yes/No	Yes	ISA 330
+Operating Expenses	Yes/No	Yes	ISA 330
+Finance Cost	Yes/No	Optional	IAS 23
+Other Income	Yes/No	Optional	ISA 520
+F. RISK ASSESSMENT VARIABLES (DRIVES ISA 315 + 330)
+Variable Name	Type	Mandatory	Ref
+Fraud Risk Indicators	Yes/No	Yes	ISA 240
+Going Concern Issue	Yes/No	Yes	ISA 570
+Significant Estimates	Yes/No	Yes	ISA 540
+Complex Transactions	Yes/No	Optional	ISA 315
+Related Party Risk	Yes/No	Yes	ISA 550
+Revenue Recognition Risk	Yes/No	Yes	ISA 240
+Internal Control Strength	Dropdown	Strong, Moderate, Weak	Yes
+IT System Reliance	Yes/No	Optional	ISA 315
+Manual Accounting	Yes/No	Optional	ISA 315
+G. AUDIT APPROACH VARIABLES (DRIVES PROCEDURES)
+Variable Name	Type	Mandatory	Ref
+Audit Approach	Dropdown	Substantive, Controls + Substantive	Yes
+Sampling Method	Dropdown	Random, Judgmental, Systematic	Yes
+Materiality Basis	Dropdown	Revenue, Assets, Profit	Yes
+Performance Materiality %	Numeric	Yes	ISA 320
+Use of Experts	Yes/No	Optional	ISA 620
+External Confirmations Required	Yes/No	Yes	ISA 505
+H. SALES TAX DATA VARIABLES (FOR AUTO ANALYSIS)
+Variable Name	Type	Mandatory	Ref
+Sales Tax Period	Date Range	Yes	Sales Tax Act
+Output Tax	Numeric	Yes	—
+Input Tax	Numeric	Yes	—
+Adjustments	Numeric	Optional	—
+Refund Claimed	Yes/No	Optional	—
+Sales Tax Returns Uploaded	Yes/No	Yes	—
+I. DOCUMENT AVAILABILITY VARIABLES (AI LOGIC CONTROL)
+Variable Name	Type	Mandatory
+Financial Statements Uploaded	Yes/No	Yes
+Sales Tax Returns Uploaded	Yes/No	Yes
+Bank Statements Available	Yes/No	Optional
+Invoices Available	Yes/No	Optional
+Contracts Available	Yes/No	Optional
+Prior Year Working Papers	Yes/No	Optional
+J. OUTPUT CONTROL VARIABLES
+Variable Name	Type	Mandatory
+Generate Trial Balance	Yes/No	Yes
+Generate General Ledger	Yes/No	Yes
+Generate Working Papers	Yes/No	Yes
+Detail Level	Dropdown	Summary / Detailed / Full Audit File
+Output Format	Dropdown	Word, PDF, Excel

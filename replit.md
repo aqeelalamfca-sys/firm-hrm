@@ -32,35 +32,24 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 
 **Admin Credentials (seeded):** `admin@calfirm.com` / `Admin@123` (role: `super_admin`). Password hashed as `SHA256(password + "hrm_salt_2024")`. DB column is `password_hash`; role enum values: `super_admin`, `hr_admin`, `finance_officer`, `manager`, `employee`, `partner`, `trainee`.
 
-**Audit Working Paper Generator (A-K Code System):**
-- Frontend: `artifacts/hrm-system/src/pages/working-papers.tsx` (~3370 lines)
-- Backend: `artifacts/api-server/src/routes/working-papers.ts` (~2280 lines)
-- 5-step wizard: Upload (0) → Configure (1) → Analyse (2) → Generate/Review (3) → Export (4)
-- **Bug fixes applied**: `handleAnalyze` stays on Step 2; `handleGenerate` stays on Step 3; `salesTaxRows` in all payloads; xlsx binary parsing; `URL.revokeObjectURL()` on all exports; full 50+ state reset on "Start New Engagement".
-- **Smart Defaults Engine**: `applySmartDefaults()` — auto-fills June year-end, deadlines, risk flags, framework, tax flags, sales tax period based on current date. Exclusions: entityName, NTN, SECP, address, firm, team. Auto-called after upload extraction; also available via "Apply Smart Defaults" button in Configure hero.
-- **File Classification Dropdown**: Each uploaded file has a "Classify" badge users can click to assign document type (10 types). Classifications override auto-classify in AI extraction/analysis.
-- **localStorage Draft Persistence**: Key `ana_wp_draft_v2`; saves 1.5s debounce; restored on mount with green banner; cleared on "Start New Engagement".
-- **Stale Data Warning**: `configChangedAfterAnalysis` flag triggers amber banner in Analyse step with "Re-run Analysis" button when config/files change after analysis.
-- **WP Phase Selection Panel**: Phase checkboxes A-K with All/None controls and paper count per phase; Generate disabled if 0 phases selected.
-- **Pre-Analysis Summary Card**: Entity/files/FY/papers summary shown before running analysis; validation warning if entity name missing.
-- **Backend Improvements**: `smartChunk()` for intelligent document truncation (head 65% + tail 35%); user classifications override auto-classify; 6000 chars/file in extract-entity, 8000 chars/file in analyze; 10-file limit in extract-entity.
-- **A-K Code System**: 65 papers across 11 phases (A=Acceptance/6, B=Planning/10, C=Risk Assessment/6, D=Internal Controls/5, E=Substantive Testing/10, F=Special Areas/6, G=Completion/7, H=Reporting/5, I=Quality & Ethics/4, J=Tax & Regulatory/5, K=Final Output/3)
-- **Phase-by-phase AI generation**: 4-batch approach (A-D, E, F-H, I-K) to avoid token limits
-- **121-Variable Dynamic Engagement Configuration Engine**:
-  - Definitions: `artifacts/hrm-system/src/lib/engagement-variable-defs.ts` — all 121 variables across 15 sections
-  - Component: `artifacts/hrm-system/src/components/engagement-config.tsx` — dynamic rendering engine
-  - **15 Sections**: Entity Legal & Classification, Financial Reporting Basis, Prior Year / Opening Balance Context, Materiality, Risk Assessment, IT / Controls / Service Organization, Experts / Multi-location / Cycles, Sampling / Confirmations, Pakistan Tax & Regulatory, Significant FS Areas, Ethics / Independence / Quality, Team / Approvals / EQCR, Governance / Deadlines / Subsequent Events, Reporting Drivers, System Controls / Regeneration / Archive
-  - **6 Field Types**: dropdown, toggle, text, number, date, multi-select, user-picker
-  - **Dependency Rules**: `showWhen` (single parent) and `showWhenAny` (OR conditions) for conditional field visibility
-  - **Helpers**: `isVariableVisible()`, `getSectionStatus()`, `validateAllMandatory()`, `getAllTriggeredWPs()`, `getDefaultValues()`, `isFieldComplete()` (canonical completion checker)
-  - **UI Features**: Collapsible section cards with status chips (Not Started/In Progress/Complete), field-level tooltips with ISA standard references + WP code mapping + high-impact badge, section completion tracking, triggered WP display per section, summary stats panel (mandatory/sections/triggered WPs/completed)
-  - **WP Code Mapping**: Each variable maps to specific working paper codes (A1-K3) via wpCodes array
-  - **Backward compatibility**: Legacy individual state variables preserved alongside `configValues` Record state; both sent in generate API payload
-- **Enhanced Excel export (17 sheets)**: Cover, Index, Section sheets + Materiality (ISA 320/450), Analytical Review (ISA 520), Lead Schedule, PM Allocation, FS Mapping, ToC Matrix, ToD Matrix, Misstatements (ISA 450), AJE Schedule, Tax Computation, Deferred Tax (IAS 12), WHT Compliance, Evidence Index, Sampling (ISA 530)
-- **WP Reference Mapping**: E1=Cash & Bank, E2=Trade Receivables, E3=Inventory, E4=PPE, E5=Trade Payables, E6=Revenue, E7=Expenses, E8=Equity, E9=Taxation, E10=Provisions; J1=Income Tax, J2=Deferred Tax, J3=Sales Tax, J4=WHT, J5=Super Tax
-- **Confirmation letters**: Bank (E1), Debtors (E2), Creditors (E5), Legal (G4) with ISA 505/580 refs
-- Full Financial Statement data entry: Balance Sheet (7 sections, 32 line items) + P&L (5 sections, 15 line items)
-- Export formats: PDF, DOCX, Excel, Confirmations bundle
+**AI Working Paper Generator (7-Step, A-L+AI Structure) — REBUILT:**
+- Frontend: `artifacts/hrm-system/src/pages/working-papers.tsx` (~3300 lines)
+- Backend: `artifacts/api-server/src/routes/working-papers.ts` (~2570 lines)
+- **7-step flow**: Upload → Variables → AI Extraction → Trial Balance → General Ledger → Working Papers → Export
+- **URL routing**: `/working-papers/upload`, `/variables`, `/extraction`, `/trial-balance`, `/general-ledger`, `/working-papers-review` (wait — actually `working-papers`), `/export`
+- **User uploads only**: Financial Statements + Sales Tax Returns — AI does everything else
+- **Variable Matrix (A-J groups)**: 80+ variables covering Engagement Profile, Entity Profile, Financial Reporting, Tax, FS Components, Risk Assessment, Audit Approach, Sales Tax Data, Document Availability, Output Control
+- **Data source badges**: Every AI value tagged as Extracted (blue) / Derived (green) / Estimated (amber) / User-confirmed (purple)
+- **Working Paper Index (A-L + AI)**: A=Pre-Engagement, B=Planning, C=TB & Financials, D=GL & Analytics, E=Substantive, F=Tax, G=Controls, H=Completion, I=Reporting, J=Quality Control, K=Client Communication, L=Inspection/QCR, AI=AI Control Papers
+- **Draft key**: `ana_wp_v3` (localStorage)
+- **Traceability**: FS → Extracted Data → TB → GL → Working Papers (all linked)
+- **Editable tables**: TB (inline cell editing, source tag update) and GL (expandable account view with entries)
+- **File storage**: Files stored in React ref (fsFilesRef / stFilesRef) — persist in-session only; extracted data preserved in draft so users can resume
+- **Backend**: `smartChunk()` for doc truncation; 6000 chars/file in extract-entity; 8000 chars/file in analyze; 14000 token WP generation
+- **Batch generation**: 4-batch approach (A-D, E, F-H, I-L+AI) to stay within token limits per batch
+- **AI prompts**: extract-entity (50+ fields), analyze (6000 tokens, 0.15 temp, full ISA 315 suite), generate-gl-tb (8000 tokens, Pakistan COA), /generate (14000 tokens, AuditWise system message, no-placeholder enforcement)
+- **Legacy file**: `artifacts/hrm-system/src/lib/engagement-variable-defs.ts` (121 variables) retained for backward compatibility only
+- Export formats: PDF, DOCX, Excel
 - Docker: `deploy/Dockerfile` uses `--no-frozen-lockfile` (patched for pnpm lockfile drift)
 
 **Key Features & Implementations:**
