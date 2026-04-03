@@ -2200,6 +2200,7 @@ export default function WorkingPapers() {
 
       const glAccounts = Array.from(accountMap.values());
 
+      const reconProof = data.reconciliation_proof || {};
       setSession(s => ({
         ...s,
         trialBalance: tb,
@@ -2212,10 +2213,16 @@ export default function WorkingPapers() {
           total_credit: data.summary?.total_credit || 0,
           gl_entries: data.summary?.gl_entries || glEntries.length,
           tb_accounts: data.summary?.tb_accounts || tb.length,
+          phases_completed: data.summary?.phases_completed || 1,
+          coa_accounts: data.summary?.coa_accounts || (data.chart_of_accounts || []).length,
+          accounting_equation_satisfied: data.summary?.accounting_equation_satisfied ?? reconProof.accounting_equation_satisfied ?? false,
+          reconciliation_proof: reconProof,
         },
       }));
 
-      toast({ title: "Trial Balance Generated", description: `${tb.length} accounts · ${glEntries.length} GL entries` });
+      const balText = data.summary?.is_balanced ? "Balanced" : "Adjustment applied";
+      const eqText = reconProof.accounting_equation_satisfied ? "A=L+E verified" : "Equation pending";
+      toast({ title: "Trial Balance Generated (3-Phase)", description: `${tb.length} accounts · ${glEntries.length} GL entries · ${balText} · ${eqText}` });
 
     } catch (err: any) {
       toast({ title: "Generation failed", description: err.message, variant: "destructive" });

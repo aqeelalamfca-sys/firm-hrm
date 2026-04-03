@@ -47,7 +47,7 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - **File storage**: Files stored in React ref (fsFilesRef / stFilesRef) — persist in-session only; extracted data preserved in draft so users can resume
 - **Backend**: `smartChunk()` for doc truncation; 6000 chars/file in extract-entity; 8000 chars/file in analyze; 14000 token WP generation
 - **Batch generation**: 4-batch approach (A-D, E, F-H, I-L+AI) to stay within token limits per batch
-- **AI prompts**: extract-entity (50+ fields), analyze (6000 tokens, 0.15 temp, full ISA 315 suite), generate-gl-tb (8000 tokens, Pakistan COA), /generate (14000 tokens, AuditWise system message, no-placeholder enforcement)
+- **AI prompts**: extract-entity (50+ fields), analyze (6000 tokens, 0.15 temp, full ISA 315 suite), generate-gl-tb (3-phase multi-call: Phase 1=COA+TB 12K tokens, Phase 2=batched GL 12 accounts/batch 12K tokens each, Phase 3=server-side reconciliation with auto-balance via Retained Earnings; Pakistan ICAP-aligned COA), /generate (14000 tokens, AuditWise system message, no-placeholder enforcement)
 - **Legacy file**: `artifacts/hrm-system/src/lib/engagement-variable-defs.ts` (121 variables) retained for backward compatibility only
 - Export formats: PDF, DOCX, Excel
 - Docker: `deploy/Dockerfile` uses `--no-frozen-lockfile` (patched for pnpm lockfile drift)

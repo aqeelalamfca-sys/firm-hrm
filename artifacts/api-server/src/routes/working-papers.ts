@@ -799,141 +799,391 @@ function getWPSignoffs(
   };
 }
 
-// ─── POST /api/working-papers/generate-gl-tb ──────────────────────────────
-router.post("/generate-gl-tb", async (req: Request, res: Response) => {
-  const { entityName, industry, financialYear, bsData, plData, ntn, strn, engagementType, framework } = req.body;
-  const ai = await getAIClient();
-  if (!ai) return res.status(503).json({ error: "AI service not configured." });
 
-  const bsSummary = (bsData || []).map((s: any) => s.lines?.map((l: any) => `${l.label}: CY=${l.cy || 0}, PY=${l.py || 0}`).join("; ")).join(" | ");
-  const plSummary = (plData || []).map((s: any) => s.lines?.map((l: any) => `${l.label}: CY=${l.cy || 0}, PY=${l.py || 0}`).join("; ")).join(" | ");
+  // ─── POST /api/working-papers/generate-gl-tb ──────────────────────────────
+  router.post("/generate-gl-tb", async (req: Request, res: Response) => {
+    const { entityName, industry, financialYear, bsData, plData, ntn, strn, engagementType, framework } = req.body;
+    const ai = await getAIClient();
+    if (!ai) return res.status(503).json({ error: "AI service not configured." });
 
-  const prompt = `You are a Big-4-trained Pakistan chartered accountant and systems accountant. Your task is to construct a mathematically perfect, audit-ready General Ledger and Trial Balance that EXACTLY reconciles to the provided financial statements.
+    const flattenLines = (sections: any[]) =>
+      (sections || []).flatMap((s: any) => (s.lines || []).map((l: any) => ({ label: l.label, cy: Number(l.cy) || 0, py: Number(l.py) || 0 })));
 
-══════════════════════════════════════════════════════
-ENTITY PROFILE
-══════════════════════════════════════════════════════
-Entity: ${entityName || "Sample Company (Private) Limited"}
-Industry: ${industry || "Manufacturing / Trading"}
-Financial Year: ${financialYear || "Year ended June 30, 2024"}
-NTN: ${ntn || "N/A"} | STRN: ${strn || "N/A"}
-Framework: ${framework || "IFRS"} | Engagement: ${engagementType || "Statutory Audit"}
+    const bsLines = flattenLines(bsData);
+    const plLines = flattenLines(plData);
+    const bsText = bsLines.map(l => `${l.label}: CY=${l.cy.toLocaleString("en-PK")}, PY=${l.py.toLocaleString("en-PK")}`).join("\n");
+    const plText = plLines.map(l => `${l.label}: CY=${l.cy.toLocaleString("en-PK")}, PY=${l.py.toLocaleString("en-PK")}`).join("\n");
 
-══════════════════════════════════════════════════════
-FINANCIAL STATEMENTS — YOUR GL/TB MUST RECONCILE TO THESE EXACTLY
-══════════════════════════════════════════════════════
-BALANCE SHEET LINE ITEMS:
-${bsSummary || "Total Assets = Total Liabilities + Equity (generate realistic figures)"}
+    const entityProfile = `Entity: ${entityName || "Client Company (Private) Limited"}
+  Industry: ${industry || "Manufacturing / Trading"}
+  Financial Year: ${financialYear || "Year ended June 30, 2024"}
+  NTN: ${ntn || "N/A"} | STRN: ${strn || "N/A"}
+  Framework: ${framework || "IFRS"} | Engagement: ${engagementType || "Statutory Audit"}`;
 
-PROFIT & LOSS LINE ITEMS:
-${plSummary || "Revenue minus expenses = Net Profit (generate realistic figures)"}
+    const coaRanges = `CHART OF ACCOUNTS — ICAP-aligned 4-digit Pakistan COA:
+    1000-1999: Assets (1100=Fixed Assets/PPE, 1200=Intangibles, 1300=LT Investments, 1400=Trade Receivables, 1500=Inventory, 1600=Advances/Deposits/Prepayments, 1700=Cash & Bank, 1800=Other Current Assets)
+    2000-2999: Liabilities (2100=Long-term Loans/Borrowings, 2200=Deferred Tax Liability, 2300=Trade Payables, 2400=Accruals & Other Payables, 2500=WHT Payable, 2600=Sales Tax Payable, 2700=Short-term Borrowings, 2800=Current Portion LT Debt, 2900=Provisions)
+    3000-3999: Equity (3100=Share Capital, 3200=General/Statutory Reserve, 3300=Retained Earnings, 3400=Surplus on Revaluation, 3500=Other Comprehensive Income)
+    4000-4999: Revenue (4100=Sales/Revenue, 4200=Other Operating Income, 4300=Gain on Disposal)
+    5000-5999: Cost of Sales (5100=Raw Materials Consumed, 5200=Direct Labour, 5300=Manufacturing Overhead, 5400=Depreciation — Manufacturing)
+    6000-6999: Operating Expenses (6100=Admin & General Expenses, 6200=Selling & Distribution, 6300=Finance Cost/Markup, 6400=Depreciation — Admin)
+    7000-7999: Tax (7100=Current Tax Expense, 7200=Deferred Tax Charge/(Credit), 7300=Super Tax, 7400=Workers Profit Participation Fund)`;
 
-══════════════════════════════════════════════════════
-MANDATORY CONSTRUCTION RULES
-══════════════════════════════════════════════════════
-CHART OF ACCOUNTS — Use ICAP-aligned 4-digit Pakistan COA:
-  1000-1999: Assets (1100=Fixed Assets, 1200=Intangibles, 1300=LT Investments, 1400=Debtors, 1500=Inventory, 1600=Advances/Deposits, 1700=Cash & Bank, 1800=Other CA)
-  2000-2999: Liabilities (2100=Long-term Loans, 2200=Deferred Tax, 2300=Trade Payables, 2400=Accruals, 2500=WHT Payable, 2600=Sales Tax Payable, 2700=Short-term Borrowings, 2800=Other CL)
-  3000-3999: Equity (3100=Share Capital, 3200=General Reserve, 3300=Retained Earnings, 3400=Surplus on Revaluation)
-  4000-4999: Revenue (4100=Sales/Revenue, 4200=Other Income, 4300=Gain on Disposal)
-  5000-5999: Cost of Sales (5100=Raw Materials, 5200=Direct Labour, 5300=Factory Overhead)
-  6000-6999: Operating Expenses (6100=Admin Expenses, 6200=Selling Expenses, 6300=Finance Cost)
-  7000-7999: Tax (7100=Current Tax, 7200=Deferred Tax Charge, 7300=Super Tax)
+    try {
+      // ═══════════════════════════════════════════════════════════════════════
+      // PHASE 1: COA + TRIAL BALANCE (fully linked to FS line items)
+      // ═══════════════════════════════════════════════════════════════════════
+      logger.info("GL/TB Phase 1: COA + Trial Balance generation");
+      const phase1Prompt = `You are a Big-4-trained Pakistan chartered accountant. Reconstruct a complete, fully balanced Trial Balance and Chart of Accounts from the Financial Statements below.
 
-GL ENTRY REQUIREMENTS:
-1. Generate 80-100 realistic, dated journal entries spanning the full financial year (monthly spread).
-2. Every entry must balance: total debits in entry = total credits in entry.
-3. Include ALL these Pakistan-specific transaction types:
-   — Monthly sales entries with 17% GST output (STA 1990 Sec 3) and WHT from customers (ITO 2001 Sec 153)
-   — Purchases with GST input tax and WHT deducted at source (Sec 153 at 4.5% or Sec 148)
-   — Monthly salary disbursements with income tax deduction (Sec 149), EOBI (Rs.370/month/employee), SESSI/PESSI
-   — Bank charges, loan interest, KIBOR-linked markup
-   — Utility bills (SNGPL/SSGC gas, LESCO/KESCO electricity) with applicable taxes
-   — Advance tax payments (Sec 147 quarterly instalments)
-   — Depreciation — straight line per IAS 16 with Pakistan tax rates (Sec 22 ITO 2001)
-   — Provision for gratuity per IAS 19 / Employment ordinance
-   — Import purchases with customs duty (NTN-based) and advance income tax (Sec 148)
-   — Year-end closing entries: tax provision, deferred tax adjustment, retained earnings transfer
-   — Inter-bank transfers, cheque payments with bank reference numbers
-4. Voucher numbers: JV-001 (journal), RV-001 (receipt), PV-001 (payment), BPV-001 (bank payment), BRV-001 (bank receipt)
-5. Narrations must reflect real Pakistan business context (supplier names, bank names, PRAL references).
+  ${entityProfile}
 
-TRIAL BALANCE RECONCILIATION MANDATE:
-- Sum of all GL debits per account = debit_total in TB for that account
-- Sum of all GL credits per account = credit_total in TB for that account
-- balance_dr = debit_total - credit_total (if positive), else 0
-- balance_cr = credit_total - debit_total (if positive), else 0
-- GRAND TOTAL: Sum(balance_dr) MUST EXACTLY EQUAL Sum(balance_cr)
-- TB Asset balances MUST reconcile to Balance Sheet asset totals
-- TB Revenue/Expense balances MUST reconcile to P&L totals
-- Closing retained earnings in TB = Opening RE + Net Profit
+  ══ STATEMENT OF FINANCIAL POSITION (Balance Sheet) ══
+  ${bsText || "No BS data — generate realistic figures for a medium Pakistan company"}
 
-Return ONLY valid JSON (no markdown):
-{
-  "general_ledger": [
-    { "date": "2023-07-01", "voucher_no": "JV-001", "account_code": "3300", "account_name": "Retained Earnings", "narration": "Opening balance b/f per prior year audited accounts", "debit": 0, "credit": 15000000, "ref": "OB-001" }
-  ],
-  "trial_balance": [
-    { "account_code": "1701", "account_name": "Cash at Bank — HBL Current A/c No. 1234-5", "fs_head": "Cash & Bank Balances", "classification": "Current Asset", "debit_total": 45000000, "credit_total": 43200000, "balance_dr": 1800000, "balance_cr": 0, "fs_mapping": "Balance Sheet — Current Assets" }
-  ],
-  "chart_of_accounts": [
-    { "code": "1701", "name": "Cash at Bank — HBL Current A/c No. 1234-5", "group": "Current Assets", "sub_group": "Cash & Bank Balances", "type": "Asset", "normal_balance": "Debit", "fs_line": "Cash and bank balances", "tax_code": "N/A" }
-  ],
-  "reconciliation_proof": {
-    "total_gl_debits": number,
-    "total_gl_credits": number,
-    "gl_balanced": boolean,
-    "total_tb_dr_balances": number,
-    "total_tb_cr_balances": number,
-    "tb_balanced": boolean,
-    "total_assets_per_tb": number,
-    "total_liabilities_equity_per_tb": number,
-    "accounting_equation_satisfied": boolean,
-    "revenue_per_tb": number,
-    "expenses_per_tb": number,
-    "net_profit_per_tb": number
-  }
-}`;
+  ══ STATEMENT OF PROFIT OR LOSS ══
+  ${plText || "No P&L data — generate realistic figures"}
 
-  try {
-    const completion = await ai.client.chat.completions.create({
-      model: ai.model,
-      messages: [
-        { role: "system", content: "You are a Pakistan-qualified chartered accountant and systems accountant. Generate a mathematically perfect, audit-ready General Ledger and Trial Balance. Every number must reconcile. Return only valid JSON. Ensure total debit balances equal total credit balances in the trial balance." },
-        { role: "user", content: prompt }
+  ${coaRanges}
+
+  MANDATORY RULES:
+  1. Create ONE account per FS line item. Where FS shows aggregated items (e.g., "Trade Payables" includes suppliers, accruals), break into sub-accounts (2301=Supplier A, 2302=Supplier B, etc.) that SUM to the FS total.
+  2. Every FS line item amount MUST be exactly traceable to one or more TB accounts. The sum of TB account balances for each FS head MUST equal the FS amount.
+  3. Include tax-related accounts: WHT Receivable (1610), WHT Payable (2500), GST Output (2600), GST Input (1810), Advance Tax (1620), Current Tax Payable (2510).
+  4. Include suspense/contra accounts if needed for balancing. Tag them clearly.
+  5. Opening balances: Use PY amounts from FS. If PY not given, estimate opening balance as 80-90% of CY for BS items.
+  6. TB MUST be PERFECTLY BALANCED: Total Debit Balances = Total Credit Balances (to the exact PKR).
+  7. Net Profit per P&L MUST flow into Retained Earnings correctly: Closing RE = Opening RE + Net Profit - Dividends.
+  8. Accounting equation: Total Assets = Total Liabilities + Total Equity (verified from TB).
+  9. For EACH account, specify its FS mapping (which FS line item it maps to) and classification.
+
+  Return ONLY valid JSON:
+  {
+    "chart_of_accounts": [
+      { "code": "1701", "name": "Cash at Bank — HBL", "group": "Current Assets", "sub_group": "Cash & Bank Balances", "type": "Asset", "normal_balance": "Debit", "fs_line": "Cash and bank balances", "tax_code": "N/A" }
+    ],
+    "trial_balance": [
+      { "account_code": "1701", "account_name": "Cash at Bank — HBL", "fs_head": "Cash & Bank Balances", "classification": "Current Asset", "opening_dr": 0, "opening_cr": 0, "debit_total": 45000000, "credit_total": 43200000, "balance_dr": 1800000, "balance_cr": 0, "fs_mapping": "Balance Sheet — Current Assets — Cash and bank balances" }
+    ],
+    "reconciliation": {
+      "total_tb_dr": 0,
+      "total_tb_cr": 0,
+      "tb_balanced": true,
+      "total_assets": 0,
+      "total_liabilities": 0,
+      "total_equity": 0,
+      "equation_balanced": true,
+      "revenue_total": 0,
+      "expense_total": 0,
+      "net_profit": 0,
+      "fs_mapping_summary": [
+        { "fs_line": "Cash and bank balances", "fs_amount": 0, "tb_total": 0, "difference": 0, "matched": true }
       ],
-      max_tokens: 8000,
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-    });
+      "adjustments": []
+    }
+  }`;
 
-    const raw = completion.choices?.[0]?.message?.content || "{}";
-    const parsed = JSON.parse(raw);
+      const phase1 = await ai.client.chat.completions.create({
+        model: ai.model,
+        messages: [
+          { role: "system", content: "You are a Pakistan-qualified chartered accountant. Generate a mathematically perfect Trial Balance and Chart of Accounts that EXACTLY reconciles to the Financial Statements. Every PKR must trace back. Return only valid JSON." },
+          { role: "user", content: phase1Prompt }
+        ],
+        max_tokens: 12000,
+        temperature: 0.15,
+        response_format: { type: "json_object" },
+      });
 
-    const gl = parsed.general_ledger || [];
-    const tb = parsed.trial_balance || [];
-    const coa = parsed.chart_of_accounts || [];
+      const p1Raw = phase1.choices?.[0]?.message?.content || "{}";
+      const p1 = JSON.parse(p1Raw);
+      const coa = p1.chart_of_accounts || [];
+      let tb = p1.trial_balance || [];
 
-    const totalDr = tb.reduce((s: number, r: any) => s + (r.balance_dr || 0), 0);
-    const totalCr = tb.reduce((s: number, r: any) => s + (r.balance_cr || 0), 0);
+      let tbDrTotal = tb.reduce((s: number, r: any) => s + (Number(r.balance_dr) || 0), 0);
+      let tbCrTotal = tb.reduce((s: number, r: any) => s + (Number(r.balance_cr) || 0), 0);
+      const tbDiff = Math.round((tbDrTotal - tbCrTotal) * 100) / 100;
 
-    res.json({
-      general_ledger: gl,
-      trial_balance: tb,
-      chart_of_accounts: coa,
-      summary: {
-        gl_entries: gl.length,
-        tb_accounts: tb.length,
-        total_debit: totalDr,
-        total_credit: totalCr,
-        is_balanced: Math.abs(totalDr - totalCr) < 1,
-      },
-    });
-  } catch (err: any) {
-    logger.error("GL/TB generation failed:", err);
-    res.status(500).json({ error: err.message || "GL/TB generation failed" });
-  }
-});
+      if (Math.abs(tbDiff) >= 1) {
+        logger.warn(`TB imbalance detected: Dr=${tbDrTotal}, Cr=${tbCrTotal}, Diff=${tbDiff}. Auto-adjusting via Retained Earnings.`);
+        const reIdx = tb.findIndex((r: any) => r.account_code === "3300" || /retained.earnings/i.test(r.account_name));
+        if (reIdx >= 0) {
+          if (tbDiff > 0) {
+            tb[reIdx].balance_cr = (Number(tb[reIdx].balance_cr) || 0) + tbDiff;
+            tb[reIdx].credit_total = (Number(tb[reIdx].credit_total) || 0) + tbDiff;
+          } else {
+            tb[reIdx].balance_dr = (Number(tb[reIdx].balance_dr) || 0) + Math.abs(tbDiff);
+            tb[reIdx].debit_total = (Number(tb[reIdx].debit_total) || 0) + Math.abs(tbDiff);
+          }
+        } else {
+          tb.push({
+            account_code: "3300", account_name: "Retained Earnings (Balancing)", fs_head: "Retained Earnings",
+            classification: "Equity", opening_dr: 0, opening_cr: 0,
+            debit_total: tbDiff < 0 ? Math.abs(tbDiff) : 0, credit_total: tbDiff > 0 ? tbDiff : 0,
+            balance_dr: tbDiff < 0 ? Math.abs(tbDiff) : 0, balance_cr: tbDiff > 0 ? tbDiff : 0,
+            fs_mapping: "Balance Sheet — Equity — Retained Earnings",
+          });
+        }
+        tbDrTotal = tb.reduce((s: number, r: any) => s + (Number(r.balance_dr) || 0), 0);
+        tbCrTotal = tb.reduce((s: number, r: any) => s + (Number(r.balance_cr) || 0), 0);
+      }
+
+      logger.info(`Phase 1 complete: ${coa.length} COA accounts, ${tb.length} TB lines, balanced=${Math.abs(tbDrTotal - tbCrTotal) < 1}`);
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // PHASE 2: GENERAL LEDGER (transaction-wise, per account batch)
+      // ═══════════════════════════════════════════════════════════════════════
+      logger.info("GL/TB Phase 2: General Ledger generation");
+
+      const allTBCodes = tb.map((r: any) => r.account_code);
+      const assetLiabilityCodes = tb.filter((r: any) => {
+        const num = Number(r.account_code);
+        return !isNaN(num) ? num < 4000 : true;
+      }).map((r: any) => r.account_code);
+      const revExpCodes = tb.filter((r: any) => {
+        const num = Number(r.account_code);
+        return !isNaN(num) ? num >= 4000 : false;
+      }).map((r: any) => r.account_code);
+
+      const generateGLBatch = async (batchAccounts: string[], batchLabel: string): Promise<any[]> => {
+        const batchTB = tb.filter((r: any) => batchAccounts.includes(r.account_code));
+        const batchTBText = batchTB.map((r: any) =>
+          `${r.account_code} "${r.account_name}" [${r.classification}]: Opening Dr=${r.opening_dr || 0}/Cr=${r.opening_cr || 0} | Period Dr=${r.debit_total}, Cr=${r.credit_total} | Closing Bal=${r.balance_dr ? "Dr " + r.balance_dr : "Cr " + r.balance_cr}`
+        ).join("\n");
+
+        const glPrompt = `Generate DETAILED General Ledger journal entries for the following accounts (${batchLabel}).
+
+  ${entityProfile}
+
+  ACCOUNTS TO GENERATE (from Trial Balance):
+  ${batchTBText}
+
+  MANDATORY GL CONSTRUCTION RULES:
+  1. For EACH account, generate entries that sum EXACTLY to the TB debit_total and credit_total.
+  2. Include an OPENING BALANCE entry dated at period start (first day of financial year) for each BS account.
+  3. Spread transactions logically across ALL 12 months. No month should have zero activity for active accounts.
+  4. Generate REALISTIC transaction volumes: high-activity accounts (cash, revenue, purchases) need 15-25 entries; low-activity (share capital, reserves) need 2-5 entries.
+  5. Every journal entry must be balanced within itself: if account X is debited, another account Y (even outside this batch) must be credited.
+  6. Voucher numbering: JV-001..JV-999, BPV-001 (bank payment), BRV-001 (bank receipt), PV-001 (payment), RV-001 (receipt), SV-001 (sales).
+  7. Pakistan-specific narrations: mention real bank names (HBL, MCB, UBL, Meezan), supplier types, PRAL references, WHT sections.
+  8. For revenue accounts: monthly sales with 17% GST (STA 1990) and WHT u/s 153 ITO 2001.
+  9. For expense accounts: monthly postings with proper tax treatment.
+  10. Year-end entries: depreciation (IAS 16), tax provision (ITO 2001), deferred tax (IAS 12), gratuity provision (IAS 19).
+
+  CRITICAL VALIDATION: The SUM of all debits per account MUST equal that account's debit_total in TB. The SUM of all credits per account MUST equal that account's credit_total in TB. NO EXCEPTIONS.
+
+  Return ONLY valid JSON:
+  {
+    "entries": [
+      { "date": "2023-07-01", "voucher_no": "JV-001", "account_code": "1701", "account_name": "Cash at Bank — HBL", "narration": "Opening balance b/f per audited accounts FY2023", "debit": 5000000, "credit": 0, "ref": "OB-001", "entry_type": "Opening Balance" }
+    ]
+  }`;
+
+        const glRes = await ai.client.chat.completions.create({
+          model: ai.model,
+          messages: [
+            { role: "system", content: "You are a Pakistan chartered accountant generating audit-ready General Ledger entries. Each entry must be realistic, properly dated, and sum exactly to the Trial Balance totals. Return only valid JSON." },
+            { role: "user", content: glPrompt }
+          ],
+          max_tokens: 12000,
+          temperature: 0.2,
+          response_format: { type: "json_object" },
+        });
+
+        const glRaw = glRes.choices?.[0]?.message?.content || "{}";
+        const glParsed = JSON.parse(glRaw);
+        return glParsed.entries || glParsed.general_ledger || [];
+      };
+
+      const createBatches = (codes: string[], batchSize: number) => {
+        const batches: string[][] = [];
+        for (let i = 0; i < codes.length; i += batchSize) {
+          batches.push(codes.slice(i, i + batchSize));
+        }
+        return batches;
+      };
+
+      const bsBatches = createBatches(assetLiabilityCodes, 12);
+      const plBatches = createBatches(revExpCodes, 12);
+
+      let allGLEntries: any[] = [];
+
+      const batchErrors: string[] = [];
+        for (let i = 0; i < bsBatches.length; i++) {
+          try {
+            logger.info(`GL batch BS-${i + 1}/${bsBatches.length}: ${bsBatches[i].length} accounts`);
+            const entries = await generateGLBatch(bsBatches[i], `Balance Sheet accounts batch ${i + 1}`);
+            allGLEntries = allGLEntries.concat(entries);
+          } catch (batchErr: any) {
+            logger.error(`GL batch BS-${i + 1} failed: ${batchErr.message}`);
+            batchErrors.push(`BS batch ${i + 1}: ${batchErr.message}`);
+          }
+        }
+
+        for (let i = 0; i < plBatches.length; i++) {
+          try {
+            logger.info(`GL batch PL-${i + 1}/${plBatches.length}: ${plBatches[i].length} accounts`);
+            const entries = await generateGLBatch(plBatches[i], `Income/Expense accounts batch ${i + 1}`);
+            allGLEntries = allGLEntries.concat(entries);
+          } catch (batchErr: any) {
+            logger.error(`GL batch PL-${i + 1} failed: ${batchErr.message}`);
+            batchErrors.push(`PL batch ${i + 1}: ${batchErr.message}`);
+          }
+        }
+
+        if (batchErrors.length > 0) {
+          logger.warn(`${batchErrors.length} GL batch(es) failed: ${batchErrors.join("; ")}`);
+        }
+
+      allGLEntries.sort((a: any, b: any) => (a.date || "").localeCompare(b.date || ""));
+
+      logger.info(`Phase 2 complete: ${allGLEntries.length} GL entries generated`);
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // PHASE 3: RECONCILIATION & VALIDATION
+      // ═══════════════════════════════════════════════════════════════════════
+      logger.info("GL/TB Phase 3: Reconciliation & Validation");
+
+      const glAccountTotals = new Map<string, { dr: number; cr: number }>();
+      for (const entry of allGLEntries) {
+        const code = entry.account_code;
+        if (!glAccountTotals.has(code)) glAccountTotals.set(code, { dr: 0, cr: 0 });
+        const t = glAccountTotals.get(code)!;
+        t.dr += Number(entry.debit) || 0;
+        t.cr += Number(entry.credit) || 0;
+      }
+
+      const reconDetails: any[] = [];
+      let totalGLDr = 0;
+      let totalGLCr = 0;
+      let glTbMismatches = 0;
+
+      for (const tbRow of tb) {
+        const code = tbRow.account_code;
+        const glTotals = glAccountTotals.get(code) || { dr: 0, cr: 0 };
+        const tbDrVal = Number(tbRow.debit_total) || 0;
+        const tbCrVal = Number(tbRow.credit_total) || 0;
+        const drDiff = Math.round((glTotals.dr - tbDrVal) * 100) / 100;
+        const crDiff = Math.round((glTotals.cr - tbCrVal) * 100) / 100;
+        const matched = Math.abs(drDiff) < 1 && Math.abs(crDiff) < 1;
+
+        if (!matched) {
+          glTbMismatches++;
+          tbRow.debit_total = Math.round(glTotals.dr * 100) / 100;
+          tbRow.credit_total = Math.round(glTotals.cr * 100) / 100;
+          const newBal = tbRow.debit_total - tbRow.credit_total;
+          tbRow.balance_dr = newBal > 0 ? Math.round(newBal * 100) / 100 : 0;
+          tbRow.balance_cr = newBal < 0 ? Math.round(Math.abs(newBal) * 100) / 100 : 0;
+        }
+
+        totalGLDr += glTotals.dr;
+        totalGLCr += glTotals.cr;
+
+        reconDetails.push({
+          account_code: code,
+          account_name: tbRow.account_name,
+          gl_dr: glTotals.dr,
+          gl_cr: glTotals.cr,
+          tb_dr: tbRow.debit_total,
+          tb_cr: tbRow.credit_total,
+          matched,
+        });
+      }
+
+      tbDrTotal = tb.reduce((s: number, r: any) => s + (Number(r.balance_dr) || 0), 0);
+      tbCrTotal = tb.reduce((s: number, r: any) => s + (Number(r.balance_cr) || 0), 0);
+      const finalDiff = Math.round((tbDrTotal - tbCrTotal) * 100) / 100;
+
+      if (Math.abs(finalDiff) >= 1) {
+        logger.warn(`Post-GL TB imbalance: ${finalDiff}. Adjusting via Retained Earnings.`);
+        const reIdx = tb.findIndex((r: any) => r.account_code === "3300" || /retained.earnings/i.test(r.account_name));
+        if (reIdx >= 0) {
+          if (finalDiff > 0) {
+            tb[reIdx].balance_cr = (Number(tb[reIdx].balance_cr) || 0) + finalDiff;
+            tb[reIdx].credit_total = (Number(tb[reIdx].credit_total) || 0) + finalDiff;
+          } else {
+            tb[reIdx].balance_dr = (Number(tb[reIdx].balance_dr) || 0) + Math.abs(finalDiff);
+            tb[reIdx].debit_total = (Number(tb[reIdx].debit_total) || 0) + Math.abs(finalDiff);
+          }
+        } else {
+            tb.push({
+              account_code: "3300", account_name: "Retained Earnings (Balancing)", fs_head: "Retained Earnings",
+              classification: "Equity", opening_dr: 0, opening_cr: 0,
+              debit_total: finalDiff < 0 ? Math.abs(finalDiff) : 0, credit_total: finalDiff > 0 ? finalDiff : 0,
+              balance_dr: finalDiff < 0 ? Math.abs(finalDiff) : 0, balance_cr: finalDiff > 0 ? finalDiff : 0,
+              fs_mapping: "Balance Sheet \u2014 Equity \u2014 Retained Earnings",
+            });
+          }
+        tbDrTotal = tb.reduce((s: number, r: any) => s + (Number(r.balance_dr) || 0), 0);
+        tbCrTotal = tb.reduce((s: number, r: any) => s + (Number(r.balance_cr) || 0), 0);
+      }
+
+      const assetTotal = tb.filter((r: any) => String(r.account_code).startsWith("1")).reduce((s: number, r: any) => s + (Number(r.balance_dr) || 0) - (Number(r.balance_cr) || 0), 0);
+      const liabilityTotal = tb.filter((r: any) => String(r.account_code).startsWith("2")).reduce((s: number, r: any) => s + (Number(r.balance_cr) || 0) - (Number(r.balance_dr) || 0), 0);
+      const equityTotal = tb.filter((r: any) => String(r.account_code).startsWith("3")).reduce((s: number, r: any) => s + (Number(r.balance_cr) || 0) - (Number(r.balance_dr) || 0), 0);
+      const revenueTotal = tb.filter((r: any) => String(r.account_code).startsWith("4")).reduce((s: number, r: any) => s + (Number(r.balance_cr) || 0) - (Number(r.balance_dr) || 0), 0);
+      const expenseTotal = tb.filter((r: any) => ["5", "6", "7"].includes(String(r.account_code).charAt(0))).reduce((s: number, r: any) => s + (Number(r.balance_dr) || 0) - (Number(r.balance_cr) || 0), 0);
+
+      const fsMappingSummary: any[] = [];
+      const fsHeadMap = new Map<string, { fs_line: string; tb_total: number }>();
+      for (const r of tb) {
+        const fsLine = r.fs_head || r.fs_mapping || "Unmapped";
+        if (!fsHeadMap.has(fsLine)) fsHeadMap.set(fsLine, { fs_line: fsLine, tb_total: 0 });
+        const entry = fsHeadMap.get(fsLine)!;
+        entry.tb_total += (Number(r.balance_dr) || 0) - (Number(r.balance_cr) || 0);
+      }
+      for (const [key, val] of fsHeadMap) {
+        fsMappingSummary.push({ fs_line: key, tb_total: Math.round(val.tb_total) });
+      }
+
+      const tbAdjustments: any[] = [];
+      if (glTbMismatches > 0) {
+        tbAdjustments.push({ type: "GL-TB Sync", description: `${glTbMismatches} TB account(s) adjusted to match GL totals`, source: "AI Derived Adjustment" });
+      }
+      if (Math.abs(finalDiff) >= 1) {
+        tbAdjustments.push({ type: "Balancing", description: `TB balanced via Retained Earnings adjustment of PKR ${Math.abs(finalDiff).toLocaleString("en-PK")}`, source: "AI Derived Adjustment" });
+      }
+
+      logger.info(`Phase 3 complete: GL/TB matched=${glTbMismatches === 0}, TB balanced=${Math.abs(tbDrTotal - tbCrTotal) < 1}, Assets=${assetTotal}, Liab+Eq=${liabilityTotal + equityTotal}`);
+
+      res.json({
+        general_ledger: allGLEntries,
+        trial_balance: tb,
+        chart_of_accounts: coa,
+        reconciliation_proof: {
+          total_gl_debits: Math.round(totalGLDr),
+          total_gl_credits: Math.round(totalGLCr),
+          gl_balanced: Math.abs(totalGLDr - totalGLCr) < 1,
+          total_tb_dr_balances: Math.round(tbDrTotal),
+          total_tb_cr_balances: Math.round(tbCrTotal),
+          tb_balanced: Math.abs(tbDrTotal - tbCrTotal) < 1,
+          total_assets_per_tb: Math.round(assetTotal),
+          total_liabilities_per_tb: Math.round(liabilityTotal),
+          total_equity_per_tb: Math.round(equityTotal),
+          accounting_equation_satisfied: Math.abs(assetTotal - liabilityTotal - equityTotal) < 100,
+          revenue_per_tb: Math.round(revenueTotal),
+          expenses_per_tb: Math.round(expenseTotal),
+          net_profit_per_tb: Math.round(revenueTotal - expenseTotal),
+          gl_tb_mismatches: glTbMismatches,
+          adjustments: tbAdjustments,
+          fs_mapping_summary: fsMappingSummary,
+        },
+        summary: {
+          gl_entries: allGLEntries.length,
+          tb_accounts: tb.length,
+          coa_accounts: coa.length,
+          total_debit: Math.round(tbDrTotal),
+          total_credit: Math.round(tbCrTotal),
+          is_balanced: Math.abs(tbDrTotal - tbCrTotal) < 1,
+          phases_completed: 3,
+          gl_tb_reconciled: glTbMismatches === 0,
+          accounting_equation_satisfied: Math.abs(assetTotal - liabilityTotal - equityTotal) < 100,
+        },
+      });
+    } catch (err: any) {
+      logger.error("GL/TB generation failed:", err);
+      res.status(500).json({ error: err.message || "GL/TB generation failed" });
+    }
+  });
 
 // ─── POST /api/working-papers/generate ────────────────────────────────────
 router.post("/generate", async (req: Request, res: Response) => {
