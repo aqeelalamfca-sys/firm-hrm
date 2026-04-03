@@ -1220,8 +1220,9 @@ router.post("/generate", async (req: Request, res: Response) => {
     return res.status(503).json({ error: "AI service not configured." });
   }
 
+  const safeNum = (v: any): number => { if (v == null) return 0; const s = String(v).replace(/,/g, "").trim(); const n = Number(s); return isNaN(n) ? 0 : n; };
   const fin = analysis.financials || {};
-  const formatPKR = (n: number) => `PKR ${(n || 0).toLocaleString("en-PK")}`;
+  const formatPKR = (n: any) => { const v = safeNum(n); return `PKR ${v.toLocaleString("en-PK")}`; };
   const entity = analysis.entity || {};
   const materiality = analysis.materiality || {};
   const risks = analysis.risk_assessment || {};
@@ -1243,7 +1244,10 @@ router.post("/generate", async (req: Request, res: Response) => {
     "N1", "N2", "N3", "N4", "N5", "N6",
     "O1", "O2", "O3", "O4", "O5", "O6",
   ];
-  const papersToGenerate = selectedPapers?.length > 0 ? selectedPapers : allPapers;
+  if (Array.isArray(selectedPapers) && selectedPapers.length === 0) {
+    return res.status(400).json({ error: "No papers selected for generation." });
+  }
+  const papersToGenerate = Array.isArray(selectedPapers) && selectedPapers.length > 0 ? selectedPapers : allPapers;
 
   const wpDefinitions: Record<string, { title: string; section: string; isa: string; description: string }> = {
     "A1": { title: "Client Acceptance Checklist", section: "Pre-Engagement & Acceptance", isa: "ISA 210, ISQM 1", description: "Client acceptance evaluation including integrity, risk, and competence assessment." },
@@ -1434,8 +1438,8 @@ TAX & REGULATORY (PAKISTAN):
 
 FINANCIAL DATA (Current Year):
 - Revenue: ${formatPKR(fin.revenue)}
-- Gross Profit: ${formatPKR(fin.gross_profit)} (${fin.revenue ? ((fin.gross_profit/fin.revenue)*100).toFixed(1) : 0}%)
-- Net Profit: ${formatPKR(fin.net_profit)} (${fin.revenue ? ((fin.net_profit/fin.revenue)*100).toFixed(1) : 0}%)
+- Gross Profit: ${formatPKR(fin.gross_profit)} (${safeNum(fin.revenue) ? ((safeNum(fin.gross_profit)/safeNum(fin.revenue))*100).toFixed(1) : "0"}%)
+- Net Profit: ${formatPKR(fin.net_profit)} (${safeNum(fin.revenue) ? ((safeNum(fin.net_profit)/safeNum(fin.revenue))*100).toFixed(1) : "0"}%)
 - Total Assets: ${formatPKR(fin.total_assets)}
 - Total Liabilities: ${formatPKR(fin.total_liabilities)}
 - Equity: ${formatPKR(fin.equity)}
@@ -1557,7 +1561,7 @@ Each working paper MUST:
 7. Evidence refs must match the evidence items in the context (use actual filenames or generate realistic refs like "TB-01", "GL-01", "BS-01").
 8. Conclusions must be affirmative professional statements: "Based on procedures performed, we are satisfied that..."
 9. Sign-off details: preparer, reviewer, approver as provided in context.
-10. Materiality amounts must be the EXACT amounts from the context — ${materiality.overall_materiality ? `OM = PKR ${(materiality.overall_materiality || 0).toLocaleString("en-PK")}` : "compute from financials"}.
+10. Materiality amounts must be the EXACT amounts from the context — ${materiality.overall_materiality ? `OM = PKR ${safeNum(materiality.overall_materiality).toLocaleString("en-PK")}` : "compute from financials"}.
 11. RECONCILIATION CHECK: Verify all figures tie back to the Trial Balance and General Ledger. Any discrepancy must be noted and resolved within this step.
 12. ISA COMPLIANCE GATE: Each paper must explicitly state which ISA requirements it satisfies and confirm compliance before the step is marked complete.
 13. CROSS-REFERENCING MANDATE: Reference previously completed working papers by their exact WP ref codes. Every substantive paper (F-series) must link back to risk assessment (B8/B9), controls evaluation (E-series), and planning (B-series) papers. Audit evidence (G-series) must cross-reference substantive procedures (F-series).
@@ -1601,12 +1605,23 @@ ABSOLUTE RULES:
 
     const workingPapers = allGeneratedPapers;
 
+    const sectionPrefixMap: Record<string, string> = {
+      "A": "A — Pre-Engagement & Acceptance", "B": "B — Planning",
+      "C": "C — Trial Balance & Financials", "D": "D — Analytical Review",
+      "E": "E — Internal Control & Risk", "F": "F — Substantive Procedures (Test of Details)",
+      "G": "G — Audit Evidence", "H": "H — Completion",
+      "I": "I — Reporting", "J": "J — Quality Control & EQCR",
+      "K": "K — Client Communication", "L": "L — Regulatory & Compliance (Pakistan)",
+      "M": "M — Administrative", "N": "N — IT & Data (AI / Digital Audit)",
+      "O": "O — Inspection / QCR / Archiving",
+    };
     const enrichedPapers = workingPapers.map((wp: any) => {
       const def      = wpDefinitions[wp.ref] || {};
       const signoffs = getWPSignoffs(wp.ref, engDates, teamNames);
+      const prefix   = (wp.ref || "").replace(/[0-9]/g, "").toUpperCase();
       return {
         ...wp,
-        section_label:   def.section || wp.section,
+        section_label:   sectionPrefixMap[prefix] || def.section || wp.section,
         isa_references:  wp.isa_references || [def.isa || "ISA 500"],
         assertions:      wp.assertions || [],
         evidence_refs:   wp.evidence_refs || [],
@@ -2605,7 +2620,7 @@ router.post("/export-docx", async (req: Request, res: Response) => {
       const financialYear = meta?.financial_year || "Year ended June 30, 2024";
       const fin = analysis?.financials || {};
       const materiality = analysis?.materiality || {};
-      const formatPKR = (n: number) => `PKR ${(n || 0).toLocaleString("en-PK")}`;
+      const formatPKR = (n: any) => { const v = Number(n); return `PKR ${(isNaN(v) ? 0 : v).toLocaleString("en-PK")}`; };
       const now = new Date().toLocaleDateString("en-PK", { day: "2-digit", month: "long", year: "numeric" });
 
       const A4_W = 11906;
@@ -3085,7 +3100,7 @@ router.post("/generate-confirmations", async (req: Request, res: Response) => {
     const entityName = meta?.entity || "Client Company";
     const financialYear = meta?.financial_year || "Year ended June 30, 2024";
     const fin = analysis?.financials || {};
-    const formatPKR = (n: number) => `PKR ${(n || 0).toLocaleString("en-PK")}`;
+    const formatPKR = (n: any) => { const v = Number(n); return `PKR ${(isNaN(v) ? 0 : v).toLocaleString("en-PK")}`; };
     const today = new Date().toLocaleDateString("en-PK", { day: "2-digit", month: "long", year: "numeric" });
 
     const doc = new PDFDocument({ size: "A4", margin: 72 });
