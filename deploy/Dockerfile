@@ -22,11 +22,14 @@ RUN pnpm --filter @workspace/api-server run build
 RUN pnpm --filter @workspace/hrm-system run build
 
 FROM node:24-slim AS production
+RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/artifacts/api-server/node_modules ./artifacts/api-server/node_modules
 COPY --from=builder /app/artifacts/api-server/dist ./dist
 COPY --from=builder /app/artifacts/hrm-system/dist/public ./dist/public
 COPY --from=builder /app/package.json ./
+RUN pnpm add pdfkit@0.16.0 --dir /app 2>/dev/null || npm install --no-save pdfkit@0.16.0
 
 ENV NODE_ENV=production
 ENV PORT=5000
