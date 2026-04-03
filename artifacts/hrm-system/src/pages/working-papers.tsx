@@ -5,12 +5,12 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Upload, FileText, Loader2, CheckCircle2, Download, ChevronRight,
   ChevronDown, ChevronUp, BookOpen, Shield, AlertTriangle, TrendingUp,
-  Building2, Calendar, Briefcase, X, RefreshCw,
+  Building2, Calendar as CalendarIcon, Briefcase, X, RefreshCw,
   BarChart2, FileCheck, ClipboardCheck, Sparkles,
   FileSearch, Scale, Layers, FileOutput, Check, Table2,
   Activity, FileSpreadsheet, Hash, Settings2,
   Trash2, AlertCircle, ArrowRight, Zap, Database,
-  Edit3, Save, RotateCcw, Lock, Unlock,
+  Edit3, RotateCcw, Lock, Unlock,
   ChevronLeft, CheckSquare, Square,
   Globe, Users, Package, TrendingDown, DollarSign, Percent,
   Flag, Book, Clipboard, Award, BarChart, Info,
@@ -25,6 +25,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format, parse, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -406,6 +409,42 @@ function SectionHeader({ icon: Icon, title, subtitle, color }: { icon: any; titl
   );
 }
 
+function DatePickerField({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const [open, setOpen] = useState(false);
+  const dateObj = value ? parse(value, "yyyy-MM-dd", new Date()) : undefined;
+  const selected = dateObj && isValid(dateObj) ? dateObj : undefined;
+  const displayText = selected ? format(selected, "dd MMM yyyy") : null;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className={cn("h-8 w-full justify-start text-left text-xs font-normal gap-2", !displayText && "text-muted-foreground")}>
+          <CalendarIcon className="w-3.5 h-3.5 shrink-0 opacity-60" />
+          {displayText || <span>{placeholder || "Pick a date"}</span>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={selected}
+          onSelect={(day) => {
+            if (day) {
+              onChange(format(day, "yyyy-MM-dd"));
+            } else {
+              onChange("");
+            }
+            setOpen(false);
+          }}
+          defaultMonth={selected}
+          captionLayout="dropdown"
+          fromYear={2015}
+          toYear={2035}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function YesNoToggle({ label, value, onChange, hint }: { label: string; value: boolean; onChange: (v: boolean) => void; hint?: string }) {
   return (
     <div className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
@@ -557,13 +596,13 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
             </Select>
           </Field>
           <Field label="Year End *">
-            <Input type="date" value={vars.yearEnd} onChange={e => set("yearEnd", e.target.value)} className="h-8 text-xs" />
+            <DatePickerField value={vars.yearEnd} onChange={v => set("yearEnd", v)} placeholder="Select year end" />
           </Field>
           <Field label="Period From">
-            <Input type="date" value={vars.periodStart} onChange={e => set("periodStart", e.target.value)} className="h-8 text-xs" />
+            <DatePickerField value={vars.periodStart} onChange={v => set("periodStart", v)} placeholder="Period start" />
           </Field>
           <Field label="Period To">
-            <Input type="date" value={vars.periodEnd} onChange={e => set("periodEnd", e.target.value)} className="h-8 text-xs" />
+            <DatePickerField value={vars.periodEnd} onChange={v => set("periodEnd", v)} placeholder="Period end" />
           </Field>
           <Field label="Engagement Partner">
             <Input value={vars.engagementPartner} onChange={e => set("engagementPartner", e.target.value)} className="h-8 text-xs" placeholder="Partner name" />
@@ -801,10 +840,10 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
       <GroupPanel id="H" label="H. Sales Tax Data" icon={Hash} color="bg-pink-50 border-pink-200">
         <div className="grid grid-cols-2 gap-3">
           <Field label="ST Period From">
-            <Input type="date" value={vars.stPeriodFrom} onChange={e => set("stPeriodFrom", e.target.value)} className="h-8 text-xs" />
+            <DatePickerField value={vars.stPeriodFrom} onChange={v => set("stPeriodFrom", v)} placeholder="ST period start" />
           </Field>
           <Field label="ST Period To">
-            <Input type="date" value={vars.stPeriodTo} onChange={e => set("stPeriodTo", e.target.value)} className="h-8 text-xs" />
+            <DatePickerField value={vars.stPeriodTo} onChange={v => set("stPeriodTo", v)} placeholder="ST period end" />
           </Field>
           <Field label="Output Tax (PKR)">
             <Input type="number" value={vars.outputTax || ""} onChange={e => set("outputTax", Number(e.target.value))} className="h-8 text-xs" placeholder="0" />
@@ -1116,11 +1155,58 @@ function ExtractionStep({ extractedData, vars, onContinue, onBack, onRerun }:
 
 // ─── STEP 3: TRIAL BALANCE ─────────────────────────────────────────────────────
 
+function EditableCell({ value, onChange, type = "text", align = "left" }: {
+  value: string | number; onChange: (v: any) => void; type?: "text" | "number"; align?: "left" | "right";
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(value));
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setDraft(String(value)); }, [value]);
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+
+  const committedRef = useRef(false);
+  const commit = () => {
+    if (committedRef.current) return;
+    committedRef.current = true;
+    setEditing(false);
+    const finalVal = type === "number" ? Number(draft) || 0 : draft;
+    if (finalVal !== value) onChange(finalVal);
+  };
+
+  useEffect(() => { if (editing) committedRef.current = false; }, [editing]);
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type={type}
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); commit(); } if (e.key === "Escape") { setDraft(String(value)); setEditing(false); } }}
+        className={cn("w-full h-6 px-1.5 text-xs bg-white border border-blue-300 rounded outline-none ring-2 ring-blue-100 font-mono", align === "right" && "text-right")}
+      />
+    );
+  }
+
+  return (
+    <span
+      onClick={() => setEditing(true)}
+      className={cn("block w-full px-1.5 py-0.5 rounded cursor-text hover:bg-blue-50 hover:ring-1 hover:ring-blue-200 transition-all",
+        type === "number" ? "font-mono" : "font-medium text-slate-800",
+        align === "right" && "text-right")}
+      title="Click to edit"
+    >
+      {type === "number" ? (Number(value) || 0).toLocaleString("en-PK") : value}
+    </span>
+  );
+}
+
 function TrialBalanceStep({ accounts, summary, onContinue, onBack, onRegenerate, onAccountChange }:
   { accounts: TBAccount[]; summary: any; onContinue: () => void; onBack: () => void;
     onRegenerate: () => void; onAccountChange: (accounts: TBAccount[]) => void }) {
 
-  const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [searchQ, setSearchQ] = useState("");
   const [filterClass, setFilterClass] = useState("All");
 
@@ -1140,7 +1226,6 @@ function TrialBalanceStep({ accounts, summary, onContinue, onBack, onRegenerate,
     const realIdx = accounts.indexOf(filtered[idx]);
     if (realIdx >= 0) {
       (updated[realIdx] as any)[field] = val;
-      // Recompute balance
       if (field === "debit_total" || field === "credit_total") {
         const dr = Number(updated[realIdx].debit_total);
         const cr = Number(updated[realIdx].credit_total);
@@ -1171,7 +1256,7 @@ function TrialBalanceStep({ accounts, summary, onContinue, onBack, onRegenerate,
       <div className="flex items-center justify-between mb-2">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Trial Balance</h2>
-          <p className="text-sm text-slate-500 mt-0.5">{accounts.length} accounts · Click any cell to edit · Source tags show AI confidence</p>
+          <p className="text-sm text-slate-500 mt-0.5">{accounts.length} accounts · Click any cell to edit · Changes auto-save</p>
         </div>
         <div className="flex items-center gap-2">
           <div className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border",
@@ -1183,7 +1268,6 @@ function TrialBalanceStep({ accounts, summary, onContinue, onBack, onRegenerate,
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex gap-2 flex-wrap">
         <Input placeholder="Search accounts..." value={searchQ} onChange={e => setSearchQ(e.target.value)} className="h-8 text-xs max-w-48" />
         <Select value={filterClass} onValueChange={setFilterClass}>
@@ -1197,7 +1281,6 @@ function TrialBalanceStep({ accounts, summary, onContinue, onBack, onRegenerate,
         </div>
       </div>
 
-      {/* Table */}
       <div className="border border-slate-200 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -1211,40 +1294,28 @@ function TrialBalanceStep({ accounts, summary, onContinue, onBack, onRegenerate,
                 <th className="text-right px-3 py-2 font-semibold text-slate-600 w-28">Credit Total</th>
                 <th className="text-right px-3 py-2 font-semibold text-slate-600 w-28">Balance Dr</th>
                 <th className="text-right px-3 py-2 font-semibold text-slate-600 w-28">Balance Cr</th>
-                <th className="px-3 py-2 w-8"></th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((a, i) => (
-                <tr key={i} className={cn("border-b border-slate-100 hover:bg-slate-50 transition-colors", editingIdx === i && "bg-blue-50")}>
+                <tr key={i} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
                   <td className="px-3 py-1.5 font-mono text-slate-600">{a.account_code}</td>
                   <td className="px-3 py-1.5">
-                    {editingIdx === i
-                      ? <Input value={a.account_name} className="h-6 text-xs py-0" onChange={e => updateAccount(i, "account_name", e.target.value)} />
-                      : <span className="font-medium text-slate-800">{a.account_name}</span>}
+                    <EditableCell value={a.account_name} onChange={v => updateAccount(i, "account_name", v)} />
                   </td>
                   <td className="px-3 py-1.5 text-slate-500">{a.classification}</td>
                   <td className="px-3 py-1.5"><SourceBadge source={a.source || "Estimated"} /></td>
                   <td className="px-3 py-1.5 text-right">
-                    {editingIdx === i
-                      ? <Input type="number" value={a.debit_total} className="h-6 text-xs py-0 text-right" onChange={e => updateAccount(i, "debit_total", Number(e.target.value))} />
-                      : <span className="font-mono">{(a.debit_total || 0).toLocaleString("en-PK")}</span>}
+                    <EditableCell value={a.debit_total} onChange={v => updateAccount(i, "debit_total", v)} type="number" align="right" />
                   </td>
                   <td className="px-3 py-1.5 text-right">
-                    {editingIdx === i
-                      ? <Input type="number" value={a.credit_total} className="h-6 text-xs py-0 text-right" onChange={e => updateAccount(i, "credit_total", Number(e.target.value))} />
-                      : <span className="font-mono">{(a.credit_total || 0).toLocaleString("en-PK")}</span>}
+                    <EditableCell value={a.credit_total} onChange={v => updateAccount(i, "credit_total", v)} type="number" align="right" />
                   </td>
                   <td className="px-3 py-1.5 text-right">
                     {a.balance_dr > 0 ? <span className="font-semibold text-slate-800 font-mono">{(a.balance_dr).toLocaleString("en-PK")}</span> : <span className="text-slate-300">—</span>}
                   </td>
                   <td className="px-3 py-1.5 text-right">
                     {a.balance_cr > 0 ? <span className="font-semibold text-slate-800 font-mono">{(a.balance_cr).toLocaleString("en-PK")}</span> : <span className="text-slate-300">—</span>}
-                  </td>
-                  <td className="px-3 py-1.5">
-                    <button onClick={() => setEditingIdx(editingIdx === i ? null : i)} className="p-0.5 text-slate-400 hover:text-blue-600">
-                      {editingIdx === i ? <Save className="w-3.5 h-3.5" /> : <Edit3 className="w-3.5 h-3.5" />}
-                    </button>
                   </td>
                 </tr>
               ))}
@@ -1254,7 +1325,6 @@ function TrialBalanceStep({ accounts, summary, onContinue, onBack, onRegenerate,
                 <td colSpan={6} className="px-3 py-2 text-slate-700 text-xs">GRAND TOTAL</td>
                 <td className="px-3 py-2 text-right text-xs font-mono">{totalDr.toLocaleString("en-PK")}</td>
                 <td className="px-3 py-2 text-right text-xs font-mono">{totalCr.toLocaleString("en-PK")}</td>
-                <td></td>
               </tr>
             </tfoot>
           </table>
