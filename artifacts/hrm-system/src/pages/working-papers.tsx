@@ -987,14 +987,19 @@ function ExtractionStep({ extractedData, vars, onContinue, onBack, onRerun }:
     </button>
   );
 
-  const DataRow = ({ label, value, source, confidence }: { label: string; value: any; source?: DataSource; confidence?: number }) => (
-    <div className="flex items-start gap-3 py-1.5 border-b border-slate-50 last:border-0">
-      <span className="text-xs text-slate-500 w-36 shrink-0">{label}</span>
-      <span className="text-xs text-slate-800 flex-1 font-medium">{value ?? <span className="text-red-400 italic">Not found</span>}</span>
-      {source && <SourceBadge source={source} />}
-      {confidence !== undefined && <ConfidenceBadge pct={confidence} />}
-    </div>
-  );
+  const DataRow = ({ label, value, source, confidence }: { label: string; value: any; source?: DataSource; confidence?: number }) => {
+    const displayValue = value == null ? null
+      : typeof value === "object" ? JSON.stringify(value)
+      : String(value);
+    return (
+      <div className="flex items-start gap-3 py-1.5 border-b border-slate-50 last:border-0">
+        <span className="text-xs text-slate-500 w-36 shrink-0">{label}</span>
+        <span className="text-xs text-slate-800 flex-1 font-medium">{displayValue ?? <span className="text-red-400 italic">Not found</span>}</span>
+        {source && <SourceBadge source={source} />}
+        {confidence !== undefined && <ConfidenceBadge pct={confidence} />}
+      </div>
+    );
+  };
 
   const mat = analysis?.materiality || {};
   const risks = analysis?.risk_assessment || {};
@@ -1140,7 +1145,7 @@ function ExtractionStep({ extractedData, vars, onContinue, onBack, onRerun }:
                 {flags.map((f, i) => (
                   <div key={i} className="flex items-start gap-2 text-xs text-amber-800 py-1">
                     <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                    <span>{f}</span>
+                    <span>{typeof f === "object" ? JSON.stringify(f) : String(f)}</span>
                   </div>
                 ))}
               </div>
@@ -1153,7 +1158,7 @@ function ExtractionStep({ extractedData, vars, onContinue, onBack, onRerun }:
                 {missingData.map((m, i) => (
                   <div key={i} className="flex items-start gap-2 text-xs text-red-700 py-1">
                     <X className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
-                    <span>{m}</span>
+                    <span>{typeof m === "object" ? JSON.stringify(m) : String(m)}</span>
                   </div>
                 ))}
               </div>
@@ -1166,7 +1171,7 @@ function ExtractionStep({ extractedData, vars, onContinue, onBack, onRerun }:
                 {assumptions.map((a, i) => (
                   <div key={i} className="flex items-start gap-2 text-xs text-slate-700 py-1">
                     <Sparkles className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5" />
-                    <span>{a}</span>
+                    <span>{typeof a === "object" ? JSON.stringify(a) : String(a)}</span>
                   </div>
                 ))}
               </div>
@@ -2051,7 +2056,7 @@ export default function WorkingPapers() {
 
       // Build extractedData from both responses
       const extractedData: ExtractedData = {
-        entity: { ...extraction, ...analysis.entity },
+        entity: { ...(extraction.entity || {}), entity_name: extraction.entity_name, ntn: extraction.ntn, strn: extraction.strn, financial_year: extraction.financial_year, legal_form: extraction.legal_form, industry: extraction.industry, reporting_framework: extraction.reporting_framework, registered_address: extraction.registered_address, bankers: extraction.bankers, directors: extraction.directors, auditors: extraction.auditors, engagement_type: extraction.engagement_type, ...(analysis.entity || {}) },
         financials: { ...extraction.financials, ...analysis.financials },
         taxData: extraction.tax_data || {},
         tbLines: extraction.tb_lines || [],

@@ -74,28 +74,27 @@ push_to_github() {
   git config --global user.name  "Replit Agent"
   git config --global user.email "deploy@ana-ca.com"
 
-  # If the index is locked (e.g. by auto-checkpoint), wait for it to clear or skip staging
+  # If the index is locked (e.g. by auto-checkpoint), wait briefly then force-remove
   LOCK_FILE="$(git rev-parse --git-dir)/index.lock"
   if [ -f "$LOCK_FILE" ]; then
-    warn "Git index.lock detected — waiting up to 30s for it to clear..."
-    for i in $(seq 1 6); do
-      sleep 5
+    warn "Git index.lock detected — waiting up to 10s for it to clear..."
+    for i in $(seq 1 4); do
+      sleep 2
       [ ! -f "$LOCK_FILE" ] && break
-      [ $i -eq 6 ] && warn "Lock still present — skipping staging, pushing current HEAD."
     done
+    if [ -f "$LOCK_FILE" ]; then
+      warn "Force-removing stale index.lock"
+      rm -f "$LOCK_FILE"
+    fi
   fi
 
-  if [ ! -f "$LOCK_FILE" ]; then
-    log "Staging all changes..."
-    git add -A
-    if git diff --cached --quiet; then
-      warn "No new changes to commit — pushing current HEAD anyway."
-    else
-      git commit -m "$COMMIT_MSG"
-      ok "Committed: $COMMIT_MSG"
-    fi
+  log "Staging all changes..."
+  git add -A
+  if git diff --cached --quiet; then
+    warn "No new changes to commit — pushing current HEAD anyway."
   else
-    warn "Skipped staging/commit (index locked) — pushing latest checkpoint commit."
+    git commit -m "$COMMIT_MSG"
+    ok "Committed: $COMMIT_MSG"
   fi
 
   log "Pushing to GitHub..."
