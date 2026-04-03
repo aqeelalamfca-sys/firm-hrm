@@ -154,39 +154,100 @@ router.post("/extract-entity", upload.array("files", 20), async (req: Request, r
     }
     const docSummary = docs.join("\n\n---\n\n");
 
-    const userPrompt = `Extract entity and financial details from these documents.
-Return ONLY valid JSON — no markdown, no extra text:
-{
-  "entity_name": string or null,
-  "ntn": string or null,
-  "secp": string or null,
-  "financial_year": string or null,
-  "registered_address": string or null,
-  "engagement_type": "Statutory Audit"|"Tax Audit"|"Internal Audit"|"Special Purpose Audit"|"Review Engagement"|"Compilation" or null,
-  "financials": {
-    "revenue": number or null,
-    "gross_profit": number or null,
-    "net_profit": number or null,
-    "total_assets": number or null,
-    "total_liabilities": number or null,
-    "equity": number or null,
-    "cash_and_bank": number or null,
-    "trade_receivables": number or null,
-    "trade_payables": number or null,
-    "inventory": number or null,
-    "fixed_assets": number or null,
-    "prior_year_revenue": number or null,
-    "prior_year_net_profit": number or null,
-    "prior_year_total_assets": number or null
-  }
-}
-If a field cannot be found, use null.
+    const userPrompt = `You are a senior Pakistan-qualified chartered accountant and forensic document analyst with OCR expertise. Your task is to extract EVERY piece of auditable data from the uploaded financial documents.
 
-DOCUMENTS:
-${docSummary}`;
+DOCUMENTS TO ANALYZE:
+${docSummary}
+
+EXTRACTION RULES:
+1. Read EVERY number, date, name, and reference from the documents with precision.
+2. For all financial figures: extract as plain numbers in PKR (no commas, no currency symbols).
+3. If a document contains a Trial Balance or GL, extract ALL account lines.
+4. If figures appear inconsistent, note the inconsistency in "flags".
+5. Use null for any field genuinely not present — never guess or fabricate.
+6. Extract BOTH current year and prior year figures wherever visible.
+
+Return ONLY valid JSON (no markdown, no extra text):
+{
+  "entity_name": string | null,
+  "ntn": string | null,
+  "secp": string | null,
+  "strn": string | null,
+  "cnic": string | null,
+  "financial_year": string | null,
+  "period_start": string | null,
+  "period_end": string | null,
+  "registered_address": string | null,
+  "city": string | null,
+  "industry": string | null,
+  "entity_type": "Private Limited"|"Public Limited"|"Partnership"|"Sole Proprietor"|"NGO/NPO"|"Trust"|"Other" | null,
+  "listed_status": "Listed"|"Unlisted" | null,
+  "framework": "IFRS"|"IFRS for SMEs"|"IPSAS"|"Other" | null,
+  "engagement_type": "Statutory Audit"|"Tax Audit"|"Internal Audit"|"Special Purpose Audit"|"Review Engagement"|"Compilation" | null,
+  "directors": [{ "name": string, "cnic": string | null, "designation": string }],
+  "auditors": { "firm_name": string | null, "partner": string | null, "engagement_no": string | null },
+  "bankers": [{ "bank_name": string, "account_no": string | null, "branch": string | null }],
+  "financials": {
+    "revenue": number | null,
+    "cost_of_sales": number | null,
+    "gross_profit": number | null,
+    "operating_expenses": number | null,
+    "operating_profit": number | null,
+    "finance_cost": number | null,
+    "net_profit_before_tax": number | null,
+    "tax_expense": number | null,
+    "net_profit": number | null,
+    "total_assets": number | null,
+    "non_current_assets": number | null,
+    "fixed_assets": number | null,
+    "intangible_assets": number | null,
+    "long_term_investments": number | null,
+    "current_assets": number | null,
+    "inventory": number | null,
+    "trade_receivables": number | null,
+    "advances_deposits": number | null,
+    "cash_and_bank": number | null,
+    "total_liabilities": number | null,
+    "non_current_liabilities": number | null,
+    "long_term_loans": number | null,
+    "current_liabilities": number | null,
+    "trade_payables": number | null,
+    "short_term_borrowings": number | null,
+    "accrued_liabilities": number | null,
+    "tax_payable": number | null,
+    "equity": number | null,
+    "share_capital": number | null,
+    "retained_earnings": number | null,
+    "reserves": number | null,
+    "prior_year_revenue": number | null,
+    "prior_year_gross_profit": number | null,
+    "prior_year_net_profit": number | null,
+    "prior_year_total_assets": number | null,
+    "prior_year_equity": number | null,
+    "currency": "PKR" | string | null
+  },
+  "tax_data": {
+    "advance_tax_paid": number | null,
+    "wht_deducted": number | null,
+    "sales_tax_output": number | null,
+    "sales_tax_input": number | null,
+    "income_tax_provision": number | null,
+    "deferred_tax": number | null,
+    "super_tax": number | null,
+    "prior_year_tax": number | null
+  },
+  "tb_lines": [
+    { "account_code": string, "account_name": string, "debit": number, "credit": number, "balance": number, "classification": "Asset"|"Liability"|"Equity"|"Revenue"|"Expense" }
+  ],
+  "gl_summary": [
+    { "date": string, "voucher": string, "account": string, "narration": string, "debit": number, "credit": number }
+  ],
+  "flags": [string],
+  "documents_found": [{ "filename": string, "type": "Trial Balance"|"General Ledger"|"Balance Sheet"|"P&L"|"Bank Statement"|"Tax Return"|"Other", "period": string | null }]
+}`;
 
     const messageContent: any[] = [{ type: "text", text: userPrompt }];
-    for (const imgFile of imageFiles.slice(0, 3)) {
+    for (const imgFile of imageFiles.slice(0, 4)) {
       const base64 = imgFile.buffer.toString("base64");
       messageContent.push({ type: "image_url", image_url: { url: `data:${imgFile.mimetype};base64,${base64}`, detail: "high" } });
     }
@@ -194,10 +255,10 @@ ${docSummary}`;
     const response = await ai.client.chat.completions.create({
       model: ai.model,
       messages: [
-        { role: "system", content: "You are a document parser. Extract entity and financial details precisely from financial documents. Return only JSON." },
+        { role: "system", content: "You are an expert chartered accountant and forensic document analyst specialising in Pakistan accounting and audit standards. Extract every field from financial documents with forensic precision. Return only valid JSON." },
         { role: "user", content: messageContent },
       ],
-      max_tokens: 1000,
+      max_tokens: 3000,
       temperature: 0.1,
       response_format: { type: "json_object" },
     });
@@ -354,53 +415,91 @@ router.post("/analyze", upload.array("files", 20), async (req: Request, res: Res
       `FILE: ${d.filename}\nTYPE: ${d.type}\n${d.isImage ? "[Scanned image — analyzed via vision API]" : smartChunk(d.content, 8000)}`
     ).join("\n\n---\n\n");
 
-    const systemPrompt = `You are AuditWise Engine v3, an enterprise-grade audit AI specializing in Pakistan audit & accounting standards.
-You analyze financial documents and generate ISA-compliant working papers with evidence-based cross-referencing.
+    const systemPrompt = `You are AuditWise AI — Pakistan's most advanced audit intelligence engine, calibrated to the full ICAP/IAASB standard suite and Pakistan legal framework.
 
-Standards compliance: ISA 200–720, ISQM 1 & 2, IFRS/IAS/IFRS for SMEs, ICAP Code of Ethics, Companies Act 2017 (Pakistan), SECP Regulations, FBR Laws (ITO 2001, STA 1990, FED Act).
+STANDARDS YOU MUST APPLY:
+• ISA 200–720 (all), ISQM 1 & 2, ISA 315 (Revised 2019), ISA 540 (Revised 2019)
+• IFRS Full Suite, IFRS for SMEs, IAS 1, 2, 7, 8, 10, 12, 16, 19, 24, 36, 37, 38, 40
+• ICAP Code of Ethics (2022), Companies Act 2017, SECP (Listed Companies) Regulations 2017
+• FBR: ITO 2001, STA 1990, Federal Excise Act 2005, Finance Act (latest), SRO notifications
+• AMLA 2010, FATF Recommendations, CDD/KYC requirements for audit firms
+• SBP Prudential Regulations (for banking entities), SECP Insurance Ordinance (for insurers)
 
-RULES:
-- Never leave any field blank. Never generate placeholder or generic text.
-- When data is missing, generate realistic, plausible estimated data clearly tagged as "[Auditor Assumption / Estimated]"
-- Always use professional audit language: "We have performed...", "The audit procedures indicate..."
-- Evidence IDs follow format: A-100 (TB), B-200 (GL), C-300 (Bank), D-400 (FS), E-500 (Contracts), F-600 (Others)`;
+GENERATION MANDATE:
+1. ALL fields are MANDATORY — never return null for computed fields; derive estimates from available data.
+2. When document data is insufficient, generate REALISTIC, ENTITY-SPECIFIC figures tagged "[Auditor Estimate — ISA 315]".
+3. Every risk must map to specific ISA assertion categories: Occurrence, Completeness, Accuracy, Cut-off, Classification, Existence, Rights & Obligations, Valuation, Presentation & Disclosure.
+4. Materiality MUST be computed from actual financial data using the hierarchy: Net Profit 5-10% > Revenue 0.5-1% > Total Assets 1-2% > Equity 2-5%.
+5. Use precise professional language per ISA 230 documentation standards.
+6. Risk ratings must be evidence-based, not generic.
+7. Every ratio must be computed from actual extracted figures — show your arithmetic.`;
 
-    const userPrompt = `Analyze the following documents for a ${engagementType || "statutory audit"} engagement.
+    const userPrompt = `Perform a COMPREHENSIVE audit intelligence analysis for this ${engagementType || "statutory audit"} engagement.
 
-ENTITY: ${entityName || "Client Company"}
-FINANCIAL YEAR: ${financialYear || "Year ending June 30, 2024"}
-AUDITOR INSTRUCTIONS: ${instructions || "Generate complete audit working papers"}
+═══════════════════════════════════════════════════════
+ENGAGEMENT CONTEXT
+═══════════════════════════════════════════════════════
+Entity: ${entityName || "Client Company"}
+Financial Year: ${financialYear || "Year ending June 30, 2024"}
+Special Instructions from Auditor: ${instructions || "Full ISA-compliant working papers required"}
 
-UPLOADED DOCUMENTS:
+═══════════════════════════════════════════════════════
+SOURCE DOCUMENTS (analyze every line)
+═══════════════════════════════════════════════════════
 ${docSummary}
 
-Extract and return a structured JSON object with this EXACT format (all fields required):
+═══════════════════════════════════════════════════════
+REQUIRED OUTPUT — Return ONLY valid JSON, no markdown
+═══════════════════════════════════════════════════════
 {
   "entity": {
     "name": string,
-    "type": string,
+    "type": "Private Limited"|"Public Limited"|"Partnership"|"Sole Proprietor"|"NGO/NPO"|"Trust"|"Other",
     "industry": string,
+    "sub_industry": string,
     "financial_year": string,
-    "reporting_framework": string,
+    "period_start": string,
+    "period_end": string,
+    "reporting_framework": "IFRS"|"IFRS for SMEs"|"IPSAS"|"Other",
     "registration_no": string,
     "ntn": string,
-    "address": string
+    "strn": string,
+    "address": string,
+    "bankers": [string],
+    "key_persons": [{ "name": string, "role": string }]
   },
   "financials": {
     "revenue": number,
+    "cost_of_sales": number,
     "gross_profit": number,
+    "operating_expenses": number,
+    "ebitda": number,
+    "depreciation_amortization": number,
+    "finance_cost": number,
+    "net_profit_before_tax": number,
+    "tax_expense": number,
     "net_profit": number,
     "total_assets": number,
-    "total_liabilities": number,
-    "equity": number,
-    "cash_and_bank": number,
-    "trade_receivables": number,
-    "trade_payables": number,
-    "inventory": number,
+    "non_current_assets": number,
     "fixed_assets": number,
+    "current_assets": number,
+    "inventory": number,
+    "trade_receivables": number,
+    "cash_and_bank": number,
+    "total_liabilities": number,
+    "non_current_liabilities": number,
+    "long_term_debt": number,
+    "current_liabilities": number,
+    "trade_payables": number,
+    "short_term_borrowings": number,
+    "equity": number,
+    "share_capital": number,
+    "retained_earnings": number,
     "prior_year_revenue": number,
+    "prior_year_gross_profit": number,
     "prior_year_net_profit": number,
     "prior_year_total_assets": number,
+    "prior_year_equity": number,
     "currency": "PKR"
   },
   "materiality": {
@@ -408,60 +507,153 @@ Extract and return a structured JSON object with this EXACT format (all fields r
     "performance_materiality": number,
     "trivial_threshold": number,
     "basis": string,
+    "benchmark_value": number,
     "percentage_used": number,
     "rationale": string,
-    "isa_ref": "ISA 320"
+    "alternative_materiality": number,
+    "alternative_basis": string,
+    "group_materiality_applicable": boolean,
+    "isa_ref": "ISA 320",
+    "computation_steps": string
   },
   "risk_assessment": {
-    "overall_risk": "Low" | "Medium" | "High",
-    "inherent_risks": [{ "area": string, "risk": string, "level": "Low"|"Medium"|"High", "isa_ref": string, "assertions": [string] }],
-    "control_risks": [{ "area": string, "risk": string, "level": "Low"|"Medium"|"High", "implication": string }],
-    "fraud_indicators": [{ "indicator": string, "assessment": string, "isa_ref": "ISA 240" }]
+    "overall_risk": "Low"|"Medium"|"High"|"Very High",
+    "fraud_risk_level": "Low"|"Medium"|"High",
+    "going_concern_risk": "Low"|"Medium"|"High",
+    "inherent_risks": [{
+      "area": string,
+      "risk_description": string,
+      "root_cause": string,
+      "level": "Low"|"Medium"|"High",
+      "isa_ref": string,
+      "assertions_at_risk": ["Occurrence"|"Completeness"|"Accuracy"|"Cut-off"|"Classification"|"Existence"|"Rights"|"Valuation"|"Disclosure"],
+      "audit_response": string,
+      "materiality_threshold": number
+    }],
+    "control_risks": [{
+      "cycle": string,
+      "weakness": string,
+      "level": "Low"|"Medium"|"High",
+      "implication": string,
+      "compensating_controls": string,
+      "test_of_control_approach": string
+    }],
+    "fraud_risks": [{
+      "risk_type": "Management Override"|"Revenue Recognition"|"Asset Misappropriation"|"Financial Reporting"|"Other",
+      "indicator": string,
+      "assessment": string,
+      "audit_response": string,
+      "isa_ref": "ISA 240"
+    }],
+    "it_risks": [{ "system": string, "risk": string, "control": string }],
+    "key_audit_matters": [{ "matter": string, "significance": string, "audit_approach": string, "isa_ref": "ISA 701" }]
   },
   "analytical_procedures": {
     "ratios": {
       "current_ratio": number,
       "quick_ratio": number,
+      "cash_ratio": number,
       "gross_margin_pct": number,
+      "operating_margin_pct": number,
       "net_margin_pct": number,
+      "ebitda_margin_pct": number,
       "return_on_assets_pct": number,
+      "return_on_equity_pct": number,
       "debt_to_equity": number,
+      "debt_to_assets": number,
+      "interest_coverage": number,
       "asset_turnover": number,
       "receivables_days": number,
       "payables_days": number,
-      "inventory_days": number
+      "inventory_days": number,
+      "cash_conversion_cycle": number,
+      "working_capital": number
     },
-    "variance_analysis": [
-      { "item": string, "current_year": number, "prior_year": number, "variance_amount": number, "variance_pct": number, "assessment": string, "audit_response": string }
-    ],
+    "ratio_interpretations": [{ "ratio": string, "value": string, "benchmark": string, "interpretation": string, "audit_implication": string }],
+    "variance_analysis": [{
+      "item": string,
+      "current_year": number,
+      "prior_year": number,
+      "variance_amount": number,
+      "variance_pct": number,
+      "assessment": "Expected"|"Unexpected"|"Requires Investigation",
+      "explanation": string,
+      "audit_response": string
+    }],
     "trend_analysis": string,
+    "unusual_items": [{ "item": string, "amount": number, "concern": string, "procedure": string }],
     "analytical_conclusions": [string],
     "isa_ref": "ISA 520"
   },
   "reconciliation": {
+    "accounting_equation_check": { "assets": number, "liabilities_plus_equity": number, "difference": number, "balanced": boolean },
     "tb_vs_fs": { "status": "Reconciled"|"Unreconciled"|"Not Available", "difference": number, "notes": string },
     "tb_vs_gl": { "status": "Reconciled"|"Unreconciled"|"Not Available", "difference": number, "notes": string },
     "opening_vs_prior_year": { "status": "Reconciled"|"Unreconciled"|"Not Available", "difference": number, "notes": string },
     "bank_reconciliation": { "status": "Reconciled"|"Unreconciled"|"Not Available", "difference": number, "notes": string },
+    "pl_vs_tb": { "status": "Reconciled"|"Unreconciled"|"Not Available", "difference": number, "notes": string },
     "flags": [string]
   },
-  "internal_control_weaknesses": [
-    { "area": string, "weakness": string, "risk_level": "Low"|"Medium"|"High", "recommendation": string, "management_response": string }
-  ],
-  "evidence_items": [
-    { "id": string, "filename": string, "type": "TB"|"GL"|"Bank"|"FS"|"Contracts"|"Others", "description": string, "pages_or_sheets": string, "date_received": string }
-  ],
-  "key_audit_areas": [
-    { "area": string, "assertions": [string], "risk_level": string, "audit_approach": string, "procedures": [string], "evidence_refs": [string] }
-  ],
-  "documents_classified": [
-    { "filename": string, "classified_as": string, "evidence_id": string, "data_extracted": string }
-  ],
+  "internal_control_weaknesses": [{
+    "cycle": "Revenue"|"Purchases"|"Payroll"|"Fixed Assets"|"Treasury"|"IT"|"Financial Reporting"|"Other",
+    "area": string,
+    "weakness": string,
+    "root_cause": string,
+    "risk_level": "Low"|"Medium"|"High"|"Critical",
+    "impact": string,
+    "recommendation": string,
+    "management_response": string,
+    "isa_ref": "ISA 265"
+  }],
+  "tax_analysis": {
+    "income_tax_provision": number,
+    "effective_tax_rate_pct": number,
+    "minimum_tax_applicable": boolean,
+    "minimum_tax_amount": number,
+    "super_tax_applicable": boolean,
+    "super_tax_amount": number,
+    "wht_exposure": string,
+    "sales_tax_compliant": boolean,
+    "tax_risks": [{ "risk": string, "section": string, "amount": number, "recommendation": string }],
+    "deferred_tax_position": string
+  },
+  "evidence_items": [{
+    "id": string,
+    "filename": string,
+    "type": "TB"|"GL"|"Bank"|"FS"|"Tax Return"|"Contracts"|"Board Minutes"|"Others",
+    "description": string,
+    "period_covered": string,
+    "date_received": string,
+    "reliability": "High"|"Medium"|"Low",
+    "sufficiency": "Sufficient"|"Partial"|"Insufficient"
+  }],
+  "audit_program_highlights": [{
+    "area": string,
+    "risk_level": "Low"|"Medium"|"High",
+    "assertions": [string],
+    "planned_procedures": [string],
+    "sample_size": number,
+    "evidence_refs": [string]
+  }],
+  "documents_classified": [{
+    "filename": string,
+    "classified_as": string,
+    "evidence_id": string,
+    "key_data_extracted": string,
+    "reliability_assessment": string
+  }],
+  "going_concern_indicators": {
+    "positive": [string],
+    "negative": [string],
+    "auditor_conclusion": string,
+    "isa_ref": "ISA 570"
+  },
   "missing_data_flags": [string],
-  "assumptions_made": [string]
+  "assumptions_made": [string],
+  "auditor_notes": string
 }
 
-Return ONLY valid JSON, no markdown, no extra text.`;
+CRITICAL: All ratio values must be actual numbers (not strings). Compute every ratio from the extracted financial data. Return ONLY valid JSON.`;
 
     const messageContent: any[] = [{ type: "text", text: userPrompt }];
 
@@ -479,8 +671,8 @@ Return ONLY valid JSON, no markdown, no extra text.`;
         { role: "system", content: systemPrompt },
         { role: "user", content: messageContent },
       ],
-      max_tokens: 4000,
-      temperature: 0.3,
+      max_tokens: 6000,
+      temperature: 0.15,
       response_format: { type: "json_object" },
     });
 
@@ -573,47 +765,102 @@ router.post("/generate-gl-tb", async (req: Request, res: Response) => {
   const bsSummary = (bsData || []).map((s: any) => s.lines?.map((l: any) => `${l.label}: CY=${l.cy || 0}, PY=${l.py || 0}`).join("; ")).join(" | ");
   const plSummary = (plData || []).map((s: any) => s.lines?.map((l: any) => `${l.label}: CY=${l.cy || 0}, PY=${l.py || 0}`).join("; ")).join(" | ");
 
-  const prompt = `You are a senior chartered accountant in Pakistan. Generate a COMPLETE General Ledger and Trial Balance for the following entity.
+  const prompt = `You are a Big-4-trained Pakistan chartered accountant and systems accountant. Your task is to construct a mathematically perfect, audit-ready General Ledger and Trial Balance that EXACTLY reconciles to the provided financial statements.
 
-ENTITY: ${entityName || "Sample Company"}
-INDUSTRY: ${industry || "Manufacturing"}
-FINANCIAL YEAR: ${financialYear || "Year ended June 30, 2024"}
+══════════════════════════════════════════════════════
+ENTITY PROFILE
+══════════════════════════════════════════════════════
+Entity: ${entityName || "Sample Company (Private) Limited"}
+Industry: ${industry || "Manufacturing / Trading"}
+Financial Year: ${financialYear || "Year ended June 30, 2024"}
 NTN: ${ntn || "N/A"} | STRN: ${strn || "N/A"}
-FRAMEWORK: ${framework || "IFRS"}
-ENGAGEMENT: ${engagementType || "Statutory Audit"}
+Framework: ${framework || "IFRS"} | Engagement: ${engagementType || "Statutory Audit"}
 
-FINANCIAL STATEMENTS DATA:
-Balance Sheet: ${bsSummary || "Not provided"}
-Profit & Loss: ${plSummary || "Not provided"}
+══════════════════════════════════════════════════════
+FINANCIAL STATEMENTS — YOUR GL/TB MUST RECONCILE TO THESE EXACTLY
+══════════════════════════════════════════════════════
+BALANCE SHEET LINE ITEMS:
+${bsSummary || "Total Assets = Total Liabilities + Equity (generate realistic figures)"}
 
-INSTRUCTIONS:
-1. Generate a detailed General Ledger with realistic Pakistan-style transactions for the full financial year.
-2. Use Pakistani Chart of Accounts coding (4-digit codes): 1xxx=Assets, 2xxx=Liabilities, 3xxx=Equity, 4xxx=Revenue, 5xxx=Cost of Sales, 6xxx=Expenses, 7xxx=Other Income, 8xxx=Tax.
-3. Each GL entry must have: date, voucher_no (JV-001 format), account_code, account_name, narration (Pakistan business context), debit, credit.
-4. Include typical Pakistan transactions: sales tax input/output, WHT deductions, bank charges, supplier payments, salary disbursement, utility payments, depreciation, provisions, tax payments, EOBI/gratuity.
-5. Generate minimum 40-60 transaction entries covering the full year.
-6. From the GL, derive a Trial Balance that EXACTLY matches - every account's total debits and credits must reconcile.
-7. Trial Balance columns: account_code, account_name, debit_total, credit_total, balance_dr, balance_cr.
-8. TB total debits MUST equal total credits (balanced).
+PROFIT & LOSS LINE ITEMS:
+${plSummary || "Revenue minus expenses = Net Profit (generate realistic figures)"}
 
-Return ONLY valid JSON:
+══════════════════════════════════════════════════════
+MANDATORY CONSTRUCTION RULES
+══════════════════════════════════════════════════════
+CHART OF ACCOUNTS — Use ICAP-aligned 4-digit Pakistan COA:
+  1000-1999: Assets (1100=Fixed Assets, 1200=Intangibles, 1300=LT Investments, 1400=Debtors, 1500=Inventory, 1600=Advances/Deposits, 1700=Cash & Bank, 1800=Other CA)
+  2000-2999: Liabilities (2100=Long-term Loans, 2200=Deferred Tax, 2300=Trade Payables, 2400=Accruals, 2500=WHT Payable, 2600=Sales Tax Payable, 2700=Short-term Borrowings, 2800=Other CL)
+  3000-3999: Equity (3100=Share Capital, 3200=General Reserve, 3300=Retained Earnings, 3400=Surplus on Revaluation)
+  4000-4999: Revenue (4100=Sales/Revenue, 4200=Other Income, 4300=Gain on Disposal)
+  5000-5999: Cost of Sales (5100=Raw Materials, 5200=Direct Labour, 5300=Factory Overhead)
+  6000-6999: Operating Expenses (6100=Admin Expenses, 6200=Selling Expenses, 6300=Finance Cost)
+  7000-7999: Tax (7100=Current Tax, 7200=Deferred Tax Charge, 7300=Super Tax)
+
+GL ENTRY REQUIREMENTS:
+1. Generate 80-100 realistic, dated journal entries spanning the full financial year (monthly spread).
+2. Every entry must balance: total debits in entry = total credits in entry.
+3. Include ALL these Pakistan-specific transaction types:
+   — Monthly sales entries with 17% GST output (STA 1990 Sec 3) and WHT from customers (ITO 2001 Sec 153)
+   — Purchases with GST input tax and WHT deducted at source (Sec 153 at 4.5% or Sec 148)
+   — Monthly salary disbursements with income tax deduction (Sec 149), EOBI (Rs.370/month/employee), SESSI/PESSI
+   — Bank charges, loan interest, KIBOR-linked markup
+   — Utility bills (SNGPL/SSGC gas, LESCO/KESCO electricity) with applicable taxes
+   — Advance tax payments (Sec 147 quarterly instalments)
+   — Depreciation — straight line per IAS 16 with Pakistan tax rates (Sec 22 ITO 2001)
+   — Provision for gratuity per IAS 19 / Employment ordinance
+   — Import purchases with customs duty (NTN-based) and advance income tax (Sec 148)
+   — Year-end closing entries: tax provision, deferred tax adjustment, retained earnings transfer
+   — Inter-bank transfers, cheque payments with bank reference numbers
+4. Voucher numbers: JV-001 (journal), RV-001 (receipt), PV-001 (payment), BPV-001 (bank payment), BRV-001 (bank receipt)
+5. Narrations must reflect real Pakistan business context (supplier names, bank names, PRAL references).
+
+TRIAL BALANCE RECONCILIATION MANDATE:
+- Sum of all GL debits per account = debit_total in TB for that account
+- Sum of all GL credits per account = credit_total in TB for that account
+- balance_dr = debit_total - credit_total (if positive), else 0
+- balance_cr = credit_total - debit_total (if positive), else 0
+- GRAND TOTAL: Sum(balance_dr) MUST EXACTLY EQUAL Sum(balance_cr)
+- TB Asset balances MUST reconcile to Balance Sheet asset totals
+- TB Revenue/Expense balances MUST reconcile to P&L totals
+- Closing retained earnings in TB = Opening RE + Net Profit
+
+Return ONLY valid JSON (no markdown):
 {
   "general_ledger": [
-    { "date": "2023-07-01", "voucher_no": "JV-001", "account_code": "1001", "account_name": "Cash at Bank - HBL", "narration": "Opening balance brought forward", "debit": 500000, "credit": 0 }
+    { "date": "2023-07-01", "voucher_no": "JV-001", "account_code": "3300", "account_name": "Retained Earnings", "narration": "Opening balance b/f per prior year audited accounts", "debit": 0, "credit": 15000000, "ref": "OB-001" }
   ],
   "trial_balance": [
-    { "account_code": "1001", "account_name": "Cash at Bank - HBL", "debit_total": 5000000, "credit_total": 4500000, "balance_dr": 500000, "balance_cr": 0 }
+    { "account_code": "1701", "account_name": "Cash at Bank — HBL Current A/c No. 1234-5", "fs_head": "Cash & Bank Balances", "classification": "Current Asset", "debit_total": 45000000, "credit_total": 43200000, "balance_dr": 1800000, "balance_cr": 0, "fs_mapping": "Balance Sheet — Current Assets" }
   ],
   "chart_of_accounts": [
-    { "code": "1001", "name": "Cash at Bank - HBL", "group": "Current Assets", "type": "Asset" }
-  ]
+    { "code": "1701", "name": "Cash at Bank — HBL Current A/c No. 1234-5", "group": "Current Assets", "sub_group": "Cash & Bank Balances", "type": "Asset", "normal_balance": "Debit", "fs_line": "Cash and bank balances", "tax_code": "N/A" }
+  ],
+  "reconciliation_proof": {
+    "total_gl_debits": number,
+    "total_gl_credits": number,
+    "gl_balanced": boolean,
+    "total_tb_dr_balances": number,
+    "total_tb_cr_balances": number,
+    "tb_balanced": boolean,
+    "total_assets_per_tb": number,
+    "total_liabilities_equity_per_tb": number,
+    "accounting_equation_satisfied": boolean,
+    "revenue_per_tb": number,
+    "expenses_per_tb": number,
+    "net_profit_per_tb": number
+  }
 }`;
 
   try {
     const completion = await ai.client.chat.completions.create({
       model: ai.model,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.3,
+      messages: [
+        { role: "system", content: "You are a Pakistan-qualified chartered accountant and systems accountant. Generate a mathematically perfect, audit-ready General Ledger and Trial Balance. Every number must reconcile. Return only valid JSON. Ensure total debit balances equal total credit balances in the trial balance." },
+        { role: "user", content: prompt }
+      ],
+      max_tokens: 8000,
+      temperature: 0.2,
       response_format: { type: "json_object" },
     });
 
@@ -900,16 +1147,50 @@ Return JSON: { "working_papers": [...] }`;
         return def ? `${ref}: ${def.title} (${def.section}) — ${def.isa} — ${def.description}` : ref;
       }).join("\n");
 
-      const batchPrompt = `Generate the following audit working papers (batch ${bi + 1} of ${batches.length}):\n${batchDefs}\n\n${contextBlock}\n\n${wpJsonSchema}`;
+      const batchPrompt = `══════════════════════════════════════════════════════════════════
+WORKING PAPERS TO GENERATE — Batch ${bi + 1} of ${batches.length}
+══════════════════════════════════════════════════════════════════
+${batchDefs}
+
+══════════════════════════════════════════════════════════════════
+FULL ENGAGEMENT CONTEXT (use ALL data below in every paper)
+══════════════════════════════════════════════════════════════════
+${contextBlock}
+
+══════════════════════════════════════════════════════════════════
+GENERATION MANDATE — READ CAREFULLY
+══════════════════════════════════════════════════════════════════
+Each working paper MUST:
+1. Use ACTUAL financial figures from the context above — no placeholders like "XXX" or "[amount]".
+2. Reference specific ISA paragraphs (e.g. "ISA 315.26(a)", "ISA 320.10") not just "ISA 315".
+3. Include at least 6-10 detailed audit procedures per paper with specific findings.
+4. Every procedure finding must reference actual numbers, account names, or document references.
+5. Pakistan-specific compliance: cite ITO 2001 sections, STA 1990, Companies Act 2017 where applicable.
+6. Cross-reference to related working papers using exact WP references (e.g. "See B6 for materiality").
+7. Evidence refs must match the evidence items in the context (use actual filenames or generate realistic refs like "TB-01", "GL-01", "BS-01").
+8. Conclusions must be affirmative professional statements: "Based on procedures performed, we are satisfied that..."
+9. Sign-off details: preparer, reviewer, approver as provided in context.
+10. Materiality amounts must be the EXACT amounts from the context — ${materiality.overall_materiality ? `OM = PKR ${(materiality.overall_materiality || 0).toLocaleString("en-PK")}` : "compute from financials"}.
+
+${wpJsonSchema}`;
 
       const genResponse = await ai.client.chat.completions.create({
         model: ai.model,
         messages: [
-          { role: "system", content: "You are a professional Pakistan audit AI engine. Generate ISA-compliant working papers. Return only valid JSON. Never use placeholder text." },
+          { role: "system", content: `You are AuditWise — Pakistan's premier audit working paper AI engine trained on Big-4 methodologies and ICAP standards.
+
+ABSOLUTE RULES:
+• NEVER use placeholder text like "[amount]", "[name]", "XXX", "TBD", "[insert]" — use real data from the context.
+• NEVER generate generic procedures — every procedure must be specific to this entity, industry, and financial data.
+• Every working paper is a LEGAL AUDIT DOCUMENT — write with precision, completeness, and professional scepticism.
+• Use ISA 230 documentation standards: who did what, when, what was found, what was concluded.
+• All figures must be in PKR with realistic amounts consistent with the entity's financial scale.
+• Materiality thresholds must appear in substantive testing procedures.
+• Return ONLY valid JSON in the exact schema provided. No markdown, no prose outside JSON.` },
           { role: "user", content: batchPrompt },
         ],
-        max_tokens: 12000,
-        temperature: 0.2,
+        max_tokens: 14000,
+        temperature: 0.15,
         response_format: { type: "json_object" },
       });
 
