@@ -53,8 +53,9 @@ setup_ssh() {
       { warn "Could not auto-install sshpass; trying ssh-copy approach"; }
     fi
     if command -v sshpass &>/dev/null; then
-      SSH_CMD="sshpass -e ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -p $VPS_PORT"
-      export SSHPASS="$VPS_SSH_PASSWORD"
+      SSH_CMD="sshpass -e ssh -o StrictHostKeyChecking=no -o PubkeyAuthentication=no -o ConnectTimeout=20 -p $VPS_PORT"
+      SSHPASS=$(printf '%s' "$VPS_SSH_PASSWORD")
+      export SSHPASS
       ok "Password auth ready via sshpass"
     else
       err "sshpass not available and no SSH key set. Please add VPS_SSH_KEY to Replit Secrets."
