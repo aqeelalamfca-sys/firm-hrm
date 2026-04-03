@@ -497,6 +497,35 @@ function YesNoToggle({ label, value, onChange, hint }: { label: string; value: b
   );
 }
 
+function VarGroupPanel({ id, label, icon: Icon, color, children, openGroup, onToggle }:
+  { id: string; label: string; icon: any; color: string; children: React.ReactNode; openGroup: string | null; onToggle: (g: string) => void }) {
+  const isOpen = openGroup === id;
+  return (
+    <div className={cn("border rounded-xl", color)}>
+      <button className="w-full flex items-center justify-between p-3 text-left hover:bg-white/50 transition-colors"
+        onClick={() => onToggle(id)}>
+        <div className="flex items-center gap-2">
+          <Icon className="w-4 h-4 text-slate-600" />
+          <span className="font-medium text-sm text-slate-800">{label}</span>
+        </div>
+        <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-200", isOpen && "rotate-180")} />
+      </button>
+      <div className={cn("overflow-hidden transition-all duration-200", isOpen ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0")}>
+        <div className="p-4 bg-white border-t border-slate-100">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function VarField({ label, children, span }: { label: string; children: React.ReactNode; span?: boolean }) {
+  return (
+    <div className={cn("space-y-1", span ? "col-span-2" : "")}>
+      <Label className="text-xs text-slate-600">{label}</Label>
+      {children}
+    </div>
+  );
+}
+
 // ─── STEP 0: UPLOAD ────────────────────────────────────────────────────────────
 
 function UploadStep({ fsFiles, stFiles, onFsAdd, onStAdd, onFsRemove, onStRemove, onContinue }:
@@ -591,34 +620,9 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
 
   const [openGroup, setOpenGroup] = useState<string | null>("A");
   const set = (field: keyof VariableMatrix, val: any) => onChange({ ...vars, [field]: val });
-  const toggle = (g: string) => setOpenGroup(g === openGroup ? null : g);
+  const toggle = useCallback((g: string) => setOpenGroup(prev => g === prev ? null : g), []);
 
-  const GroupPanel = ({ id, label, icon: Icon, color, children }:
-    { id: string; label: string; icon: any; color: string; children: React.ReactNode }) => {
-    const isOpen = openGroup === id;
-    return (
-      <div className={cn("border rounded-xl", color)}>
-        <button className="w-full flex items-center justify-between p-3 text-left hover:bg-white/50 transition-colors"
-          onClick={() => toggle(id)}>
-          <div className="flex items-center gap-2">
-            <Icon className="w-4 h-4 text-slate-600" />
-            <span className="font-medium text-sm text-slate-800">{label}</span>
-          </div>
-          <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-200", isOpen && "rotate-180")} />
-        </button>
-        <div className={cn("overflow-hidden transition-all duration-200", isOpen ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0")}>
-          <div className="p-4 bg-white border-t border-slate-100">{children}</div>
-        </div>
-      </div>
-    );
-  };
-
-  const Field = ({ label, children, span }: { label: string; children: React.ReactNode; span?: boolean }) => (
-    <div className={cn("space-y-1", span ? "col-span-2" : "")}>
-      <Label className="text-xs text-slate-600">{label}</Label>
-      {children}
-    </div>
-  );
+  const Field = VarField;
 
   const canContinue = vars.entityName.trim() !== "" && vars.yearEnd !== "";
 
@@ -630,7 +634,7 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
       </div>
 
       {/* A. Engagement Profile */}
-      <GroupPanel id="A" label="A. Engagement Profile" icon={Briefcase} color="bg-blue-50 border-blue-200">
+      <VarGroupPanel id="A" label="A. Engagement Profile" icon={Briefcase} color="bg-blue-50 border-blue-200" openGroup={openGroup} onToggle={toggle}>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Engagement Type *">
             <Select value={vars.engagementType} onValueChange={v => set("engagementType", v)}>
@@ -668,10 +672,10 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
           <YesNoToggle label="Group Audit" value={vars.groupAudit} onChange={v => set("groupAudit", v)} hint="ISA 600 applies" />
           <YesNoToggle label="EQCR Required" value={vars.eqcrRequired} onChange={v => set("eqcrRequired", v)} hint="ISQM 2 — for PIE or complex engagements" />
         </div>
-      </GroupPanel>
+      </VarGroupPanel>
 
       {/* B. Entity Profile */}
-      <GroupPanel id="B" label="B. Entity Profile" icon={Building2} color="bg-violet-50 border-violet-200">
+      <VarGroupPanel id="B" label="B. Entity Profile" icon={Building2} color="bg-violet-50 border-violet-200" openGroup={openGroup} onToggle={toggle}>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Entity Name *" span>
             <Input value={vars.entityName} onChange={e => set("entityName", e.target.value)} className="h-8 text-xs truncate" placeholder="Company name" maxLength={200} />
@@ -724,10 +728,10 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
           <YesNoToggle label="Foreign Operations" value={vars.foreignOperations} onChange={v => set("foreignOperations", v)} hint="ISA 600 — component auditor may apply" />
           <YesNoToggle label="Related Parties Exist" value={vars.relatedPartiesExist} onChange={v => set("relatedPartiesExist", v)} hint="ISA 550, IAS 24" />
         </div>
-      </GroupPanel>
+      </VarGroupPanel>
 
       {/* C. Financial Reporting */}
-      <GroupPanel id="C" label="C. Financial Reporting" icon={BookOpen} color="bg-green-50 border-green-200">
+      <VarGroupPanel id="C" label="C. Financial Reporting" icon={BookOpen} color="bg-green-50 border-green-200" openGroup={openGroup} onToggle={toggle}>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Reporting Framework">
             <Select value={vars.framework} onValueChange={v => set("framework", v)}>
@@ -756,10 +760,10 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
           <YesNoToggle label="Prior Year FS Available" value={vars.priorYearFsAvailable} onChange={v => set("priorYearFsAvailable", v)} hint="ISA 510 — opening balances" />
           <YesNoToggle label="Audit Adjustments Expected" value={vars.auditAdjustmentsExpected} onChange={v => set("auditAdjustmentsExpected", v)} hint="ISA 450" />
         </div>
-      </GroupPanel>
+      </VarGroupPanel>
 
       {/* D. Tax & Regulatory */}
-      <GroupPanel id="D" label="D. Tax & Regulatory" icon={DollarSign} color="bg-yellow-50 border-yellow-200">
+      <VarGroupPanel id="D" label="D. Tax & Regulatory" icon={DollarSign} color="bg-yellow-50 border-yellow-200" openGroup={openGroup} onToggle={toggle}>
         <div className="grid grid-cols-2 gap-3 mb-3">
           <Field label="Provincial Sales Tax">
             <Select value={vars.provincialSalesTax} onValueChange={v => set("provincialSalesTax", v)}>
@@ -778,10 +782,10 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
           <YesNoToggle label="Deferred Tax Applicable" value={vars.deferredTaxApplicable} onChange={v => set("deferredTaxApplicable", v)} hint="IAS 12" />
           <YesNoToggle label="Tax Audit Exposure" value={vars.taxAuditExposure} onChange={v => set("taxAuditExposure", v)} hint="Prior FBR notices or pending assessments" />
         </div>
-      </GroupPanel>
+      </VarGroupPanel>
 
       {/* E. FS Components */}
-      <GroupPanel id="E" label="E. Financial Statement Components" icon={Layers} color="bg-orange-50 border-orange-200">
+      <VarGroupPanel id="E" label="E. Financial Statement Components" icon={Layers} color="bg-orange-50 border-orange-200" openGroup={openGroup} onToggle={toggle}>
         <div className="space-y-3">
           <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Assets</p>
           <div className="grid grid-cols-2 gap-0">
@@ -818,10 +822,10 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
             ))}
           </div>
         </div>
-      </GroupPanel>
+      </VarGroupPanel>
 
       {/* F. Risk Assessment */}
-      <GroupPanel id="F" label="F. Risk Assessment" icon={Shield} color="bg-red-50 border-red-200">
+      <VarGroupPanel id="F" label="F. Risk Assessment" icon={Shield} color="bg-red-50 border-red-200" openGroup={openGroup} onToggle={toggle}>
         <div className="grid grid-cols-2 gap-3 mb-3">
           <Field label="Internal Control Strength" span>
             <Select value={vars.internalControlStrength} onValueChange={v => set("internalControlStrength", v)}>
@@ -842,10 +846,10 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
           <YesNoToggle label="IT System Reliance" value={vars.itSystemReliance} onChange={v => set("itSystemReliance", v)} hint="ISA 315 — IT general controls" />
           <YesNoToggle label="Manual Accounting" value={vars.manualAccounting} onChange={v => set("manualAccounting", v)} hint="ISA 315 — higher error risk" />
         </div>
-      </GroupPanel>
+      </VarGroupPanel>
 
       {/* G. Audit Approach */}
-      <GroupPanel id="G" label="G. Audit Approach" icon={Target} color="bg-cyan-50 border-cyan-200">
+      <VarGroupPanel id="G" label="G. Audit Approach" icon={Target} color="bg-cyan-50 border-cyan-200" openGroup={openGroup} onToggle={toggle}>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Audit Approach">
             <Select value={vars.auditApproach} onValueChange={v => set("auditApproach", v)}>
@@ -879,10 +883,10 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
           <YesNoToggle label="Use of Experts Required" value={vars.useOfExperts} onChange={v => set("useOfExperts", v)} hint="ISA 620" />
           <YesNoToggle label="External Confirmations Required" value={vars.externalConfirmations} onChange={v => set("externalConfirmations", v)} hint="ISA 505" />
         </div>
-      </GroupPanel>
+      </VarGroupPanel>
 
       {/* H. Sales Tax Data */}
-      <GroupPanel id="H" label="H. Sales Tax Data" icon={Hash} color="bg-pink-50 border-pink-200">
+      <VarGroupPanel id="H" label="H. Sales Tax Data" icon={Hash} color="bg-pink-50 border-pink-200" openGroup={openGroup} onToggle={toggle}>
         <div className="grid grid-cols-2 gap-3">
           <Field label="ST Period From">
             <DatePickerField value={vars.stPeriodFrom} onChange={v => set("stPeriodFrom", v)} placeholder="ST period start" />
@@ -903,20 +907,20 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
         <div className="mt-3">
           <YesNoToggle label="Sales Tax Refund Claimed" value={vars.refundClaimed} onChange={v => set("refundClaimed", v)} />
         </div>
-      </GroupPanel>
+      </VarGroupPanel>
 
       {/* I. Document Availability */}
-      <GroupPanel id="I" label="I. Document Availability" icon={FileCheck} color="bg-teal-50 border-teal-200">
+      <VarGroupPanel id="I" label="I. Document Availability" icon={FileCheck} color="bg-teal-50 border-teal-200" openGroup={openGroup} onToggle={toggle}>
         <div className="space-y-0">
           <YesNoToggle label="Bank Statements Available" value={vars.bankStatementsAvailable} onChange={v => set("bankStatementsAvailable", v)} />
           <YesNoToggle label="Invoices / Tax Invoices Available" value={vars.invoicesAvailable} onChange={v => set("invoicesAvailable", v)} />
           <YesNoToggle label="Contracts / Agreements Available" value={vars.contractsAvailable} onChange={v => set("contractsAvailable", v)} />
           <YesNoToggle label="Prior Year Working Papers Available" value={vars.priorYearWPsAvailable} onChange={v => set("priorYearWPsAvailable", v)} />
         </div>
-      </GroupPanel>
+      </VarGroupPanel>
 
       {/* J. Output Control */}
-      <GroupPanel id="J" label="J. Output Control" icon={FileOutput} color="bg-slate-50 border-slate-300">
+      <VarGroupPanel id="J" label="J. Output Control" icon={FileOutput} color="bg-slate-50 border-slate-300" openGroup={openGroup} onToggle={toggle}>
         <div className="grid grid-cols-2 gap-3 mb-3">
           <Field label="Detail Level">
             <Select value={vars.detailLevel} onValueChange={v => set("detailLevel", v)}>
@@ -940,7 +944,7 @@ function VariablesStep({ vars, onChange, onContinue, onBack }:
           <YesNoToggle label="Generate General Ledger" value={vars.generateGL} onChange={v => set("generateGL", v)} />
           <YesNoToggle label="Generate Working Papers" value={vars.generateWPs} onChange={v => set("generateWPs", v)} />
         </div>
-      </GroupPanel>
+      </VarGroupPanel>
 
       {!canContinue && (
         <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
