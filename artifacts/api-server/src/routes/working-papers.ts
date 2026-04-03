@@ -780,8 +780,9 @@ router.post("/generate", async (req: Request, res: Response) => {
     ? evidenceItems.map((e: any) => `  ${e.id}: ${e.filename} (${e.type}) — ${e.description}`).join("\n")
     : "  EV-1: Trial Balance\n  EV-2: General Ledger\n  EV-3: Bank Statements";
 
+  const toN = (v: any, d = 2) => { const n = parseFloat(v); return isNaN(n) ? "—" : n.toFixed(d); };
   const ratiosSummary = ap.ratios
-    ? `Gross Margin: ${ap.ratios.gross_margin_pct?.toFixed(1)}% | Net Margin: ${ap.ratios.net_margin_pct?.toFixed(1)}% | Current Ratio: ${ap.ratios.current_ratio?.toFixed(2)} | D/E: ${ap.ratios.debt_to_equity?.toFixed(2)}`
+    ? `Gross Margin: ${toN(ap.ratios.gross_margin_pct, 1)}% | Net Margin: ${toN(ap.ratios.net_margin_pct, 1)}% | Current Ratio: ${toN(ap.ratios.current_ratio)} | D/E: ${toN(ap.ratios.debt_to_equity)}`
     : "Ratios not computed";
 
   const bsSummary = Array.isArray(bsData) ? bsData.flatMap((s: any) => (s.lines || []).map((l: any) => `${l.label}: CY=${l.cy}, PY=${l.py}`)).join("\n") : "";
@@ -1498,10 +1499,10 @@ router.post("/export-excel", async (req: Request, res: Response) => {
       ["Total Assets", fmtN(fin.total_assets), fmtN(fin.prior_year_total_assets), fin.total_assets && fin.prior_year_total_assets ? `${(((fin.total_assets - fin.prior_year_total_assets)/fin.prior_year_total_assets)*100).toFixed(1)}%` : "N/A", ""],
       [],
       ["KEY RATIOS"],
-      ["Gross Margin %", ratios.gross_margin_pct ? `${ratios.gross_margin_pct.toFixed(1)}%` : "N/A", "", "", ""],
-      ["Net Margin %", ratios.net_margin_pct ? `${ratios.net_margin_pct.toFixed(1)}%` : "N/A", "", "", ""],
-      ["Current Ratio", ratios.current_ratio ? ratios.current_ratio.toFixed(2) : "N/A", "", "", ""],
-      ["Debt-to-Equity", ratios.debt_to_equity ? ratios.debt_to_equity.toFixed(2) : "N/A", "", "", ""],
+      ["Gross Margin %", ratios.gross_margin_pct != null ? `${parseFloat(ratios.gross_margin_pct).toFixed(1)}%` : "N/A", "", "", ""],
+      ["Net Margin %", ratios.net_margin_pct != null ? `${parseFloat(ratios.net_margin_pct).toFixed(1)}%` : "N/A", "", "", ""],
+      ["Current Ratio", ratios.current_ratio != null ? parseFloat(ratios.current_ratio).toFixed(2) : "N/A", "", "", ""],
+      ["Debt-to-Equity", ratios.debt_to_equity != null ? parseFloat(ratios.debt_to_equity).toFixed(2) : "N/A", "", "", ""],
       ["Return on Assets %", fin.total_assets ? `${((fin.net_profit / fin.total_assets)*100).toFixed(1)}%` : "N/A", "", "", ""],
       ["Return on Equity %", fin.equity ? `${((fin.net_profit / fin.equity)*100).toFixed(1)}%` : "N/A", "", "", ""],
     ];
