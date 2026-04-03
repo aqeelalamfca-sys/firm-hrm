@@ -148,24 +148,45 @@ router.post("/extract-entity", upload.array("files", 20), async (req: Request, r
   try {
     const imageFiles = files.filter(f => f.mimetype.startsWith("image/"));
     const docs: string[] = [];
-    for (const file of files.slice(0, 10)) {
+    let totalSheets = 0;
+    let totalPages = 0;
+    for (const file of files) {
       const content = await extractTextFromFile(file);
-      docs.push(`FILE: ${file.originalname}\n${smartChunk(content, 6000)}`);
+      const name = file.originalname.toLowerCase();
+      if (name.endsWith(".xlsx") || name.endsWith(".xls") || file.mimetype.includes("spreadsheet") || file.mimetype.includes("excel")) {
+        const wb = XLSX.read(file.buffer, { type: "buffer" });
+        totalSheets += wb.SheetNames.length;
+      } else if (file.mimetype === "application/pdf" || name.endsWith(".pdf")) {
+        const pageMatches = content.match(/\f/g);
+        totalPages += (pageMatches ? pageMatches.length + 1 : Math.max(1, Math.ceil(content.length / 3000)));
+      } else {
+        totalPages += 1;
+      }
+      docs.push(`FILE: ${file.originalname}\n${smartChunk(content, 12000)}`);
     }
     const docSummary = docs.join("\n\n---\n\n");
+    logger.info(`extract-entity: processing ${files.length} files, ${totalSheets} sheets, ${totalPages} pages, ${docSummary.length} chars total`);
 
     const userPrompt = `You are a senior Pakistan-qualified chartered accountant and forensic document analyst with OCR expertise. Your task is to extract EVERY piece of auditable data from the uploaded financial documents.
 
-DOCUMENTS TO ANALYZE:
+COMPLETENESS MANDATE:
+- You MUST scan EVERY sheet in Excel files and EVERY page in PDF/other files.
+- Extraction is ONLY considered complete when every sheet, every page, and every data element has been fully scanned, structured, validated, and mapped.
+- If any data is missing, incomplete, or inconsistent, flag it explicitly in "flags".
+- Do NOT skip any sections, schedules, notes, annexures, or appendices.
+
+DOCUMENTS TO ANALYZE (${files.length} files, ${totalSheets} Excel sheets, ${totalPages} document pages):
 ${docSummary}
 
 EXTRACTION RULES:
-1. Read EVERY number, date, name, and reference from the documents with precision.
+1. Read EVERY number, date, name, and reference from ALL pages/sheets with precision.
 2. For all financial figures: extract as plain numbers in PKR (no commas, no currency symbols).
-3. If a document contains a Trial Balance or GL, extract ALL account lines.
+3. If a document contains a Trial Balance or GL, extract ALL account lines — every single row.
 4. If figures appear inconsistent, note the inconsistency in "flags".
 5. Use null for any field genuinely not present — never guess or fabricate.
 6. Extract BOTH current year and prior year figures wherever visible.
+7. For multi-sheet Excel files: scan EVERY sheet — Balance Sheet, P&L, TB, Notes, Schedules, etc.
+8. For multi-page PDFs: read EVERY page including notes to accounts, schedules, and annexures.
 
 Return ONLY valid JSON (no markdown, no extra text):
 {
@@ -255,10 +276,10 @@ Return ONLY valid JSON (no markdown, no extra text):
     const response = await ai.client.chat.completions.create({
       model: ai.model,
       messages: [
-        { role: "system", content: "You are an expert chartered accountant and forensic document analyst specialising in Pakistan accounting and audit standards. Extract every field from financial documents with forensic precision. Return only valid JSON." },
+        { role: "system", content: "You are an expert chartered accountant and forensic document analyst specialising in Pakistan accounting and audit standards. Extract every field from financial documents with forensic precision. Scan EVERY sheet in Excel files and EVERY page in PDFs — no content may be skipped. Return only valid JSON." },
         { role: "user", content: messageContent },
       ],
-      max_tokens: 3000,
+      max_tokens: 8000,
       temperature: 0.1,
       response_format: { type: "json_object" },
     });
@@ -266,6 +287,14 @@ Return ONLY valid JSON (no markdown, no extra text):
     const raw = response.choices[0]?.message?.content || "{}";
     let data: any = {};
     try { data = JSON.parse(raw); } catch { data = {}; }
+
+    data._extraction_stats = {
+      files_processed: files.length,
+      total_sheets: totalSheets,
+      total_pages: totalPages,
+      total_chars_scanned: docSummary.length,
+    };
+
     return res.json(data);
   } catch (err: any) {
     logger.error({ err }, "extract-entity failed");
@@ -412,8 +441,9 @@ router.post("/analyze", upload.array("files", 20), async (req: Request, res: Res
     }
 
     const docSummary = extractedDocs.map(d =>
-      `FILE: ${d.filename}\nTYPE: ${d.type}\n${d.isImage ? "[Scanned image — analyzed via vision API]" : smartChunk(d.content, 8000)}`
+      `FILE: ${d.filename}\nTYPE: ${d.type}\n${d.isImage ? "[Scanned image — analyzed via vision API]" : smartChunk(d.content, 14000)}`
     ).join("\n\n---\n\n");
+    logger.info(`analyze: processing ${files.length} files (${docSummary.length} chars total content)`);
 
     const systemPrompt = `You are AuditWise AI — Pakistan's most advanced audit intelligence engine, calibrated to the full ICAP/IAASB standard suite and Pakistan legal framework.
 
@@ -436,6 +466,12 @@ GENERATION MANDATE:
 
     const userPrompt = `Perform a COMPREHENSIVE audit intelligence analysis for this ${engagementType || "statutory audit"} engagement.
 
+COMPLETENESS MANDATE:
+- Every sheet in Excel files and every page in PDFs/other files MUST be fully scanned, structured, validated, and mapped into audit-ready datasets.
+- Extraction is NOT considered complete if any schedule, note, annexure, or data element has been skipped.
+- All financial figures must be cross-checked: Assets = Liabilities + Equity, Revenue − Expenses = Net Profit. Flag any imbalance.
+- Include ALL line items from every financial schedule — not just totals or summaries.
+
 ═══════════════════════════════════════════════════════
 ENGAGEMENT CONTEXT
 ═══════════════════════════════════════════════════════
@@ -444,7 +480,7 @@ Financial Year: ${financialYear || "Year ending June 30, 2024"}
 Special Instructions from Auditor: ${instructions || "Full ISA-compliant working papers required"}
 
 ═══════════════════════════════════════════════════════
-SOURCE DOCUMENTS (analyze every line)
+SOURCE DOCUMENTS (analyze every line of every sheet/page)
 ═══════════════════════════════════════════════════════
 ${docSummary}
 
@@ -671,7 +707,7 @@ CRITICAL: All ratio values must be actual numbers (not strings). Compute every r
         { role: "system", content: systemPrompt },
         { role: "user", content: messageContent },
       ],
-      max_tokens: 6000,
+      max_tokens: 12000,
       temperature: 0.15,
       response_format: { type: "json_object" },
     });
@@ -688,6 +724,11 @@ CRITICAL: All ratio values must be actual numbers (not strings). Compute every r
       success: true,
       analysis: analysisData,
       documentsProcessed: extractedDocs.map(d => ({ filename: d.filename, type: d.type })),
+      _analysis_stats: {
+        files_processed: files.length,
+        total_chars_analyzed: docSummary.length,
+        documents_classified: extractedDocs.length,
+      },
     });
   } catch (err: any) {
     logger.error({ err }, "Working paper analysis failed");

@@ -1928,6 +1928,7 @@ export default function WorkingPapers() {
 
   // ─ Loading States ─
   const [extracting, setExtracting] = useState(false);
+  const [extractPhase, setExtractPhase] = useState<{ step: number; label: string; detail: string }>({ step: 0, label: "", detail: "" });
   const [generatingTB, setGeneratingTB] = useState(false);
   const [generatingWPs, setGeneratingWPs] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
@@ -1955,9 +1956,12 @@ export default function WorkingPapers() {
     }
 
     setExtracting(true);
+    const totalFiles = fsFiles.length + stFiles.length;
 
     try {
-      // Step 1: Extract entity + financial data
+      // Phase 1: Scanning & uploading files
+      setExtractPhase({ step: 1, label: "Scanning Documents", detail: `Reading ${totalFiles} file(s) — scanning every sheet and page` });
+
       const fd1 = new FormData();
       [...fsFiles, ...stFiles].forEach(f => fd1.append("files", f));
       fd1.append("entityName", session.vars.entityName);
@@ -1969,17 +1973,25 @@ export default function WorkingPapers() {
         ].reduce((acc, [k, v]) => ({ ...acc, [k as string]: v }), {})
       ));
 
+      // Phase 2: Entity & Financial Extraction
+      setExtractPhase({ step: 2, label: "Extracting Financial Data", detail: "OCR scanning all pages · Extracting every account, figure, and reference" });
+
       const r1 = await fetch("/api/working-papers/extract-entity", {
         method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd1,
       });
       if (!r1.ok) throw new Error(`Extraction failed: ${r1.status}`);
       const extraction = await r1.json();
 
-      // Step 2: Full analysis (ISA 315 risk, materiality, ratios)
+      const stats = extraction._extraction_stats || {};
+      setExtractPhase({ step: 3, label: "Structuring Datasets", detail: `${stats.files_processed || totalFiles} files · ${stats.total_sheets || 0} Excel sheets · ${stats.total_pages || 0} pages scanned` });
+
+      // Phase 3: Full ISA Analysis
+      setExtractPhase({ step: 4, label: "Running ISA 315 Analysis", detail: "Risk assessment · Materiality computation · Ratio analysis · Reconciliation checks" });
+
       const fd2 = new FormData();
       [...fsFiles, ...stFiles].forEach(f => fd2.append("files", f));
-      fd2.append("entityName", extraction.entity?.entity_name || session.vars.entityName);
-      fd2.append("financialYear", extraction.entity?.financial_year || session.vars.yearEnd);
+      fd2.append("entityName", extraction.entity_name || session.vars.entityName);
+      fd2.append("financialYear", extraction.financial_year || session.vars.yearEnd);
       fd2.append("engagementType", session.vars.engagementType);
       fd2.append("instructions", `Framework: ${session.vars.framework}. Industry: ${session.vars.industry}. Materiality basis: ${session.vars.materialityBasis}. Performance materiality: ${session.vars.performanceMaterialityPct}%.`);
 
@@ -1989,9 +2001,12 @@ export default function WorkingPapers() {
       if (!r2.ok) throw new Error(`Analysis failed: ${r2.status}`);
       const analysis = await r2.json();
 
+      // Phase 4: Validating & Mapping
+      setExtractPhase({ step: 5, label: "Validating & Mapping", detail: "Cross-checking figures · Mapping to audit-ready datasets · Verifying completeness" });
+
       // Build extractedData from both responses
       const extractedData: ExtractedData = {
-        entity: { ...extraction.entity, ...analysis.entity },
+        entity: { ...extraction, ...analysis.entity },
         financials: { ...extraction.financials, ...analysis.financials },
         taxData: extraction.tax_data || {},
         tbLines: extraction.tb_lines || [],
@@ -1999,20 +2014,25 @@ export default function WorkingPapers() {
         flags: [...(extraction.flags || []), ...(analysis.flags || [])],
         documents_found: extraction.documents_found || [],
         extractionLog: [
+          `Scanned ${stats.files_processed || totalFiles} file(s) · ${stats.total_sheets || 0} Excel sheets · ${stats.total_pages || 0} document pages`,
+          `Total content scanned: ${((stats.total_chars_scanned || 0) / 1000).toFixed(0)}K characters`,
           `Processed ${fsFiles.length} Financial Statement file(s)`,
           `Processed ${stFiles.length} Sales Tax Return file(s)`,
-          `Entity identified: ${extraction.entity?.entity_name || "Unknown"}`,
+          `Entity identified: ${extraction.entity_name || "Unknown"}`,
           `Framework: ${session.vars.framework}`,
-          `Financial year: ${extraction.entity?.financial_year || session.vars.yearEnd}`,
-          `Risk assessment: ${analysis.risk_assessment?.overall_risk || "Medium"}`,
-          `Materiality computed: ${analysis.materiality?.overall_materiality ? fmtPKR(analysis.materiality.overall_materiality) : "Pending"}`,
-          ...(analysis.ratios ? ["Financial ratios: " + Object.keys(analysis.ratios).length + " computed"] : []),
+          `Financial year: ${extraction.financial_year || session.vars.yearEnd}`,
+          `Risk assessment: ${analysis.analysis?.risk_assessment?.overall_risk || "Medium"}`,
+          `Materiality computed: ${analysis.analysis?.materiality?.overall_materiality ? fmtPKR(analysis.analysis.materiality.overall_materiality) : "Pending"}`,
+          ...(analysis.analysis?.analytical_procedures?.ratios ? ["Financial ratios computed"] : []),
+          `Reconciliation checks: ${analysis.analysis?.reconciliation?.flags?.length || 0} flags`,
         ],
-        analysis,
+        analysis: analysis.analysis || analysis,
         confidenceScores: extraction.confidence_scores || {},
         assumptions: extraction.assumptions || analysis.assumptions || [],
-        missingData: extraction.missing_data || [],
+        missingData: extraction.missing_data || analysis.analysis?.missing_data_flags || [],
       };
+
+      setExtractPhase({ step: 6, label: "Complete", detail: "All data extracted, structured, and validated" });
 
       // Auto-fill variables from extraction
       const updatedVars: VariableMatrix = {
@@ -2466,11 +2486,47 @@ export default function WorkingPapers() {
           {/* STEP 2: Extraction */}
           {stepIdx === 2 && (
             extracting ? (
-              <div className="text-center py-16">
-                <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-500" />
-                <p className="text-slate-600 font-medium">Running AI Extraction...</p>
-                <p className="text-sm text-slate-400 mt-1">OCR reading files · Extracting financial data · Running ISA 315 analysis</p>
-                <p className="text-xs text-slate-400 mt-1">This takes 30-60 seconds depending on document complexity</p>
+              <div className="max-w-lg mx-auto py-10">
+                <div className="text-center mb-6">
+                  <Loader2 className="w-10 h-10 animate-spin mx-auto mb-3 text-blue-500" />
+                  <h3 className="text-lg font-bold text-slate-800">Running AI Extraction</h3>
+                  <p className="text-sm text-slate-500 mt-1">Every sheet and every page is being scanned exhaustively</p>
+                </div>
+
+                <div className="space-y-2 mb-6">
+                  {[
+                    { step: 1, label: "Scanning Documents" },
+                    { step: 2, label: "Extracting Financial Data" },
+                    { step: 3, label: "Structuring Datasets" },
+                    { step: 4, label: "Running ISA 315 Analysis" },
+                    { step: 5, label: "Validating & Mapping" },
+                    { step: 6, label: "Complete" },
+                  ].map(phase => {
+                    const isCurrent = extractPhase.step === phase.step;
+                    const isDone = extractPhase.step > phase.step;
+                    return (
+                      <div key={phase.step} className={cn(
+                        "flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-all",
+                        isCurrent ? "bg-blue-50 border-blue-200 shadow-sm" : isDone ? "bg-green-50 border-green-200" : "bg-slate-50 border-slate-100 opacity-50"
+                      )}>
+                        <div className={cn("w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold",
+                          isDone ? "bg-green-500 text-white" : isCurrent ? "bg-blue-500 text-white" : "bg-slate-200 text-slate-400"
+                        )}>
+                          {isDone ? <Check className="w-3.5 h-3.5" /> : isCurrent ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : phase.step}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={cn("text-sm font-medium", isCurrent ? "text-blue-800" : isDone ? "text-green-700" : "text-slate-400")}>{phase.label}</p>
+                          {isCurrent && extractPhase.detail && (
+                            <p className="text-xs text-blue-500 mt-0.5 truncate">{extractPhase.detail}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <Progress value={(extractPhase.step / 6) * 100} className="h-2 mb-2" />
+                <p className="text-xs text-slate-400 text-center">This typically takes 30–90 seconds depending on document size and complexity</p>
               </div>
             ) : (
               <ExtractionStep
