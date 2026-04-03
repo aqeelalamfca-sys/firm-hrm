@@ -2088,7 +2088,7 @@ router.post("/export-pdf", async (req: Request, res: Response) => {
 router.post("/export-excel", async (req: Request, res: Response) => {
   const { workingPapers, meta, analysis } = req.body;
 
-  if (!workingPapers || workingPapers.length === 0) {
+  if (!Array.isArray(workingPapers) || workingPapers.length === 0) {
     return res.status(400).json({ error: "No working papers to export." });
   }
 
@@ -2097,8 +2097,9 @@ router.post("/export-excel", async (req: Request, res: Response) => {
     const fin = analysis?.financials || {};
     const mat = analysis?.materiality || {};
     const risks = analysis?.risk_assessment || {};
+    const asArr = (v: any): any[] => Array.isArray(v) ? v : [];
 
-    const fmtN = (n: any) => (n || n === 0) ? Number(n).toLocaleString("en-PK") : "N/A";
+    const fmtN = (n: any) => { const v = Number(n); return (!isNaN(v) && (n || n === 0)) ? v.toLocaleString("en-PK") : "N/A"; };
     const now = new Date().toLocaleDateString("en-PK", { day: "2-digit", month: "long", year: "numeric" });
 
     // ── 1. COVER SHEET ─────────────────────────────────────────────────────
@@ -2137,16 +2138,18 @@ router.post("/export-excel", async (req: Request, res: Response) => {
       ["RISK ASSESSMENT"],
       ["Overall Risk Level", risks.overall_risk || "Medium"],
     ];
-    if (risks.inherent_risks?.length) {
+    const iRisks = asArr(risks.inherent_risks);
+    if (iRisks.length) {
       coverData.push(["Inherent Risk Area", "Risk Description", "Level"]);
-      risks.inherent_risks.forEach((r: any) => {
+      iRisks.forEach((r: any) => {
         coverData.push([r.area || "", r.risk || "", r.level || ""]);
       });
     }
-    if (analysis?.assumptions_made?.length) {
+    const assumptions = asArr(analysis?.assumptions_made);
+    if (assumptions.length) {
       coverData.push([]);
       coverData.push(["AUDITOR ASSUMPTIONS / ESTIMATED DATA"]);
-      analysis.assumptions_made.forEach((a: string, i: number) => {
+      assumptions.forEach((a: string, i: number) => {
         coverData.push([`${i + 1}.`, a]);
       });
     }
@@ -2201,28 +2204,31 @@ router.post("/export-excel", async (req: Request, res: Response) => {
           rows.push([]);
         }
 
-        if (wp.procedures && wp.procedures.length > 0) {
+        const procs = asArr(wp.procedures);
+        if (procs.length > 0) {
           rows.push(["AUDIT PROCEDURES"]);
           rows.push(["Ref", "Procedure", "Finding / Evidence Obtained", "Conclusion"]);
-          wp.procedures.forEach((p: any, i: number) => {
+          procs.forEach((p: any, i: number) => {
             rows.push([p.no || `${i + 1}`, p.procedure || "", p.finding || "", p.conclusion || ""]);
           });
           rows.push([]);
         }
 
-        if (wp.summary_table && wp.summary_table.length > 0) {
+        const sumTbl = asArr(wp.summary_table);
+        if (sumTbl.length > 0) {
           rows.push(["SUMMARY SCHEDULE"]);
           rows.push(["Item", "Amount / Value", "Comment"]);
-          wp.summary_table.forEach((r: any) => {
-            rows.push([r.item || "", r.value || "", r.comment || ""]);
+          sumTbl.forEach((r: any) => {
+            rows.push([r.item || "", String(r.value ?? ""), r.comment || ""]);
           });
           rows.push([]);
         }
 
-        if (wp.key_findings && wp.key_findings.length > 0) {
+        const findings = asArr(wp.key_findings);
+        if (findings.length > 0) {
           rows.push(["KEY FINDINGS"]);
-          wp.key_findings.forEach((f: string, i: number) => {
-            rows.push([`${i + 1}.`, f]);
+          findings.forEach((f: string, i: number) => {
+            rows.push([`${i + 1}.`, String(f ?? "")]);
           });
           rows.push([]);
         }
@@ -2233,21 +2239,28 @@ router.post("/export-excel", async (req: Request, res: Response) => {
           rows.push([]);
         }
 
-        if (wp.recommendations && wp.recommendations.length > 0) {
+        const recs = asArr(wp.recommendations);
+        if (recs.length > 0) {
           rows.push(["RECOMMENDATIONS"]);
-          wp.recommendations.forEach((r: string, i: number) => {
-            rows.push([`${i + 1}.`, r]);
+          recs.forEach((r: string, i: number) => {
+            rows.push([`${i + 1}.`, String(r ?? "")]);
           });
           rows.push([]);
         }
 
         rows.push(["Prepared By:", wp.preparer || "Audit Senior", "Reviewed By:", wp.reviewer || "Audit Manager", "Partner:", wp.partner || "Partner"]);
         rows.push([]);
-        rows.push(["─".repeat(80)]);
+        rows.push(["—".repeat(40)]);
         rows.push([]);
       }
 
-      const sheetName = secName.length > 31 ? secName.slice(0, 31) : secName;
+      let sheetName = secName.replace(/[\\\/*?\[\]:]/g, "").trim().slice(0, 31) || "Section";
+      let dedupIdx = 2;
+      while (wb.SheetNames.includes(sheetName)) {
+        const suffix = ` (${dedupIdx})`;
+        sheetName = (secName.replace(/[\\\/*?\[\]:]/g, "").trim().slice(0, 31 - suffix.length) || "Section") + suffix;
+        dedupIdx++;
+      }
       const sheet = XLSX.utils.aoa_to_sheet(rows);
       sheet["!cols"] = [{ wch: 10 }, { wch: 45 }, { wch: 38 }, { wch: 22 }];
       XLSX.utils.book_append_sheet(wb, sheet, sheetName);
@@ -2280,17 +2293,17 @@ router.post("/export-excel", async (req: Request, res: Response) => {
       ["ANALYTICAL PROCEDURES — ISA 520"],
       [],
       ["Ratio / Metric", "Current Year", "Prior Year", "Variance", "Comment"],
-      ["Revenue", fmtN(fin.revenue), fmtN(fin.prior_year_revenue), fin.revenue && fin.prior_year_revenue ? `${(((fin.revenue - fin.prior_year_revenue)/fin.prior_year_revenue)*100).toFixed(1)}%` : "N/A", ""],
-      ["Net Profit", fmtN(fin.net_profit), fmtN(fin.prior_year_net_profit), fin.net_profit && fin.prior_year_net_profit ? `${(((fin.net_profit - fin.prior_year_net_profit)/fin.prior_year_net_profit)*100).toFixed(1)}%` : "N/A", ""],
-      ["Total Assets", fmtN(fin.total_assets), fmtN(fin.prior_year_total_assets), fin.total_assets && fin.prior_year_total_assets ? `${(((fin.total_assets - fin.prior_year_total_assets)/fin.prior_year_total_assets)*100).toFixed(1)}%` : "N/A", ""],
+      ["Revenue", fmtN(fin.revenue), fmtN(fin.prior_year_revenue), fin.revenue && fin.prior_year_revenue ? `${(((Number(fin.revenue) - Number(fin.prior_year_revenue))/Number(fin.prior_year_revenue))*100).toFixed(1)}%` : "N/A", ""],
+      ["Net Profit", fmtN(fin.net_profit), fmtN(fin.prior_year_net_profit), fin.net_profit && fin.prior_year_net_profit ? `${(((Number(fin.net_profit) - Number(fin.prior_year_net_profit))/Number(fin.prior_year_net_profit))*100).toFixed(1)}%` : "N/A", ""],
+      ["Total Assets", fmtN(fin.total_assets), fmtN(fin.prior_year_total_assets), fin.total_assets && fin.prior_year_total_assets ? `${(((Number(fin.total_assets) - Number(fin.prior_year_total_assets))/Number(fin.prior_year_total_assets))*100).toFixed(1)}%` : "N/A", ""],
       [],
       ["KEY RATIOS"],
-      ["Gross Margin %", ratios.gross_margin_pct != null ? `${parseFloat(ratios.gross_margin_pct).toFixed(1)}%` : "N/A", "", "", ""],
-      ["Net Margin %", ratios.net_margin_pct != null ? `${parseFloat(ratios.net_margin_pct).toFixed(1)}%` : "N/A", "", "", ""],
-      ["Current Ratio", ratios.current_ratio != null ? parseFloat(ratios.current_ratio).toFixed(2) : "N/A", "", "", ""],
-      ["Debt-to-Equity", ratios.debt_to_equity != null ? parseFloat(ratios.debt_to_equity).toFixed(2) : "N/A", "", "", ""],
-      ["Return on Assets %", fin.total_assets ? `${((fin.net_profit / fin.total_assets)*100).toFixed(1)}%` : "N/A", "", "", ""],
-      ["Return on Equity %", fin.equity ? `${((fin.net_profit / fin.equity)*100).toFixed(1)}%` : "N/A", "", "", ""],
+      ["Gross Margin %", ratios.gross_margin_pct != null && !isNaN(Number(ratios.gross_margin_pct)) ? `${Number(ratios.gross_margin_pct).toFixed(1)}%` : "N/A", "", "", ""],
+      ["Net Margin %", ratios.net_margin_pct != null && !isNaN(Number(ratios.net_margin_pct)) ? `${Number(ratios.net_margin_pct).toFixed(1)}%` : "N/A", "", "", ""],
+      ["Current Ratio", ratios.current_ratio != null && !isNaN(Number(ratios.current_ratio)) ? Number(ratios.current_ratio).toFixed(2) : "N/A", "", "", ""],
+      ["Debt-to-Equity", ratios.debt_to_equity != null && !isNaN(Number(ratios.debt_to_equity)) ? Number(ratios.debt_to_equity).toFixed(2) : "N/A", "", "", ""],
+      ["Return on Assets %", fin.total_assets && fin.net_profit != null ? `${((Number(fin.net_profit) / Number(fin.total_assets))*100).toFixed(1)}%` : "N/A", "", "", ""],
+      ["Return on Equity %", fin.equity && fin.net_profit != null ? `${((Number(fin.net_profit) / Number(fin.equity))*100).toFixed(1)}%` : "N/A", "", "", ""],
     ];
     const apSheet = XLSX.utils.aoa_to_sheet(apRows);
     apSheet["!cols"] = [{ wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 16 }, { wch: 30 }];
@@ -2314,7 +2327,7 @@ router.post("/export-excel", async (req: Request, res: Response) => {
     ];
     const om = mat.overall_materiality || 0;
     for (const item of bsAreas) {
-      const mvt = item.py ? (item.cy || 0) - item.py : null;
+      const mvt = item.py ? (Number(item.cy) || 0) - Number(item.py) : null;
       const mvtPct = item.py && item.py !== 0 ? ((mvt! / item.py) * 100).toFixed(1) + "%" : "—";
       const flag = (item.cy || 0) > om ? "Above OM" : "Below OM";
       lsRows.push([item.area, fmtN(item.cy), item.py ? fmtN(item.py) : "—", mvt !== null ? fmtN(mvt) : "—", mvtPct, item.ref, flag]);
@@ -2339,7 +2352,7 @@ router.post("/export-excel", async (req: Request, res: Response) => {
       { item: "Cash & Bank", amount: fin.cash_and_bank, ref: "F5", risk: "Low" },
       { item: "Expenses", amount: fin.net_profit, ref: "F20", risk: "Medium" },
     ];
-    const totalCarrying = pmAreas.reduce((s, a) => s + (a.amount || 0), 0);
+    const totalCarrying = pmAreas.reduce((s, a) => s + (Number(a.amount) || 0), 0);
     for (const a of pmAreas) {
       const pct = totalCarrying ? ((a.amount || 0) / totalCarrying * 100).toFixed(1) : "0";
       const allocated = totalCarrying ? Math.round(pmTotal * (a.amount || 0) / totalCarrying) : 0;
