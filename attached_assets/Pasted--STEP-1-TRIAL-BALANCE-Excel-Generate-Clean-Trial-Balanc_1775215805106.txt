@@ -1,0 +1,143 @@
+🔹 STEP 1 — TRIAL BALANCE (Excel)
+Generate:
+Clean Trial Balance (coded accounts)
+Opening, movement, closing balances
+Mapping with FS heads
+Add:
+Sheet: TB_Final
+Sheet: TB_Adjustments
+Sheet: TB_vs_FS_Reconciliation
+
+➡️ Complete + conclude → THEN proceed
+
+🔹 STEP 2 — TRANSACTION-WISE GENERAL LEDGER (Excel)
+Generate:
+Account-wise detailed ledgers
+Date, narration, debit/credit, running balance
+AI shall:
+Reconstruct missing transactions if needed
+Link GL totals with TB
+
+➡️ Complete + reconcile → THEN proceed
+
+🔹 STEP 3 — PRE-ENGAGEMENT & ACCEPTANCE
+Acceptance, independence, risk profiling
+Engagement letter draft
+Compliance: ISA 210, ISQM 1, IESBA
+
+➡️ Complete with conclusion → THEN proceed
+
+🔹 STEP 4 — PLANNING
+Understanding entity
+Risk assessment (FS + assertion level)
+Fraud risk
+Materiality (with calculation + rationale)
+Audit strategy & plan
+
+➡️ Complete → THEN proceed
+
+🔹 STEP 5 — ANALYTICAL REVIEW
+Compute ratios (profitability, liquidity, leverage, efficiency)
+Trend & variance analysis
+Audit implications
+
+➡️ Complete → THEN proceed
+
+🔹 STEP 6 — INTERNAL CONTROLS & RISK ASSESSMENT
+Process walkthroughs
+Control identification
+Test of Controls (if applicable)
+Control deficiencies
+
+➡️ Complete → THEN proceed
+
+🔹 STEP 7 — SUBSTANTIVE PROCEDURES (Excel — CORE)
+Excel Workbook Structure:
+
+Sheet 1 — Summary
+
+Account head
+Population (number & value)
+Sample size (number & value)
+Sampling method
+Risk level
+
+Separate Sheet for EACH HEAD:
+
+Cash
+Receivables
+Inventory
+PPE
+Payables
+Revenue
+Expenses
+Taxation
+etc.
+Each Sheet Must Include:
+Population listing
+Sample selection (AI-based)
+Testing procedures
+Exceptions identified
+Conclusion
+
+➡️ Complete ALL heads → THEN proceed
+
+🔹 STEP 8 — AUDIT EVIDENCE & CONFIRMATIONS
+Bank confirmations
+Debtors/creditors confirmations
+Legal confirmations
+Evidence index
+
+➡️ Complete → THEN proceed
+
+🔹 STEP 9 — COMPLETION & REVIEW
+Misstatement summary
+Subsequent events
+Going concern
+Final analytical review
+Disclosure checklist
+
+➡️ Complete → THEN proceed
+
+🔹 STEP 10 — REPORTING
+Draft auditor’s report
+Final report
+KAM (if applicable)
+EOM / OM
+
+➡️ Complete → THEN proceed
+
+🔹 STEP 11 — QUALITY CONTROL & EQCR
+EQCR checklist
+Review notes
+Clearance documentation
+
+➡️ Complete → THEN proceed
+
+🔹 STEP 12 — CLIENT COMMUNICATION
+Management letter
+TCWG communication
+Audit findings report
+
+➡️ Complete → THEN proceed
+
+🔹 STEP 13 — REGULATORY & LEGAL COMPLIANCE
+Companies Act compliance
+FBR (Income Tax, Sales Tax, WHT)
+SECP requirements
+
+➡️ Complete → THEN proceed
+
+🔹 STEP 14 — ADMINISTRATIVE & ENGAGEMENT MANAGEMENT
+Time budget
+Team allocation
+Billing
+
+➡️ Complete → THEN proceed
+
+🔹 STEP 15 — INSPECTION / QCR / ARCHIVING
+QCR checklist (ICAP aligned)
+ISA compliance mapping
+Final indexed file
+
+➡️ Complete → FINALIZE

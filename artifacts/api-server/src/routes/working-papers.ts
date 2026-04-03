@@ -1139,15 +1139,31 @@ SIGNIFICANT RISK AREAS: ${Array.isArray(significantRiskAreas) && significantRisk
 RULES: Use real numbers, ISA 230 language, Pakistan standards (ITO 2001, STA 1990, Companies Act 2017). Never use placeholder text.
 Return JSON: { "working_papers": [...] }`;
 
-  const batches: string[][] = [];
-  const batchGroups = [
-    (papersToGenerate as string[]).filter((p: string) => /^[A-D]/.test(p)),
-    (papersToGenerate as string[]).filter((p: string) => /^E/.test(p)),
-    (papersToGenerate as string[]).filter((p: string) => /^[F-H]/.test(p)),
-    (papersToGenerate as string[]).filter((p: string) => /^[I-L]/.test(p) || /^AI/.test(p)),
+  const sequentialSteps: { label: string; filter: (p: string) => boolean }[] = [
+    { label: "Step 1 — Pre-Engagement & Acceptance", filter: (p: string) => /^A\d/.test(p) },
+    { label: "Step 2 — Planning & Strategy", filter: (p: string) => /^B\d/.test(p) },
+    { label: "Step 3 — Data & Financial Statements", filter: (p: string) => /^C\d/.test(p) },
+    { label: "Step 4 — Internal Controls & Risk Assessment", filter: (p: string) => /^D\d/.test(p) },
+    { label: "Step 5 — Substantive Testing (Cash, Receivables, Inventory)", filter: (p: string) => /^E[1-5]$/.test(p) },
+    { label: "Step 6 — Substantive Testing (Revenue, Expenses, Equity)", filter: (p: string) => /^E([6-9]|1\d|2\d)$/.test(p) },
+    { label: "Step 7 — Special Areas", filter: (p: string) => /^F\d/.test(p) },
+    { label: "Step 8 — Completion & Review", filter: (p: string) => /^G\d/.test(p) },
+    { label: "Step 9 — Reporting", filter: (p: string) => /^H\d/.test(p) },
+    { label: "Step 10 — Quality Control & EQCR", filter: (p: string) => /^I\d/.test(p) },
+    { label: "Step 11 — Tax & Regulatory Compliance", filter: (p: string) => /^J\d/.test(p) },
+    { label: "Step 12 — Final Output & Archive", filter: (p: string) => /^K\d/.test(p) },
+    { label: "Step 13 — Inspection / QCR File", filter: (p: string) => /^L\d/.test(p) },
+    { label: "Step 14 — AI Working Paper Controls", filter: (p: string) => /^AI\d/.test(p) },
   ];
-  for (const bg of batchGroups) {
-    if (bg.length > 0) batches.push(bg);
+
+  const batches: string[][] = [];
+  const batchLabels: string[] = [];
+  for (const step of sequentialSteps) {
+    const papers = (papersToGenerate as string[]).filter(step.filter);
+    if (papers.length > 0) {
+      batches.push(papers);
+      batchLabels.push(step.label);
+    }
   }
 
   try {
@@ -1160,11 +1176,21 @@ Return JSON: { "working_papers": [...] }`;
         return def ? `${ref}: ${def.title} (${def.section}) — ${def.isa} — ${def.description}` : ref;
       }).join("\n");
 
-      const batchPrompt = `══════════════════════════════════════════════════════════════════
-WORKING PAPERS TO GENERATE — Batch ${bi + 1} of ${batches.length}
+      const completedSummary = allGeneratedPapers.length > 0
+        ? `\n══════════════════════════════════════════════════════════════════
+PREVIOUSLY COMPLETED STEPS (${allGeneratedPapers.length} papers finalized — cross-reference these)
 ══════════════════════════════════════════════════════════════════
-${batchDefs}
+${allGeneratedPapers.map((wp: any) => `${wp.ref}: ${wp.title} — Conclusion: ${(wp.auditor_conclusion || "Complete").substring(0, 120)}`).join("\n")}\n`
+        : "";
 
+      const batchPrompt = `══════════════════════════════════════════════════════════════════
+${batchLabels[bi]} — Sequential Step ${bi + 1} of ${batches.length}
+══════════════════════════════════════════════════════════════════
+STRICT SEQUENTIAL PROCESSING: This step MUST be fully complete — including all outputs, reconciliations, conclusions, and cross-references — before the next step begins. Do NOT leave any section incomplete or inconsistent.
+
+PAPERS TO GENERATE IN THIS STEP:
+${batchDefs}
+${completedSummary}
 ══════════════════════════════════════════════════════════════════
 FULL ENGAGEMENT CONTEXT (use ALL data below in every paper)
 ══════════════════════════════════════════════════════════════════
@@ -1184,6 +1210,9 @@ Each working paper MUST:
 8. Conclusions must be affirmative professional statements: "Based on procedures performed, we are satisfied that..."
 9. Sign-off details: preparer, reviewer, approver as provided in context.
 10. Materiality amounts must be the EXACT amounts from the context — ${materiality.overall_materiality ? `OM = PKR ${(materiality.overall_materiality || 0).toLocaleString("en-PK")}` : "compute from financials"}.
+11. RECONCILIATION CHECK: Verify all figures tie back to the Trial Balance and General Ledger. Any discrepancy must be noted and resolved within this step.
+12. ISA COMPLIANCE GATE: Each paper must explicitly state which ISA requirements it satisfies and confirm compliance before the step is marked complete.
+13. CROSS-REFERENCING MANDATE: Reference previously completed working papers by their exact WP ref codes. Every substantive paper must link back to the risk assessment (D-series) and planning (B-series) papers.
 
 ${wpJsonSchema}`;
 
@@ -1199,6 +1228,9 @@ ABSOLUTE RULES:
 • Use ISA 230 documentation standards: who did what, when, what was found, what was concluded.
 • All figures must be in PKR with realistic amounts consistent with the entity's financial scale.
 • Materiality thresholds must appear in substantive testing procedures.
+• STRICT SEQUENTIAL DISCIPLINE: You are generating one step at a time. Each paper in this step MUST be 100% finalized — complete procedures, findings, conclusions, cross-references, and ISA sign-off — before the response is returned. Incomplete or inconsistent output will cause the entire audit file to fail.
+• CROSS-REFERENCING: Where previous steps have been completed, reference them by exact WP ref (e.g. "Per A3 engagement letter", "Risk identified in D1"). Maintain consistency across the entire audit file.
+• RECONCILIATION: All monetary values must reconcile to the Trial Balance and source financials. Flag any discrepancy explicitly.
 • Return ONLY valid JSON in the exact schema provided. No markdown, no prose outside JSON.` },
           { role: "user", content: batchPrompt },
         ],
@@ -1216,7 +1248,7 @@ ABSOLUTE RULES:
       }
       const batchPapers = batchData.working_papers || [];
       allGeneratedPapers.push(...batchPapers);
-      logger.info(`Batch ${bi + 1}/${batches.length}: generated ${batchPapers.length} papers`);
+      logger.info(`Sequential step ${bi + 1}/${batches.length} (${batchLabels[bi]}): generated ${batchPapers.length} papers — total so far: ${allGeneratedPapers.length}`);
     }
 
     const workingPapers = allGeneratedPapers;

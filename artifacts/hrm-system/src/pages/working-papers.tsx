@@ -1767,7 +1767,26 @@ function ExportStep({ onBack, onExport, exporting, session }:
         )}
       </div>
 
-      {/* Export Options */}
+      {/* Download All — Excel & Word */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-6 text-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold">Download Complete Audit File</h3>
+            <p className="text-sm text-blue-100 mt-1">Excel Workbook + Word Document — full audit package in one click</p>
+          </div>
+          <Button
+            size="lg"
+            className="bg-white text-blue-700 hover:bg-blue-50 gap-2 font-bold px-8 shadow-lg"
+            onClick={() => onExport("excel-word")}
+            disabled={!!exporting}
+          >
+            {exporting === "excel-word" ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+            Download All (Excel & Word)
+          </Button>
+        </div>
+      </div>
+
+      {/* Individual Export Options */}
       <div className="grid grid-cols-3 gap-4">
         {[
           {
@@ -1794,10 +1813,10 @@ function ExportStep({ onBack, onExport, exporting, session }:
         ))}
       </div>
 
-      {/* Export All */}
-      <Button className="w-full gap-2" size="lg" onClick={() => onExport("all")} disabled={!!exporting}>
+      {/* Export All Formats */}
+      <Button variant="outline" className="w-full gap-2" size="lg" onClick={() => onExport("all")} disabled={!!exporting}>
         {exporting === "all" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-        Export Complete Audit Package (All Formats)
+        Export All Formats (Excel + Word + PDF)
       </Button>
 
       <div className="flex items-start gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
@@ -2273,8 +2292,8 @@ export default function WorkingPapers() {
       return;
     }
 
-    const doExport = async (format: string) => {
-      setExporting(format);
+    const doExport = async (format: string, silent = false) => {
+      if (!silent) setExporting(format);
       try {
         const endpoint = format === "excel" ? "export-excel" : format === "docx" ? "export-docx" : "export-pdf";
         const res = await fetch(`/api/working-papers/${endpoint}`, {
@@ -2307,11 +2326,23 @@ export default function WorkingPapers() {
       } catch (err: any) {
         toast({ title: "Export failed", description: err.message, variant: "destructive" });
       }
-      setExporting(null);
+      if (!silent) setExporting(null);
     };
 
     if (fmt === "all") {
-      for (const f of ["excel","docx","pdf"]) await doExport(f);
+      setExporting("all");
+      try {
+        for (const f of ["excel","docx","pdf"]) await doExport(f, true);
+      } finally {
+        setExporting(null);
+      }
+    } else if (fmt === "excel-word") {
+      setExporting("excel-word");
+      try {
+        await Promise.all([doExport("excel", true), doExport("docx", true)]);
+      } finally {
+        setExporting(null);
+      }
     } else {
       await doExport(fmt);
     }
