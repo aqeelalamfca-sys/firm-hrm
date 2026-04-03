@@ -160,162 +160,202 @@ const WP_INDEX_FULL: { section: string; color: string; icon: any; papers: { code
       { code: "A1", title: "Client Acceptance Checklist", trigger: "New client", standard: "ISA 210, ISQM 1" },
       { code: "A2", title: "Continuance Evaluation", trigger: "Existing client", standard: "ISQM 1" },
       { code: "A3", title: "Engagement Letter", trigger: "All", standard: "ISA 210" },
-      { code: "A4", title: "Independence Declaration", trigger: "All", standard: "IESBA Code" },
+      { code: "A4", title: "Independence Declarations (Firm & Team)", trigger: "All", standard: "IESBA Code" },
       { code: "A5", title: "Conflict of Interest Assessment", trigger: "All", standard: "IESBA" },
-      { code: "A6", title: "Client Risk Profiling", trigger: "High-risk entity", standard: "ISA 220" },
-      { code: "A7", title: "AML / KYC Documentation", trigger: "Regulated entities", standard: "AMLA 2010" },
-      { code: "A8", title: "Terms of Engagement Approval", trigger: "All", standard: "ISA 210" },
+      { code: "A6", title: "Ethical Compliance (IESBA)", trigger: "All", standard: "IESBA Code" },
+      { code: "A7", title: "Client Risk Profiling", trigger: "All", standard: "ISA 220" },
+      { code: "A8", title: "KYC / AML Documentation", trigger: "Regulated entities", standard: "AMLA 2010" },
+      { code: "A9", title: "Previous Auditor Communication", trigger: "New client", standard: "ISA 300" },
+      { code: "A10", title: "Terms of Engagement Approval", trigger: "All", standard: "ISA 210" },
     ],
   },
   {
-    section: "B — Planning File", color: "bg-violet-50 border-violet-200", icon: BarChart,
+    section: "B — Planning", color: "bg-violet-50 border-violet-200", icon: BarChart,
     papers: [
       { code: "B1", title: "Understanding the Entity & Environment", trigger: "All", standard: "ISA 315" },
       { code: "B2", title: "Industry Analysis", trigger: "All", standard: "ISA 315" },
-      { code: "B3", title: "Business Model & Revenue Streams", trigger: "All", standard: "ISA 315" },
-      { code: "B4", title: "Internal Control Understanding", trigger: "All", standard: "ISA 315" },
-      { code: "B5", title: "Risk Assessment Matrix", trigger: "All", standard: "ISA 315" },
-      { code: "B6", title: "Fraud Risk Assessment", trigger: "All", standard: "ISA 240" },
-      { code: "B7", title: "Laws & Regulations Compliance Review", trigger: "All", standard: "ISA 250" },
-      { code: "B8", title: "Related Party Assessment", trigger: "Related parties", standard: "ISA 550" },
-      { code: "B9", title: "IT Environment Assessment", trigger: "IT reliance", standard: "ISA 315" },
-      { code: "B10", title: "Going Concern Assessment (Initial)", trigger: "All", standard: "ISA 570" },
-      { code: "B11", title: "Engagement Strategy", trigger: "All", standard: "ISA 300" },
-      { code: "B12", title: "Audit Plan", trigger: "All", standard: "ISA 300" },
-      { code: "B13", title: "Materiality Calculation", trigger: "All", standard: "ISA 320" },
-      { code: "B14", title: "Performance Materiality", trigger: "All", standard: "ISA 320" },
-      { code: "B15", title: "Sampling Plan", trigger: "All", standard: "ISA 530" },
-      { code: "B16", title: "Analytical Procedures (Planning)", trigger: "All", standard: "ISA 520" },
+      { code: "B3", title: "Regulatory Framework Assessment", trigger: "All", standard: "ISA 250" },
+      { code: "B4", title: "Business Model & Revenue Streams", trigger: "All", standard: "ISA 315" },
+      { code: "B5", title: "Internal Control Narratives", trigger: "All", standard: "ISA 315" },
+      { code: "B6", title: "Process Flowcharts", trigger: "All", standard: "ISA 315" },
+      { code: "B7", title: "IT Environment Assessment", trigger: "IT reliance", standard: "ISA 315" },
+      { code: "B8", title: "Risk Assessment (Financial Statement Level)", trigger: "All", standard: "ISA 315" },
+      { code: "B9", title: "Risk Assessment (Assertion Level)", trigger: "All", standard: "ISA 315" },
+      { code: "B10", title: "Fraud Risk Assessment", trigger: "All", standard: "ISA 240" },
+      { code: "B11", title: "Laws & Regulations Compliance Review", trigger: "All", standard: "ISA 250" },
+      { code: "B12", title: "Materiality Calculation (Overall, PM, Trivial)", trigger: "All", standard: "ISA 320" },
+      { code: "B13", title: "Audit Strategy Memorandum", trigger: "All", standard: "ISA 300" },
+      { code: "B14", title: "Detailed Audit Plan", trigger: "All", standard: "ISA 300" },
+      { code: "B15", title: "Related Party Identification", trigger: "Related parties", standard: "ISA 550" },
     ],
   },
   {
     section: "C — Trial Balance & Financials", color: "bg-green-50 border-green-200", icon: Table2,
     papers: [
-      { code: "C1", title: "Extracted Financial Statements", trigger: "Upload", standard: "ISA 500" },
-      { code: "C2", title: "AI Generated Trial Balance", trigger: "No TB uploaded", standard: "ISA 500" },
-      { code: "C3", title: "Trial Balance (Final)", trigger: "All", standard: "ISA 500" },
-      { code: "C4", title: "TB vs FS Reconciliation", trigger: "All", standard: "ISA 500" },
-      { code: "C5", title: "Prior Year vs Current Year Comparison", trigger: "All", standard: "ISA 510" },
-      { code: "C6", title: "Lead Schedules (All Heads)", trigger: "All", standard: "ISA 330" },
-      { code: "C7", title: "Chart of Accounts Mapping", trigger: "AI process", standard: "ISA 315" },
+      { code: "C1", title: "Raw Trial Balance", trigger: "All", standard: "ISA 500" },
+      { code: "C2", title: "Adjusted Trial Balance", trigger: "All", standard: "ISA 500" },
+      { code: "C3", title: "Lead Schedules (FS Mapping)", trigger: "All", standard: "ISA 500" },
+      { code: "C4", title: "Financial Statements (Draft)", trigger: "All", standard: "IAS 1" },
+      { code: "C5", title: "Financial Statements (Final)", trigger: "All", standard: "IAS 1" },
+      { code: "C6", title: "Prior Year Comparatives", trigger: "All", standard: "ISA 510" },
+      { code: "C7", title: "Chart of Accounts Mapping", trigger: "All", standard: "ISA 315" },
+      { code: "C8", title: "Consolidation (if applicable)", trigger: "Group audit", standard: "IFRS 10" },
     ],
   },
   {
-    section: "D — General Ledger & Data Analytics", color: "bg-cyan-50 border-cyan-200", icon: Database,
+    section: "D — Analytical Review", color: "bg-cyan-50 border-cyan-200", icon: BarChart,
     papers: [
-      { code: "D1", title: "AI Generated General Ledger", trigger: "No GL uploaded", standard: "ISA 500" },
-      { code: "D2", title: "GL Summary by Account", trigger: "All", standard: "ISA 500" },
-      { code: "D3", title: "Transaction Trend Analysis", trigger: "All", standard: "ISA 520" },
-      { code: "D4", title: "Journal Entry Testing", trigger: "All", standard: "ISA 240" },
-      { code: "D5", title: "Unusual Transactions Identification", trigger: "All", standard: "ISA 240" },
-      { code: "D6", title: "Cut-off Testing", trigger: "All", standard: "ISA 330" },
+      { code: "D1", title: "Ratio Analysis (Liquidity, Profitability, Leverage, Efficiency)", trigger: "All", standard: "ISA 520" },
+      { code: "D2", title: "Trend Analysis (YoY / Monthly)", trigger: "All", standard: "ISA 520" },
+      { code: "D3", title: "Budget vs Actual Analysis", trigger: "Budget available", standard: "ISA 520" },
+      { code: "D4", title: "Variance Analysis", trigger: "All", standard: "ISA 520" },
+      { code: "D5", title: "Expectation vs Actual Comparison", trigger: "All", standard: "ISA 520" },
+      { code: "D6", title: "Analytical Review Conclusion", trigger: "All", standard: "ISA 520" },
     ],
   },
   {
-    section: "E — Substantive Working Papers", color: "bg-orange-50 border-orange-200", icon: FileSearch,
+    section: "E — Internal Control & Risk", color: "bg-pink-50 border-pink-200", icon: Shield,
     papers: [
-      { code: "E1", title: "Cash & Bank Testing", trigger: "Has Cash & Bank", standard: "ISA 505" },
-      { code: "E2", title: "Bank Reconciliation", trigger: "Has Cash & Bank", standard: "ISA 500" },
-      { code: "E3", title: "Receivables Aging & Testing", trigger: "Has Receivables", standard: "ISA 330" },
-      { code: "E4", title: "Debtor Confirmations", trigger: "External confirmations", standard: "ISA 505" },
-      { code: "E5", title: "Inventory Observation & Valuation", trigger: "Has Inventory", standard: "ISA 501" },
-      { code: "E6", title: "Fixed Asset Register Testing", trigger: "Has Fixed Assets", standard: "ISA 540" },
-      { code: "E7", title: "Depreciation Testing", trigger: "Has Fixed Assets", standard: "IAS 16" },
-      { code: "E8", title: "Intangible Asset Testing", trigger: "Has Intangibles", standard: "IAS 38" },
-      { code: "E9", title: "Investment Valuation", trigger: "Has Investments", standard: "IFRS 9" },
-      { code: "E10", title: "Payables Testing", trigger: "Has Payables", standard: "ISA 330" },
-      { code: "E11", title: "Creditor Confirmations", trigger: "External confirmations", standard: "ISA 505" },
-      { code: "E12", title: "Borrowings Verification", trigger: "Has Borrowings", standard: "ISA 540" },
-      { code: "E13", title: "Interest Calculation", trigger: "Has Finance Cost", standard: "ISA 540" },
-      { code: "E14", title: "Provisions & Estimates", trigger: "Has Provisions", standard: "IAS 37" },
-      { code: "E15", title: "Contingent Liabilities Review", trigger: "Has Contingent Liabilities", standard: "ISA 501" },
-      { code: "E16", title: "Share Capital Verification", trigger: "Has Share Capital", standard: "Companies Act" },
-      { code: "E17", title: "Reserves & Retained Earnings", trigger: "Has Reserves", standard: "IAS 1" },
-      { code: "E18", title: "Revenue Testing", trigger: "All", standard: "ISA 240" },
-      { code: "E19", title: "Cost of Sales Testing", trigger: "Has Cost of Sales", standard: "ISA 330" },
-      { code: "E20", title: "Expense Testing", trigger: "Has Operating Expenses", standard: "ISA 330" },
-      { code: "E21", title: "Analytical Procedures", trigger: "All", standard: "ISA 520" },
+      { code: "E1", title: "Walkthrough Documentation", trigger: "All", standard: "ISA 315" },
+      { code: "E2", title: "Control Identification Matrix", trigger: "All", standard: "ISA 315" },
+      { code: "E3", title: "Risk-Control Matrix (RCM)", trigger: "All", standard: "ISA 315, ISA 330" },
+      { code: "E4", title: "Test of Controls (ToC)", trigger: "Controls approach", standard: "ISA 330" },
+      { code: "E5", title: "Control Deviations Log", trigger: "Controls approach", standard: "ISA 330" },
+      { code: "E6", title: "IT General Controls (ITGC) Testing", trigger: "IT reliance", standard: "ISA 315" },
+      { code: "E7", title: "Application Controls Testing", trigger: "IT reliance", standard: "ISA 315" },
+      { code: "E8", title: "Control Deficiency Evaluation", trigger: "All", standard: "ISA 265" },
+      { code: "E9", title: "Controls Conclusion", trigger: "All", standard: "ISA 265" },
     ],
   },
   {
-    section: "F — Taxation Working Papers", color: "bg-yellow-50 border-yellow-200", icon: DollarSign,
+    section: "F — Substantive Procedures (Test of Details)", color: "bg-orange-50 border-orange-200", icon: FileSearch,
     papers: [
-      { code: "F1", title: "Income Tax Computation", trigger: "Income Tax applicable", standard: "ITO 2001" },
-      { code: "F2", title: "Deferred Tax Calculation", trigger: "Deferred Tax applicable", standard: "IAS 12" },
-      { code: "F3", title: "Sales Tax Reconciliation", trigger: "Sales Tax applicable", standard: "Sales Tax Act" },
-      { code: "F4", title: "Output vs Input Tax Analysis", trigger: "Sales Tax applicable", standard: "STA 1990" },
-      { code: "F5", title: "Withholding Tax Compliance", trigger: "WHT applicable", standard: "ITO 2001" },
-      { code: "F6", title: "Tax Exposure Assessment", trigger: "Tax audit risk", standard: "ISA 250" },
+      { code: "F1", title: "Sampling Plan", trigger: "All", standard: "ISA 530" },
+      { code: "F2", title: "Sampling Selection Sheet", trigger: "All", standard: "ISA 530" },
+      { code: "F3", title: "Substantive Testing Strategy", trigger: "All", standard: "ISA 330" },
+      { code: "F4", title: "Misstatement Tracking Sheet", trigger: "All", standard: "ISA 450" },
+      { code: "F5", title: "Cash & Bank Testing", trigger: "Has Cash & Bank", standard: "ISA 505" },
+      { code: "F6", title: "Bank Reconciliation Testing", trigger: "Has Cash & Bank", standard: "ISA 500" },
+      { code: "F7", title: "Receivables Testing (Aging, Confirmations)", trigger: "Has Receivables", standard: "ISA 505" },
+      { code: "F8", title: "Inventory Testing (Existence, Valuation)", trigger: "Has Inventory", standard: "ISA 501, IAS 2" },
+      { code: "F9", title: "PPE Testing (Additions, Disposals, Depreciation)", trigger: "Has Fixed Assets", standard: "IAS 16" },
+      { code: "F10", title: "Intangible Assets Testing", trigger: "Has Intangibles", standard: "IAS 38" },
+      { code: "F11", title: "Investment Testing", trigger: "Has Investments", standard: "IFRS 9" },
+      { code: "F12", title: "Payables Testing", trigger: "Has Payables", standard: "ISA 330" },
+      { code: "F13", title: "Borrowings Testing", trigger: "Has Borrowings", standard: "ISA 540" },
+      { code: "F14", title: "Accruals Testing", trigger: "All", standard: "ISA 330" },
+      { code: "F15", title: "Provisions & Contingencies", trigger: "Has Provisions", standard: "IAS 37" },
+      { code: "F16", title: "Share Capital Verification", trigger: "Has Share Capital", standard: "Companies Act" },
+      { code: "F17", title: "Reserves & Retained Earnings", trigger: "Has Reserves", standard: "IAS 1" },
+      { code: "F18", title: "Revenue Testing (Cut-off, Occurrence)", trigger: "All", standard: "IFRS 15, ISA 240" },
+      { code: "F19", title: "Cost of Sales Testing", trigger: "Has Cost of Sales", standard: "ISA 330" },
+      { code: "F20", title: "Operating Expenses Testing", trigger: "Has Operating Expenses", standard: "ISA 330" },
+      { code: "F21", title: "Payroll Testing", trigger: "Has Payroll", standard: "ISA 330" },
+      { code: "F22", title: "Finance Cost Testing", trigger: "Has Finance Cost", standard: "ISA 540" },
+      { code: "F23", title: "Other Income Testing", trigger: "Has Other Income", standard: "ISA 330" },
+      { code: "F24", title: "Current Tax Computation", trigger: "Income Tax applicable", standard: "ITO 2001" },
+      { code: "F25", title: "Deferred Tax Calculation", trigger: "Deferred Tax applicable", standard: "IAS 12" },
+      { code: "F26", title: "Sales Tax / VAT Testing", trigger: "Sales Tax applicable", standard: "STA 1990" },
+      { code: "F27", title: "Withholding Tax Testing", trigger: "WHT applicable", standard: "ITO 2001" },
     ],
   },
   {
-    section: "G — Test of Controls", color: "bg-pink-50 border-pink-200", icon: Shield,
+    section: "G — Audit Evidence", color: "bg-amber-50 border-amber-200", icon: FileCheck,
     papers: [
-      { code: "G1", title: "Control Design Evaluation", trigger: "Controls approach", standard: "ISA 315" },
-      { code: "G2", title: "Control Operating Effectiveness", trigger: "Controls approach", standard: "ISA 330" },
-      { code: "G3", title: "Walkthrough Documentation", trigger: "Controls approach", standard: "ISA 315" },
-      { code: "G4", title: "Control Deficiency Log", trigger: "Controls approach", standard: "ISA 265" },
+      { code: "G1", title: "Bank Confirmations", trigger: "Has Cash & Bank", standard: "ISA 505" },
+      { code: "G2", title: "Debtors Confirmations", trigger: "Has Receivables", standard: "ISA 505" },
+      { code: "G3", title: "Creditors Confirmations", trigger: "Has Payables", standard: "ISA 505" },
+      { code: "G4", title: "Legal Confirmations", trigger: "All", standard: "ISA 501" },
+      { code: "G5", title: "Third Party Confirmations", trigger: "All", standard: "ISA 505" },
+      { code: "G6", title: "Physical Verification Reports", trigger: "Has Fixed Assets / Inventory", standard: "ISA 501" },
+      { code: "G7", title: "Supporting Documents Index", trigger: "All", standard: "ISA 500" },
+      { code: "G8", title: "Evidence Cross-Reference Sheet", trigger: "All", standard: "ISA 500" },
     ],
   },
   {
-    section: "H — Completion & Finalization", color: "bg-red-50 border-red-200", icon: CheckCircle2,
+    section: "H — Completion", color: "bg-red-50 border-red-200", icon: CheckCircle2,
     papers: [
-      { code: "H1", title: "Misstatements Summary", trigger: "All", standard: "ISA 450" },
-      { code: "H2", title: "Adjusting Entries", trigger: "All", standard: "ISA 450" },
-      { code: "H3", title: "Final Analytical Review", trigger: "All", standard: "ISA 520" },
-      { code: "H4", title: "Going Concern Final Assessment", trigger: "All", standard: "ISA 570" },
-      { code: "H5", title: "Subsequent Events Review", trigger: "All", standard: "ISA 560" },
+      { code: "H1", title: "Summary of Misstatements (Unadjusted & Adjusted)", trigger: "All", standard: "ISA 450" },
+      { code: "H2", title: "Subsequent Events Review", trigger: "All", standard: "ISA 560" },
+      { code: "H3", title: "Going Concern Assessment", trigger: "All", standard: "ISA 570" },
+      { code: "H4", title: "Final Analytical Review", trigger: "All", standard: "ISA 520" },
+      { code: "H5", title: "Disclosure Checklist (IFRS / Companies Act)", trigger: "All", standard: "IFRS / Companies Act" },
       { code: "H6", title: "Management Representation Letter", trigger: "All", standard: "ISA 580" },
-      { code: "H7", title: "Disclosure Checklist", trigger: "All", standard: "IFRS / Companies Act" },
-      { code: "H8", title: "Audit Conclusion Memo", trigger: "All", standard: "ISA 700" },
+      { code: "H7", title: "Engagement Completion Checklist", trigger: "All", standard: "ISA 220, ISA 230" },
     ],
   },
   {
-    section: "I — Reporting File", color: "bg-indigo-50 border-indigo-200", icon: FileOutput,
+    section: "I — Reporting", color: "bg-indigo-50 border-indigo-200", icon: FileOutput,
     papers: [
-      { code: "I1", title: "Draft Audit Report", trigger: "All", standard: "ISA 700" },
-      { code: "I2", title: "Modified Opinion (if any)", trigger: "Modified opinion", standard: "ISA 705" },
-      { code: "I3", title: "Emphasis of Matter", trigger: "Emphasis needed", standard: "ISA 706" },
-      { code: "I4", title: "Key Audit Matters", trigger: "Listed entity", standard: "ISA 701" },
-      { code: "I5", title: "Other Information Review", trigger: "All", standard: "ISA 720" },
+      { code: "I1", title: "Draft Auditor's Report", trigger: "All", standard: "ISA 700" },
+      { code: "I2", title: "Final Auditor's Report", trigger: "All", standard: "ISA 700" },
+      { code: "I3", title: "Key Audit Matters (KAM)", trigger: "Listed entity", standard: "ISA 701" },
+      { code: "I4", title: "Emphasis of Matter (EOM)", trigger: "Emphasis needed", standard: "ISA 706" },
+      { code: "I5", title: "Other Matter Paragraph", trigger: "As needed", standard: "ISA 706" },
+      { code: "I6", title: "Other Information Review (ISA 720)", trigger: "All", standard: "ISA 720" },
     ],
   },
   {
-    section: "J — Quality Control & Review", color: "bg-teal-50 border-teal-200", icon: Award,
+    section: "J — Quality Control & EQCR", color: "bg-teal-50 border-teal-200", icon: Award,
     papers: [
-      { code: "J1", title: "Engagement Quality Review Checklist", trigger: "EQCR required", standard: "ISQM 2" },
-      { code: "J2", title: "Partner Review Notes", trigger: "All", standard: "ISA 220" },
-      { code: "J3", title: "Manager Review Notes", trigger: "All", standard: "ISA 220" },
-      { code: "J4", title: "Documentation Completion Checklist", trigger: "All", standard: "ISA 230" },
+      { code: "J1", title: "Engagement Quality Control Review Checklist", trigger: "EQCR required", standard: "ISQM 2" },
+      { code: "J2", title: "Reviewer Notes & Clearance", trigger: "All", standard: "ISA 220" },
+      { code: "J3", title: "Consultation Documentation", trigger: "Complex matters", standard: "ISA 220, ISQM 1" },
+      { code: "J4", title: "Independence Reconfirmation", trigger: "All", standard: "IESBA Code" },
+      { code: "J5", title: "Quality Control Sign-offs", trigger: "All", standard: "ISA 220" },
     ],
   },
   {
     section: "K — Client Communication", color: "bg-slate-50 border-slate-200", icon: Users,
     papers: [
-      { code: "K1", title: "Management Letter", trigger: "All", standard: "ISA 265" },
-      { code: "K2", title: "Internal Control Weakness Letter", trigger: "Deficiencies found", standard: "ISA 265" },
-      { code: "K3", title: "Communication with TCWG", trigger: "All", standard: "ISA 260" },
+      { code: "K1", title: "Audit Planning Letter", trigger: "All", standard: "ISA 260" },
+      { code: "K2", title: "Management Letter (Control Weaknesses)", trigger: "Deficiencies found", standard: "ISA 265" },
+      { code: "K3", title: "TCWG Communication", trigger: "All", standard: "ISA 260" },
+      { code: "K4", title: "Audit Findings Report", trigger: "All", standard: "ISA 260" },
+      { code: "K5", title: "Exit Meeting Minutes", trigger: "All", standard: "ISA 260" },
     ],
   },
   {
-    section: "L — Inspection / QCR File", color: "bg-emerald-50 border-emerald-200", icon: FileCheck,
+    section: "L — Regulatory & Compliance (Pakistan)", color: "bg-emerald-50 border-emerald-200", icon: Shield,
     papers: [
-      { code: "L1", title: "QCR Checklist", trigger: "All", standard: "ICAP / ISQM" },
-      { code: "L2", title: "Regulatory Compliance Checklist", trigger: "Listed / SECP", standard: "SECP" },
-      { code: "L3", title: "Audit File Index", trigger: "All", standard: "ISA 230" },
-      { code: "L4", title: "Archiving Documentation", trigger: "All", standard: "ISA 230" },
+      { code: "L1", title: "Companies Act Compliance Checklist", trigger: "All", standard: "Companies Act 2017" },
+      { code: "L2", title: "SECP Filings Review", trigger: "Listed / SECP", standard: "SECP Regulations" },
+      { code: "L3", title: "Income Tax Compliance (FBR)", trigger: "All", standard: "ITO 2001" },
+      { code: "L4", title: "Sales Tax Compliance (FBR / PRA / SRB / KPRA / BRA)", trigger: "Sales Tax applicable", standard: "STA 1990" },
+      { code: "L5", title: "Withholding Tax Compliance", trigger: "WHT applicable", standard: "ITO 2001" },
+      { code: "L6", title: "Zakat / WWF / EOBI Compliance", trigger: "All", standard: "Pakistan Laws" },
     ],
   },
   {
-    section: "AI — AI Working Paper Controls", color: "bg-purple-50 border-purple-200", icon: Sparkles,
+    section: "M — Administrative", color: "bg-gray-50 border-gray-200", icon: ClipboardCheck,
     papers: [
-      { code: "AI1", title: "Data Extraction Log (OCR Output)", trigger: "All", standard: "AI Process" },
-      { code: "AI2", title: "Assumption Register", trigger: "All", standard: "AI Process" },
-      { code: "AI3", title: "TB Reconstruction Logic", trigger: "No TB uploaded", standard: "AI Process" },
-      { code: "AI4", title: "GL Reconstruction Logic", trigger: "No GL uploaded", standard: "AI Process" },
-      { code: "AI5", title: "Risk Flag Summary", trigger: "All", standard: "AI Process" },
-      { code: "AI6", title: "Missing Data Report", trigger: "All", standard: "AI Process" },
-      { code: "AI7", title: "AI Confidence Score Sheet", trigger: "All", standard: "AI Process" },
+      { code: "M1", title: "Engagement Budget & Time Sheet", trigger: "All", standard: "ISQM 1" },
+      { code: "M2", title: "Team Allocation", trigger: "All", standard: "ISA 220" },
+      { code: "M3", title: "Billing & Fee Note", trigger: "All", standard: "ISQM 1" },
+      { code: "M4", title: "Document Indexing", trigger: "All", standard: "ISA 230" },
+      { code: "M5", title: "Version Control Log", trigger: "All", standard: "ISA 230" },
+    ],
+  },
+  {
+    section: "N — IT & Data (AI / Digital Audit)", color: "bg-purple-50 border-purple-200", icon: Sparkles,
+    papers: [
+      { code: "N1", title: "Data Extraction Log (OCR Output)", trigger: "All", standard: "AI Process" },
+      { code: "N2", title: "Data Validation Sheet", trigger: "All", standard: "AI Process" },
+      { code: "N3", title: "TB vs GL Reconciliation", trigger: "All", standard: "AI Process" },
+      { code: "N4", title: "FS Mapping Sheet", trigger: "All", standard: "AI Process" },
+      { code: "N5", title: "AI Assumptions Log", trigger: "All", standard: "AI Process" },
+      { code: "N6", title: "Exception & Error Log", trigger: "All", standard: "AI Process" },
+    ],
+  },
+  {
+    section: "O — Inspection / QCR / Archiving", color: "bg-rose-50 border-rose-200", icon: FileCheck,
+    papers: [
+      { code: "O1", title: "ICAP QCR Checklist", trigger: "All", standard: "ICAP / ISQM 1" },
+      { code: "O2", title: "ISA Compliance Mapping", trigger: "All", standard: "ISA 200-720" },
+      { code: "O3", title: "Working Paper Index", trigger: "All", standard: "ISA 230" },
+      { code: "O4", title: "Deficiency Tracking", trigger: "All", standard: "ISA 265" },
+      { code: "O5", title: "Final Archive File", trigger: "All", standard: "ISA 230" },
+      { code: "O6", title: "File Lock & Retention Record", trigger: "All", standard: "ISA 230" },
     ],
   },
 ];
@@ -2200,18 +2240,33 @@ export default function WorkingPapers() {
       const v = session.vars;
 
       const papersToGenerate = session.selectedPapers.filter(p => {
-        // Filter based on variable triggers
-        if (p.startsWith("F") && !v.salesTaxApplicable) return !["F3","F4"].includes(p);
-        if (p === "B8" && !v.relatedPartiesExist) return false;
-        if (p === "B9" && !v.itSystemReliance) return false;
-        if (["G1","G2","G3","G4"].includes(p) && v.auditApproach === "Substantive Only") return false;
+        if (p === "B7" && !v.itSystemReliance) return false;
+        if (p === "B15" && !v.relatedPartiesExist) return false;
+        if (p === "C8" && !v.groupAudit) return false;
+        if (["E4","E5"].includes(p) && v.auditApproach === "Substantive Only") return false;
+        if (["E6","E7"].includes(p) && !v.itSystemReliance) return false;
+        if (["F5","F6"].includes(p) && !v.hasCashBank) return false;
+        if (p === "F7" && !v.hasReceivables) return false;
+        if (p === "F8" && !v.hasInventory) return false;
+        if (p === "F9" && !v.hasFixedAssets) return false;
+        if (p === "F10" && !v.hasIntangibles) return false;
+        if (p === "F11" && !v.hasInvestments) return false;
+        if (p === "F12" && !v.hasPayables) return false;
+        if (p === "F13" && !v.hasBorrowings) return false;
+        if (p === "F15" && !v.hasProvisions && !v.hasContingentLiabilities) return false;
+        if (p === "F16" && !v.hasShareCapital) return false;
+        if (p === "F17" && !v.hasReserves && !v.hasRetainedEarnings) return false;
+        if (p === "F19" && !v.hasCostOfSales) return false;
+        if (p === "F20" && !v.hasOperatingExpenses) return false;
+        if (p === "F22" && !v.hasFinanceCost) return false;
+        if (p === "F23" && !v.hasOtherIncome) return false;
+        if (p === "F24" && !v.incomeTaxApplicable) return false;
+        if (p === "F25" && !v.deferredTaxApplicable) return false;
+        if (p === "F26" && !v.salesTaxApplicable) return false;
+        if (p === "F27" && !v.whtApplicable) return false;
+        if (["G1","G2","G3"].includes(p) && !v.externalConfirmations) return false;
         if (p === "J1" && !v.eqcrRequired) return false;
-        if (p === "E5" && !v.hasInventory) return false;
-        if (p === "E8" && !v.hasIntangibles) return false;
-        if (p === "E9" && !v.hasInvestments) return false;
-        if (p === "E12" && !v.hasBorrowings) return false;
-        if (p === "E14" && !v.hasProvisions) return false;
-        if (p === "E15" && !v.hasContingentLiabilities) return false;
+        if (["L4","L5"].includes(p) && !v.salesTaxApplicable && !v.whtApplicable) return false;
         return true;
       });
 

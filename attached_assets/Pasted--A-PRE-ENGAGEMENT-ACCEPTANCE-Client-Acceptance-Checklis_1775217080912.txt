@@ -1,0 +1,150 @@
+🔷 A. PRE-ENGAGEMENT & ACCEPTANCE
+Client Acceptance Checklist
+Continuance Evaluation
+Engagement Letter
+Independence Declarations (Firm & Team)
+Conflict of Interest Assessment
+Ethical Compliance (IESBA)
+Client Risk Profiling
+KYC / AML Documentation
+Previous Auditor Communication
+Terms of Engagement Approval
+🔷 B. PLANNING
+Understanding the Entity & Environment
+Industry Analysis
+Regulatory Framework Assessment
+Business Model & Revenue Streams
+Internal Control Narratives
+Process Flowcharts
+IT Environment Assessment
+Risk Assessment (Financial Statement Level)
+Risk Assessment (Assertion Level)
+Fraud Risk Assessment
+Laws & Regulations Compliance Review
+Materiality Calculation (Overall, PM, Trivial)
+Audit Strategy Memorandum
+Detailed Audit Plan
+Related Party Identification
+🔷 C. TRIAL BALANCE & FINANCIALS
+Raw Trial Balance
+Adjusted Trial Balance
+Lead Schedules (FS Mapping)
+Financial Statements (Draft)
+Financial Statements (Final)
+Prior Year Comparatives
+Chart of Accounts Mapping
+Consolidation (if applicable)
+🔷 D. ANALYTICAL REVIEW
+Ratio Analysis (Liquidity, Profitability, Leverage, Efficiency)
+Trend Analysis (YoY / Monthly)
+Budget vs Actual Analysis
+Variance Analysis
+Expectation vs Actual Comparison
+Analytical Review Conclusion
+🔷 E. INTERNAL CONTROL & RISK
+Walkthrough Documentation
+Control Identification Matrix
+Risk-Control Matrix (RCM)
+Test of Controls (ToC)
+Control Deviations Log
+IT General Controls (ITGC) Testing
+Application Controls Testing
+Control Deficiency Evaluation
+Controls Conclusion
+🔷 F. SUBSTANTIVE PROCEDURES (TEST OF DETAILS)
+🔹 General
+Sampling Plan (ISA 530)
+Sampling Selection Sheet
+Substantive Testing Strategy
+Misstatement Tracking Sheet
+🔹 Assets
+Cash & Bank Testing
+Bank Reconciliation Testing
+Receivables Testing (Aging, Confirmations)
+Inventory Testing (Existence, Valuation)
+PPE Testing (Additions, Disposals, Depreciation)
+Intangible Assets Testing
+Investment Testing
+🔹 Liabilities
+Payables Testing
+Borrowings Testing
+Accruals Testing
+Provisions & Contingencies
+🔹 Equity
+Share Capital Verification
+Reserves & Retained Earnings
+🔹 Income Statement
+Revenue Testing (Cut-off, Occurrence)
+Cost of Sales Testing
+Operating Expenses Testing
+Payroll Testing
+Finance Cost Testing
+Other Income Testing
+🔹 Taxation
+Current Tax Computation
+Deferred Tax Calculation
+Sales Tax / VAT Testing
+Withholding Tax Testing
+🔷 G. AUDIT EVIDENCE
+Bank Confirmations
+Debtors Confirmations
+Creditors Confirmations
+Legal Confirmations
+Third Party Confirmations
+Physical Verification Reports
+Supporting Documents Index
+Evidence Cross-Reference Sheet
+🔷 H. COMPLETION
+Summary of Misstatements (Unadjusted & Adjusted)
+Subsequent Events Review
+Going Concern Assessment
+Final Analytical Review
+Disclosure Checklist (IFRS / Companies Act)
+Management Representation Letter
+Engagement Completion Checklist
+🔷 I. REPORTING
+Draft Auditor’s Report
+Final Auditor’s Report
+Key Audit Matters (KAM)
+Emphasis of Matter (EOM)
+Other Matter Paragraph
+Other Information Review (ISA 720)
+🔷 J. QUALITY CONTROL & EQCR
+Engagement Quality Control Review Checklist
+Reviewer Notes & Clearance
+Consultation Documentation
+Independence Reconfirmation
+Quality Control Sign-offs
+🔷 K. CLIENT COMMUNICATION
+Audit Planning Letter
+Management Letter (Control Weaknesses)
+TCWG Communication
+Audit Findings Report
+Exit Meeting Minutes
+🔷 L. REGULATORY & COMPLIANCE (PAKISTAN)
+Companies Act Compliance Checklist
+SECP Filings Review
+Income Tax Compliance (FBR)
+Sales Tax Compliance (FBR / PRA / SRB / KPRA / BRA)
+Withholding Tax Compliance
+Zakat / WWF / EOBI Compliance
+🔷 M. ADMINISTRATIVE
+Engagement Budget & Time Sheet
+Team Allocation
+Billing & Fee Note
+Document Indexing
+Version Control Log
+🔷 N. IT & DATA (FOR AI / DIGITAL AUDIT)
+Data Extraction Log (OCR Output)
+Data Validation Sheet
+TB vs GL Reconciliation
+FS Mapping Sheet
+AI Assumptions Log
+Exception & Error Log
+🔷 O. INSPECTION / QCR / ARCHIVING
+ICAP QCR Checklist
+ISA Compliance Mapping
+Working Paper Index
+Deficiency Tracking
+Final Archive File
+File Lock & Retention Record
