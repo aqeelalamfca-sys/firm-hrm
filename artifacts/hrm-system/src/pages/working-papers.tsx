@@ -498,8 +498,8 @@ function YesNoToggle({ label, value, onChange, hint }: { label: string; value: b
 }
 
 function VarGroupPanel({ id, label, icon: Icon, color, children, openGroup, onToggle }:
-  { id: string; label: string; icon: any; color: string; children: React.ReactNode; openGroup: string | null; onToggle: (g: string) => void }) {
-  const isOpen = openGroup === id;
+  { id: string; label: string; icon: any; color: string; children: React.ReactNode; openGroup: Set<string>; onToggle: (g: string) => void }) {
+  const isOpen = openGroup.has(id);
   return (
     <div className={cn("border rounded-xl", color)}>
       <button className="w-full flex items-center justify-between p-3 text-left hover:bg-white/50 transition-colors"
@@ -618,9 +618,13 @@ function UploadStep({ fsFiles, stFiles, onFsAdd, onStAdd, onFsRemove, onStRemove
 function VariablesStep({ vars, onChange, onContinue, onBack }:
   { vars: VariableMatrix; onChange: (v: VariableMatrix) => void; onContinue: () => void; onBack: () => void }) {
 
-  const [openGroup, setOpenGroup] = useState<string | null>("A");
+  const [openGroup, setOpenGroup] = useState<Set<string>>(new Set(["A"]));
   const set = (field: keyof VariableMatrix, val: any) => onChange({ ...vars, [field]: val });
-  const toggle = useCallback((g: string) => setOpenGroup(prev => g === prev ? null : g), []);
+  const toggle = useCallback((g: string) => setOpenGroup(prev => {
+    const next = new Set(prev);
+    if (next.has(g)) next.delete(g); else next.add(g);
+    return next;
+  }), []);
 
   const Field = VarField;
 
