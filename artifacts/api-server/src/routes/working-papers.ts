@@ -12,6 +12,7 @@ import * as XLSX from "xlsx";
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell,
   WidthType, AlignmentType, BorderStyle, ShadingType, PageBreak,
+  type IShadingAttributesProperties,
 } from "docx";
 
 const router = Router();
@@ -66,7 +67,7 @@ async function getAIClient(): Promise<{ client: OpenAI; model: string } | null> 
   try {
     const settingsKeys = ["chatgpt_api_key", "ai_provider", "ai_model", "ai_base_url"];
     const rows = await db.select().from(systemSettingsTable).where(inArray(systemSettingsTable.key, settingsKeys));
-    const getVal = (key: string) => rows.find(r => r.key === key)?.value || "";
+    const getVal = (key: string) => rows.find((r: { key: string | null; value: string | null }) => r.key === key)?.value || "";
     const apiKey = getVal("chatgpt_api_key");
     const provider = getVal("ai_provider") || "openai";
     const customModel = getVal("ai_model");
@@ -879,10 +880,10 @@ Return JSON: { "working_papers": [...] }`;
 
   const batches: string[][] = [];
   const batchGroups = [
-    papersToGenerate.filter(p => /^[A-D]/.test(p)),
-    papersToGenerate.filter(p => /^E/.test(p)),
-    papersToGenerate.filter(p => /^[F-H]/.test(p)),
-    papersToGenerate.filter(p => /^[I-K]/.test(p)),
+    (papersToGenerate as string[]).filter((p: string) => /^[A-D]/.test(p)),
+    (papersToGenerate as string[]).filter((p: string) => /^E/.test(p)),
+    (papersToGenerate as string[]).filter((p: string) => /^[F-H]/.test(p)),
+    (papersToGenerate as string[]).filter((p: string) => /^[I-K]/.test(p)),
   ];
   for (const bg of batchGroups) {
     if (bg.length > 0) batches.push(bg);
@@ -1809,10 +1810,10 @@ router.post("/export-docx", async (req: Request, res: Response) => {
     const cellShading = { fill: "1B3A6B", type: ShadingType.CLEAR, color: "auto" };
     const lightShading = { fill: "EBF0FA", type: ShadingType.CLEAR, color: "auto" };
 
-    const makeCell = (text: string, bold = false, dark = false, width = 2500) =>
+    const makeCell = (text: string, bold = false, dark = false, width = 2500, bg?: IShadingAttributesProperties) =>
       new TableCell({
         width: { size: width, type: WidthType.DXA },
-        shading: dark ? cellShading : undefined,
+        shading: dark ? cellShading : (bg ?? undefined),
         children: [new Paragraph({
           children: [new TextRun({ text, bold, color: dark ? "FFFFFF" : "1B3A6B", size: 20 })],
         })],
@@ -1862,12 +1863,11 @@ router.post("/export-docx", async (req: Request, res: Response) => {
         ...workingPapers.map((wp: any, i: number) =>
           new TableRow({
             children: [
-              makeCell(wp.ref, false, false, 1500),
-              makeCell(wp.title, false, false, 4000),
-              makeCell(wp.section_label || wp.section, false, false, 2000),
-              makeCell((wp.isa_references || []).join(", ").slice(0, 25), false, false, 1500),
+              makeCell(wp.ref, false, false, 1500, i % 2 === 0 ? lightShading : undefined),
+              makeCell(wp.title, false, false, 4000, i % 2 === 0 ? lightShading : undefined),
+              makeCell(wp.section_label || wp.section, false, false, 2000, i % 2 === 0 ? lightShading : undefined),
+              makeCell((wp.isa_references || []).join(", ").slice(0, 25), false, false, 1500, i % 2 === 0 ? lightShading : undefined),
             ],
-            shading: i % 2 === 0 ? lightShading : undefined,
           })
         ),
       ],
@@ -1893,8 +1893,10 @@ router.post("/export-docx", async (req: Request, res: Response) => {
         rows: [
           new TableRow({ children: [makeCell("Item", true, true, 4500), makeCell("Amount (PKR)", true, true, 4500)] }),
           ...finRows.map(([item, val], i) => new TableRow({
-            children: [makeCell(item, true, false, 4500), makeCell(val, false, false, 4500)],
-            shading: i % 2 === 0 ? lightShading : undefined,
+            children: [
+              makeCell(item, true, false, 4500, i % 2 === 0 ? lightShading : undefined),
+              makeCell(val, false, false, 4500, i % 2 === 0 ? lightShading : undefined),
+            ],
           })),
         ],
       });
@@ -1910,12 +1912,11 @@ router.post("/export-docx", async (req: Request, res: Response) => {
           new TableRow({ children: [makeCell("Ref", true, true, 1000), makeCell("Description", true, true, 4000), makeCell("Type", true, true, 1500), makeCell("WPs Referenced", true, true, 2500)] }),
           ...evidenceIndex.map((e: any, i: number) => new TableRow({
             children: [
-              makeCell(e.ref, true, false, 1000),
-              makeCell(e.description, false, false, 4000),
-              makeCell(e.type, false, false, 1500),
-              makeCell((e.wp_refs || []).join(", "), false, false, 2500),
+              makeCell(e.ref, true, false, 1000, i % 2 === 0 ? lightShading : undefined),
+              makeCell(e.description, false, false, 4000, i % 2 === 0 ? lightShading : undefined),
+              makeCell(e.type, false, false, 1500, i % 2 === 0 ? lightShading : undefined),
+              makeCell((e.wp_refs || []).join(", "), false, false, 2500, i % 2 === 0 ? lightShading : undefined),
             ],
-            shading: i % 2 === 0 ? lightShading : undefined,
           })),
         ],
       });
@@ -1973,13 +1974,12 @@ router.post("/export-docx", async (req: Request, res: Response) => {
             new TableRow({ children: [makeCell("No.", true, true, 600), makeCell("Procedure", true, true, 3200), makeCell("Finding", true, true, 2800), makeCell("Conclusion", true, true, 1400), makeCell("Ref", true, true, 1000)] }),
             ...wp.procedures.map((p: any, i: number) => new TableRow({
               children: [
-                makeCell(p.no || String(i + 1), false, false, 600),
-                makeCell(p.procedure, false, false, 3200),
-                makeCell(p.finding, false, false, 2800),
-                makeCell(p.conclusion, false, false, 1400),
-                makeCell(p.evidence_ref || "", false, false, 1000),
+                makeCell(p.no || String(i + 1), false, false, 600, i % 2 === 0 ? lightShading : undefined),
+                makeCell(p.procedure, false, false, 3200, i % 2 === 0 ? lightShading : undefined),
+                makeCell(p.finding, false, false, 2800, i % 2 === 0 ? lightShading : undefined),
+                makeCell(p.conclusion, false, false, 1400, i % 2 === 0 ? lightShading : undefined),
+                makeCell(p.evidence_ref || "", false, false, 1000, i % 2 === 0 ? lightShading : undefined),
               ],
-              shading: i % 2 === 0 ? lightShading : undefined,
             })),
           ],
         });

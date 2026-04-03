@@ -37,7 +37,7 @@ async function getOpenAIClient(): Promise<{ client: OpenAI; model: string } | nu
       .from(systemSettingsTable)
       .where(inArray(systemSettingsTable.key, settingsKeys));
 
-    const getVal = (key: string) => rows.find(r => r.key === key)?.value || "";
+    const getVal = (key: string) => rows.find((r: { key: string | null; value: string | null }) => r.key === key)?.value || "";
     const apiKey = getVal("chatgpt_api_key");
     const provider = getVal("ai_provider") || "openai";
     const customModel = getVal("ai_model");
@@ -244,7 +244,7 @@ async function getRecentUpdates(category: string): Promise<string[]> {
       )
       .orderBy(desc(regulatoryUpdatesTable.createdAt))
       .limit(5);
-    return recent.map(r => r.text);
+    return recent.map((r: { text: string | null }) => r.text ?? "");
   } catch {
     return [];
   }
