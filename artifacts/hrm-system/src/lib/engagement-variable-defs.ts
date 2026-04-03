@@ -284,9 +284,23 @@ export function getAllTriggeredWPs(values: Record<string, any>): string[] {
 }
 
 export function getDefaultValues(): Record<string, any> {
+  const today = new Date();
+  const curMonth = today.getMonth() + 1;
+  const curYear = today.getFullYear();
+  const fyEndYear = curMonth <= 6 ? curYear - 1 : curYear;
+  const d2 = (n: number) => String(n).padStart(2, "0");
+  const fmt = (y: number, m: number, day: number) => `${y}-${d2(m)}-${d2(day)}`;
+
   const defaults: Record<string, any> = {};
   for (const v of VARIABLE_DEFS) {
     if (v.defaultValue !== undefined) defaults[v.key] = v.defaultValue;
   }
+
+  // Dynamic governance date defaults — all relative to June 30 FY year-end
+  defaults.engagementAcceptanceDate          = fmt(fyEndYear, 6, 30);   // FY year-end date
+  defaults.managementFsApprovalDate          = fmt(fyEndYear, 9, 30);   // 3 months after year-end
+  defaults.boardAuditCommitteeApprovalDate   = fmt(fyEndYear, 10, 31);  // 4 months after year-end
+  defaults.subsequentEventsReviewCutoffDate  = fmt(fyEndYear, 9, 30);   // matches audit report date
+
   return defaults;
 }

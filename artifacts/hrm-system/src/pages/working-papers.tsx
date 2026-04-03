@@ -1029,6 +1029,15 @@ export default function WorkingPapers() {
     setIndependenceConfirmed(true);
     setConflictCheck(true);
 
+    // Governance dates in configValues (only fill if still empty)
+    setConfigValues(prev => ({
+      ...prev,
+      engagementAcceptanceDate:         prev.engagementAcceptanceDate         || fmt(fyEndYear, 6, 30),
+      managementFsApprovalDate:         prev.managementFsApprovalDate         || fmt(fyEndYear, 9, 30),
+      boardAuditCommitteeApprovalDate:  prev.boardAuditCommitteeApprovalDate  || fmt(fyEndYear, 10, 31),
+      subsequentEventsReviewCutoffDate: prev.subsequentEventsReviewCutoffDate || fmt(fyEndYear, 9, 30),
+    }));
+
     if (showToast) {
       toast({
         title: "Smart defaults applied",
