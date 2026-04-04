@@ -538,172 +538,237 @@ export default function WorkingPapers() {
   // ── SESSION LIST ──
   if (!activeSession) {
     return (
-      <div className="p-6 max-w-5xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">AI Working Paper Generator</h1>
-            <p className="text-muted-foreground text-sm mt-1">Audit-grade sequential workflow: Upload → Extract → Arrange → Verify → Generate → Export</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+        <div className="bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 text-white">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center backdrop-blur-sm">
+                    <Sparkles className="w-5 h-5 text-blue-300" />
+                  </div>
+                  AI Working Paper Generator
+                </h1>
+                <p className="text-slate-300 text-xs sm:text-sm mt-1.5">Audit-grade sequential workflow: Upload → Extract → Arrange → Verify → Generate → Export</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 bg-white/5 rounded-lg px-3 py-1.5 border border-white/10">
+                  <FileCheck className="w-3.5 h-3.5" />
+                  <span>{sessions.length} session{sessions.length !== 1 ? "s" : ""}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="bg-card border rounded-xl p-6 space-y-4">
-          <h2 className="font-semibold">New Engagement Session</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Client / Entity Name *</label>
-              <Input placeholder="e.g. ABC Industries (Pvt.) Ltd." value={newClientName} onChange={e => setNewClientName(e.target.value)} />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+          <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50/50 px-5 py-4 border-b border-slate-200/60">
+              <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+                <div className="w-7 h-7 rounded-md bg-blue-600 flex items-center justify-center">
+                  <Plus className="w-4 h-4 text-white" />
+                </div>
+                New Engagement Session
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">Fill in client and engagement details to start a new audit session</p>
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Entity Type *</label>
-              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newEntityType} onChange={e => setNewEntityType(e.target.value)}>
-                <option value="Private Limited">Private Limited Company</option>
-                <option value="Public Limited (Listed)">Public Limited (Listed / PIE)</option>
-                <option value="Public Limited (Unlisted)">Public Limited (Unlisted)</option>
-                <option value="Single Member">Single Member Company</option>
-                <option value="LLP">Limited Liability Partnership</option>
-                <option value="AOP">Association of Persons (AOP)</option>
-                <option value="Sole Proprietor">Sole Proprietor</option>
-                <option value="NGO/NPO">NGO / NPO (Section 42)</option>
-                <option value="Trust">Trust</option>
-                <option value="Government Entity">Government Entity</option>
-                <option value="Branch Office">Branch Office (Foreign Company)</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Engagement Year *</label>
-              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newYear} onChange={e => handleYearChange(e.target.value)}>
-                {[2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030].map(y => (
-                  <option key={y} value={String(y)}>{y}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">NTN (National Tax Number) *</label>
-              <Input placeholder="e.g. 1234567-8" value={newNtn} onChange={e => setNewNtn(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">STRN (Sales Tax Registration)</label>
-              <Input placeholder="e.g. 32-00-1234-567-89" value={newStrn} onChange={e => setNewStrn(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Period Start *</label>
-              <Input type="date" value={newPeriodStart} onChange={e => setNewPeriodStart(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Period End *</label>
-              <Input type="date" value={newPeriodEnd} onChange={e => setNewPeriodEnd(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Reporting Framework *</label>
-              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newFramework} onChange={e => setNewFramework(e.target.value)}>
-                <option value="IFRS">IFRS (Full)</option>
-                <option value="IFRS for SMEs">IFRS for SMEs</option>
-                <option value="AFRS">AFRS (Accounting Framework)</option>
-                <option value="Fourth Schedule">Fourth Schedule (Companies Act 2017)</option>
-                <option value="Fifth Schedule">Fifth Schedule (Banking/Insurance)</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Engagement Type *</label>
-              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newEngagementType} onChange={e => setNewEngagementType(e.target.value)}>
-                <option value="statutory_audit">Statutory Audit</option>
-                <option value="limited_review">Limited Review / Review Engagement</option>
-                <option value="group_audit">Group / Consolidated Audit</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Engagement Continuity *</label>
-              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newEngagementContinuity} onChange={e => setNewEngagementContinuity(e.target.value)}>
-                <option value="first_time">First Time Engagement</option>
-                <option value="recurring">Recurring (Same Auditor)</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Audit Firm Name</label>
-              <Input placeholder="e.g. Alam & Aulakh Chartered Accountants" value={newAuditFirmName} onChange={e => setNewAuditFirmName(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Audit Firm Logo</label>
-              <div className="flex items-center gap-3">
-                <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={e => {
-                  const f = e.target.files?.[0];
-                  if (f) { setNewAuditFirmLogo(f); setLogoPreview(URL.createObjectURL(f)); }
-                }} />
-                <Button type="button" variant="outline" size="sm" onClick={() => logoInputRef.current?.click()}>
-                  <Upload className="w-3.5 h-3.5 mr-1.5" /> {newAuditFirmLogo ? "Change" : "Upload"}
+            <div className="p-5 space-y-5">
+              <div>
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  Client Information
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                  <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
+                    <label className="text-xs font-medium text-slate-600">Client / Entity Name <span className="text-red-500">*</span></label>
+                    <Input placeholder="e.g. ABC Industries (Pvt.) Ltd." value={newClientName} onChange={e => setNewClientName(e.target.value)} className="h-9" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Entity Type <span className="text-red-500">*</span></label>
+                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newEntityType} onChange={e => setNewEntityType(e.target.value)}>
+                      <option value="Private Limited">Private Limited Company</option>
+                      <option value="Public Limited (Listed)">Public Limited (Listed / PIE)</option>
+                      <option value="Public Limited (Unlisted)">Public Limited (Unlisted)</option>
+                      <option value="Single Member">Single Member Company</option>
+                      <option value="LLP">Limited Liability Partnership</option>
+                      <option value="AOP">Association of Persons (AOP)</option>
+                      <option value="Sole Proprietor">Sole Proprietor</option>
+                      <option value="NGO/NPO">NGO / NPO (Section 42)</option>
+                      <option value="Trust">Trust</option>
+                      <option value="Government Entity">Government Entity</option>
+                      <option value="Branch Office">Branch Office (Foreign Company)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">NTN <span className="text-red-500">*</span></label>
+                    <Input placeholder="e.g. 1234567-8" value={newNtn} onChange={e => setNewNtn(e.target.value)} className="h-9" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">STRN (Sales Tax)</label>
+                    <Input placeholder="e.g. 32-00-1234-567-89" value={newStrn} onChange={e => setNewStrn(e.target.value)} className="h-9" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-dashed border-slate-200 pt-4">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  Engagement Details
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Engagement Year <span className="text-red-500">*</span></label>
+                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newYear} onChange={e => handleYearChange(e.target.value)}>
+                      {[2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030].map(y => (
+                        <option key={y} value={String(y)}>{y}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Period Start <span className="text-red-500">*</span></label>
+                    <Input type="date" value={newPeriodStart} onChange={e => setNewPeriodStart(e.target.value)} className="h-9" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Period End <span className="text-red-500">*</span></label>
+                    <Input type="date" value={newPeriodEnd} onChange={e => setNewPeriodEnd(e.target.value)} className="h-9" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Reporting Framework <span className="text-red-500">*</span></label>
+                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newFramework} onChange={e => setNewFramework(e.target.value)}>
+                      <option value="IFRS">IFRS (Full)</option>
+                      <option value="IFRS for SMEs">IFRS for SMEs</option>
+                      <option value="AFRS">AFRS (Accounting Framework)</option>
+                      <option value="Fourth Schedule">Fourth Schedule (Companies Act 2017)</option>
+                      <option value="Fifth Schedule">Fifth Schedule (Banking/Insurance)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Engagement Type <span className="text-red-500">*</span></label>
+                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newEngagementType} onChange={e => setNewEngagementType(e.target.value)}>
+                      <option value="statutory_audit">Statutory Audit</option>
+                      <option value="limited_review">Limited Review / Review Engagement</option>
+                      <option value="group_audit">Group / Consolidated Audit</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Continuity <span className="text-red-500">*</span></label>
+                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newEngagementContinuity} onChange={e => setNewEngagementContinuity(e.target.value)}>
+                      <option value="first_time">First Time Engagement</option>
+                      <option value="recurring">Recurring (Same Auditor)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-dashed border-slate-200 pt-4">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                  Audit Team & Firm
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Audit Firm Name</label>
+                    <Input placeholder="e.g. Alam & Aulakh CA" value={newAuditFirmName} onChange={e => setNewAuditFirmName(e.target.value)} className="h-9" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Audit Firm Logo</label>
+                    <div className="flex items-center gap-3 h-9">
+                      <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={e => {
+                        const f = e.target.files?.[0];
+                        if (f) { setNewAuditFirmLogo(f); setLogoPreview(URL.createObjectURL(f)); }
+                      }} />
+                      <Button type="button" variant="outline" size="sm" className="h-8" onClick={() => logoInputRef.current?.click()}>
+                        <Upload className="w-3.5 h-3.5 mr-1.5" /> {newAuditFirmLogo ? "Change" : "Upload"}
+                      </Button>
+                      {logoPreview && <img src={logoPreview} alt="Logo preview" className="h-8 w-auto rounded border" />}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Preparer</label>
+                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newPreparerId} onChange={e => setNewPreparerId(e.target.value)}>
+                      <option value="">-- Select Preparer --</option>
+                      {teamMembers.map((m: any) => (
+                        <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Reviewer</label>
+                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newReviewerId} onChange={e => setNewReviewerId(e.target.value)}>
+                      <option value="">-- Select Reviewer --</option>
+                      {teamMembers.filter((m: any) => ["super_admin", "manager", "partner", "hr_admin"].includes(m.role)).map((m: any) => (
+                        <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Approver</label>
+                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newApproverId} onChange={e => setNewApproverId(e.target.value)}>
+                      <option value="">-- Select Approver --</option>
+                      {teamMembers.filter((m: any) => ["super_admin", "partner"].includes(m.role)).map((m: any) => (
+                        <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {(newEntityType === "Public Limited (Listed)" || newEntityType === "Government Entity") && (
+                <div className="flex items-center gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                  <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <span>{newEntityType === "Public Limited (Listed)" ? "Listed entities require EQCR review and enhanced disclosure working papers." : "Government entity engagements follow special reporting requirements."}</span>
+                </div>
+              )}
+
+              <div className="flex justify-end pt-2">
+                <Button onClick={createSession} disabled={loading} size="lg" className="px-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-200/50">
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                  Create Session
                 </Button>
-                {logoPreview && <img src={logoPreview} alt="Logo preview" className="h-8 w-auto rounded border" />}
               </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Preparer (Prepared By)</label>
-              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newPreparerId} onChange={e => setNewPreparerId(e.target.value)}>
-                <option value="">-- Select Preparer --</option>
-                {teamMembers.map((m: any) => (
-                  <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Reviewer (Reviewed By)</label>
-              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newReviewerId} onChange={e => setNewReviewerId(e.target.value)}>
-                <option value="">-- Select Reviewer --</option>
-                {teamMembers.filter((m: any) => ["super_admin", "manager", "partner", "hr_admin"].includes(m.role)).map((m: any) => (
-                  <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Approver (Approved By)</label>
-              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newApproverId} onChange={e => setNewApproverId(e.target.value)}>
-                <option value="">-- Select Approver --</option>
-                {teamMembers.filter((m: any) => ["super_admin", "partner"].includes(m.role)).map((m: any) => (
-                  <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-end">
-              <Button onClick={createSession} disabled={loading} className="w-full">
-                {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                Create Session
-              </Button>
-            </div>
           </div>
-          {(newEntityType === "Public Limited (Listed)" || newEntityType === "Government Entity") && (
-            <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              {newEntityType === "Public Limited (Listed)" ? "Listed entities require EQCR review and enhanced disclosure working papers." : "Government entity engagements follow special reporting requirements."}
+
+          {sessions.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-1">Existing Sessions ({sessions.length})</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {sessions.map((s: any) => {
+                  const statusCls = s.status === "completed" || s.status === "exported" ? "bg-emerald-500" :
+                    s.status === "generation" || s.status === "variables" ? "bg-blue-500" :
+                    s.status === "upload" || s.status === "draft" ? "bg-slate-400" : "bg-amber-500";
+                  return (
+                    <div key={s.id} className="group bg-white border border-slate-200/80 rounded-xl p-4 hover:shadow-lg hover:border-blue-200 cursor-pointer transition-all duration-200" onClick={() => fetchSession(s.id)}>
+                      <div className="flex items-start gap-3">
+                        <div className={cn("w-2 h-2 rounded-full mt-2 shrink-0", statusCls)} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">{s.clientName}</p>
+                            {s.entityType && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium border border-blue-100">{s.entityType}</span>}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            <span className="text-xs text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md">{s.engagementYear}</span>
+                            <span className="text-xs text-slate-500">{s.reportingFramework || "IFRS"}</span>
+                            <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium capitalize", statusColor(s.status))}>{s.status?.replace(/_/g, " ")}</span>
+                          </div>
+                          {(s.preparerName || s.reviewerName || s.approverName) && (
+                            <div className="flex items-center gap-3 mt-2 flex-wrap">
+                              {s.preparerName && <span className="text-[11px] text-slate-400"><span className="font-medium text-slate-600">{s.preparerName}</span></span>}
+                              {s.reviewerName && <span className="text-[11px] text-slate-400"><span className="font-medium text-slate-600">{s.reviewerName}</span></span>}
+                            </div>
+                          )}
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all shrink-0 mt-1" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
-
-        {sessions.length > 0 && (
-          <div className="bg-card border rounded-xl divide-y">
-            <div className="p-4 font-semibold">Existing Sessions</div>
-            {sessions.map((s: any) => (
-              <div key={s.id} className="p-4 flex items-center justify-between hover:bg-muted/30 cursor-pointer" onClick={() => fetchSession(s.id)}>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium">{s.clientName}</p>
-                    {s.entityType && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-medium">{s.entityType}</span>}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Year: {s.engagementYear} — {s.reportingFramework || "IFRS"} — Stage: {s.status}
-                    {s.ntn && <span className="ml-2">NTN: {s.ntn}</span>}
-                  </p>
-                  {(s.preparerName || s.reviewerName || s.approverName) && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {s.preparerName && <span>Preparer: {s.preparerName}</span>}
-                      {s.reviewerName && <span className="ml-3">Reviewer: {s.reviewerName}</span>}
-                      {s.approverName && <span className="ml-3">Approver: {s.approverName}</span>}
-                    </p>
-                  )}
-                </div>
-                <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     );
   }
@@ -711,69 +776,80 @@ export default function WorkingPapers() {
   const stageIndex = STAGES.findIndex(s => s.key === stage);
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => { setActiveSession(null); setStage("upload"); }}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back
-        </Button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-xl font-bold">{activeSession.clientName}</h1>
-            {activeSession.entityType && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium">{activeSession.entityType}</span>}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+      <div className="bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="py-4 sm:py-5">
+            <div className="flex items-start gap-3 sm:gap-4">
+              <button onClick={() => { setActiveSession(null); setStage("upload"); }} className="mt-0.5 p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors shrink-0">
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate">{activeSession.clientName}</h1>
+                  {activeSession.entityType && <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/15 text-blue-200 font-medium border border-white/10">{activeSession.entityType}</span>}
+                </div>
+                <div className="flex items-center gap-2 mt-1 flex-wrap text-slate-300 text-xs sm:text-sm">
+                  <span className="bg-white/10 px-2 py-0.5 rounded-md">{activeSession.engagementYear}</span>
+                  <span>{activeSession.reportingFramework || "IFRS"}</span>
+                  {activeSession.periodStart && activeSession.periodEnd && (
+                    <span className="hidden sm:inline">{activeSession.periodStart} to {activeSession.periodEnd}</span>
+                  )}
+                  {activeSession.ntn && <span className="hidden sm:inline">NTN: {activeSession.ntn}</span>}
+                </div>
+                <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                  {activeSession.auditFirmName && (
+                    <div className="flex items-center gap-1.5">
+                      {activeSession.auditFirmLogo && <img src={`${API_BASE.replace('/api', '')}${activeSession.auditFirmLogo}`} alt="Firm logo" className="h-5 w-auto rounded" />}
+                      <span className="text-[11px] text-slate-400 font-medium">{activeSession.auditFirmName}</span>
+                    </div>
+                  )}
+                  {(activeSession.preparerName || activeSession.reviewerName || activeSession.approverName) && (
+                    <div className="hidden sm:flex items-center gap-3">
+                      {activeSession.preparerName && <span className="text-[11px] text-slate-400">Prep: <span className="text-slate-300">{activeSession.preparerName}</span></span>}
+                      {activeSession.reviewerName && <span className="text-[11px] text-slate-400">Rev: <span className="text-slate-300">{activeSession.reviewerName}</span></span>}
+                      {activeSession.approverName && <span className="text-[11px] text-slate-400">App: <span className="text-slate-300">{activeSession.approverName}</span></span>}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button onClick={() => fetchExceptions()} className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 transition-colors text-xs font-medium border border-amber-400/20">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Exceptions</span> ({exceptions.length})
+              </button>
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {activeSession.engagementYear} — {activeSession.reportingFramework || "IFRS"}
-            {activeSession.periodStart && activeSession.periodEnd && <span className="ml-1">— Period: {activeSession.periodStart} to {activeSession.periodEnd}</span>}
-            {activeSession.ntn && <span className="ml-1">— NTN: {activeSession.ntn}</span>}
-            {activeSession.engagementContinuity && <span className="ml-1">— {activeSession.engagementContinuity === "recurring" ? "Recurring" : "First Time"}</span>}
-          </p>
-          {activeSession.auditFirmName && (
-            <div className="flex items-center gap-2 mt-1">
-              {activeSession.auditFirmLogo && <img src={`${API_BASE.replace('/api', '')}${activeSession.auditFirmLogo}`} alt="Firm logo" className="h-6 w-auto rounded" />}
-              <span className="text-xs text-muted-foreground font-medium">{activeSession.auditFirmName}</span>
-            </div>
-          )}
-          {(activeSession.preparerName || activeSession.reviewerName || activeSession.approverName) && (
-            <div className="flex items-center gap-4 mt-1 flex-wrap">
-              {activeSession.preparerName && (
-                <span className="text-xs"><span className="text-muted-foreground">Prepared by:</span> <span className="font-medium">{activeSession.preparerName}</span></span>
-              )}
-              {activeSession.reviewerName && (
-                <span className="text-xs"><span className="text-muted-foreground">Reviewed by:</span> <span className="font-medium">{activeSession.reviewerName}</span></span>
-              )}
-              {activeSession.approverName && (
-                <span className="text-xs"><span className="text-muted-foreground">Approved by:</span> <span className="font-medium">{activeSession.approverName}</span></span>
-              )}
-            </div>
-          )}
+
+          <div className="flex items-center gap-0.5 sm:gap-1 pb-0 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+            {STAGES.map((s, i) => {
+              const Icon = s.icon;
+              const isActive = s.key === stage;
+              const isPast = i < stageIndex;
+              return (
+                <button
+                  key={s.key}
+                  className={cn(
+                    "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-t-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all relative",
+                    isActive
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : isPast
+                        ? "text-emerald-300 hover:bg-white/10"
+                        : "text-slate-400 hover:bg-white/10",
+                  )}
+                  onClick={() => setStage(s.key)}
+                >
+                  {isPast ? <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                  <span className="hidden sm:inline">{s.label}</span>
+                  <span className="sm:hidden">{s.label.replace("AI ", "").split(" ")[0]}</span>
+                  {isActive && <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-600 rounded-t" />}
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => fetchExceptions()}>
-          <AlertTriangle className="w-4 h-4 mr-1" /> Exceptions ({exceptions.length})
-        </Button>
       </div>
 
-      {/* Stage Navigation */}
-      <div className="flex items-center gap-1 bg-muted/30 rounded-xl p-1.5 overflow-x-auto">
-        {STAGES.map((s, i) => {
-          const Icon = s.icon;
-          const isActive = s.key === stage;
-          const isPast = i < stageIndex;
-          return (
-            <button
-              key={s.key}
-              className={cn(
-                "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all",
-                isActive ? "bg-white shadow text-primary" : isPast ? "text-emerald-600" : "text-muted-foreground",
-              )}
-              onClick={() => setStage(s.key)}
-            >
-              {isPast ? <CheckCircle2 className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
-              {s.label}
-            </button>
-          );
-        })}
-      </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-5">
 
       {/* Stage Content */}
       {stage === "upload" && (
@@ -861,17 +937,22 @@ export default function WorkingPapers() {
         />
       )}
 
-      {/* Exception Modal Overlay */}
       {exceptions.length > 0 && stage !== "generation" && stage !== "export" && (
         <div className="fixed bottom-4 right-4 z-50">
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 shadow-lg max-w-xs">
-            <div className="flex items-center gap-2 text-amber-800 text-sm font-medium">
-              <AlertTriangle className="w-4 h-4" />
-              {exceptions.filter((e: any) => e.status === "open").length} open exceptions
+          <div className="bg-white border border-amber-200 rounded-xl p-3.5 shadow-xl shadow-amber-100/50 max-w-xs backdrop-blur-sm">
+            <div className="flex items-center gap-2.5 text-amber-800 text-sm font-medium">
+              <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm">{exceptions.filter((e: any) => e.status === "open").length} open exceptions</p>
+                <p className="text-[11px] text-amber-600/80 font-normal">Click Exceptions button to review</p>
+              </div>
             </div>
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -882,87 +963,138 @@ export default function WorkingPapers() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, onUpload, onNext, loading, validateFile }: any) {
+  const [dragActive, setDragActive] = useState(false);
   return (
-    <div className="space-y-4">
-      <div className="bg-card border rounded-xl p-6">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Upload className="w-5 h-5 text-primary" /> Upload Documents
-        </h2>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
-          <strong>Upload Rules:</strong> Financial Statements/TB/GL/Bank Statements → Excel only (.xlsx/.xls) | Sales Tax Return/Notices/Annexures → PDF only
-        </div>
-
-        <div
-          className="border-2 border-dashed rounded-xl p-8 text-center cursor-pointer hover:border-primary/50 transition"
-          onClick={() => fileInputRef.current?.click()}
-          onDragOver={e => e.preventDefault()}
-          onDrop={e => { e.preventDefault(); const dt = e.dataTransfer.files; if (dt.length) { const arr = Array.from(dt).map(f => ({ file: f, category: "other" })); setFiles((p: any) => [...p, ...arr]); } }}
-        >
-          <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-          <p className="text-muted-foreground">Drop files here or click to browse</p>
-          <p className="text-xs text-muted-foreground mt-1">Accepted: .xlsx, .xls, .pdf, .jpg, .png</p>
-          <input ref={fileInputRef} type="file" multiple accept=".xlsx,.xls,.pdf,.jpg,.jpeg,.png,.webp" onChange={onFileAdd} className="hidden" />
-        </div>
-
-        {files.length > 0 && (
-          <div className="mt-4 space-y-2">
-            <h3 className="text-sm font-semibold">Files to Upload ({files.length})</h3>
-            {files.map((uf: any, i: number) => {
-              const err = validateFile(uf.file, uf.category);
-              return (
-                <div key={i} className={cn("flex items-center gap-3 p-3 rounded-lg border", err ? "bg-red-50 border-red-200" : "bg-muted/30")}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{uf.file.name}</p>
-                    <p className="text-xs text-muted-foreground">{(uf.file.size / 1024).toFixed(0)} KB</p>
-                    {err && <p className="text-xs text-red-600 mt-1">{err}</p>}
-                  </div>
-                  <select
-                    className="text-xs border rounded-lg px-2 py-1.5 bg-white"
-                    value={uf.category}
-                    onChange={e => {
-                      const updated = [...files];
-                      updated[i].category = e.target.value;
-                      setFiles(updated);
-                    }}
-                  >
-                    {FILE_CATEGORIES.map(c => (
-                      <option key={c.value} value={c.value}>{c.label} ({c.format})</option>
-                    ))}
-                  </select>
-                  <button onClick={() => setFiles((p: any) => p.filter((_: any, j: number) => j !== i))}>
-                    <X className="w-4 h-4 text-muted-foreground hover:text-red-500" />
-                  </button>
-                </div>
-              );
-            })}
-            <Button onClick={onUpload} disabled={loading} className="mt-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
-              Upload {files.length} File{files.length > 1 ? "s" : ""}
-            </Button>
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+            <Upload className="w-5 h-5 text-blue-600" />
           </div>
-        )}
+          <div>
+            <p className="text-2xl font-bold text-slate-900">{files.length}</p>
+            <p className="text-xs text-slate-500">Queued</p>
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-slate-900">{uploadedFiles.length}</p>
+            <p className="text-xs text-slate-500">Uploaded</p>
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
+            <FileText className="w-5 h-5 text-purple-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-slate-900">{uploadedFiles.filter((f: any) => f.format === "xlsx" || f.format === "xls").length}</p>
+            <p className="text-xs text-slate-500">Excel Files</p>
+          </div>
+        </div>
+      </div>
 
-        {uploadedFiles.length > 0 && (
-          <div className="mt-6">
-            <h3 className="text-sm font-semibold mb-2">Uploaded Files ({uploadedFiles.length})</h3>
-            <div className="space-y-1">
-              {uploadedFiles.map((f: any) => (
-                <div key={f.id} className="flex items-center gap-2 p-2 rounded bg-green-50 text-sm">
-                  <CheckCircle2 className="w-4 h-4 text-green-600" />
-                  <span className="truncate flex-1">{f.originalName}</span>
-                  <span className="text-xs text-muted-foreground capitalize">{f.category?.replace(/_/g, " ")}</span>
-                  <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700">{f.format}</span>
-                </div>
-              ))}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50/50 px-5 py-4 border-b border-slate-200/60">
+          <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+            <Upload className="w-5 h-5 text-blue-600" /> Upload Documents
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">Financial Statements / TB / GL / Bank Statements require Excel (.xlsx/.xls). Tax Returns / Notices require PDF.</p>
+        </div>
+        <div className="p-5 space-y-5">
+          <div
+            className={cn(
+              "border-2 border-dashed rounded-xl p-8 sm:p-12 text-center cursor-pointer transition-all duration-200",
+              dragActive ? "border-blue-400 bg-blue-50/50 scale-[1.01]" : "border-slate-200 hover:border-blue-300 hover:bg-blue-50/20"
+            )}
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={e => { e.preventDefault(); setDragActive(true); }}
+            onDragLeave={() => setDragActive(false)}
+            onDrop={e => { e.preventDefault(); setDragActive(false); const dt = e.dataTransfer.files; if (dt.length) { const arr = Array.from(dt).map(f => ({ file: f, category: "other" })); setFiles((p: any) => [...p, ...arr]); } }}
+          >
+            <div className={cn("w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center transition-colors", dragActive ? "bg-blue-100" : "bg-slate-100")}>
+              <Upload className={cn("w-7 h-7 transition-colors", dragActive ? "text-blue-600" : "text-slate-400")} />
             </div>
+            <p className="font-medium text-slate-700">Drop files here or <span className="text-blue-600 underline underline-offset-2">browse</span></p>
+            <p className="text-xs text-slate-400 mt-1.5">Accepted: .xlsx, .xls, .pdf, .jpg, .png, .webp</p>
+            <input ref={fileInputRef} type="file" multiple accept=".xlsx,.xls,.pdf,.jpg,.jpeg,.png,.webp" onChange={onFileAdd} className="hidden" />
           </div>
-        )}
+
+          {files.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-900">Files to Upload ({files.length})</h3>
+                <Button onClick={onUpload} disabled={loading} size="sm" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-sm">
+                  {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Upload className="w-3.5 h-3.5 mr-1.5" />}
+                  Upload {files.length} File{files.length > 1 ? "s" : ""}
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {files.map((uf: any, i: number) => {
+                  const err = validateFile(uf.file, uf.category);
+                  const ext = uf.file.name.split(".").pop()?.toLowerCase();
+                  return (
+                    <div key={i} className={cn("flex items-center gap-3 p-3 rounded-xl border transition-colors", err ? "bg-red-50 border-red-200" : "bg-slate-50/50 border-slate-200 hover:bg-slate-50")}>
+                      <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-bold uppercase",
+                        ext === "pdf" ? "bg-red-100 text-red-700" : ext === "xlsx" || ext === "xls" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"
+                      )}>{ext}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{uf.file.name}</p>
+                        <p className="text-xs text-slate-400">{(uf.file.size / 1024).toFixed(0)} KB</p>
+                        {err && <p className="text-xs text-red-600 mt-0.5 font-medium">{err}</p>}
+                      </div>
+                      <select
+                        className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:ring-2 focus:ring-blue-200 focus:border-blue-400 max-w-[160px] sm:max-w-none"
+                        value={uf.category}
+                        onChange={e => { const updated = [...files]; updated[i].category = e.target.value; setFiles(updated); }}
+                      >
+                        {FILE_CATEGORIES.map(c => (
+                          <option key={c.value} value={c.value}>{c.label} ({c.format})</option>
+                        ))}
+                      </select>
+                      <button onClick={() => setFiles((p: any) => p.filter((_: any, j: number) => j !== i))} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors shrink-0">
+                        <X className="w-4 h-4 text-slate-400 hover:text-red-500" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {uploadedFiles.length > 0 && (
+            <div className="border-t border-slate-200 pt-5">
+              <h3 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Uploaded Files ({uploadedFiles.length})
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {uploadedFiles.map((f: any) => {
+                  const ext = (f.originalName || "").split(".").pop()?.toLowerCase();
+                  return (
+                    <div key={f.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-100 text-sm">
+                      <div className={cn("w-8 h-8 rounded-md flex items-center justify-center shrink-0 text-[9px] font-bold uppercase",
+                        ext === "pdf" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+                      )}>{ext}</div>
+                      <div className="flex-1 min-w-0">
+                        <span className="truncate block text-sm font-medium text-slate-800">{f.originalName}</span>
+                        <span className="text-[11px] text-slate-500 capitalize">{f.category?.replace(/_/g, " ")}</span>
+                      </div>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {uploadedFiles.length > 0 && (
         <div className="flex justify-end">
-          <Button onClick={onNext} disabled={loading} size="lg">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Play className="w-4 h-4 mr-2" />}
+          <Button onClick={onNext} disabled={loading} size="lg" className="px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-200/50">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
             Run AI Extraction
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
@@ -977,84 +1109,118 @@ function ExtractionStage({ data, session, onFetchArranged, onRerun, loading, con
   const stats = data?.stats;
 
   return (
-    <div className="space-y-4">
-      <div className="bg-card border rounded-xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Eye className="w-5 h-5 text-primary" /> AI Extraction Results
-          </h2>
-          <Button variant="outline" size="sm" onClick={onRerun} disabled={loading}>
-            <RefreshCw className="w-4 h-4 mr-1" /> Re-run
+    <div className="space-y-5">
+      {stats && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[
+            { label: "Files Processed", value: stats.files, icon: FileText, color: "blue" },
+            { label: "Pages Scanned", value: stats.pages, icon: Layers, color: "purple" },
+            { label: "Sheets Parsed", value: stats.sheets, icon: ClipboardCheck, color: "emerald" },
+          ].map(s => (
+            <div key={s.label} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+              <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
+                s.color === "blue" ? "bg-blue-50" : s.color === "purple" ? "bg-purple-50" : "bg-emerald-50"
+              )}>
+                <s.icon className={cn("w-5 h-5",
+                  s.color === "blue" ? "text-blue-600" : s.color === "purple" ? "text-purple-600" : "text-emerald-600"
+                )} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900">{s.value}</p>
+                <p className="text-xs text-slate-500">{s.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-purple-50 to-blue-50/50 px-5 py-4 border-b border-slate-200/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+              <Bot className="w-5 h-5 text-purple-600" /> AI Extraction Results
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">Review AI-extracted data points and confidence levels</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={onRerun} disabled={loading} className="self-start">
+            <RefreshCw className={cn("w-3.5 h-3.5 mr-1.5", loading && "animate-spin")} /> Re-run Extraction
           </Button>
         </div>
 
-        {stats && (
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            <div className="bg-blue-50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-blue-700">{stats.files}</p>
-              <p className="text-xs text-blue-600">Files</p>
-            </div>
-            <div className="bg-purple-50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-purple-700">{stats.pages}</p>
-              <p className="text-xs text-purple-600">Pages</p>
-            </div>
-            <div className="bg-emerald-50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-emerald-700">{stats.sheets}</p>
-              <p className="text-xs text-emerald-600">Sheets</p>
-            </div>
-          </div>
-        )}
-
-        {extractionData && (
-          <div className="space-y-3">
-            {extractionData.entity && (
-              <div className="p-4 bg-muted/30 rounded-lg">
-                <h3 className="text-sm font-semibold mb-2">Entity Profile</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-                  {Object.entries(extractionData.entity).filter(([, v]) => v && typeof v !== "object").map(([k, v]) => (
-                    <div key={k}><span className="text-muted-foreground">{k.replace(/_/g, " ")}:</span> <span className="font-medium">{String(v)}</span></div>
-                  ))}
+        <div className="p-5">
+          {extractionData ? (
+            <div className="space-y-4">
+              {extractionData.entity && (
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                    Entity Profile
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2.5">
+                    {Object.entries(extractionData.entity).filter(([, v]) => v && typeof v !== "object").map(([k, v]) => (
+                      <div key={k} className="flex items-baseline gap-1.5">
+                        <span className="text-xs text-slate-500 capitalize shrink-0">{k.replace(/_/g, " ")}:</span>
+                        <span className="text-sm font-medium text-slate-900 truncate">{String(v)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-            {extractionData.confidence_scores && (
-              <div className="p-4 bg-muted/30 rounded-lg">
-                <h3 className="text-sm font-semibold mb-2">Confidence Scores</h3>
-                <div className="flex gap-3 flex-wrap">
-                  {Object.entries(extractionData.confidence_scores).map(([k, v]) => (
-                    <div key={k} className="flex items-center gap-1 text-sm">
-                      <span className="text-muted-foreground">{k.replace(/_/g, " ")}:</span>
-                      {confidenceBadge(Number(v))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {extractionData.flags && extractionData.flags.length > 0 && (
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                <h3 className="text-sm font-semibold text-amber-800 mb-2">Flags & Warnings</h3>
-                <ul className="space-y-1">
-                  {extractionData.flags.map((f: string, i: number) => (
-                    <li key={i} className="text-sm text-amber-700 flex items-start gap-2">
-                      <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" /> {f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
+              )}
 
-        {!extractionData && (
-          <div className="text-center py-8 text-muted-foreground">
-            <Eye className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>Extraction has not been run yet. Go back to Upload to run extraction.</p>
-          </div>
-        )}
+              {extractionData.confidence_scores && (
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    Confidence Scores
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {Object.entries(extractionData.confidence_scores).map(([k, v]) => {
+                      const n = Number(v);
+                      return (
+                        <div key={k} className="flex items-center gap-3 bg-white rounded-lg p-2.5 border border-slate-100">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-slate-500 capitalize truncate">{k.replace(/_/g, " ")}</p>
+                            <div className="w-full h-1.5 bg-slate-200 rounded-full mt-1.5 overflow-hidden">
+                              <div className={cn("h-full rounded-full transition-all", n >= 85 ? "bg-emerald-500" : n >= 70 ? "bg-amber-500" : "bg-red-500")} style={{ width: `${Math.min(n, 100)}%` }} />
+                            </div>
+                          </div>
+                          {confidenceBadge(n)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {extractionData.flags && extractionData.flags.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <h3 className="text-xs font-semibold text-amber-800 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" /> Flags & Warnings ({extractionData.flags.length})
+                  </h3>
+                  <ul className="space-y-1.5">
+                    {extractionData.flags.map((f: string, i: number) => (
+                      <li key={i} className="text-sm text-amber-800 flex items-start gap-2.5 bg-white/60 rounded-lg p-2.5 border border-amber-100">
+                        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" /> {f}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 rounded-2xl bg-slate-100 mx-auto mb-4 flex items-center justify-center">
+                <Eye className="w-8 h-8 text-slate-300" />
+              </div>
+              <p className="text-slate-500 font-medium">No extraction data yet</p>
+              <p className="text-xs text-slate-400 mt-1">Go back to Upload stage and run AI Extraction</p>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={onFetchArranged} size="lg">
+        <Button onClick={onFetchArranged} size="lg" className="px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-200/50">
           Review Arranged Data <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
@@ -1066,80 +1232,154 @@ function ArrangedDataStage({ data, activeTab, setActiveTab, onFetch, onApproveAl
   useEffect(() => { if (!data) onFetch(); }, []);
 
   if (!data) return (
-    <div className="text-center py-12">
-      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
-      <p className="text-muted-foreground">Loading arranged data...</p>
+    <div className="text-center py-16">
+      <div className="w-14 h-14 rounded-2xl bg-slate-100 mx-auto mb-4 flex items-center justify-center">
+        <Loader2 className="w-7 h-7 animate-spin text-blue-600" />
+      </div>
+      <p className="text-slate-600 font-medium">Loading arranged data...</p>
+      <p className="text-xs text-slate-400 mt-1">Organizing extracted fields by category</p>
     </div>
   );
 
   const tabs = data.tabNames || [];
   const tabData = data.tabs || {};
+  const currentTabData = activeTab ? tabData[activeTab] || [] : [];
+  const approvedCount = currentTabData.filter((r: any) => r.isApproved).length;
+  const totalCount = currentTabData.length;
 
   return (
-    <div className="space-y-4">
-      <div className="bg-card border rounded-xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Layers className="w-5 h-5 text-primary" /> Arranged Data Review
-          </h2>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onFetch}><RefreshCw className="w-4 h-4 mr-1" /> Refresh</Button>
-            <Button size="sm" onClick={onApproveAll} disabled={loading}>
-              <CheckCircle2 className="w-4 h-4 mr-1" /> Approve All
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+            <Layers className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-slate-900">{tabs.length}</p>
+            <p className="text-xs text-slate-500">Data Tabs</p>
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-slate-900">{approvedCount}/{totalCount}</p>
+            <p className="text-xs text-slate-500">Approved in Tab</p>
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
+            <Gauge className="w-5 h-5 text-purple-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-slate-900">{totalCount > 0 ? Math.round((approvedCount / totalCount) * 100) : 0}%</p>
+            <p className="text-xs text-slate-500">Completion</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50/50 px-5 py-4 border-b border-slate-200/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+              <Layers className="w-5 h-5 text-indigo-600" /> Arranged Data Review
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">Review and approve AI-organized fields by category</p>
+          </div>
+          <div className="flex gap-2 self-start">
+            <Button variant="outline" size="sm" onClick={onFetch}>
+              <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
+            </Button>
+            <Button size="sm" onClick={onApproveAll} disabled={loading} className="bg-emerald-600 hover:bg-emerald-700">
+              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Approve All
             </Button>
           </div>
         </div>
 
-        <div className="flex gap-1 overflow-x-auto pb-2 mb-4">
-          {tabs.map((t: string) => (
-            <button
-              key={t}
-              className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition",
-                activeTab === t ? "bg-primary text-primary-foreground" : "bg-muted/50 hover:bg-muted",
-              )}
-              onClick={() => setActiveTab(t)}
-            >
-              {t}
-              {tabData[t]?.length > 0 && <span className="ml-1 opacity-70">({tabData[t].length})</span>}
-            </button>
-          ))}
+        <div className="flex gap-1 overflow-x-auto p-3 border-b border-slate-100 bg-slate-50/50 scrollbar-hide">
+          {tabs.map((t: string) => {
+            const count = tabData[t]?.length || 0;
+            const approved = tabData[t]?.filter((r: any) => r.isApproved).length || 0;
+            return (
+              <button
+                key={t}
+                className={cn(
+                  "px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5",
+                  activeTab === t
+                    ? "bg-white text-slate-900 shadow-sm border border-slate-200"
+                    : "text-slate-500 hover:bg-white/80 hover:text-slate-700",
+                )}
+                onClick={() => setActiveTab(t)}
+              >
+                {t}
+                {count > 0 && (
+                  <span className={cn("px-1.5 py-0.5 rounded-full text-[10px] font-semibold",
+                    approved === count ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                  )}>{approved}/{count}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        {activeTab && tabData[activeTab] && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30">
-                  <th className="p-2 text-left">Field</th>
-                  <th className="p-2 text-left">Extracted Value</th>
-                  <th className="p-2 text-left">Confidence</th>
-                  <th className="p-2 text-left">Source</th>
-                  <th className="p-2 text-left">Approved</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(tabData[activeTab] || []).map((row: any, i: number) => (
-                  <tr key={row.id || i} className="border-b hover:bg-muted/20">
-                    <td className="p-2 font-medium">{(row.fieldName || "").replace(/_/g, " ")}</td>
-                    <td className="p-2 max-w-xs truncate">{row.finalApprovedValue || row.extractedValue}</td>
-                    <td className="p-2">{confidenceBadge(row.confidence)}</td>
-                    <td className="p-2 text-xs text-muted-foreground">{row.sourceFile || "—"}</td>
-                    <td className="p-2">{row.isApproved ? <Check className="w-4 h-4 text-green-600" /> : <Clock className="w-4 h-4 text-muted-foreground" />}</td>
+        <div className="p-0">
+          {activeTab && tabData[activeTab] ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/50">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Field</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Value</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider hidden sm:table-cell">Confidence</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider hidden md:table-cell">Source</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-20">Status</th>
                   </tr>
-                ))}
-                {(!tabData[activeTab] || tabData[activeTab].length === 0) && (
-                  <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">No data in this tab</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(tabData[activeTab] || []).map((row: any, i: number) => (
+                    <tr key={row.id || i} className={cn("transition-colors", row.isApproved ? "bg-emerald-50/30" : "hover:bg-slate-50/50")}>
+                      <td className="px-4 py-3">
+                        <span className="font-medium text-slate-900 text-sm">{(row.fieldName || "").replace(/_/g, " ")}</span>
+                      </td>
+                      <td className="px-4 py-3 max-w-xs">
+                        <span className="text-sm text-slate-700 truncate block">{row.finalApprovedValue || row.extractedValue || "—"}</span>
+                      </td>
+                      <td className="px-4 py-3 hidden sm:table-cell">{confidenceBadge(row.confidence)}</td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <span className="text-xs text-slate-400 truncate block max-w-[150px]">{row.sourceFile || "—"}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {row.isApproved ? (
+                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100">
+                            <Check className="w-4 h-4 text-emerald-600" />
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-100">
+                            <Clock className="w-4 h-4 text-slate-400" />
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {(!tabData[activeTab] || tabData[activeTab].length === 0) && (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400 text-sm">No data in this tab</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-12 text-slate-400">
+              <Layers className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">Select a tab to view arranged data</p>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={onNext} size="lg" disabled={loading}>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Settings2 className="w-4 h-4 mr-2" />}
+        <Button onClick={onNext} size="lg" disabled={loading} className="px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-200/50">
+          {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Zap className="w-4 h-4 mr-2" />}
           Auto-fill Variables <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
@@ -1661,202 +1901,249 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
-            { label: "Total", value: stats.total, color: "bg-slate-100 text-slate-800", filterKey: "all" },
-            { label: "Filled", value: stats.filled, color: "bg-green-100 text-green-800", filterKey: "reviewed" },
-            { label: "Missing", value: stats.missing, color: "bg-red-100 text-red-800", filterKey: "missing" },
-            { label: "Low Confidence", value: stats.lowConfidence, color: "bg-amber-100 text-amber-800", filterKey: "low_confidence" },
-            { label: "Needs Review", value: stats.needsReview, color: "bg-purple-100 text-purple-800", filterKey: "needs_review" },
-            { label: "Locked", value: stats.locked, color: "bg-blue-100 text-blue-800", filterKey: "locked" },
+            { label: "Total", value: stats.total, icon: Settings2, bg: "bg-slate-50", iconColor: "text-slate-600", filterKey: "all" },
+            { label: "Filled", value: stats.filled, icon: CheckCircle2, bg: "bg-emerald-50", iconColor: "text-emerald-600", filterKey: "reviewed" },
+            { label: "Missing", value: stats.missing, icon: AlertCircle, bg: "bg-red-50", iconColor: "text-red-600", filterKey: "missing" },
+            { label: "Low Conf.", value: stats.lowConfidence, icon: AlertTriangle, bg: "bg-amber-50", iconColor: "text-amber-600", filterKey: "low_confidence" },
+            { label: "Review", value: stats.needsReview, icon: Eye, bg: "bg-purple-50", iconColor: "text-purple-600", filterKey: "needs_review" },
+            { label: "Locked", value: stats.locked, icon: Lock, bg: "bg-blue-50", iconColor: "text-blue-600", filterKey: "locked" },
           ].map(s => (
-            <button key={s.label} onClick={() => setFilter(s.filterKey)} className={cn("rounded-lg p-3 text-center border cursor-pointer transition-all hover:scale-105 hover:shadow-md", s.color, filter === s.filterKey && "ring-2 ring-primary ring-offset-1")}>
-              <p className="text-2xl font-bold">{s.value}</p>
-              <p className="text-xs font-medium mt-0.5">{s.label}</p>
+            <button key={s.label} onClick={() => setFilter(s.filterKey)} className={cn(
+              "bg-white border rounded-xl p-3 text-center transition-all hover:shadow-md cursor-pointer",
+              filter === s.filterKey ? "ring-2 ring-blue-500 ring-offset-1 border-blue-200 shadow-sm" : "border-slate-200"
+            )}>
+              <div className={cn("w-8 h-8 rounded-lg mx-auto mb-1.5 flex items-center justify-center", s.bg)}>
+                <s.icon className={cn("w-4 h-4", s.iconColor)} />
+              </div>
+              <p className="text-xl font-bold text-slate-900">{s.value}</p>
+              <p className="text-[10px] text-slate-500 font-medium mt-0.5">{s.label}</p>
             </button>
           ))}
         </div>
       )}
 
-      <div className="bg-card border rounded-xl p-6">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Settings2 className="w-5 h-5 text-primary" /> Audit Variable Register
-            {stats && <span className="text-xs font-normal text-muted-foreground">({stats.filled}/{stats.total} filled)</span>}
-          </h2>
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={onFetch}><RefreshCw className="w-4 h-4 mr-1" /> Refresh</Button>
-            <Button variant="outline" size="sm" onClick={runValidation}><Shield className="w-4 h-4 mr-1" /> Validate</Button>
-            <Button variant="outline" size="sm" onClick={() => setShowAuditTrail(!showAuditTrail)}><ClipboardCheck className="w-4 h-4 mr-1" /> Trail ({changeLog.length})</Button>
-            <Button size="sm" onClick={onLockAll} disabled={loading} className="bg-amber-600 hover:bg-amber-700">
-              <Lock className="w-4 h-4 mr-1" /> Lock All & Proceed
-            </Button>
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-emerald-50 to-blue-50/50 px-5 py-4 border-b border-slate-200/60">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+                <Settings2 className="w-5 h-5 text-emerald-600" /> Audit Variable Register
+                {stats && <span className="text-xs font-normal text-slate-500 ml-1">({stats.filled}/{stats.total} filled)</span>}
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">Review, edit and lock audit variables before generation</p>
+            </div>
+            <div className="flex gap-2 flex-wrap self-start">
+              <Button variant="outline" size="sm" onClick={onFetch} className="h-8">
+                <RefreshCw className="w-3.5 h-3.5 mr-1" /> Refresh
+              </Button>
+              <Button variant="outline" size="sm" onClick={runValidation} className="h-8">
+                <Shield className="w-3.5 h-3.5 mr-1" /> Validate
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowAuditTrail(!showAuditTrail)} className="h-8">
+                <ClipboardCheck className="w-3.5 h-3.5 mr-1" /> Trail ({changeLog.length})
+              </Button>
+              <Button size="sm" onClick={onLockAll} disabled={loading} className="h-8 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-sm">
+                <Lock className="w-3.5 h-3.5 mr-1" /> Lock All
+              </Button>
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-4">
-          <Input className="h-8 w-64 text-sm" placeholder="Search variables..." value={search} onChange={e => setSearch(e.target.value)} />
-          {["all", "mandatory", "missing", "low_confidence", "needs_review", "reviewed", "locked"].map(f => (
-            <button key={f} onClick={() => setFilter(f)} className={cn("px-3 py-1 rounded-full text-xs font-medium border transition-colors", filter === f ? "bg-primary text-white border-primary" : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted")}>
-              {f.replace(/_/g, " ").replace(/^\w/, c => c.toUpperCase())}
-            </button>
-          ))}
-        </div>
-
-        {validationIssues.length > 0 && (
-          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <h3 className="text-sm font-semibold text-amber-900 mb-2 flex items-center gap-1"><AlertTriangle className="w-4 h-4" /> Validation Issues ({validationIssues.length})</h3>
-            <div className="space-y-1 max-h-32 overflow-y-auto">
-              {validationIssues.map((issue: any, i: number) => (
-                <div key={i} className="text-xs flex items-center gap-2 p-1">
-                  <span className={cn("w-2 h-2 rounded-full", issue.severity === "high" ? "bg-red-500" : issue.severity === "medium" ? "bg-amber-500" : "bg-blue-500")} />
-                  <span className="font-medium">{issue.label}</span>
-                  <span className="text-muted-foreground">{issue.issue}</span>
-                </div>
+        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/30">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1 sm:max-w-xs">
+              <Input className="h-8 text-sm pl-8" placeholder="Search variables..." value={search} onChange={e => setSearch(e.target.value)} />
+              <Settings2 className="w-3.5 h-3.5 absolute left-2.5 top-2 text-slate-400" />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {["all", "mandatory", "missing", "low_confidence", "needs_review", "reviewed", "locked"].map(f => (
+                <button key={f} onClick={() => setFilter(f)} className={cn(
+                  "px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all",
+                  filter === f
+                    ? "bg-slate-900 text-white shadow-sm"
+                    : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
+                )}>
+                  {f.replace(/_/g, " ").replace(/^\w/, c => c.toUpperCase())}
+                </button>
               ))}
             </div>
           </div>
-        )}
+        </div>
 
-        {groupEntries.map(([groupName, groupData]: any) => {
-          const isExpanded = expandedGroups[groupName] !== false;
-          const gs = groupData.stats || { total: 0, filled: 0, missing: 0, locked: 0 };
-          const pct = gs.total > 0 ? Math.round((gs.filled / gs.total) * 100) : 0;
-          const allLocked = gs.locked === gs.total && gs.total > 0;
-
-          return (
-            <div key={groupName} className="mb-3 border rounded-lg overflow-hidden">
-              <button onClick={() => toggleGroup(groupName)} className={cn("w-full flex items-center justify-between p-3 hover:bg-muted/30 transition-colors", allLocked ? "bg-green-50" : "bg-muted/10")}>
-                <div className="flex items-center gap-2">
-                  {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                  <span className="font-semibold text-sm">{groupName}</span>
-                  {allLocked && <Lock className="w-3 h-3 text-green-600" />}
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1">
-                    <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${pct}%` }} />
-                    </div>
-                    <span className="text-xs text-muted-foreground w-8">{pct}%</span>
+        <div className="p-4 sm:p-5 space-y-3">
+          {validationIssues.length > 0 && (
+            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl">
+              <h3 className="text-xs font-semibold text-amber-900 mb-2.5 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" /> Validation Issues ({validationIssues.length})
+              </h3>
+              <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                {validationIssues.map((issue: any, i: number) => (
+                  <div key={i} className="text-xs flex items-center gap-2 p-2 bg-white/60 rounded-lg border border-amber-100">
+                    <span className={cn("w-2 h-2 rounded-full shrink-0", issue.severity === "high" ? "bg-red-500" : issue.severity === "medium" ? "bg-amber-500" : "bg-blue-500")} />
+                    <span className="font-medium text-slate-800">{issue.label}</span>
+                    <span className="text-slate-500">{issue.issue}</span>
                   </div>
-                  <span className="text-xs text-muted-foreground">{gs.filled}/{gs.total}</span>
-                  {gs.missing > 0 && <span className="text-xs bg-red-100 text-red-700 px-1.5 rounded">{gs.missing} missing</span>}
-                  {!allLocked && (
-                    <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={(e) => { e.stopPropagation(); onLockSection(groupName); }}>
-                      <Lock className="w-3 h-3 mr-1" /> Lock
-                    </Button>
-                  )}
-                </div>
-              </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-              {isExpanded && (
-                <div className="border-t">
-                  {Object.entries(groupData.subgroups || {}).map(([subName, subVars]: any) => {
-                    const filtered = subVars.filter(filterVar);
-                    if (filtered.length === 0) return null;
-                    return (
-                      <div key={subName} className="border-b last:border-b-0">
-                        <div className="px-4 py-1.5 bg-muted/20">
-                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{subName}</span>
-                        </div>
-                        <div className="divide-y">
-                          {filtered.map((v: any) => {
-                            const def = v.definition;
-                            const isMandatory = def?.mandatoryFlag;
-                            const isEditing = editingVar === v.id;
-                            const isEmpty = !v.finalValue || v.finalValue.trim() === "";
-                            const isLowConf = v.confidence && Number(v.confidence) < 70;
+          {groupEntries.map(([groupName, groupData]: any) => {
+            const isExpanded = expandedGroups[groupName] !== false;
+            const gs = groupData.stats || { total: 0, filled: 0, missing: 0, locked: 0 };
+            const pct = gs.total > 0 ? Math.round((gs.filled / gs.total) * 100) : 0;
+            const allLocked = gs.locked === gs.total && gs.total > 0;
 
-                            return (
-                              <div key={v.id} className={cn(
-                                "flex items-start gap-3 px-4 py-2.5 transition-colors",
-                                v.isLocked ? "bg-green-50/40 border-l-2 border-l-green-400" :
-                                isEmpty ? "bg-red-50/30 border-l-2 border-l-red-300" :
-                                isLowConf ? "bg-amber-50/30 border-l-2 border-l-amber-300" :
-                                v.reviewStatus === "needs_review" ? "bg-purple-50/30 border-l-2 border-l-purple-300" :
-                                "hover:bg-muted/10 border-l-2 border-l-transparent"
-                              )}>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <p className="text-sm font-medium leading-tight">{def?.variableLabel || (v.variableName || "").replace(/_/g, " ")}</p>
-                                    {isMandatory && <span className="text-[9px] bg-red-100 text-red-700 px-1 py-px rounded font-bold tracking-wide">REQ</span>}
-                                    {v.reviewStatus === "needs_review" && <span className="text-[9px] bg-purple-100 text-purple-700 px-1 py-px rounded font-semibold">REVIEW</span>}
-                                    {def?.aiExtractableFlag && <span className="text-[9px] bg-blue-50 text-blue-600 px-1 py-px rounded">AI</span>}
-                                    {def?.standardReference && <span className="text-[9px] text-muted-foreground bg-slate-50 px-1 py-px rounded">{def.standardReference}</span>}
-                                    {def?.pakistanReference && <span className="text-[9px] text-muted-foreground bg-slate-50 px-1 py-px rounded">{def.pakistanReference}</span>}
+            return (
+              <div key={groupName} className={cn("border rounded-xl overflow-hidden transition-all", allLocked ? "border-emerald-200" : "border-slate-200")}>
+                <button onClick={() => toggleGroup(groupName)} className={cn(
+                  "w-full flex items-center justify-between p-3.5 sm:p-4 transition-colors",
+                  allLocked ? "bg-emerald-50/50 hover:bg-emerald-50" : "bg-slate-50/50 hover:bg-slate-50"
+                )}>
+                  <div className="flex items-center gap-2.5">
+                    <div className={cn("w-6 h-6 rounded-md flex items-center justify-center transition-transform", isExpanded && "rotate-0")}>
+                      {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-600" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                    </div>
+                    <span className="font-semibold text-sm text-slate-900">{groupName}</span>
+                    {allLocked && <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium flex items-center gap-1"><Lock className="w-3 h-3" /> Locked</span>}
+                  </div>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="hidden sm:flex items-center gap-1.5">
+                      <div className="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
+                        <div className={cn("h-full rounded-full transition-all", pct === 100 ? "bg-emerald-500" : pct > 50 ? "bg-blue-500" : "bg-amber-500")} style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="text-xs text-slate-500 w-8 text-right tabular-nums">{pct}%</span>
+                    </div>
+                    <span className="text-xs text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-100">{gs.filled}/{gs.total}</span>
+                    {gs.missing > 0 && <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">{gs.missing} missing</span>}
+                    {!allLocked && (
+                      <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5 hover:bg-amber-50 hover:text-amber-700" onClick={(e) => { e.stopPropagation(); onLockSection(groupName); }}>
+                        <Lock className="w-3 h-3 mr-1" /> Lock
+                      </Button>
+                    )}
+                  </div>
+                </button>
+
+                {isExpanded && (
+                  <div className="border-t border-slate-100">
+                    {Object.entries(groupData.subgroups || {}).map(([subName, subVars]: any) => {
+                      const filtered = subVars.filter(filterVar);
+                      if (filtered.length === 0) return null;
+                      return (
+                        <div key={subName} className="border-b border-slate-100 last:border-b-0">
+                          <div className="px-4 py-2 bg-slate-50/80">
+                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{subName}</span>
+                          </div>
+                          <div className="divide-y divide-slate-100">
+                            {filtered.map((v: any) => {
+                              const def = v.definition;
+                              const isMandatory = def?.mandatoryFlag;
+                              const isEditing = editingVar === v.id;
+                              const isEmpty = !v.finalValue || v.finalValue.trim() === "";
+                              const isLowConf = v.confidence && Number(v.confidence) < 70;
+
+                              return (
+                                <div key={v.id} className={cn(
+                                  "flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3 px-4 py-3 transition-colors",
+                                  v.isLocked ? "bg-emerald-50/30 border-l-3 border-l-emerald-400" :
+                                  isEmpty ? "bg-red-50/20 border-l-3 border-l-red-300" :
+                                  isLowConf ? "bg-amber-50/20 border-l-3 border-l-amber-300" :
+                                  v.reviewStatus === "needs_review" ? "bg-purple-50/20 border-l-3 border-l-purple-300" :
+                                  "hover:bg-slate-50/50 border-l-3 border-l-transparent"
+                                )}>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <p className="text-sm font-medium leading-tight text-slate-900">{def?.variableLabel || (v.variableName || "").replace(/_/g, " ")}</p>
+                                      {isMandatory && <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-px rounded-full font-bold tracking-wide">REQ</span>}
+                                      {v.reviewStatus === "needs_review" && <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-px rounded-full font-semibold">REVIEW</span>}
+                                      {def?.aiExtractableFlag && <span className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-px rounded-full border border-blue-100">AI</span>}
+                                      {def?.standardReference && <span className="text-[9px] text-slate-400 bg-slate-50 px-1.5 py-px rounded-full border border-slate-100 hidden sm:inline">{def.standardReference}</span>}
+                                      {def?.pakistanReference && <span className="text-[9px] text-slate-400 bg-slate-50 px-1.5 py-px rounded-full border border-slate-100 hidden sm:inline">{def.pakistanReference}</span>}
+                                    </div>
+
+                                    {isEditing ? (
+                                      <div className="mt-2.5 space-y-2.5">
+                                        <RenderEditInput def={def} value={editValue} onChange={setEditValue} />
+                                        <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center pt-1">
+                                          <Input className="h-8 text-xs w-full sm:w-48 placeholder:text-slate-400" value={editReason} onChange={e => setEditReason(e.target.value)} placeholder="Reason for change..." />
+                                          <div className="flex gap-1.5">
+                                            <Button size="sm" variant="default" className="h-8 text-xs px-3 bg-blue-600 hover:bg-blue-700" onClick={() => onSave(v.id)}><Save className="w-3 h-3 mr-1" /> Save</Button>
+                                            <Button size="sm" variant="ghost" className="h-8 text-xs px-2.5" onClick={() => setEditingVar(null)}>Cancel</Button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="mt-1">
+                                        <RenderDisplayValue def={def} value={v.finalValue || v.autoFilledValue || ""} sourceType={v.sourceType} />
+                                      </div>
+                                    )}
                                   </div>
 
-                                  {isEditing ? (
-                                    <div className="mt-2 space-y-2">
-                                      <RenderEditInput def={def} value={editValue} onChange={setEditValue} />
-                                      <div className="flex gap-2 items-center pt-1">
-                                        <Input className="h-7 text-xs w-48 placeholder:text-muted-foreground/50" value={editReason} onChange={e => setEditReason(e.target.value)} placeholder="Reason for change..." />
-                                        <Button size="sm" variant="default" className="h-7 text-xs px-3" onClick={() => onSave(v.id)}><Save className="w-3 h-3 mr-1" /> Save</Button>
-                                        <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => setEditingVar(null)}>Cancel</Button>
+                                  <div className="flex items-center gap-1.5 shrink-0 sm:pt-0.5 self-end sm:self-start">
+                                    {confidenceBadge(v.confidence ? Number(v.confidence) : null)}
+                                    {v.reviewStatus === "needs_review" && !v.isLocked && (
+                                      <button onClick={() => onReview(v.id)} className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors border border-purple-200" title="Mark as reviewed">
+                                        <Check className="w-3 h-3 inline mr-0.5" /> Review
+                                      </button>
+                                    )}
+                                    {v.isLocked ? (
+                                      <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center">
+                                        <Lock className="w-3.5 h-3.5 text-emerald-600" />
                                       </div>
-                                    </div>
-                                  ) : (
-                                    <div className="mt-0.5">
-                                      <RenderDisplayValue def={def} value={v.finalValue || v.autoFilledValue || ""} sourceType={v.sourceType} />
-                                    </div>
-                                  )}
+                                    ) : (
+                                      <button onClick={() => { setEditingVar(v.id); setEditValue(v.finalValue || ""); setEditReason(""); }} className="p-1.5 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-200">
+                                        <Pencil className="w-3.5 h-3.5 text-slate-400 hover:text-blue-600" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
-
-                                <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
-                                  {confidenceBadge(v.confidence ? Number(v.confidence) : null)}
-                                  {v.reviewStatus === "needs_review" && !v.isLocked && (
-                                    <button onClick={() => onReview(v.id)} className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors" title="Mark as reviewed">
-                                      ✓ Review
-                                    </button>
-                                  )}
-                                  {v.isLocked ? (
-                                    <Lock className="w-4 h-4 text-green-600" />
-                                  ) : (
-                                    <button onClick={() => { setEditingVar(v.id); setEditValue(v.finalValue || ""); setEditReason(""); }} className="p-1 rounded hover:bg-slate-100 transition-colors">
-                                      <Pencil className="w-3.5 h-3.5 text-muted-foreground hover:text-primary" />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
-        {variables.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">
-            <Settings2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>No variables yet. Go back to run extraction and auto-fill.</p>
-          </div>
-        )}
-
-        {showAuditTrail && changeLog.length > 0 && (
-          <div className="mt-6 p-4 bg-muted/30 rounded-lg">
-            <h3 className="text-sm font-semibold mb-2 flex items-center gap-2"><ClipboardCheck className="w-4 h-4" /> Audit Trail ({changeLog.length} changes)</h3>
-            <div className="space-y-1 max-h-48 overflow-y-auto">
-              {changeLog.map((c: any) => (
-                <div key={c.id} className="text-xs flex gap-3 p-1.5 rounded bg-white border items-center">
-                  <span className="font-mono text-muted-foreground">{c.variableCode || c.fieldName}</span>
-                  <span className="font-medium">{(c.fieldName || "").replace(/_/g, " ")}</span>
-                  <span className="text-red-600 line-through">{c.oldValue || "—"}</span>
-                  <ArrowRight className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-green-600">{c.newValue}</span>
-                  {c.reason && <span className="text-muted-foreground italic">({c.reason})</span>}
-                  {c.sourceOfChange && <span className="text-muted-foreground">[{c.sourceOfChange}]</span>}
-                </div>
-              ))}
+          {variables.length === 0 && (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 rounded-2xl bg-slate-100 mx-auto mb-4 flex items-center justify-center">
+                <Settings2 className="w-8 h-8 text-slate-300" />
+              </div>
+              <p className="text-slate-500 font-medium">No variables yet</p>
+              <p className="text-xs text-slate-400 mt-1">Go back to run extraction and auto-fill</p>
             </div>
-          </div>
-        )}
+          )}
+
+          {showAuditTrail && changeLog.length > 0 && (
+            <div className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4">
+              <h3 className="text-xs font-semibold text-slate-700 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                <ClipboardCheck className="w-4 h-4 text-slate-500" /> Audit Trail ({changeLog.length} changes)
+              </h3>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {changeLog.map((c: any) => (
+                  <div key={c.id} className="text-xs flex flex-wrap gap-2 sm:gap-3 p-2.5 rounded-lg bg-white border border-slate-100 items-center">
+                    <span className="font-mono text-slate-400 text-[10px]">{c.variableCode || c.fieldName}</span>
+                    <span className="font-medium text-slate-700">{(c.fieldName || "").replace(/_/g, " ")}</span>
+                    <span className="text-red-500 line-through bg-red-50 px-1.5 py-0.5 rounded">{c.oldValue || "—"}</span>
+                    <ArrowRight className="w-3 h-3 text-slate-300" />
+                    <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{c.newValue}</span>
+                    {c.reason && <span className="text-slate-400 italic">({c.reason})</span>}
+                    {c.sourceOfChange && <span className="text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded text-[10px]">[{c.sourceOfChange}]</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1925,77 +2212,95 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
 
   return (
     <div className="space-y-5">
-      <div className="bg-card border rounded-xl overflow-hidden">
-        <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-4">
-          <div className="flex items-center justify-between">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-slate-900">{completed}/{total}</p>
+            <p className="text-xs text-slate-500">Approved</p>
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
+            <Eye className="w-5 h-5 text-purple-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-slate-900">{validating}</p>
+            <p className="text-xs text-slate-500">Pending Review</p>
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+            <Gauge className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-slate-900">{progress}%</p>
+            <p className="text-xs text-slate-500">Completion</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-orange-50 to-amber-50/50 px-4 sm:px-5 py-4 border-b border-slate-200/60">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <Layers className="w-5 h-5" /> Audit Head Generation
+              <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+                <Layers className="w-5 h-5 text-orange-600" /> Audit Head Generation
               </h2>
-              <p className="text-slate-300 text-xs mt-0.5">Sequential workflow: Generate → Review → Approve → Export</p>
+              <p className="text-xs text-slate-500 mt-0.5">Generate → Review → Approve → Export</p>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={onRefresh} className="text-white hover:bg-white/10 h-8">
+            <div className="flex items-center gap-2 self-start">
+              <Button variant="outline" size="sm" onClick={onRefresh} className="h-8">
                 <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
               </Button>
             </div>
           </div>
 
-          <div className="mt-4 flex items-center gap-4">
+          <div className="mt-3 flex items-center gap-3">
             <div className="flex-1">
-              <div className="w-full bg-slate-600 rounded-full h-2">
-                <div className="bg-emerald-400 h-2 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+              <div className="w-full bg-slate-200 rounded-full h-2">
+                <div className={cn("h-2 rounded-full transition-all duration-500", progress === 100 ? "bg-emerald-500" : progress > 50 ? "bg-blue-500" : "bg-amber-500")} style={{ width: `${progress}%` }} />
               </div>
             </div>
-            <span className="text-white text-sm font-medium whitespace-nowrap">{completed}/{total} Complete</span>
+            <span className="text-xs font-medium text-slate-600 whitespace-nowrap">{completed}/{total}</span>
           </div>
 
-          <div className="flex items-center gap-6 mt-3">
+          <div className="flex items-center gap-4 sm:gap-6 mt-2.5">
             <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span className="text-slate-300 text-[11px]">{completed} Approved</span>
+              <div className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="text-slate-500 text-[11px]">{completed} Approved</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-purple-400" />
-              <span className="text-slate-300 text-[11px]">{validating} Pending</span>
+              <div className="w-2 h-2 rounded-full bg-purple-500" />
+              <span className="text-slate-500 text-[11px]">{validating} Pending</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-gray-400" />
-              <span className="text-slate-300 text-[11px]">{total - completed - validating} Remaining</span>
+              <div className="w-2 h-2 rounded-full bg-slate-300" />
+              <span className="text-slate-500 text-[11px]">{total - completed - validating} Remaining</span>
             </div>
           </div>
         </div>
 
         {(approvableHeads.length > 1 || exportableHeads.length > 1) && (
-          <div className="px-6 py-3 bg-slate-50 border-b flex items-center gap-3 flex-wrap">
-            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Bulk Actions:</span>
+          <div className="px-4 sm:px-5 py-2.5 bg-slate-50/50 border-b border-slate-100 flex items-center gap-3 flex-wrap">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Bulk:</span>
             {approvableHeads.length > 1 && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={approveAll}
-                disabled={loading || approvalInProgress}
-                className="h-7 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-              >
+              <Button size="sm" variant="outline" onClick={approveAll} disabled={loading || approvalInProgress} className="h-7 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50">
                 {approvalInProgress ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
                 Approve All ({approvableHeads.length})
               </Button>
             )}
             {exportableHeads.length > 1 && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={exportAll}
-                disabled={loading}
-                className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
-              >
+              <Button size="sm" variant="outline" onClick={exportAll} disabled={loading} className="h-7 text-xs border-blue-200 text-blue-700 hover:bg-blue-50">
                 <Download className="w-3 h-3 mr-1" /> Export All ({exportableHeads.length})
               </Button>
             )}
           </div>
         )}
 
-        <div className="divide-y">
+        <div className="divide-y divide-slate-100">
           {allHeads.map((head: any, i: number) => {
             const canGenerate = head.status === "ready" || head.status === "in_progress";
             const canRegenerate = head.status === "validating" || head.status === "review";
@@ -2010,19 +2315,19 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
               <div key={head.id} className={cn("transition-colors", isLocked ? "opacity-50" : "")}>
                 <div
                   className={cn(
-                    "flex items-center gap-4 px-6 py-3.5 cursor-pointer hover:bg-slate-50/80 transition-colors",
+                    "flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 cursor-pointer hover:bg-slate-50/80 transition-colors",
                     isDone && "bg-emerald-50/30",
-                    canApprove && "bg-purple-50/30",
+                    canApprove && "bg-purple-50/20",
                     canGenerate && "bg-blue-50/20",
                   )}
                   onClick={() => !isLocked && setExpandedHead(isExpanded ? null : i)}
                 >
                   <div className={cn(
-                    "w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0",
+                    "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
                     isDone ? "bg-emerald-100 text-emerald-700" :
                     canApprove ? "bg-purple-100 text-purple-700" :
                     canGenerate ? "bg-blue-100 text-blue-700" :
-                    "bg-gray-100 text-gray-400"
+                    "bg-slate-100 text-slate-400"
                   )}>
                     {i + 1}
                   </div>
@@ -2032,30 +2337,30 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className={cn("font-medium text-sm", isLocked && "text-gray-400")}>{head.headName}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className={cn("font-medium text-sm text-slate-900", isLocked && "text-slate-400")}>{head.headName}</p>
                       <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-medium", statusBadgeClass(head.status))}>
                         {statusLabel(head.status)}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 mt-0.5">
+                    <div className="flex items-center gap-2 sm:gap-3 mt-0.5 flex-wrap">
                       {head.outputType && (
                         <span className="text-[11px] text-slate-400 flex items-center gap-1">
                           <FileText className="w-3 h-3" /> {head.outputType.toUpperCase()}
                         </span>
                       )}
                       {head.generatedAt && (
-                        <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                        <span className="text-[11px] text-slate-400 flex items-center gap-1 hidden sm:flex">
                           <Clock className="w-3 h-3" /> {new Date(head.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </span>
                       )}
                       {head.exceptionsCount > 0 && (
                         <span className="relative group cursor-pointer">
                           <span className="text-[11px] text-amber-600 flex items-center gap-0.5 font-medium">
-                            <AlertTriangle className="w-3 h-3" /> {head.exceptionsCount} exception{head.exceptionsCount > 1 ? "s" : ""}
+                            <AlertTriangle className="w-3 h-3" /> {head.exceptionsCount}
                           </span>
-                          <div className="absolute left-0 top-full mt-1.5 z-50 hidden group-hover:block w-80 max-h-52 overflow-y-auto">
-                            <div className="bg-white border border-amber-200 rounded-lg shadow-xl p-3 space-y-2">
+                          <div className="absolute left-0 top-full mt-1.5 z-50 hidden group-hover:block w-72 sm:w-80 max-h-52 overflow-y-auto">
+                            <div className="bg-white border border-amber-200 rounded-xl shadow-xl p-3 space-y-2">
                               <p className="text-xs font-semibold text-amber-900 flex items-center gap-1.5 border-b border-amber-100 pb-1.5">
                                 <AlertTriangle className="w-3.5 h-3.5" /> {head.exceptionsCount} Exception{head.exceptionsCount > 1 ? "s" : ""}
                               </p>
@@ -2072,7 +2377,7 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
                                   </div>
                                 </div>
                               )) : (
-                                <p className="text-[10px] text-slate-500 italic">Hover for details or check the Exceptions panel.</p>
+                                <p className="text-[10px] text-slate-500 italic">Check the Exceptions panel for details.</p>
                               )}
                               {headExceptions.length > 8 && (
                                 <p className="text-[10px] text-slate-400 pt-1 border-t border-slate-100">+ {headExceptions.length - 8} more</p>
@@ -2084,63 +2389,63 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-wrap justify-end" onClick={(e) => e.stopPropagation()}>
                     {canGenerate && (
-                      <Button size="sm" onClick={() => onGenerate(head.headIndex)} disabled={loading} className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
-                        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Play className="w-3.5 h-3.5 mr-1.5" /> Generate</>}
+                      <Button size="sm" onClick={() => onGenerate(head.headIndex)} disabled={loading} className="h-8 px-2.5 sm:px-3 bg-blue-600 hover:bg-blue-700 text-white shadow-sm text-xs">
+                        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Play className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Generate</span></>}
                       </Button>
                     )}
                     {canRegenerate && (
-                      <Button size="sm" variant="outline" onClick={() => onGenerate(head.headIndex)} disabled={loading} className="h-8 px-3 border-amber-300 text-amber-700 hover:bg-amber-50">
-                        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Redo</>}
+                      <Button size="sm" variant="outline" onClick={() => onGenerate(head.headIndex)} disabled={loading} className="h-8 px-2.5 sm:px-3 border-amber-200 text-amber-700 hover:bg-amber-50 text-xs">
+                        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><RefreshCw className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Redo</span></>}
                       </Button>
                     )}
                     {canApprove && (
-                      <Button size="sm" onClick={() => onApprove(head.headIndex)} disabled={loading} className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
-                        <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Approve
+                      <Button size="sm" onClick={() => onApprove(head.headIndex)} disabled={loading} className="h-8 px-2.5 sm:px-3 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm text-xs">
+                        <CheckCircle2 className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Approve</span>
                       </Button>
                     )}
                     {canExport && (
-                      <Button size="sm" variant="outline" onClick={() => onExport(head.headIndex)} className="h-8 px-3 border-slate-300 hover:bg-slate-50">
-                        <Download className="w-3.5 h-3.5 mr-1.5" /> Export
+                      <Button size="sm" variant="outline" onClick={() => onExport(head.headIndex)} className="h-8 px-2.5 sm:px-3 border-slate-200 hover:bg-slate-50 text-xs">
+                        <Download className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Export</span>
                       </Button>
                     )}
                     {!isLocked && (
-                      <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform", isExpanded && "rotate-180")} />
+                      <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform hidden sm:block", isExpanded && "rotate-180")} />
                     )}
                   </div>
                 </div>
 
                 {isExpanded && !isLocked && (
-                  <div className="px-6 pb-4 pt-1 bg-slate-50/50 border-t border-dashed">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                      <div className="bg-white rounded-lg p-3 border">
-                        <p className="text-slate-400 mb-1">Status</p>
-                        <p className="font-medium flex items-center gap-1">{statusIcon(head.status)} {statusLabel(head.status)}</p>
+                  <div className="px-4 sm:px-5 pb-4 pt-2 bg-slate-50/30 border-t border-slate-100">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                      <div className="bg-white rounded-xl p-3 border border-slate-100">
+                        <p className="text-slate-400 mb-1 text-[10px] uppercase tracking-wider">Status</p>
+                        <p className="font-medium text-slate-700 flex items-center gap-1">{statusIcon(head.status)} {statusLabel(head.status)}</p>
                       </div>
-                      <div className="bg-white rounded-lg p-3 border">
-                        <p className="text-slate-400 mb-1">Output Format</p>
-                        <p className="font-medium flex items-center gap-1"><FileText className="w-3.5 h-3.5 text-blue-500" /> {(head.outputType || "N/A").toUpperCase()}</p>
+                      <div className="bg-white rounded-xl p-3 border border-slate-100">
+                        <p className="text-slate-400 mb-1 text-[10px] uppercase tracking-wider">Format</p>
+                        <p className="font-medium text-slate-700 flex items-center gap-1"><FileText className="w-3.5 h-3.5 text-blue-500" /> {(head.outputType || "N/A").toUpperCase()}</p>
                       </div>
-                      <div className="bg-white rounded-lg p-3 border">
-                        <p className="text-slate-400 mb-1">Exceptions</p>
+                      <div className="bg-white rounded-xl p-3 border border-slate-100">
+                        <p className="text-slate-400 mb-1 text-[10px] uppercase tracking-wider">Exceptions</p>
                         <p className={cn("font-medium flex items-center gap-1", head.exceptionsCount > 0 ? "text-amber-600" : "text-emerald-600")}>
-                          {head.exceptionsCount > 0 ? <><AlertTriangle className="w-3.5 h-3.5" /> {head.exceptionsCount} found</> : <><CheckCircle2 className="w-3.5 h-3.5" /> None</>}
+                          {head.exceptionsCount > 0 ? <><AlertTriangle className="w-3.5 h-3.5" /> {head.exceptionsCount}</> : <><CheckCircle2 className="w-3.5 h-3.5" /> None</>}
                         </p>
                       </div>
-                      <div className="bg-white rounded-lg p-3 border">
-                        <p className="text-slate-400 mb-1">Generated At</p>
-                        <p className="font-medium flex items-center gap-1">
+                      <div className="bg-white rounded-xl p-3 border border-slate-100">
+                        <p className="text-slate-400 mb-1 text-[10px] uppercase tracking-wider">Generated</p>
+                        <p className="font-medium text-slate-700 flex items-center gap-1">
                           <Clock className="w-3.5 h-3.5 text-slate-400" /> {head.generatedAt ? new Date(head.generatedAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "Not yet"}
                         </p>
                       </div>
                     </div>
                     {headExceptions.length > 0 && (
-                      <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                      <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
                         <p className="text-xs font-semibold text-amber-800 mb-2 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Open Exceptions</p>
                         <div className="space-y-1.5">
                           {headExceptions.map((exc: any, idx: number) => (
-                            <div key={exc.id || idx} className="flex items-start gap-2 text-xs">
+                            <div key={exc.id || idx} className="flex items-start gap-2 text-xs bg-white/60 rounded-lg p-2 border border-amber-100">
                               <span className={cn("mt-0.5 w-2 h-2 rounded-full shrink-0",
                                 exc.severity === "critical" ? "bg-red-500" : exc.severity === "high" ? "bg-orange-500" : exc.severity === "medium" ? "bg-amber-500" : "bg-blue-400"
                               )} />
@@ -2167,72 +2472,122 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
 function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle, loading }: any) {
   const completedHeads = (heads || []).filter((h: any) => ["approved", "exported", "completed"].includes(h.status));
   const openExceptions = (exceptions || []).filter((e: any) => e.status === "open");
+  const totalHeads = (heads || []).length;
+  const exportPct = totalHeads > 0 ? Math.round((completedHeads.length / totalHeads) * 100) : 0;
 
   return (
-    <div className="space-y-4">
-      <div className="bg-card border rounded-xl p-6">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Download className="w-5 h-5 text-primary" /> Export Center
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-blue-50 rounded-lg p-4 text-center">
-            <p className="text-3xl font-bold text-blue-700">{completedHeads.length}</p>
-            <p className="text-sm text-blue-600">Heads Completed</p>
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
           </div>
-          <div className="bg-amber-50 rounded-lg p-4 text-center">
-            <p className="text-3xl font-bold text-amber-700">{openExceptions.length}</p>
-            <p className="text-sm text-amber-600">Open Exceptions</p>
-          </div>
-          <div className="bg-emerald-50 rounded-lg p-4 text-center">
-            <p className="text-3xl font-bold text-emerald-700">{(heads || []).length}</p>
-            <p className="text-sm text-emerald-600">Total Heads</p>
+          <div>
+            <p className="text-2xl font-bold text-slate-900">{completedHeads.length}/{totalHeads}</p>
+            <p className="text-xs text-slate-500">Ready to Export</p>
           </div>
         </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5 text-amber-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-slate-900">{openExceptions.length}</p>
+            <p className="text-xs text-slate-500">Open Exceptions</p>
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+            <Gauge className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-slate-900">{exportPct}%</p>
+            <p className="text-xs text-slate-500">Completion</p>
+          </div>
+        </div>
+      </div>
 
-        <div className="space-y-2 mb-6">
-          <h3 className="text-sm font-semibold">Export by Head</h3>
-          {(heads || []).map((head: any) => {
-            const canExport = ["approved", "exported", "completed"].includes(head.status);
-            return (
-              <div key={head.id} className="flex items-center gap-3 p-3 rounded-lg border">
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{head.headName}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{head.status?.replace(/_/g, " ")} • {head.outputType?.toUpperCase()}</p>
-                </div>
-                <Button size="sm" variant="outline" disabled={!canExport} onClick={() => onExportHead(head.headIndex)}>
-                  <Download className="w-3 h-3 mr-1" /> Export
-                </Button>
-              </div>
-            );
-          })}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-emerald-50 to-green-50/50 px-5 py-4 border-b border-slate-200/60">
+          <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+            <Download className="w-5 h-5 text-emerald-600" /> Export Center
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">Download completed working papers individually or as a full bundle</p>
         </div>
 
-        <div className="border-t pt-4">
-          <Button size="lg" onClick={onExportBundle} disabled={loading} className="w-full">
-            <Download className="w-4 h-4 mr-2" />
-            Export Full Bundle (Index + TB + Exceptions + Audit Trail)
-          </Button>
+        <div className="p-5 space-y-5">
+          <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+            <div className={cn("h-full rounded-full transition-all duration-500", exportPct === 100 ? "bg-emerald-500" : exportPct > 50 ? "bg-blue-500" : "bg-amber-500")} style={{ width: `${exportPct}%` }} />
+          </div>
+
+          <div>
+            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Export by Head</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {(heads || []).map((head: any) => {
+                const canExport = ["approved", "exported", "completed"].includes(head.status);
+                const isExported = head.status === "exported" || head.status === "completed";
+                return (
+                  <div key={head.id} className={cn(
+                    "flex items-center gap-3 p-3.5 rounded-xl border transition-all",
+                    isExported ? "bg-emerald-50/30 border-emerald-200" : canExport ? "bg-white border-slate-200 hover:border-blue-200 hover:shadow-sm" : "bg-slate-50/50 border-slate-100 opacity-70"
+                  )}>
+                    <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                      isExported ? "bg-emerald-100" : canExport ? "bg-blue-50" : "bg-slate-100"
+                    )}>
+                      {isExported ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : canExport ? <FileText className="w-4 h-4 text-blue-600" /> : <Lock className="w-4 h-4 text-slate-400" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">{head.headName}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium capitalize",
+                          isExported ? "bg-emerald-100 text-emerald-700" : canExport ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"
+                        )}>{head.status?.replace(/_/g, " ")}</span>
+                        <span className="text-[10px] text-slate-400 uppercase">{head.outputType}</span>
+                      </div>
+                    </div>
+                    <Button size="sm" variant={canExport ? "default" : "outline"} disabled={!canExport} onClick={() => onExportHead(head.headIndex)}
+                      className={cn("h-8 shrink-0", canExport && "bg-emerald-600 hover:bg-emerald-700")}>
+                      <Download className="w-3.5 h-3.5 mr-1" /> Export
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 pt-5">
+            <Button size="lg" onClick={onExportBundle} disabled={loading} className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 shadow-lg shadow-emerald-200/50 h-12 text-base">
+              {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Download className="w-5 h-5 mr-2" />}
+              Export Full Bundle
+              <span className="text-emerald-200 text-sm ml-2 font-normal hidden sm:inline">(Index + TB + Exceptions + Trail)</span>
+            </Button>
+          </div>
         </div>
       </div>
 
       {openExceptions.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
-          <h3 className="text-sm font-semibold text-amber-800 mb-3 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4" /> Open Exceptions ({openExceptions.length})
-          </h3>
-          <div className="space-y-2 max-h-60 overflow-y-auto">
+        <div className="bg-white border border-amber-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-amber-50 px-5 py-3.5 border-b border-amber-200 flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-amber-900">Open Exceptions ({openExceptions.length})</h3>
+              <p className="text-[11px] text-amber-600">These should be resolved before final export</p>
+            </div>
+          </div>
+          <div className="p-4 space-y-2 max-h-60 overflow-y-auto">
             {openExceptions.map((exc: any) => (
-              <div key={exc.id} className="p-3 bg-white rounded-lg border border-amber-200">
+              <div key={exc.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <div className="flex items-center gap-2">
-                  <span className={cn("px-2 py-0.5 rounded text-xs font-medium",
-                    exc.severity === "critical" ? "bg-red-100 text-red-800" :
-                    exc.severity === "high" ? "bg-orange-100 text-orange-800" :
-                    "bg-yellow-100 text-yellow-800"
+                  <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide",
+                    exc.severity === "critical" ? "bg-red-100 text-red-800 border border-red-200" :
+                    exc.severity === "high" ? "bg-orange-100 text-orange-800 border border-orange-200" :
+                    "bg-yellow-100 text-yellow-800 border border-yellow-200"
                   )}>{exc.severity}</span>
-                  <span className="text-sm font-medium">{exc.title}</span>
+                  <span className="text-sm font-medium text-slate-800">{exc.title}</span>
                 </div>
-                {exc.description && <p className="text-xs text-muted-foreground mt-1">{exc.description}</p>}
+                {exc.description && <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{exc.description}</p>}
               </div>
             ))}
           </div>
