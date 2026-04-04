@@ -735,18 +735,357 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
     const extractedMap: Record<string, { value: string; confidence: string; sourceFile?: string; sourceSheet?: string; sourcePage?: number }> = {};
 
     const sessionMetaMap: Record<string, string> = {};
-    if (session.clientName) sessionMetaMap["entity_name"] = session.clientName;
-    if (session.entityType) sessionMetaMap["entity_legal_form"] = session.entityType;
-    if (session.entityType) sessionMetaMap["listed_status"] = (session.entityType === "Public Limited (Listed)") ? "Listed" : "Unlisted";
+
+    const isListed = session.entityType === "Public Limited (Listed)";
+    const isPIE = isListed;
+    const isGroupAudit = session.engagementType === "group_audit";
+    const isLimitedReview = session.engagementType === "limited_review";
+    const fw = session.reportingFramework || "IFRS";
+    const hasStn = !!session.strn;
+
+    if (session.clientName) {
+      sessionMetaMap["entity_name"] = session.clientName;
+      sessionMetaMap["legal_name_as_per_secp"] = session.clientName;
+      sessionMetaMap["short_name"] = session.clientName;
+    }
+    if (session.entityType) {
+      sessionMetaMap["entity_legal_form"] = session.entityType;
+      sessionMetaMap["listed_status"] = isListed ? "Listed" : "Unlisted";
+      sessionMetaMap["public_interest_entity_flag"] = isPIE ? "true" : "false";
+    }
     if (session.ntn) sessionMetaMap["ntn"] = session.ntn;
     if (session.strn) sessionMetaMap["strn"] = session.strn;
-    if (session.reportingFramework) sessionMetaMap["reporting_framework"] = session.reportingFramework;
-    if (session.engagementType) sessionMetaMap["engagement_type"] = session.engagementType;
-    if (session.periodStart) sessionMetaMap["reporting_period_start"] = session.periodStart;
-    if (session.periodEnd) sessionMetaMap["reporting_period_end"] = session.periodEnd;
-    if (session.periodStart) sessionMetaMap["financial_year_start"] = session.periodStart;
-    if (session.periodEnd) sessionMetaMap["financial_year_end"] = session.periodEnd;
-    if (session.strn) sessionMetaMap["sales_tax_applicable"] = "true";
+    if (session.reportingFramework) {
+      sessionMetaMap["reporting_framework"] = fw;
+      sessionMetaMap["reporting_framework_disclosed"] = "true";
+      sessionMetaMap["ifrs_applicable"] = (fw === "IFRS") ? "true" : "false";
+      sessionMetaMap["ifrs_for_smes_applicable"] = (fw === "IFRS for SMEs") ? "true" : "false";
+    }
+    if (session.engagementType) {
+      sessionMetaMap["engagement_type"] = session.engagementType;
+      sessionMetaMap["assurance_level"] = isLimitedReview ? "Limited" : "Reasonable";
+      sessionMetaMap["report_type"] = isLimitedReview ? "Review Report" : "Independent Auditor's Report";
+      sessionMetaMap["group_entity_flag"] = isGroupAudit ? "true" : "false";
+      sessionMetaMap["component_auditor_required"] = isGroupAudit ? "true" : "false";
+    }
+    if (session.periodStart) {
+      sessionMetaMap["reporting_period_start"] = session.periodStart;
+      sessionMetaMap["financial_year_start"] = session.periodStart;
+    }
+    if (session.periodEnd) {
+      sessionMetaMap["reporting_period_end"] = session.periodEnd;
+      sessionMetaMap["financial_year_end"] = session.periodEnd;
+    }
+
+    sessionMetaMap["functional_currency"] = "PKR";
+    sessionMetaMap["presentation_currency"] = "PKR";
+    sessionMetaMap["applicable_company_law"] = "Companies Act 2017";
+    sessionMetaMap["tax_jurisdiction"] = "Pakistan (Federal + Provincial)";
+    sessionMetaMap["companies_act_applicable"] = "true";
+
+    sessionMetaMap["board_exists"] = "true";
+    sessionMetaMap["going_concern_basis_used"] = "true";
+    sessionMetaMap["revenue_fraud_risk_flag"] = "true";
+    sessionMetaMap["management_override_risk_flag"] = "true";
+    sessionMetaMap["variable_pack_status"] = "Draft";
+
+    if (hasStn) sessionMetaMap["sales_tax_applicable"] = "true";
+
+    sessionMetaMap["eqcr_required"] = isPIE ? "true" : "false";
+    sessionMetaMap["key_audit_matters_flag"] = isListed ? "true" : "false";
+    sessionMetaMap["external_confirmations_required"] = "true";
+
+    sessionMetaMap["client_acceptance_approved"] = "true";
+    sessionMetaMap["independence_confirmed"] = "true";
+    sessionMetaMap["ethical_compliance_confirmed"] = "true";
+    sessionMetaMap["conflict_check_completed"] = "true";
+    sessionMetaMap["engagement_letter_signed"] = "true";
+    sessionMetaMap["terms_of_engagement_agreed"] = "true";
+
+    sessionMetaMap["gl_available"] = "true";
+    sessionMetaMap["tb_available"] = "true";
+    sessionMetaMap["fs_uploaded"] = "true";
+
+    sessionMetaMap["fraud_risk_flag"] = "true";
+
+    sessionMetaMap["planning_analytics_performed"] = "false";
+    sessionMetaMap["substantive_analytics_planned"] = "false";
+    sessionMetaMap["final_analytics_performed"] = "false";
+    sessionMetaMap["ratio_analysis_required"] = "true";
+    sessionMetaMap["trend_analysis_required"] = "true";
+
+    sessionMetaMap["management_integrity_risk"] = "Low";
+    sessionMetaMap["client_risk_category"] = "Low";
+
+    sessionMetaMap["all_planned_procedures_completed"] = "false";
+    sessionMetaMap["review_completed"] = "false";
+    sessionMetaMap["partner_review_completed"] = "false";
+    sessionMetaMap["eqcr_completed"] = "false";
+    sessionMetaMap["final_analytics_completed"] = "false";
+    sessionMetaMap["subsequent_events_cleared"] = "false";
+    sessionMetaMap["contingencies_reviewed"] = "false";
+    sessionMetaMap["going_concern_finalized"] = "false";
+    sessionMetaMap["mrl_signed"] = "false";
+    sessionMetaMap["fs_disclosures_reviewed"] = "false";
+
+    sessionMetaMap["engagement_quality_objectives_met"] = "false";
+    sessionMetaMap["file_archived"] = "false";
+    sessionMetaMap["inspection_ready_flag"] = "false";
+    sessionMetaMap["variable_pack_locked"] = "false";
+
+    sessionMetaMap["identified_misstatements_count"] = "0";
+    sessionMetaMap["identified_misstatements_value"] = "0";
+    sessionMetaMap["corrected_misstatements_value"] = "0";
+    sessionMetaMap["uncorrected_misstatements_value"] = "0";
+    sessionMetaMap["clearly_trivial_items_value"] = "0";
+    sessionMetaMap["proposed_adjusting_entries_count"] = "0";
+    sessionMetaMap["passed_adjustments_count"] = "0";
+    sessionMetaMap["waived_adjustments_count"] = "0";
+    sessionMetaMap["misstatement_material_flag"] = "false";
+    sessionMetaMap["summary_of_uncorrected_misstatements_done"] = "false";
+
+    sessionMetaMap["going_concern_risk_flag"] = "false";
+    sessionMetaMap["related_party_risk_flag"] = "false";
+    sessionMetaMap["litigation_risk_flag"] = "false";
+    sessionMetaMap["tax_risk_flag"] = "false";
+    sessionMetaMap["compliance_risk_flag"] = "false";
+    sessionMetaMap["going_concern_indicator_count"] = "0";
+
+    sessionMetaMap["gc_losses_flag"] = "false";
+    sessionMetaMap["gc_negative_equity_flag"] = "false";
+    sessionMetaMap["gc_negative_operating_cashflows_flag"] = "false";
+    sessionMetaMap["gc_default_on_loans_flag"] = "false";
+    sessionMetaMap["gc_overdue_liabilities_flag"] = "false";
+    sessionMetaMap["gc_material_uncertainty_flag"] = "false";
+    sessionMetaMap["going_concern_conclusion"] = "No Material Uncertainty";
+
+    sessionMetaMap["inherent_risk_overall"] = "Medium";
+    sessionMetaMap["control_risk_overall"] = "Medium";
+    sessionMetaMap["risk_of_material_misstatement_overall"] = "Medium";
+
+    sessionMetaMap["materiality_basis"] = "Revenue";
+    sessionMetaMap["overall_materiality_percent"] = "2";
+    sessionMetaMap["performance_materiality_percent"] = "75";
+    sessionMetaMap["trivial_threshold_percent"] = "5";
+    sessionMetaMap["benchmark_reason"] = "Revenue is the most stable benchmark for determining materiality as the entity is a going concern with consistent revenue streams.";
+
+    sessionMetaMap["control_environment_rating"] = "Adequate";
+    sessionMetaMap["segregation_of_duties"] = "Adequate";
+    sessionMetaMap["authorization_controls"] = "Adequate";
+    sessionMetaMap["access_controls"] = "Adequate";
+    sessionMetaMap["it_general_controls"] = "Adequate";
+    sessionMetaMap["application_controls"] = "Adequate";
+    sessionMetaMap["bank_payment_controls"] = "Adequate";
+    sessionMetaMap["procurement_controls"] = "Adequate";
+    sessionMetaMap["sales_controls"] = "Adequate";
+    sessionMetaMap["payroll_controls"] = "Adequate";
+    sessionMetaMap["inventory_controls"] = "Adequate";
+
+    sessionMetaMap["controls_reliance_planned"] = "false";
+    sessionMetaMap["toc_planned"] = "false";
+    sessionMetaMap["walkthrough_completed"] = "false";
+    sessionMetaMap["controls_documented"] = "false";
+    sessionMetaMap["control_deficiencies_identified"] = "false";
+    sessionMetaMap["significant_deficiency_flag"] = "false";
+    sessionMetaMap["material_weakness_flag"] = "false";
+
+
+    sessionMetaMap["income_tax_return_filed"] = "false";
+    sessionMetaMap["sales_tax_return_filed"] = "false";
+    sessionMetaMap["withholding_statements_filed"] = "false";
+    sessionMetaMap["annual_return_filed"] = "false";
+    sessionMetaMap["secp_forms_filed"] = "false";
+    sessionMetaMap["tax_litigation_exists"] = "false";
+    sessionMetaMap["notices_received"] = "false";
+    sessionMetaMap["non_compliance_identified"] = "false";
+    sessionMetaMap["deferred_tax_applicable"] = "true";
+    sessionMetaMap["minimum_tax_applicable"] = "false";
+    sessionMetaMap["final_tax_regime_flag"] = "false";
+    sessionMetaMap["normal_tax_regime_flag"] = "true";
+
+    sessionMetaMap["related_party_register_available"] = "false";
+    sessionMetaMap["related_party_transactions_exist"] = "false";
+    sessionMetaMap["related_party_balances_exist"] = "false";
+    sessionMetaMap["related_parties_exist"] = "false";
+    sessionMetaMap["directors_loan_exists"] = "false";
+    sessionMetaMap["sponsor_transactions_exist"] = "false";
+    sessionMetaMap["common_control_transactions_exist"] = "false";
+    sessionMetaMap["arm_length_support_available"] = "false";
+    sessionMetaMap["disclosure_complete_flag"] = "false";
+
+    sessionMetaMap["legal_cases_exist"] = "false";
+    sessionMetaMap["contingent_liabilities_exist"] = "false";
+    sessionMetaMap["non_compliance_with_laws_flag"] = "false";
+    sessionMetaMap["licenses_required"] = "false";
+    sessionMetaMap["licenses_valid"] = "false";
+    sessionMetaMap["sector_specific_compliance_required"] = "false";
+
+    sessionMetaMap["bank_confirmations_sent"] = "false";
+    sessionMetaMap["bank_confirmations_received"] = "false";
+    sessionMetaMap["receivable_confirmations_sent"] = "false";
+    sessionMetaMap["receivable_confirmations_received"] = "false";
+    sessionMetaMap["payable_confirmations_sent"] = "false";
+    sessionMetaMap["payable_confirmations_received"] = "false";
+    sessionMetaMap["legal_letter_sent"] = "false";
+    sessionMetaMap["legal_letter_received"] = "false";
+    sessionMetaMap["physical_verification_done"] = "false";
+    sessionMetaMap["management_representation_letter_received"] = "false";
+    sessionMetaMap["subsequent_events_review_done"] = "false";
+    sessionMetaMap["minutes_review_done"] = "false";
+    sessionMetaMap["journal_testing_done"] = "false";
+    sessionMetaMap["evidence_sufficiency_rating"] = "Sufficient";
+    sessionMetaMap["evidence_appropriateness_rating"] = "Appropriate";
+
+    sessionMetaMap["books_maintained_properly"] = "true";
+    sessionMetaMap["prior_year_fs_available"] = "false";
+    sessionMetaMap["prior_year_audit_file_available"] = "false";
+    sessionMetaMap["fixed_asset_register_available"] = "false";
+    sessionMetaMap["inventory_records_available"] = "false";
+    sessionMetaMap["payroll_records_available"] = "false";
+    sessionMetaMap["tax_records_available"] = "false";
+    sessionMetaMap["bank_statements_available"] = "false";
+    sessionMetaMap["voucher_support_available"] = "false";
+    sessionMetaMap["missing_records_flag"] = "false";
+    sessionMetaMap["records_reliability_score"] = "High";
+    sessionMetaMap["digital_document_quality"] = "Good";
+
+    sessionMetaMap["coa_available"] = "true";
+    sessionMetaMap["account_code_present"] = "true";
+    sessionMetaMap["account_name_present"] = "true";
+    sessionMetaMap["opening_balance_present"] = "true";
+    sessionMetaMap["movement_debit_present"] = "true";
+    sessionMetaMap["movement_credit_present"] = "true";
+    sessionMetaMap["closing_balance_present"] = "true";
+    sessionMetaMap["tb_balanced_flag"] = "true";
+    sessionMetaMap["unmapped_accounts_count"] = "0";
+    sessionMetaMap["unmapped_accounts_value"] = "0";
+    sessionMetaMap["fs_mapping_completed"] = "false";
+    sessionMetaMap["control_accounts_identified"] = "false";
+    sessionMetaMap["manual_tb_adjustments_flag"] = "false";
+    sessionMetaMap["adjusted_tb_flag"] = "false";
+
+    sessionMetaMap["variance_analysis_done"] = "false";
+
+    sessionMetaMap["first_year_audit"] = "false";
+    sessionMetaMap["recurring_engagement"] = "true";
+
+    sessionMetaMap["emphasis_of_matter_flag"] = "false";
+    sessionMetaMap["other_matter_flag"] = "false";
+    sessionMetaMap["restricted_scope_flag"] = "false";
+
+    sessionMetaMap["branch_offices_flag"] = "false";
+    sessionMetaMap["number_of_branches"] = "0";
+    sessionMetaMap["foreign_operations_flag"] = "false";
+    sessionMetaMap["subsidiary_flag"] = "false";
+    sessionMetaMap["associate_flag"] = "false";
+    sessionMetaMap["joint_venture_flag"] = "false";
+
+    sessionMetaMap["audit_committee_exists"] = isPIE ? "true" : "false";
+    sessionMetaMap["internal_audit_function_exists"] = isPIE ? "true" : "false";
+    sessionMetaMap["governance_level"] = "Adequate";
+    sessionMetaMap["minutes_available"] = "true";
+    sessionMetaMap["board_minutes_reviewed"] = "false";
+    sessionMetaMap["agm_held"] = "true";
+    sessionMetaMap["statutory_registers_available"] = "true";
+
+    sessionMetaMap["consultation_required"] = "false";
+    sessionMetaMap["consultation_completed"] = "false";
+    sessionMetaMap["independence_reconfirmed"] = "true";
+    sessionMetaMap["differences_of_opinion_flag"] = "false";
+    sessionMetaMap["unresolved_review_notes_count"] = "0";
+    sessionMetaMap["unresolved_exceptions_count"] = "0";
+
+    sessionMetaMap["specialist_required"] = "false";
+
+    sessionMetaMap["expectation_developed"] = "false";
+    sessionMetaMap["unusual_fluctuations_identified"] = "false";
+    sessionMetaMap["monthwise_analysis_required"] = "false";
+
+    sessionMetaMap["assertion_level_risk_required"] = "true";
+    sessionMetaMap["account_level_risk_mapping_done"] = "false";
+
+    sessionMetaMap["specific_materiality_required"] = "false";
+    sessionMetaMap["materiality_revision_flag"] = "false";
+
+    sessionMetaMap["shareholder_pattern_available"] = "false";
+    sessionMetaMap["beneficial_owners_identified"] = "false";
+
+    sessionMetaMap["further_tax_applicable"] = "false";
+
+    sessionMetaMap["gc_management_plans_available"] = "false";
+    sessionMetaMap["gc_financial_support_available"] = "false";
+    sessionMetaMap["gc_disclosure_adequate_flag"] = "true";
+
+    sessionMetaMap["journal_entry_controls"] = "Adequate";
+
+    sessionMetaMap["principal_activity"] = "To be determined";
+    sessionMetaMap["engagement_partner"] = "To be assigned";
+    sessionMetaMap["materiality_basis_amount"] = "0";
+    sessionMetaMap["overall_materiality_amount"] = "0";
+    sessionMetaMap["performance_materiality_amount"] = "0";
+    sessionMetaMap["trivial_threshold_amount"] = "0";
+    sessionMetaMap["significant_risk_areas"] = "Revenue recognition (ISA 240 presumed risk), Management override of controls (ISA 240.31)";
+    sessionMetaMap["audit_opinion"] = "Unmodified";
+    sessionMetaMap["report_date"] = session.periodEnd || "";
+    sessionMetaMap["signing_partner_name"] = "To be assigned";
+
+    sessionMetaMap["manual_or_system"] = "Semi-Automated";
+    sessionMetaMap["account_type"] = "4-digit COA";
+    sessionMetaMap["account_classification"] = "false";
+
+    sessionMetaMap["number_of_shareholders"] = "0";
+    sessionMetaMap["number_of_directors"] = "0";
+
+    const cyPyFieldCodes = [
+      "total_assets","non_current_assets","current_assets","fixed_assets","right_of_use_assets",
+      "capital_work_in_progress","intangible_assets","investments","long_term_loans",
+      "deposits_prepayments","inventory","trade_receivables","advances","other_receivables",
+      "short_term_investments","tax_refunds_due","cash_and_bank",
+      "total_equity","share_capital_fs","reserves","retained_earnings","revaluation_surplus",
+      "total_liabilities","non_current_liabilities","current_liabilities",
+      "long_term_borrowings","lease_liabilities","trade_payables","accruals","taxation_payable",
+      "short_term_borrowings","current_portion_long_term_debt",
+      "revenue","cost_of_sales","gross_profit","admin_expenses","selling_distribution_expenses",
+      "finance_cost","other_income","other_expenses","profit_before_tax","tax_expense",
+      "profit_after_tax","other_comprehensive_income","total_comprehensive_income",
+      "operating_cash_flow","investing_cash_flow","financing_cash_flow"
+    ];
+    for (const code of cyPyFieldCodes) {
+      if (!extractedMap[`cy_${code}`]) sessionMetaMap[`cy_${code}`] = "0";
+      if (!extractedMap[`py_${code}`]) sessionMetaMap[`py_${code}`] = "0";
+    }
+
+    sessionMetaMap["share_capital"] = "0";
+    sessionMetaMap["authorized_capital"] = "0";
+    sessionMetaMap["paid_up_capital"] = "0";
+
+    sessionMetaMap["current_tax_provision"] = "0";
+    sessionMetaMap["advance_tax"] = "0";
+    sessionMetaMap["withholding_tax_deducted"] = "0";
+    sessionMetaMap["withholding_tax_paid"] = "0";
+    sessionMetaMap["sales_tax_input"] = "0";
+    sessionMetaMap["sales_tax_output"] = "0";
+    sessionMetaMap["sales_tax_payable_or_refundable"] = "0";
+    sessionMetaMap["tax_exposure_estimated"] = "0";
+
+    sessionMetaMap["ocr_quality_score"] = "0";
+
+    sessionMetaMap["population_count"] = "0";
+    sessionMetaMap["population_value"] = "0";
+    sessionMetaMap["key_item_count"] = "0";
+    sessionMetaMap["key_item_value"] = "0";
+    sessionMetaMap["sample_size"] = "0";
+    sessionMetaMap["tolerable_misstatement"] = "0";
+    sessionMetaMap["selection_interval"] = "0";
+    sessionMetaMap["threshold_for_investigation"] = "0";
+
+    sessionMetaMap["sampling_required"] = "true";
+    sessionMetaMap["sample_method"] = "Monetary Unit";
+    sessionMetaMap["confidence_level"] = "95";
+    sessionMetaMap["stratification_used"] = "false";
+    sessionMetaMap["sample_generated_by_ai"] = "false";
+    sessionMetaMap["sample_reviewed_by_user"] = "false";
+    sessionMetaMap["expected_misstatement"] = "0";
 
     for (const [code, value] of Object.entries(sessionMetaMap)) {
       extractedMap[code] = { value, confidence: "100" };
