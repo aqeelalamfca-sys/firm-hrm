@@ -12,6 +12,7 @@ import {
   Globe, EyeOff, Calendar, Tag, Sparkles, Bot, Zap,
   Info, AlertOctagon, Calculator, CircleDot,
   ExternalLink, Gauge, Table2, Trash2, Database,
+  GitMerge, BarChart2, Cpu, CheckCheck, ListChecks, Network, BookOpen,
 } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
@@ -117,6 +118,9 @@ export default function WorkingPapers() {
   const [editValue, setEditValue] = useState("");
   const [editReason, setEditReason] = useState("");
   const [showExceptionsPanel, setShowExceptionsPanel] = useState(false);
+  const [workbookExtracting, setWorkbookExtracting] = useState(false);
+  const [workbookReport, setWorkbookReport] = useState<any>(null);
+  const [showWorkbookPanel, setShowWorkbookPanel] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [autoChainRunning, setAutoChainRunning] = useState(false);
@@ -312,6 +316,37 @@ export default function WorkingPapers() {
       }
     } catch { toast({ title: "Extraction failed", variant: "destructive" }); }
     finally { setLoading(false); }
+  };
+
+  const handleExtractWorkbook = async () => {
+    if (!activeSession) return;
+    setWorkbookExtracting(true);
+    setWorkbookReport(null);
+    setShowWorkbookPanel(true);
+    try {
+      toast({ title: "Smart Import running…", description: "Parsing all sheets, classifying accounts, generating TB/GL and reconciling. This may take 30–60 seconds." });
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/extract-workbook`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ useAiClassification: true, generateGlTb: true, runRecon: true }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setWorkbookReport(data.report);
+        toast({ title: "Smart Import complete", description: data.message });
+        await fetchSession(activeSession.id);
+        // Auto-fetch COA data after import
+        const coaRes = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/coa`, { headers });
+        if (coaRes.ok) setCoaData(await coaRes.json());
+      } else {
+        toast({ title: "Import failed", description: data.error || "Unknown error", variant: "destructive" });
+        setWorkbookReport(data.report || null);
+      }
+    } catch (e: any) {
+      toast({ title: "Import failed", description: e.message, variant: "destructive" });
+    } finally {
+      setWorkbookExtracting(false);
+    }
   };
 
   const fetchCoaData = async () => {
@@ -1369,6 +1404,11 @@ export default function WorkingPapers() {
           onNext={runExtraction}
           loading={loading}
           validateFile={validateFile}
+          onExtractWorkbook={handleExtractWorkbook}
+          workbookExtracting={workbookExtracting}
+          workbookReport={workbookReport}
+          showWorkbookPanel={showWorkbookPanel}
+          setShowWorkbookPanel={setShowWorkbookPanel}
         />
       )}
 
@@ -1521,8 +1561,201 @@ export default function WorkingPapers() {
 // STAGE COMPONENTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, onUpload, onNext, loading, validateFile }: any) {
+// ── Workbook Pipeline Panel ───────────────────────────────────────────────────
+function WorkbookPipelinePanel({ onExtract, extracting, report, onClose }: any) {
+  const stages = [
+    { key: "entity_profile", label: "Entity Profile", icon: BookOpen, color: "blue" },
+    { key: "coa_master", label: "Chart of Accounts", icon: Database, color: "purple" },
+    { key: "fs_extraction", label: "FS Extraction Staging", icon: FileText, color: "indigo" },
+    { key: "fs_mapping", label: "FS Line Mapping", icon: GitMerge, color: "violet" },
+    { key: "journal_import", label: "Journal Import", icon: ClipboardCheck, color: "emerald" },
+    { key: "tb_generation", label: "Trial Balance Generation", icon: BarChart2, color: "teal" },
+    { key: "gl_generation", label: "General Ledger", icon: Table2, color: "cyan" },
+    { key: "audit_engine_master", label: "Audit Engine Master", icon: Shield, color: "orange" },
+    { key: "reconciliation", label: "Reconciliation (4-check)", icon: CheckCheck, color: "green" },
+    { key: "wp_index", label: "WP Index & Triggers", icon: ListChecks, color: "amber" },
+    { key: "control_matrix", label: "Control Matrix", icon: Network, color: "rose" },
+  ];
+
+  const stageStatus = (key: string) => {
+    if (!report) return extracting ? "pending" : "idle";
+    const s = report.stages[key];
+    if (!s) return "skipped";
+    return s.status === "ok" ? "ok" : s.status === "error" ? "error" : "exceptions";
+  };
+
+  const colorMap: any = {
+    blue: "bg-blue-50 text-blue-600 border-blue-200",
+    purple: "bg-purple-50 text-purple-600 border-purple-200",
+    indigo: "bg-indigo-50 text-indigo-600 border-indigo-200",
+    violet: "bg-violet-50 text-violet-600 border-violet-200",
+    emerald: "bg-emerald-50 text-emerald-600 border-emerald-200",
+    teal: "bg-teal-50 text-teal-600 border-teal-200",
+    cyan: "bg-cyan-50 text-cyan-600 border-cyan-200",
+    orange: "bg-orange-50 text-orange-600 border-orange-200",
+    green: "bg-green-50 text-green-600 border-green-200",
+    amber: "bg-amber-50 text-amber-600 border-amber-200",
+    rose: "bg-rose-50 text-rose-600 border-rose-200",
+  };
+
+  const totalExceptions = report?.summary?.exceptionCount || 0;
+  const criticalExceptions = (report?.exceptions || []).filter((e: any) => e.severity === "Critical").length;
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-gradient-to-r from-violet-50 to-indigo-50/60 px-5 py-4 border-b border-slate-200/60 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center">
+            <Cpu className="w-4.5 h-4.5 text-violet-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-900 text-sm">Smart Workbook Import Pipeline</h3>
+            <p className="text-xs text-slate-500">AI-first parsing · Auto COA classify · TB/GL generation · Zero-diff reconciliation</p>
+          </div>
+        </div>
+        {onClose && (
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+            <X className="w-4 h-4 text-slate-400" />
+          </button>
+        )}
+      </div>
+      <div className="p-5 space-y-4">
+        {/* Summary badges */}
+        {report && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: "Accounts Imported", value: report.summary?.totalAccounts || 0, icon: Database, color: "blue" },
+              { label: "Journal Lines", value: report.summary?.totalJournals || 0, icon: ClipboardCheck, color: "emerald" },
+              { label: "Reconciliation", value: report.summary?.reconStatus || "Pending", icon: CheckCheck, color: criticalExceptions > 0 ? "rose" : "green" },
+              { label: "Exceptions", value: totalExceptions, icon: AlertTriangle, color: totalExceptions > 0 ? "amber" : "green" },
+            ].map(s => (
+              <div key={s.label} className={cn("rounded-xl p-3 border", colorMap[s.color] || "bg-slate-50 border-slate-200")}>
+                <p className="text-xl font-bold">{s.value}</p>
+                <p className="text-xs mt-0.5 opacity-80">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Stage grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {stages.map(s => {
+            const status = stageStatus(s.key);
+            const stageData = report?.stages?.[s.key];
+            const Icon = s.icon;
+            return (
+              <div key={s.key} className={cn(
+                "flex items-center gap-3 p-3 rounded-xl border text-sm transition-all",
+                status === "ok" ? "bg-emerald-50 border-emerald-200" :
+                status === "error" ? "bg-red-50 border-red-200" :
+                status === "exceptions" ? "bg-amber-50 border-amber-200" :
+                status === "skipped" ? "bg-slate-50 border-slate-100 opacity-50" :
+                extracting ? "bg-slate-50 border-slate-200 animate-pulse" :
+                "bg-slate-50 border-slate-200"
+              )}>
+                <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border", colorMap[s.color])}>
+                  <Icon className="w-3.5 h-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-slate-800 text-xs truncate">{s.label}</p>
+                  {stageData && (
+                    <p className="text-[11px] text-slate-500">
+                      {stageData.count !== undefined && `${stageData.count} rows`}
+                      {stageData.exceptions !== undefined && stageData.exceptions > 0 && ` · ${stageData.exceptions} exceptions`}
+                      {stageData.message && ` · ${stageData.message}`}
+                    </p>
+                  )}
+                </div>
+                <div className="shrink-0">
+                  {status === "ok" && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                  {status === "error" && <AlertCircle className="w-4 h-4 text-red-500" />}
+                  {status === "exceptions" && <AlertTriangle className="w-4 h-4 text-amber-500" />}
+                  {status === "skipped" && <span className="text-[10px] text-slate-400 font-medium">SKIP</span>}
+                  {(status === "pending" || status === "idle") && extracting && <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Exception log */}
+        {report?.exceptions?.length > 0 && (
+          <div className="border border-amber-200 bg-amber-50 rounded-xl p-4">
+            <h4 className="text-xs font-semibold text-amber-800 mb-2 flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5" /> {report.exceptions.length} Exception{report.exceptions.length > 1 ? "s" : ""} Flagged for Review
+            </h4>
+            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+              {report.exceptions.map((ex: any, i: number) => (
+                <div key={i} className="flex items-start gap-2 text-xs">
+                  <span className={cn(
+                    "shrink-0 font-semibold px-1.5 py-0.5 rounded text-[10px]",
+                    ex.severity === "Critical" ? "bg-red-100 text-red-700" :
+                    ex.severity === "High" ? "bg-orange-100 text-orange-700" :
+                    ex.severity === "Medium" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"
+                  )}>{ex.severity}</span>
+                  <span className="text-slate-600"><span className="font-medium">{ex.source}</span> → {ex.item}: {ex.issue}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TB balance summary */}
+        {report?.summary?.tbDebitTotal > 0 && (
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center gap-6">
+            <div className="text-center">
+              <p className="text-[11px] text-slate-500">TB Debit Total</p>
+              <p className="font-bold text-slate-900 text-sm">{Number(report.summary.tbDebitTotal).toLocaleString()}</p>
+            </div>
+            <div className="w-px h-8 bg-slate-200" />
+            <div className="text-center">
+              <p className="text-[11px] text-slate-500">TB Credit Total</p>
+              <p className="font-bold text-slate-900 text-sm">{Number(report.summary.tbCreditTotal).toLocaleString()}</p>
+            </div>
+            <div className="w-px h-8 bg-slate-200" />
+            <div className="text-center">
+              <p className="text-[11px] text-slate-500">Difference</p>
+              <p className={cn("font-bold text-sm", Math.abs((report.summary.tbDebitTotal || 0) - (report.summary.tbCreditTotal || 0)) < 1 ? "text-emerald-600" : "text-red-600")}>
+                {Math.abs((report.summary.tbDebitTotal || 0) - (report.summary.tbCreditTotal || 0)).toLocaleString()}
+              </p>
+            </div>
+            <div className="flex-1 text-right">
+              {Math.abs((report.summary.tbDebitTotal || 0) - (report.summary.tbCreditTotal || 0)) < 1
+                ? <span className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full font-medium"><CheckCircle2 className="w-3 h-3" /> Balanced</span>
+                : <span className="inline-flex items-center gap-1 text-xs text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full font-medium"><AlertCircle className="w-3 h-3" /> Out of Balance</span>
+              }
+            </div>
+          </div>
+        )}
+
+        {/* Action button */}
+        <div className="flex items-center justify-between pt-1">
+          <p className="text-xs text-slate-500">
+            {!report ? "Upload an Excel workbook then run Smart Import to auto-populate all backend sheets." : `Pipeline complete · ${Object.keys(report.stages).length} stages processed`}
+          </p>
+          <Button
+            onClick={onExtract}
+            disabled={extracting}
+            size="sm"
+            className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-sm text-white"
+          >
+            {extracting
+              ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> Running Pipeline…</>
+              : <><Zap className="w-3.5 h-3.5 mr-1.5" />{report ? "Re-run Import" : "Run Smart Import"}</>
+            }
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, onUpload, onNext, loading, validateFile, onExtractWorkbook, workbookExtracting, workbookReport, showWorkbookPanel, setShowWorkbookPanel }: any) {
   const [dragActive, setDragActive] = useState(false);
+  const hasExcel = uploadedFiles.some((f: any) => {
+    const ext = (f.originalName || "").split(".").pop()?.toLowerCase();
+    return ext === "xlsx" || ext === "xls" || ext === "xlsm";
+  });
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1649,6 +1882,38 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
           )}
         </div>
       </div>
+
+      {/* Smart Workbook Import Panel — shown when Excel file is uploaded or when panel is active */}
+      {(hasExcel || showWorkbookPanel) && (
+        <WorkbookPipelinePanel
+          onExtract={onExtractWorkbook}
+          extracting={workbookExtracting}
+          report={workbookReport}
+          onClose={workbookReport || workbookExtracting ? undefined : () => setShowWorkbookPanel(false)}
+        />
+      )}
+
+      {/* Show "Smart Import" button if Excel exists but panel not shown yet */}
+      {hasExcel && !showWorkbookPanel && (
+        <div className="bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-200 rounded-xl p-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
+              <Zap className="w-4 h-4 text-violet-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Excel workbook detected</p>
+              <p className="text-xs text-slate-500">Run Smart Import to auto-extract all sheets, classify accounts, build TB/GL and reconcile.</p>
+            </div>
+          </div>
+          <Button
+            onClick={() => { setShowWorkbookPanel(true); onExtractWorkbook(); }}
+            size="sm"
+            className="shrink-0 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-sm"
+          >
+            <Zap className="w-3.5 h-3.5 mr-1.5" /> Smart Import
+          </Button>
+        </div>
+      )}
 
       {uploadedFiles.length > 0 && (
         <div className="flex justify-end">

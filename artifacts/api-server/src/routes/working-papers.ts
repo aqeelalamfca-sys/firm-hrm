@@ -13,6 +13,7 @@ import {
   auditEngineMasterTable, wpTriggerDefsTable, wpTriggerSessionTable,
   assertionLinkageTable, samplingRulesTable, analyticsEngineTable,
   analyticsSessionTable, controlMatrixTable, evidenceLogTable, reconEngineTable,
+  wpJournalImportTable, wpFsExtractionTable, wpFsMappingTable,
 } from "@workspace/db";
 import { VARIABLE_DEFINITIONS, EXTRACTION_FIELD_TO_VARIABLE_MAP, VARIABLE_GROUPS, DEPENDENCY_RULES } from "../data/variable-definitions";
 import {
@@ -3662,6 +3663,762 @@ router.post("/sessions/:id/recon/run", async (req: Request, res: Response) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── WORKBOOK EXTRACTION PIPELINE ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Convert Excel serial date number to ISO date string */
+function excelSerialToISO(serial: number | string): string {
+  if (!serial || isNaN(Number(serial))) return String(serial || "");
+  const n = Number(serial);
+  if (n < 1000) return String(serial); // not a date serial
+  const date = new Date(Math.round((n - 25569) * 86400 * 1000));
+  return date.toISOString().split("T")[0];
+}
+
+function safeNum(v: any): number { const n = parseFloat(String(v || 0)); return isNaN(n) ? 0 : n; }
+function safeBool(v: any): boolean { if (typeof v === "boolean") return v; return String(v || "").toLowerCase() === "yes" || String(v || "") === "true"; }
+
+/** Find header row index — first row where first non-empty cell matches expected header */
+function findHeaderRow(data: any[][], expectedHeaders: string[]): number {
+  for (let i = 0; i < Math.min(10, data.length); i++) {
+    const row = data[i].map((c: any) => String(c || "").trim());
+    const matches = expectedHeaders.filter(h => row.includes(h));
+    if (matches.length >= Math.ceil(expectedHeaders.length * 0.5)) return i;
+  }
+  return -1;
+}
+
+/** Parse sheet into array of row objects keyed by header names */
+function parseSheetRows(ws: XLSX.WorkSheet, expectedHeaders: string[]): Record<string, any>[] {
+  const data: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+  const headerIdx = findHeaderRow(data, expectedHeaders);
+  if (headerIdx < 0) return [];
+  const headers: string[] = data[headerIdx].map((h: any) => String(h || "").trim());
+  const rows: Record<string, any>[] = [];
+  for (let i = headerIdx + 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row.some((c: any) => c !== "" && c !== null && c !== undefined)) continue;
+    const obj: Record<string, any> = {};
+    headers.forEach((h, j) => { if (h) obj[h] = row[j] ?? ""; });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+/** AI-powered COA classification for unrecognized accounts */
+async function aiClassifyAccount(accountName: string, ai: OpenAI): Promise<{
+  fsHead: string; fsSubHead: string; accountType: string; normalBalance: string;
+  materialityTag: string; riskTag: string; assertionTag: string;
+}> {
+  try {
+    const resp = await ai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{
+        role: "user",
+        content: `You are a Pakistani CA firm audit AI. Classify this account for a working paper COA.
+Account Name: "${accountName}"
+Return ONLY valid JSON (no markdown): {
+  "fsHead": "Non-Current Assets|Current Assets|Equity|Non-Current Liabilities|Current Liabilities|Revenue|Other Income|Cost of Sales|Operating Expenses|Administrative Expenses|Finance Costs|Tax",
+  "fsSubHead": "brief sub-head",
+  "accountType": "Asset|Liability|Equity|Income|Expense",
+  "normalBalance": "Debit|Credit",
+  "materialityTag": "High|Medium|Low",
+  "riskTag": "High|Medium|Low",
+  "assertionTag": "Existence,Completeness,Valuation"
+}`
+      }],
+      max_tokens: 200,
+      temperature: 0,
+    });
+    const text = (resp.choices[0]?.message?.content || "").replace(/```json|```/g, "").trim();
+    return JSON.parse(text);
+  } catch {
+    return { fsHead: "Other", fsSubHead: "Other", accountType: "Asset", normalBalance: "Debit", materialityTag: "Low", riskTag: "Low", assertionTag: "Existence" };
+  }
+}
+
+/** Generate AI-enhanced narration for journal entry */
+async function aiEnhanceNarration(raw: string, voucherType: string, accountName: string, ai: OpenAI): Promise<string> {
+  if (raw && raw.length > 10) return raw;
+  try {
+    const resp = await ai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: `Generate a professional audit narration (max 15 words) for a ${voucherType} voucher entry for account "${accountName}". Return only the narration text.` }],
+      max_tokens: 40, temperature: 0.3,
+    });
+    return resp.choices[0]?.message?.content?.trim() || raw || `${voucherType} entry - ${accountName}`;
+  } catch { return raw || `${voucherType} entry - ${accountName}`; }
+}
+
+/** Master workbook extraction pipeline */
+router.post("/sessions/:id/extract-workbook", async (req: Request, res: Response) => {
+  const sessionId = parseInt(req.params.id);
+  const { fileId, useAiClassification = true, generateGlTb = true, runRecon = true } = req.body;
+
+  const report: {
+    stages: Record<string, { status: string; count?: number; exceptions?: number; message?: string }>;
+    exceptions: Array<{ source: string; item: string; issue: string; severity: string }>;
+    summary: { totalAccounts: number; totalJournals: number; tbDebitTotal: number; tbCreditTotal: number; reconStatus: string; exceptionCount: number };
+  } = {
+    stages: {},
+    exceptions: [],
+    summary: { totalAccounts: 0, totalJournals: 0, tbDebitTotal: 0, tbCreditTotal: 0, reconStatus: "Pending", exceptionCount: 0 },
+  };
+
+  try {
+    // ── Get session & AI client ───────────────────────────────────────────────
+    const [session] = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    let ai: OpenAI | null = null;
+    try {
+      const apiKey = process.env.OPENAI_API_KEY || process.env.REPLIT_AI_API_KEY;
+      if (apiKey) ai = new OpenAI({ apiKey, baseURL: process.env.REPLIT_AI_BASE_URL });
+      else {
+        const [setting] = await db.select().from(systemSettingsTable).where(eq((systemSettingsTable as any).key, "chatgpt_api_key")).limit(1);
+        if (setting) ai = new OpenAI({ apiKey: (setting as any).value });
+      }
+    } catch { /* no ai */ }
+
+    // ── Find uploaded Excel files for this session ────────────────────────────
+    let excelFiles = await db.select().from(wpUploadedFilesTable)
+      .where(and(eq(wpUploadedFilesTable.sessionId, sessionId)));
+    if (fileId) excelFiles = excelFiles.filter(f => f.id === parseInt(fileId));
+    const excelFile = excelFiles.find(f =>
+      f.originalName?.toLowerCase().endsWith(".xlsx") ||
+      f.originalName?.toLowerCase().endsWith(".xls") ||
+      f.originalName?.toLowerCase().endsWith(".xlsm")
+    );
+    if (!excelFile) return res.status(400).json({ error: "No Excel workbook uploaded for this session. Please upload the workbook template first." });
+
+    const filePath = `uploads/${excelFile.storedName || excelFile.originalName}`;
+    let wb: XLSX.WorkBook;
+    try {
+      wb = XLSX.readFile(filePath);
+    } catch {
+      return res.status(400).json({ error: `Cannot read Excel file: ${excelFile.originalName}` });
+    }
+    const sheetNames = wb.SheetNames;
+
+    // ══ STAGE 1: Entity Profile ═══════════════════════════════════════════════
+    if (sheetNames.includes("Entity_Profile")) {
+      try {
+        const rows = parseSheetRows(wb.Sheets["Entity_Profile"], ["Engagement_ID", "Client_Name", "Entity_Type", "Financial_Year_Start", "Financial_Year_End"]);
+        if (rows.length > 0) {
+          const r = rows[0];
+          // Update session metadata
+          await db.update(wpSessionsTable).set({
+            entityName: r["Client_Name"] || session.entityName,
+            entityType: r["Entity_Type"] || session.entityType,
+            industry: r["Industry_Type"] || session.industry,
+          }).where(eq(wpSessionsTable.id, sessionId));
+
+          // Upsert audit engine master from entity profile
+          const existing = await db.select().from(auditEngineMasterTable).where(eq(auditEngineMasterTable.sessionId, sessionId));
+          const masterData = {
+            sessionId,
+            engagementId: r["Engagement_ID"] || `ENG-${sessionId}`,
+            entityType: r["Entity_Type"] || session.entityType || "Private Limited",
+            industryType: r["Industry_Type"] || session.industry || "Manufacturing",
+            financialYear: `${excelSerialToISO(r["Financial_Year_Start"])} to ${excelSerialToISO(r["Financial_Year_End"])}`,
+            reportingFramework: r["Reporting_Framework"] || session.reportingFramework || "IFRS",
+            auditType: r["Audit_Type"] || session.engagementType || "Statutory Audit",
+            engagementStatus: r["Engagement_Status"] || "Planning",
+            materialityAmount: String(safeNum(r["Materiality_Amount"])),
+            performanceMateriality: String(safeNum(r["Performance_Materiality"])),
+            trivialityThreshold: String(safeNum(r["Triviality_Threshold"])),
+            overallRiskLevel: r["Risk_Level_Overall"] || "Medium",
+            currency: r["Functional_Currency"] || "PKR",
+          };
+          if (existing.length === 0) await db.insert(auditEngineMasterTable).values(masterData as any);
+          else await db.update(auditEngineMasterTable).set(masterData as any).where(eq(auditEngineMasterTable.sessionId, sessionId));
+          report.stages["entity_profile"] = { status: "ok", count: 1 };
+        }
+      } catch (e: any) { report.stages["entity_profile"] = { status: "error", message: e.message }; }
+    }
+
+    // ══ STAGE 2: COA Master ═══════════════════════════════════════════════════
+    let coaAccountMap: Record<string, string> = {}; // accountCode → accountName
+    if (sheetNames.includes("COA_Master")) {
+      try {
+        const rows = parseSheetRows(wb.Sheets["COA_Master"], ["Account_Code", "Account_Name", "FS_Head", "Account_Type"]);
+        const validRows = rows.filter(r => r["Account_Code"] && String(r["Account_Code"]).match(/^\d/));
+        if (validRows.length > 0) {
+          // Clear existing COA for session then re-import
+          await db.delete(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, sessionId));
+          const coaInserts = [];
+          let order = 0;
+          for (const r of validRows) {
+            const code = String(r["Account_Code"]).trim();
+            const name = String(r["Account_Name"] || "").trim();
+            coaAccountMap[code] = name;
+
+            // AI classify if fsHead missing and AI available
+            let fsHead = String(r["FS_Head"] || "").trim();
+            let fsSubHead = String(r["FS_Sub_Head"] || "").trim();
+            let accountType = String(r["Account_Type"] || "").trim();
+            let normalBalance = String(r["Normal_Balance"] || "").trim();
+            let materialityTag = String(r["Materiality_Tag"] || "Low").trim();
+            let riskTag = String(r["Risk_Tag"] || "Low").trim();
+            let assertionTag = String(r["Assertion_Tag"] || "Existence").trim();
+
+            if ((!fsHead || !accountType) && ai && useAiClassification) {
+              const cls = await aiClassifyAccount(name, ai);
+              fsHead = fsHead || cls.fsHead;
+              fsSubHead = fsSubHead || cls.fsSubHead;
+              accountType = accountType || cls.accountType;
+              normalBalance = normalBalance || cls.normalBalance;
+              materialityTag = materialityTag || cls.materialityTag;
+              riskTag = riskTag || cls.riskTag;
+              assertionTag = assertionTag || cls.assertionTag;
+            }
+
+            const openBal = safeNum(r["Opening_Balance"]);
+            const debitTotal = safeNum(r["Debit_Total"]);
+            const creditTotal = safeNum(r["Credit_Total"]);
+            const closing = safeNum(r["Closing_Balance"]) || (openBal + debitTotal - creditTotal);
+            const priorYear = safeNum(r["Prior_Year_Balance"]);
+            const variance = closing - priorYear;
+            const confidence = safeNum(r["Confidence_Score"]) || 90;
+
+            // Flag exception if closing balance looks wrong
+            const calcClosing = openBal + debitTotal - creditTotal;
+            const closingMismatch = Math.abs(closing - calcClosing) > 1 && closing !== 0;
+            if (closingMismatch) {
+              report.exceptions.push({ source: "COA_Master", item: `${code} ${name}`, issue: `Closing balance mismatch: stated=${closing}, computed=${calcClosing}`, severity: "Medium" });
+            }
+
+            coaInserts.push({
+              sessionId,
+              accountCode: code,
+              parentCode: String(r["Parent_Code"] || "").trim() || null,
+              accountName: name,
+              fsHead: fsHead || "Other",
+              fsSubHead: fsSubHead || "",
+              accountType: accountType || "Asset",
+              normalBalance: normalBalance || "Debit",
+              industryTag: String(r["Industry_Tag"] || "All"),
+              entityTypeTag: String(r["Entity_Type_Tag"] || "All"),
+              ifrsReference: String(r["IFRS_Reference"] || ""),
+              taxTreatment: String(r["Tax_Treatment"] || "Normal"),
+              isControlAccount: safeBool(r["Is_Control_Account"]),
+              isSubLedger: safeBool(r["Is_Sub_Ledger"]),
+              openingBalance: String(openBal),
+              debitTotal: String(debitTotal),
+              creditTotal: String(creditTotal),
+              closingBalance: String(closing),
+              priorYearBalance: String(priorYear),
+              variance: String(variance),
+              materialityTag,
+              riskTag,
+              assertionTag,
+              relatedPartyFlag: safeBool(r["Related_Party_Flag"]),
+              cashFlowTag: String(r["Cash_Flow_Tag"] || ""),
+              mappingGlCode: String(r["Mapping_GL_Code"] || `GL-${code}`),
+              mappingFsLine: String(r["Mapping_FS_Line"] || name),
+              workingPaperCode: String(r["Working_Paper_Code"] || ""),
+              reconciliationFlag: safeBool(r["Reconciliation_Flag"]),
+              dataSource: String(r["Data_Source"] || "Imported"),
+              confidenceScore: String(confidence),
+              exceptionFlag: closingMismatch,
+              notes: String(r["Notes"] || ""),
+              displayOrder: order++,
+            });
+          }
+          if (coaInserts.length > 0) {
+            for (let i = 0; i < coaInserts.length; i += 50) {
+              await db.insert(wpMasterCoaTable).values(coaInserts.slice(i, i + 50) as any);
+            }
+          }
+          report.stages["coa_master"] = { status: "ok", count: coaInserts.length, exceptions: report.exceptions.filter(e => e.source === "COA_Master").length };
+          report.summary.totalAccounts = coaInserts.length;
+        }
+      } catch (e: any) { report.stages["coa_master"] = { status: "error", message: e.message }; }
+    }
+
+    // ══ STAGE 3: FS Extraction Staging ════════════════════════════════════════
+    if (sheetNames.includes("FS_Extraction_Staging")) {
+      try {
+        const rows = parseSheetRows(wb.Sheets["FS_Extraction_Staging"], ["Extraction_ID", "Statement_Type", "Line_Item_Text", "Amount_Current"]);
+        if (rows.length > 0) {
+          await db.delete(wpFsExtractionTable).where(eq(wpFsExtractionTable.sessionId, sessionId));
+          const inserts = rows.filter(r => r["Line_Item_Text"]).map((r, idx) => ({
+            sessionId,
+            extractionId: String(r["Extraction_ID"] || `EXT-${String(idx + 1).padStart(3, "0")}`),
+            sourceFileName: String(r["Source_File_Name"] || ""),
+            sourceFileType: String(r["Source_File_Type"] || "Excel"),
+            pageNo: safeNum(r["Page_No"]) || null,
+            statementType: String(r["Statement_Type"] || ""),
+            sectionName: String(r["Section_Name"] || ""),
+            lineItemText: String(r["Line_Item_Text"] || ""),
+            amountCurrent: String(safeNum(r["Amount_Current"])),
+            amountPrior: String(safeNum(r["Amount_Prior"])),
+            currency: String(r["Currency"] || "PKR"),
+            signConvention: String(r["Sign_Convention"] || "As Presented"),
+            extractionMethod: String(r["Extraction_Method"] || "Template"),
+            confidenceScore: String(safeNum(r["Confidence_Score"]) || 90),
+            normalizedText: String(r["Normalized_Text"] || r["Line_Item_Text"] || ""),
+            exceptionFlag: safeBool(r["Exception_Flag"]),
+            exceptionNote: String(r["Exception_Note"] || ""),
+          }));
+          if (inserts.length > 0) await db.insert(wpFsExtractionTable).values(inserts as any);
+          report.stages["fs_extraction"] = { status: "ok", count: inserts.length };
+        }
+      } catch (e: any) { report.stages["fs_extraction"] = { status: "error", message: e.message }; }
+    }
+
+    // ══ STAGE 4: FS Mapping ═══════════════════════════════════════════════════
+    if (sheetNames.includes("FS_Mapping")) {
+      try {
+        const rows = parseSheetRows(wb.Sheets["FS_Mapping"], ["Mapping_ID", "Statement_Type", "FS_Line_Item", "Account_Code"]);
+        if (rows.length > 0) {
+          await db.delete(wpFsMappingTable).where(eq(wpFsMappingTable.sessionId, sessionId));
+          const inserts = rows.filter(r => r["FS_Line_Item"] || r["Account_Code"]).map((r, idx) => ({
+            sessionId,
+            mappingId: String(r["Mapping_ID"] || `MAP-${String(idx + 1).padStart(3, "0")}`),
+            extractionId: String(r["Extraction_ID"] || ""),
+            statementType: String(r["Statement_Type"] || ""),
+            fsLineItem: String(r["FS_Line_Item"] || ""),
+            fsNoteNo: String(r["FS_Note_No"] || ""),
+            currentAmount: String(safeNum(r["Current_Amount"])),
+            priorAmount: String(safeNum(r["Prior_Amount"])),
+            accountCode: String(r["Account_Code"] || ""),
+            accountName: String(r["Account_Name"] || coaAccountMap[String(r["Account_Code"] || "")] || ""),
+            mappingFsLine: String(r["Mapping_FS_Line"] || r["FS_Line_Item"] || ""),
+            mappingMethod: String(r["Mapping_Method"] || "Manual"),
+            mappingConfidence: String(safeNum(r["Mapping_Confidence"]) || 85),
+            reconciliationFlag: safeBool(r["Reconciliation_Flag"]),
+            exceptionFlag: safeBool(r["Exception_Flag"]),
+            notes: String(r["Notes"] || ""),
+          }));
+          if (inserts.length > 0) await db.insert(wpFsMappingTable).values(inserts as any);
+          report.stages["fs_mapping"] = { status: "ok", count: inserts.length, exceptions: inserts.filter(r => r.exceptionFlag).length };
+        }
+      } catch (e: any) { report.stages["fs_mapping"] = { status: "error", message: e.message }; }
+    }
+
+    // ══ STAGE 5: Journal Import ════════════════════════════════════════════════
+    const journalsByAccount: Record<string, { debits: number; credits: number; entries: any[] }> = {};
+    if (sheetNames.includes("Journal_Import")) {
+      try {
+        const rows = parseSheetRows(wb.Sheets["Journal_Import"], ["Journal_ID", "Account_Code", "Debit_Amount", "Credit_Amount"]);
+        if (rows.length > 0) {
+          await db.delete(wpJournalImportTable).where(eq(wpJournalImportTable.sessionId, sessionId));
+          const inserts = [];
+          for (const r of rows.filter(r => r["Account_Code"])) {
+            const code = String(r["Account_Code"]).trim();
+            const debit = safeNum(r["Debit_Amount"]);
+            const credit = safeNum(r["Credit_Amount"]);
+            const baseDebit = safeNum(r["Base_Debit"]) || debit;
+            const baseCredit = safeNum(r["Base_Credit"]) || credit;
+            const narration = String(r["Narration"] || "");
+            const voucherType = String(r["Voucher_Type"] || "JV");
+            const accountName = String(r["Account_Name"] || coaAccountMap[code] || "");
+            const entryDate = excelSerialToISO(r["Entry_Date"]);
+
+            // Flag missing account in COA
+            if (code && !coaAccountMap[code] && !String(r["Account_Name"]).trim()) {
+              report.exceptions.push({ source: "Journal_Import", item: `${r["Journal_ID"]} → ${code}`, issue: "Account code not found in COA_Master", severity: "High" });
+            }
+
+            // Check double-entry balance per Journal_ID
+            const jid = String(r["Journal_ID"] || "");
+            if (!journalsByAccount[code]) journalsByAccount[code] = { debits: 0, credits: 0, entries: [] };
+            journalsByAccount[code].debits += debit;
+            journalsByAccount[code].credits += credit;
+            journalsByAccount[code].entries.push({ entryDate, narration, voucherType, debit, credit });
+
+            inserts.push({
+              sessionId,
+              journalId: String(r["Journal_ID"] || `JNL-${inserts.length + 1}`),
+              entryNo: String(r["Entry_No"] || ""),
+              entryDate,
+              period: String(r["Period"] || ""),
+              voucherType,
+              documentNo: String(r["Document_No"] || ""),
+              narration,
+              accountCode: code,
+              accountName,
+              costCenter: String(r["Cost_Center"] || ""),
+              department: String(r["Department"] || ""),
+              projectCode: String(r["Project_Code"] || ""),
+              partyCode: String(r["Party_Code"] || ""),
+              debitAmount: String(debit),
+              creditAmount: String(credit),
+              currency: String(r["Currency"] || "PKR"),
+              exchangeRate: String(safeNum(r["Exchange_Rate"]) || 1),
+              baseDebit: String(baseDebit),
+              baseCredit: String(baseCredit),
+              sourceSystem: String(r["Source_System"] || ""),
+              sourceFileName: String(r["Source_File_Name"] || ""),
+              postedFlag: safeBool(r["Posted_Flag"]) || true,
+              dataSource: String(r["Data_Source"] || "Imported"),
+              confidenceScore: String(safeNum(r["Confidence_Score"]) || 95),
+              exceptionFlag: safeBool(r["Exception_Flag"]),
+            });
+          }
+          if (inserts.length > 0) {
+            for (let i = 0; i < inserts.length; i += 100) {
+              await db.insert(wpJournalImportTable).values(inserts.slice(i, i + 100) as any);
+            }
+          }
+          report.stages["journal_import"] = { status: "ok", count: inserts.length, exceptions: inserts.filter(r => r.exceptionFlag).length };
+          report.summary.totalJournals = inserts.length;
+        }
+      } catch (e: any) { report.stages["journal_import"] = { status: "error", message: e.message }; }
+    }
+
+    // ══ STAGE 6: Generate TB from Journals ════════════════════════════════════
+    if (generateGlTb) {
+      try {
+        // Pull all journal entries for session (from import or existing GL entries)
+        const journals = await db.select().from(wpJournalImportTable).where(eq(wpJournalImportTable.sessionId, sessionId));
+        const coaRows = await db.select().from(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, sessionId));
+
+        // Aggregate journals by account code
+        const tbAgg: Record<string, { name: string; debit: number; credit: number; opening: number; priorYear: number; fsHead: string; accountType: string; normalBalance: string }> = {};
+
+        // Seed from COA opening balances
+        for (const coa of coaRows) {
+          tbAgg[coa.accountCode] = {
+            name: coa.accountName,
+            debit: safeNum(coa.debitTotal),
+            credit: safeNum(coa.creditTotal),
+            opening: safeNum(coa.openingBalance),
+            priorYear: safeNum(coa.priorYearBalance as any),
+            fsHead: coa.fsHead || "Other",
+            accountType: coa.accountType || "Asset",
+            normalBalance: coa.normalBalance || "Debit",
+          };
+        }
+
+        // Aggregate journal movements
+        for (const j of journals) {
+          const code = j.accountCode || "";
+          if (!code) continue;
+          const name = j.accountName || coaAccountMap[code] || code;
+          if (!tbAgg[code]) {
+            tbAgg[code] = { name, debit: 0, credit: 0, opening: 0, priorYear: 0, fsHead: "Other", accountType: "Asset", normalBalance: "Debit" };
+            // AI classify if not in COA and AI available
+            if (ai && useAiClassification) {
+              const cls = await aiClassifyAccount(name, ai);
+              tbAgg[code].fsHead = cls.fsHead;
+              tbAgg[code].accountType = cls.accountType;
+              tbAgg[code].normalBalance = cls.normalBalance;
+              report.exceptions.push({ source: "TB_Generation", item: code, issue: `Account ${code} (${name}) not in COA — AI classified as ${cls.fsHead}`, severity: "Low" });
+            }
+          }
+          tbAgg[code].debit += safeNum(j.baseDebit);
+          tbAgg[code].credit += safeNum(j.baseCredit);
+        }
+
+        // Clear and rebuild TB lines
+        await db.delete(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+        const tbInserts = [];
+        let totalDebit = 0; let totalCredit = 0;
+
+        for (const [code, agg] of Object.entries(tbAgg)) {
+          const opening = agg.opening;
+          const closing = opening + agg.debit - agg.credit;
+          const closingDebit = closing > 0 ? closing : 0;
+          const closingCredit = closing < 0 ? Math.abs(closing) : 0;
+          totalDebit += closingDebit; totalCredit += closingCredit;
+
+          const balanceCheck = Math.abs(closing) < 0.01 ? "ZERO" : closing > 0 ? "DEBIT" : "CREDIT";
+          tbInserts.push({
+            sessionId,
+            accountCode: code,
+            accountName: agg.name,
+            classification: agg.fsHead,
+            fsLineMapping: agg.name,
+            debit: String(closingDebit),
+            credit: String(closingCredit),
+            balance: String(closing),
+            priorYearBalance: String(agg.priorYear),
+            source: "journal_derived",
+            confidence: "95",
+            isApproved: false,
+            hasException: false,
+          });
+        }
+        if (tbInserts.length > 0) {
+          for (let i = 0; i < tbInserts.length; i += 100) {
+            await db.insert(wpTrialBalanceLinesTable).values(tbInserts.slice(i, i + 100) as any);
+          }
+        }
+        report.stages["tb_generation"] = { status: "ok", count: tbInserts.length };
+        report.summary.tbDebitTotal = totalDebit;
+        report.summary.tbCreditTotal = totalCredit;
+
+        // Check TB balance
+        if (Math.abs(totalDebit - totalCredit) > 1) {
+          report.exceptions.push({ source: "TB_Generation", item: "Trial Balance", issue: `TB out of balance: Debit=${totalDebit.toFixed(2)}, Credit=${totalCredit.toFixed(2)}, Difference=${(totalDebit - totalCredit).toFixed(2)}`, severity: "Critical" });
+        }
+
+        // ── GL: Build per-account GL from journal entries ─────────────────────
+        await db.delete(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, sessionId));
+        await db.delete(wpGlEntriesTable).where(eq(wpGlEntriesTable.sessionId, sessionId));
+
+        for (const [code, agg] of Object.entries(tbAgg)) {
+          // Insert GL account
+          const [glAcct] = await db.insert(wpGlAccountsTable).values({
+            sessionId,
+            accountCode: code,
+            accountName: agg.name,
+            accountType: agg.accountType,
+            openingBalance: String(agg.opening),
+            closingBalance: String(agg.opening + agg.debit - agg.credit),
+            totalDebit: String(agg.debit),
+            totalCredit: String(agg.credit),
+            tbDebit: String(agg.debit),
+            tbCredit: String(agg.credit),
+            isReconciled: false,
+            isSynthetic: false,
+          } as any).returning();
+
+          // Insert GL entries sorted by date
+          const acctJournals = journals
+            .filter(j => j.accountCode === code)
+            .sort((a, b) => (a.entryDate || "").localeCompare(b.entryDate || ""));
+
+          let running = agg.opening;
+          const glInserts = acctJournals.map(j => {
+            const dr = safeNum(j.baseDebit);
+            const cr = safeNum(j.baseCredit);
+            running += (dr - cr);
+            return {
+              sessionId,
+              glAccountId: glAcct?.id,
+              entryDate: j.entryDate || "",
+              voucherNo: j.documentNo || j.journalId || "",
+              narration: j.narration || `${j.voucherType} entry`,
+              debit: String(dr),
+              credit: String(cr),
+              runningBalance: String(running),
+              month: j.entryDate ? parseInt(j.entryDate.split("-")[1] || "1") : 1,
+              isSynthetic: false,
+            };
+          });
+          if (glInserts.length > 0) {
+            for (let i = 0; i < glInserts.length; i += 100) {
+              await db.insert(wpGlEntriesTable).values(glInserts.slice(i, i + 100) as any);
+            }
+          }
+        }
+        report.stages["gl_generation"] = { status: "ok", count: journals.length };
+      } catch (e: any) { report.stages["tb_generation"] = { status: "error", message: e.message }; }
+    }
+
+    // ══ STAGE 7: Audit Engine Master ══════════════════════════════════════════
+    if (sheetNames.includes("Audit_Engine_Master")) {
+      try {
+        const rows = parseSheetRows(wb.Sheets["Audit_Engine_Master"], ["Record_ID", "Engagement_ID", "Client_Name", "Risk_Level_Overall"]);
+        if (rows.length > 0) {
+          const r = rows[0];
+          const existing = await db.select().from(auditEngineMasterTable).where(eq(auditEngineMasterTable.sessionId, sessionId));
+          const masterPatch: any = {
+            sessionId,
+            overallRiskLevel: r["Risk_Level_Overall"] || "High",
+            goingConcernFlag: safeBool(r["Going_Concern_Flag"]),
+            fraudRiskFlag: safeBool(r["Fraud_Risk_Flag"]),
+            relatedPartyFlag: safeBool(r["Related_Party_Flag"]),
+            lawComplianceFlag: safeBool(r["Law_Compliance_Flag"]),
+            itSystemDependencyFlag: safeBool(r["IT_System_Flag"]),
+            groupAuditFlag: safeBool(r["Group_Audit_Flag"]),
+            isa600Flag: safeBool(r["ISA_600_Flag"]),
+            isa610Flag: safeBool(r["ISA_610_Flag"]),
+            samplingMethod: String(r["Sampling_Method"] || "MUS"),
+            materialityAmount: String(safeNum(r["Materiality_Amount"])),
+            performanceMateriality: String(safeNum(r["Performance_Materiality"])),
+            trivialityThreshold: String(safeNum(r["Triviality_Threshold"])),
+          };
+          if (existing.length === 0) await db.insert(auditEngineMasterTable).values(masterPatch);
+          else await db.update(auditEngineMasterTable).set(masterPatch).where(eq(auditEngineMasterTable.sessionId, sessionId));
+          report.stages["audit_engine_master"] = { status: "ok", count: 1 };
+        }
+      } catch (e: any) { report.stages["audit_engine_master"] = { status: "error", message: e.message }; }
+    }
+
+    // ══ STAGE 8: Reconciliation ═══════════════════════════════════════════════
+    if (runRecon) {
+      try {
+        const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+        const journals = await db.select().from(wpJournalImportTable).where(eq(wpJournalImportTable.sessionId, sessionId));
+        const fsMappings = await db.select().from(wpFsMappingTable).where(eq(wpFsMappingTable.sessionId, sessionId));
+        const coaLines = await db.select().from(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, sessionId));
+
+        const jnlTotalDr = journals.reduce((s, j) => s + safeNum(j.baseDebit), 0);
+        const jnlTotalCr = journals.reduce((s, j) => s + safeNum(j.baseCredit), 0);
+        const tbTotalDr = tbLines.reduce((s, t) => s + safeNum(t.debit as any), 0);
+        const tbTotalCr = tbLines.reduce((s, t) => s + safeNum(t.credit as any), 0);
+        const coaVsTbMismatch = coaLines.filter(c => {
+          const tb = tbLines.find(t => t.accountCode === c.accountCode);
+          if (!tb) return false;
+          return Math.abs(safeNum(c.closingBalance as any) - safeNum(tb.balance as any)) > 1;
+        }).length;
+        const fsMappingTotal = fsMappings.reduce((s, m) => s + safeNum(m.currentAmount as any), 0);
+        const fsTbRecon = tbTotalDr - tbTotalCr;
+
+        const reconChecks = [
+          { checkId: "RCN-001", checkName: "Journal debits vs journal credits", source1Value: String(jnlTotalDr), source2Value: String(jnlTotalCr), differenceOrResult: String(Math.abs(jnlTotalDr - jnlTotalCr)), status: Math.abs(jnlTotalDr - jnlTotalCr) < 1 ? "OK" : "CHECK", exceptionFlag: Math.abs(jnlTotalDr - jnlTotalCr) >= 1, owner: "Manager" },
+          { checkId: "RCN-002", checkName: "TB closing debit vs TB closing credit", source1Value: String(tbTotalDr), source2Value: String(tbTotalCr), differenceOrResult: String(Math.abs(tbTotalDr - tbTotalCr)), status: Math.abs(tbTotalDr - tbTotalCr) < 1 ? "OK" : "CHECK", exceptionFlag: Math.abs(tbTotalDr - tbTotalCr) >= 1, owner: "Manager" },
+          { checkId: "RCN-003", checkName: "COA vs TB mismatch count", source1Value: String(coaLines.length), source2Value: String(tbLines.length), differenceOrResult: String(coaVsTbMismatch), status: coaVsTbMismatch === 0 ? "OK" : "CHECK", exceptionFlag: coaVsTbMismatch > 0, owner: "Senior" },
+          { checkId: "RCN-004", checkName: "FS extraction vs mapped total", source1Value: String(fsMappingTotal), source2Value: String(fsTbRecon), differenceOrResult: String(Math.abs(fsMappingTotal - fsTbRecon)), status: Math.abs(fsMappingTotal - fsTbRecon) < 100 ? "OK" : "CHECK", exceptionFlag: Math.abs(fsMappingTotal - fsTbRecon) >= 100, owner: "Senior" },
+          { checkId: "RCN-005", checkName: "COA account count vs Journal unique accounts", source1Value: String(coaLines.length), source2Value: String(Object.keys(journalsByAccount).length), differenceOrResult: String(Math.abs(coaLines.length - Object.keys(journalsByAccount).length)), status: "INFO", exceptionFlag: false, owner: "Associate" },
+        ];
+
+        await db.delete(reconEngineTable).where(eq(reconEngineTable.sessionId, sessionId));
+        await db.insert(reconEngineTable).values(reconChecks.map(c => ({ sessionId, ...c } as any)));
+
+        const failedChecks = reconChecks.filter(c => c.status === "CHECK").length;
+        report.stages["reconciliation"] = { status: failedChecks === 0 ? "ok" : "exceptions", count: reconChecks.length, exceptions: failedChecks };
+        report.summary.reconStatus = failedChecks === 0 ? "Balanced" : `${failedChecks} check(s) failed`;
+
+        // Add recon exceptions
+        reconChecks.filter(c => c.exceptionFlag).forEach(c => {
+          report.exceptions.push({ source: "Reconciliation", item: c.checkId, issue: `${c.checkName}: difference=${c.differenceOrResult}`, severity: "Critical" });
+        });
+      } catch (e: any) { report.stages["reconciliation"] = { status: "error", message: e.message }; }
+    }
+
+    // ══ STAGE 9: WP Index & Control Matrix ════════════════════════════════════
+    if (sheetNames.includes("WP_Index")) {
+      try {
+        const rows = parseSheetRows(wb.Sheets["WP_Index"], ["WP_Code", "WP_Name", "Status"]);
+        if (rows.length > 0) {
+          // Upsert WP trigger session records
+          for (const r of rows.filter(r => r["WP_Code"])) {
+            const existing = await db.select().from(wpTriggerSessionTable)
+              .where(and(eq(wpTriggerSessionTable.sessionId, sessionId), eq(wpTriggerSessionTable.wpCode, String(r["WP_Code"]))));
+            const patch = {
+              sessionId,
+              wpCode: String(r["WP_Code"]),
+              wpName: String(r["WP_Name"] || ""),
+              isTriggered: true,
+              triggerReason: String(r["Trigger_Source"] || "Workbook Import"),
+              status: String(r["Status"] || "Pending"),
+              conclusion: String(r["Conclusion"] || ""),
+              preparedBy: String(r["Prepared_By"] || ""),
+              reviewedBy: String(r["Reviewed_By"] || ""),
+            };
+            if (existing.length === 0) await db.insert(wpTriggerSessionTable).values(patch as any);
+            else await db.update(wpTriggerSessionTable).set(patch as any).where(and(eq(wpTriggerSessionTable.sessionId, sessionId), eq(wpTriggerSessionTable.wpCode, String(r["WP_Code"]))));
+          }
+          report.stages["wp_index"] = { status: "ok", count: rows.length };
+        }
+      } catch (e: any) { report.stages["wp_index"] = { status: "error", message: e.message }; }
+    }
+
+    if (sheetNames.includes("Control_Matrix")) {
+      try {
+        const rows = parseSheetRows(wb.Sheets["Control_Matrix"], ["Process", "Control_ID", "Control_Description"]);
+        if (rows.length > 0) {
+          for (const r of rows.filter(r => r["Process"])) {
+            const existing = await db.select().from(controlMatrixTable)
+              .where(and(eq(controlMatrixTable.sessionId, sessionId), eq(controlMatrixTable.process, String(r["Process"]))));
+            const patch = {
+              sessionId,
+              process: String(r["Process"]),
+              controlId: String(r["Control_ID"] || ""),
+              controlDescription: String(r["Control_Description"] || ""),
+              frequency: String(r["Frequency"] || ""),
+              controlOwner: String(r["Control_Owner"] || ""),
+              testType: String(r["Test_Type"] || "ToC"),
+              populationSource: String(r["Population_Source"] || ""),
+              keyControlFlag: safeBool(r["Key_Control_Flag"]),
+              designEffective: String(r["Design_Effective"] || "Not Tested"),
+              operatingEffective: String(r["Operating_Effective"] || "Not Tested"),
+              notes: String(r["Notes"] || ""),
+            };
+            if (existing.length === 0) await db.insert(controlMatrixTable).values(patch as any);
+            else await db.update(controlMatrixTable).set(patch as any).where(and(eq(controlMatrixTable.sessionId, sessionId), eq(controlMatrixTable.process, String(r["Process"]))));
+          }
+          report.stages["control_matrix"] = { status: "ok", count: rows.length };
+        }
+      } catch (e: any) { report.stages["control_matrix"] = { status: "error", message: e.message }; }
+    }
+
+    // ── Final summary ─────────────────────────────────────────────────────────
+    report.summary.exceptionCount = report.exceptions.length;
+
+    // Update session stage to data_sheet if at upload stage
+    if (session.currentStage === "upload" || session.currentStage === "extraction") {
+      await db.update(wpSessionsTable).set({ currentStage: "data_sheet" }).where(eq(wpSessionsTable.id, sessionId));
+    }
+
+    return res.json({
+      success: true,
+      message: `Workbook extraction complete. ${Object.keys(report.stages).length} stages processed, ${report.summary.exceptionCount} exception(s) flagged.`,
+      report,
+    });
+  } catch (err: any) {
+    logger.error("extract-workbook error:", err);
+    res.status(500).json({ error: err.message, report });
+  }
+});
+
+// ── Get extraction report for a session ──────────────────────────────────────
+router.get("/sessions/:id/extraction-report", async (req: Request, res: Response) => {
+  const sessionId = parseInt(req.params.id);
+  try {
+    const [journals, coa, tb, glAccts, fsMappings, fsExtraction, recon, wpIndex] = await Promise.all([
+      db.select().from(wpJournalImportTable).where(eq(wpJournalImportTable.sessionId, sessionId)),
+      db.select().from(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, sessionId)),
+      db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId)),
+      db.select().from(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, sessionId)),
+      db.select().from(wpFsMappingTable).where(eq(wpFsMappingTable.sessionId, sessionId)),
+      db.select().from(wpFsExtractionTable).where(eq(wpFsExtractionTable.sessionId, sessionId)),
+      db.select().from(reconEngineTable).where(eq(reconEngineTable.sessionId, sessionId)),
+      db.select().from(wpTriggerSessionTable).where(eq(wpTriggerSessionTable.sessionId, sessionId)),
+    ]);
+    const tbDebit = tb.reduce((s, t) => s + parseFloat(String(t.debit || 0)), 0);
+    const tbCredit = tb.reduce((s, t) => s + parseFloat(String(t.credit || 0)), 0);
+    const jnlExceptions = journals.filter(j => j.exceptionFlag).length;
+    const coaExceptions = coa.filter(c => c.exceptionFlag).length;
+    const fsMappingExceptions = fsMappings.filter(f => f.exceptionFlag).length;
+    const reconFails = recon.filter(r => r.status === "CHECK").length;
+
+    res.json({
+      counts: { journals: journals.length, coaAccounts: coa.length, tbLines: tb.length, glAccounts: glAccts.length, fsMappings: fsMappings.length, fsExtractions: fsExtraction.length, reconChecks: recon.length, wpTriggered: wpIndex.filter(w => w.isTriggered).length },
+      balances: { tbDebit, tbCredit, difference: tbDebit - tbCredit, balanced: Math.abs(tbDebit - tbCredit) < 1 },
+      exceptions: { journals: jnlExceptions, coa: coaExceptions, fsMappings: fsMappingExceptions, reconFails, total: jnlExceptions + coaExceptions + fsMappingExceptions + reconFails },
+      recon,
+      fsExtraction: fsExtraction.slice(0, 50),
+      fsMappings: fsMappings.slice(0, 50),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET journal imports for session ──────────────────────────────────────────
+router.get("/sessions/:id/journal-imports", async (req: Request, res: Response) => {
+  const sessionId = parseInt(req.params.id);
+  try {
+    const rows = await db.select().from(wpJournalImportTable).where(eq(wpJournalImportTable.sessionId, sessionId)).orderBy(asc(wpJournalImportTable.entryDate));
+    res.json(rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── GET FS extraction rows for session ───────────────────────────────────────
+router.get("/sessions/:id/fs-extraction", async (req: Request, res: Response) => {
+  const sessionId = parseInt(req.params.id);
+  try {
+    const rows = await db.select().from(wpFsExtractionTable).where(eq(wpFsExtractionTable.sessionId, sessionId));
+    res.json(rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── GET FS mappings for session ───────────────────────────────────────────────
+router.get("/sessions/:id/fs-mappings", async (req: Request, res: Response) => {
+  const sessionId = parseInt(req.params.id);
+  try {
+    const rows = await db.select().from(wpFsMappingTable).where(eq(wpFsMappingTable.sessionId, sessionId));
+    res.json(rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Seed all global reference data in one call

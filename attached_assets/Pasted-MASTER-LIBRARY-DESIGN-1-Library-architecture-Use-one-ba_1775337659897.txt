@@ -1,0 +1,519 @@
+MASTER LIBRARY DESIGN
+1) Library architecture
+
+Use one backend table:
+
+WP_LIBRARY_MASTER
+Field	Purpose
+WP_Code	Unique code
+WP_Phase	Pre-engagement / Planning / Execution / Completion / Reporting / QC / Regulatory
+WP_Title	Working paper title
+WP_Category	Checklist / Memo / Lead schedule / Reconciliation / ToC / ToD / Analytics / Confirmation / Representation / Report
+ISA_Reference	Primary standard
+Secondary_Reference	Related ISA / ISQM / IESBA / Companies Act / SECP / FBR
+Trigger_Entity_Type	Pvt Ltd / Listed / SMC / LLP / Bank / Insurance / NGO / NPO / Section 42 / SOE / Branch / Project
+Trigger_Industry	Manufacturing / Trading / Services / Construction / Education / Healthcare / Financial / IT / Textile / Pharma / Real Estate / EPC / Donor-funded
+Trigger_Risk	Low / Medium / High / Fraud / Going concern / Related party / Tax / IT reliance
+Trigger_FS_Head	Revenue / Inventory / PPE / Receivables / Payables / Cash / Equity / Borrowings / Taxation
+Trigger_Control_Mode	Manual / IT-dependent / ERP / Mixed
+Trigger_Materiality	Threshold logic
+Mandatory_Flag	Yes / No
+Output_Format	Word / Excel / PDF
+Parent_WP_Code	Main file / section
+Linked_WP_Codes	Related papers
+Linked_Assertion	Existence / Completeness / Accuracy / Cut-off / Valuation / Rights / Presentation
+Linked_Audit_Procedure_Type	Risk / ToC / ToD / Analytics / External confirmation
+Linked_Evidence_Type	Invoice / GRN / Contract / Bank statement / Tax return / Board minutes
+Linked_Report_Area	Main report / CAR / Emphasis / KAM / Other legal report
+Pakistan_Law_Tag	Companies Act 2017 / Listed Regulations / NGO / Tax / Sales tax / SOE
+Reviewer_Level	Associate / Senior / Manager / Partner / EQCR
+Auto_Generate_Flag	Yes / No
+AI_Input_Source	FS / TB / GL / Variables / OCR / Tax returns
+Status	Draft / Prepared / Reviewed / Approved
+Version_No	Version control
+2) NUMBERING MODEL
+
+Use a fixed code family so backend linking stays stable:
+
+A001–A099 = Pre-engagement & continuance
+B001–B199 = Planning & risk assessment
+C001–C099 = Financial statement analytics & materiality
+D001–D199 = Internal controls, walkthroughs, IT and sampling
+E001–E499 = Substantive procedures by FS area
+F001–F099 = Completion
+G001–G099 = Reporting
+H001–H099 = Quality management, review, EQCR, archiving
+I001–I099 = Pakistan statutory / regulatory / legal compliance
+J001–J099 = Sector-specific modules
+K001–K099 = Group audit / component audit / branches
+L001–L099 = Donor / project / NGO / grant modules
+M001–M099 = Taxation, withholding, sales tax, deferred tax
+N001–N099 = Data extraction / TB / GL / mapping engine papers
+Z001–Z999 = Dynamic client-specific auto-created schedules
+
+That structure comfortably supports 1,000+ papers once risk, sector, and statutory variants are turned on.
+
+3) CORE UNIVERSAL LIBRARY
+A. Pre-engagement & continuance
+Code	Working paper	Primary reference
+A001	Client acceptance checklist	ISA 220 / ISQM
+A002	Continuance assessment	ISA 220 / ISQM
+A003	Engagement risk profile	ISA 220
+A004	Independence declaration	IESBA / ICAP ethics
+A005	Conflict check	IESBA
+A006	Engagement letter	ISA 210
+A007	Terms of audit engagement changes memo	ISA 210
+A008	Ethical threats and safeguards memo	IESBA
+A009	Predecessor auditor communication	ISA 210 / ethics
+A010	New client KYC / ownership / UBO sheet	Pakistan legal / AML overlay
+A011	Acceptance approval sheet	ISQM / firm policy
+A012	Competence and resources assessment	ISA 220
+A013	EQCR need assessment	ISQM / ISA 220
+A014	Independence for network/related firms	IESBA
+A015	Fee dependency / overdue fee review	IESBA
+B. Planning & risk
+Code	Working paper	Primary reference
+B001	Understanding entity and environment	ISA 315
+B002	Industry and regulatory environment memo	ISA 315
+B003	Applicable reporting framework assessment	ISA 200
+B004	Business model and revenue streams memo	ISA 315
+B005	Ownership, governance and TCWG map	ISA 260 / 315
+B006	Internal control environment overview	ISA 315
+B007	IT environment overview	ISA 315
+B008	Significant classes of transactions map	ISA 315
+B009	Significant account balances map	ISA 315
+B010	Disclosure requirements map	ISA 315 / 700
+B011	Risk assessment summary	ISA 315
+B012	Fraud brainstorming memo	ISA 240
+B013	Related party risk assessment	ISA 550
+B014	Laws and regulations risk memo	ISA 250
+B015	Going concern risk screen	ISA 570
+B016	Journal entry fraud risk plan	ISA 240
+B017	Presumed fraud risk in revenue	ISA 240
+B018	Significant risk register	ISA 315
+B019	Assertions mapping matrix	ISA 315
+B020	Overall audit strategy	ISA 300
+B021	Detailed audit plan	ISA 300
+B022	Team discussion record	ISA 315 / 240
+B023	Use of expert assessment	ISA 620
+B024	Internal audit reliance assessment	ISA 610
+B025	Service organization dependence memo	ISA 402
+B026	Opening balances risk assessment	ISA 510
+B027	First-year audit transition memo	ISA 510
+B028	Branches/components identification	ISA 600
+B029	Subsequent events risk planning	ISA 560
+B030	Management override response design	ISA 240
+C. Materiality & analytics
+Code	Working paper	Primary reference
+C001	Benchmark selection memo	ISA 320
+C002	Overall materiality calculation	ISA 320
+C003	Performance materiality calculation	ISA 320
+C004	Triviality threshold	ISA 320 / 450
+C005	Materiality revision memo	ISA 320
+C006	Preliminary analytical review	ISA 520
+C007	Ratio analysis sheet	ISA 520
+C008	Trend analysis sheet	ISA 520
+C009	Reasonableness test summary	ISA 520
+C010	FS line-item fluctuation commentary	ISA 520
+C011	Revenue analytics	ISA 520
+C012	Margin analytics	ISA 520
+C013	Working capital analytics	ISA 520
+C014	Cash flow analytics	ISA 520
+C015	Analytical conclusions memo	ISA 520
+D. Controls, walkthroughs, IT, sampling
+Code	Working paper	Primary reference
+D001	Process narratives master index	ISA 315
+D002	Sales walkthrough	ISA 315
+D003	Receipts walkthrough	ISA 315
+D004	Purchases walkthrough	ISA 315
+D005	Payments walkthrough	ISA 315
+D006	Payroll walkthrough	ISA 315
+D007	Inventory walkthrough	ISA 315
+D008	Fixed assets walkthrough	ISA 315
+D009	Close and reporting process walkthrough	ISA 315
+D010	ITGC overview	ISA 315
+D011	User access controls test	ISA 315
+D012	Change management controls test	ISA 315
+D013	Backup / disaster recovery test	ISA 315
+D014	Interface / spreadsheet control test	ISA 315
+D015	Key report testing sheet	ISA 315
+D016	Control reliance conclusion	ISA 330
+D017	Sampling methodology memo	ISA 530
+D018	Sample selection sheet	ISA 530
+D019	Sample evaluation sheet	ISA 530
+D020	Control deficiency log	ISA 265
+4) SUBSTANTIVE LIBRARY BY FINANCIAL STATEMENT AREA
+E100 series – Cash and bank
+E101 Lead schedule – cash and bank
+E102 Bank confirmation control sheet
+E103 Bank reconciliation testing
+E104 Cut-off testing – receipts
+E105 Cut-off testing – payments
+E106 Cash count memo
+E107 Restricted cash review
+E108 Foreign currency retranslation test
+E109 Bank covenant compliance review
+E110 Unusual transfers / kiting review
+E120 series – Receivables and revenue
+E121 Lead schedule – trade receivables
+E122 Aged receivables analysis
+E123 ECL / impairment review
+E124 External debtor confirmations
+E125 Alternate procedures for non-replies
+E126 Subsequent receipt testing
+E127 Sales cut-off testing
+E128 Credit notes after year-end review
+E129 Revenue recognition memo
+E130 Contract revenue / performance obligations
+E131 Sales returns and rebates review
+E132 Channel stuffing / side agreement fraud review
+E133 Related party sales test
+E134 Export sales testing
+E135 Unbilled revenue review
+E136 Deferred revenue review
+E140 series – Inventory and cost of sales
+E141 Lead schedule – inventory
+E142 Attendance at stock count memo
+E143 Stock count instructions review
+E144 Test counts sheet
+E145 Cut-off at warehouse / dispatch
+E146 GRN / GDN matching test
+E147 Slow-moving and obsolete inventory review
+E148 NRV testing
+E149 Standard cost / BOM review
+E150 WIP testing
+E151 Inventory held by third parties
+E152 Goods in transit review
+E153 Scrap / wastage analytics
+E154 Manufacturing variance analysis
+E155 Cost roll-forward reconciliation
+E160 series – PPE, intangible assets, ROU assets
+E161 Lead schedule – PPE
+E162 Additions testing
+E163 Disposals testing
+E164 Repairs vs capital assessment
+E165 Physical verification memo
+E166 Depreciation recalculation
+E167 CWIP review
+E168 Borrowing cost capitalization review
+E169 Impairment indicators memo
+E170 ROU asset and lease liability review
+E171 Lease contract abstraction sheet
+E172 Intangible additions testing
+E173 Amortization recalculation
+E174 Revaluation reserve review
+E175 Title documents / ownership verification
+E180 series – Payables, expenses, accruals
+E181 Lead schedule – trade payables
+E182 Supplier statement reconciliation
+E183 Supplier confirmations
+E184 Search for unrecorded liabilities
+E185 Expense cut-off testing
+E186 Accrual testing
+E187 Goods received not invoiced review
+E188 Subsequent payment testing
+E189 Related party payables review
+E190 Advances from customers testing
+E200 series – Borrowings, leases, equity
+E201 Lead schedule – borrowings
+E202 Bank / lender confirmations
+E203 Interest recalculation
+E204 Classification current vs non-current
+E205 Covenant breach review
+E206 Security / charge documents review
+E207 Share capital reconciliation
+E208 Board approval for allotment / issue
+E209 Dividend compliance review
+E210 OCI / reserves review
+E211 Lease liability amortization test
+E220 series – Taxation
+E221 Current tax provision review
+E222 Deferred tax computation
+E223 Reconciliation with tax return
+E224 Minimum tax / final tax / super tax review
+E225 Withholding tax payable reconciliation
+E226 Sales tax payable / receivable reconciliation
+E227 Input / output sales tax test
+E228 Advance tax review
+E229 Tax contingencies memo
+E230 Correspondence with tax authorities log
+E240 series – Provisions, contingencies, subsequent events, going concern
+E241 Legal letter control sheet
+E242 Provision testing
+E243 Litigation and claims review
+E244 Warranty provision review
+E245 Subsequent events checklist | ISA 560 |
+E246 Going concern cash flow challenge memo
+E247 Financing support / sponsor support review
+E248 Going concern disclosure adequacy review
+E249 Management plans evaluation
+E250 Written representations linkage sheet
+E260 series – Financial instruments, investments, consolidation
+E261 Investment existence and valuation
+E262 Subsidiary / associate status assessment
+E263 Impairment of investments
+E264 Fair value source hierarchy review
+E265 Related party funding arrangements
+E266 Consolidation worksheet review
+E267 Intercompany elimination testing
+E268 NCI calculation sheet
+E269 Equity-accounted investee review
+E270 Component auditor communication sheet
+5) COMPLETION AND REPORTING
+F. Completion
+Code	Working paper	Primary reference
+F001	Summary of unadjusted misstatements	ISA 450
+F002	Adjusted misstatements log	ISA 450
+F003	Final analytics	ISA 520
+F004	Disclosure checklist	ISA 700
+F005	Going concern final conclusion	ISA 570
+F006	Subsequent events final conclusion	ISA 560
+F007	Related party final conclusion	ISA 550
+F008	Fraud final conclusion	ISA 240
+F009	Laws and regulations final conclusion	ISA 250
+F010	Written representations checklist	ISA 580
+F011	Management representation letter	ISA 580
+F012	Engagement completion checklist	ISA 230
+F013	Review notes clearance log	ISA 230
+F014	Partner completion memo	ISA 220
+F015	Final TB/FS tie-up sheet	ISA 230
+G. Reporting
+Code	Working paper	Primary reference
+G001	Opinion decision tree	ISA 700 / 705 / 706
+G002	Auditor’s report draft	ISA 700
+G003	Modified opinion memo	ISA 705
+G004	EOM / OMP memo	ISA 706
+G005	KAM determination memo	ISA 701
+G006	Other information review	ISA 720
+G007	TCWG communication	ISA 260
+G008	Internal control deficiencies letter	ISA 265
+G009	Management letter	firm / governance
+G010	Pakistan statutory reporting annexures	local law
+H. Quality management, EQCR, archiving
+Code	Working paper	Primary reference
+H001	Engagement quality review checklist	ISA 220 / ISQM
+H002	Consultation memo	ISQM
+H003	Differences of opinion sheet	ISQM
+H004	Reviewer sign-off matrix	ISA 220
+H005	Assembly and archiving checklist	ISA 230
+H006	Post-issuance change log	ISA 230
+H007	Confidentiality and retention checklist	ISQM
+H008	Inspection readiness file index	ISQM
+H009	Independence completion reconfirmation	IESBA
+H010	Engagement lessons learned memo	firm QM
+6) PAKISTAN-SPECIFIC MODULES
+
+ICAP has issued guidance and reporting formats for various Pakistan contexts, including audit reporting guidance and SOE-related illustrative reporting.
+
+I. Pakistan legal / regulatory papers
+I001 Companies Act compliance checklist
+I002 SECP filing and corporate records review
+I003 Board minutes and statutory registers review
+I004 Withholding tax compliance checklist
+I005 Sales tax compliance checklist
+I006 EOBI / social security / payroll dues checklist
+I007 Related party disclosures under local law checklist
+I008 Listed company code / governance checklist
+I009 Public interest entity overlay checklist
+I010 SOE audit reporting checklist
+I011 Branch office / liaison office legal compliance
+I012 Section 42 / NPO statutory compliance
+I013 Donor restriction and grant compliance
+I014 Prudential / sector regulator compliance map
+I015 Beneficial ownership / AML documentation review
+7) SECTOR-SPECIFIC EXTENSION MODULES
+J100 Manufacturing
+production planning walkthrough
+BOM and standard cost review
+yield / wastage analysis
+overhead absorption review
+WIP stage-of-completion test
+batch costing test
+excisable / regulated goods review where applicable
+J200 Trading / retail
+SKU margin analytics
+shrinkage review
+inventory location controls
+consignment inventory review
+promotional discount / rebate testing
+return reserve testing
+POS and cash collection control papers
+J300 Services / consultancy / IT
+timesheet and billing review
+milestone revenue testing
+deferred revenue testing
+contract modification review
+utilization analytics
+project profitability review
+J400 Construction / EPC / developers
+contract cost accumulation
+IPC / work certification review
+retention money testing
+claim / variation order review
+contract asset / liability testing
+site stock / project inventory testing
+land and development cost testing
+J500 Education / healthcare
+tuition / fee revenue recognition
+receivables aging by student/patient
+grant and restricted funding review
+pharmacy / consumables stock
+payroll and consultant doctor payments
+endowment / donation compliance
+J600 Banks / NBFIs / financial institutions
+loan book existence and classification
+impairment staging / provisioning
+accrued markup review
+treasury / investment valuation
+regulatory returns tie-up
+branch reconciliation review
+J700 NGOs / NPOs / Section 42 / donor entities
+donor agreement abstraction
+fund-wise trial balance
+restricted vs unrestricted funds
+grant income recognition
+project expenditure eligibility testing
+procurement compliance testing
+utilization certificate support papers
+J800 Textile / export / pharma / regulated sectors
+export rebate / incentive testing
+quota / license / GMP / DRAP-type compliance as applicable
+batch traceability
+wastage norms
+forex realization review
+consignment export review
+8) GROUP AUDIT / COMPONENT / BRANCH MODULES
+
+IAASB’s 2023–2024 handbook includes ISA 600 (Revised), and the 2025 handbook is the current edition.
+
+K001 group structure memo
+K002 component significance assessment
+K003 component auditor instructions
+K004 consolidation risk assessment
+K005 component materiality sheet
+K006 component reporting template
+K007 intercompany balance circularization
+K008 elimination testing
+K009 branch visit memo
+K010 group completion communication
+9) DYNAMIC BACKEND LOGIC FOR 1,000+ WPS
+
+The 1,000+ library should not be hardcoded as one flat list only. It should be generated from these multipliers:
+
+Base universal library
+
+Approx. 180–250 papers
+
+By FS head
+
+Each major FS head adds 10–25 papers
+
+By risk
+
+Each high-risk area adds 5–15 papers
+
+By entity type
+
+Each entity type adds 20–80 papers
+
+By sector
+
+Each sector adds 30–120 papers
+
+By reporting/regulatory overlay
+
+Listed / SOE / NGO / branch / group / tax-complex entities add 20–100 papers
+
+That is how the system reaches 1,000+ logically linked papers without clutter.
+
+10) BACKEND TRIGGER EXAMPLE
+Example rule
+
+If:
+
+Entity_Type = Private Limited
+Industry = Manufacturing
+Inventory > materiality
+Revenue high risk = Yes
+ERP = Yes
+Related party = Yes
+Going concern = No
+
+Then auto-activate:
+
+A001–A015
+B001–B030
+C001–C015
+D001–D020
+E121–E155
+E181–E189
+E201–E211
+E221–E230
+F001–F015
+G001–G010
+H001–H010
+I001–I007
+J100 manufacturing module
+11) RECOMMENDED MINIMUM MASTER FILES
+
+For the backend, create these linked tables:
+
+WP_LIBRARY_MASTER
+WP_TRIGGER_RULES
+WP_ASSERTION_MAP
+WP_FS_HEAD_LINK
+WP_SECTOR_OVERLAY
+WP_ENTITY_OVERLAY
+WP_REPORTING_OVERLAY
+WP_EVIDENCE_REQUIREMENTS
+WP_SIGNOFF_MATRIX
+WP_TEMPLATE_LIBRARY
+12) IMPORTANT PAKISTAN POSITION
+
+ICAP documents repeatedly frame audit work in Pakistan around “ISAs as applicable in Pakistan”, and ICAP has also issued local guidance, including auditor reporting formats and specific guidance for SOEs.
+
+Also, IAASB’s separate ISA for Audits of Less Complex Entities exists and is effective for audits beginning on or after December 15, 2025 in jurisdictions that adopt or permit it; whether and how it is used in Pakistan depends on local adoption/permission.
+
+13) BEST PRACTICAL OUTPUT FOR YOUR SYSTEM
+
+For your working paper generator, the best deliverable is:
+
+a) Master Library Index
+
+All possible papers with fixed codes
+
+b) Trigger Matrix
+
+Which variables activate which papers
+
+c) Template Matrix
+
+Word / Excel template linked to each paper
+
+d) Evidence Matrix
+
+What support is required for each paper
+
+e) Sign-off Matrix
+
+Prepared / reviewed / approved logic
+
+14) READY-TO-USE SHORT MASTER INDEX
+
+Use this as your fixed backend family count:
+
+A001–A050 Pre-engagement
+B001–B080 Planning & risk
+C001–C030 Materiality & analytics
+D001–D060 Controls, walkthroughs, IT, sampling
+E101–E399 Substantive by FS area
+F001–F030 Completion
+G001–G030 Reporting
+H001–H030 Quality / EQCR / archiving
+I001–I050 Pakistan legal / tax / compliance
+J001–J200 Sector overlays
+K001–K040 Group / branch / component
+L001–L060 NGO / donor / project
+M001–M060 Tax detailed schedules
+N001–N040 TB / GL / FS reconciliation / extraction
+Z001–Z999 Client-specific auto schedules
