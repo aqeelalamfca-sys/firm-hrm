@@ -2420,7 +2420,7 @@ router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Re
         }).where(eq(wpHeadsTable.id, head.id));
 
         // Step 3: Auto-resolve all exceptions
-        await db.update(wpExceptionLogTable).set({ status: "resolved", resolution: "Auto-resolved during auto-process" })
+        await db.update(wpExceptionLogTable).set({ status: "cleared", resolution: "Auto-resolved during auto-process" })
           .where(and(eq(wpExceptionLogTable.sessionId, sessionId), eq(wpExceptionLogTable.headIndex, hi), eq(wpExceptionLogTable.status, "open")));
 
         // Step 4: Approve
@@ -2482,7 +2482,7 @@ router.post("/sessions/:id/heads/:headIndex/approve", async (req: Request, res: 
       status: "approved", approvedAt: new Date(), updatedAt: new Date(),
     }).where(eq(wpHeadsTable.id, heads[0].id));
 
-    await db.update(wpExceptionLogTable).set({ status: "resolved", resolution: "Approved by reviewer" })
+    await db.update(wpExceptionLogTable).set({ status: "cleared", resolution: "Approved by reviewer" })
       .where(and(eq(wpExceptionLogTable.sessionId, sessionId), eq(wpExceptionLogTable.headIndex, headIndex), eq(wpExceptionLogTable.status, "open")));
 
     const nextHeadIndex = headIndex + 1;

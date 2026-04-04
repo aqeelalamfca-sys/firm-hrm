@@ -103,6 +103,7 @@ export default function WorkingPapers() {
   const [editingVar, setEditingVar] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
   const [editReason, setEditReason] = useState("");
+  const [showExceptionsPanel, setShowExceptionsPanel] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -571,6 +572,46 @@ export default function WorkingPapers() {
     } catch {}
   };
 
+  const resolveException = async (excId: number, status: string, resolution?: string) => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/exceptions/${excId}`, {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ status, resolution: resolution || `Manually ${status} by user` }),
+      });
+      if (res.ok) {
+        toast({ title: `Exception ${status}` });
+        await fetchExceptions();
+      } else {
+        const err = await res.json();
+        toast({ title: "Failed to update exception", description: err.error, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Failed to update exception", variant: "destructive" });
+    }
+  };
+
+  const resolveAllExceptions = async () => {
+    if (!activeSession) return;
+    const openExcs = exceptions.filter((e: any) => e.status === "open");
+    if (openExcs.length === 0) return;
+    setLoading(true);
+    try {
+      for (const exc of openExcs) {
+        await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/exceptions/${exc.id}`, {
+          method: "PATCH",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "cleared", resolution: "Bulk cleared by user" }),
+        });
+      }
+      toast({ title: `${openExcs.length} exceptions cleared` });
+      await fetchExceptions();
+    } catch {
+      toast({ title: "Failed to clear exceptions", variant: "destructive" });
+    } finally { setLoading(false); }
+  };
+
   const confidenceBadge = (conf: number | null) => {
     if (conf === null || conf === undefined) return null;
     const c = Number(conf);
@@ -857,9 +898,9 @@ export default function WorkingPapers() {
                   )}
                 </div>
               </div>
-              <button onClick={() => fetchExceptions()} className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 transition-colors text-xs font-medium border border-amber-400/20">
+              <button onClick={() => { fetchExceptions(); setShowExceptionsPanel(!showExceptionsPanel); }} className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 transition-colors text-xs font-medium border border-amber-400/20">
                 <AlertTriangle className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Exceptions</span> ({exceptions.length})
+                <span className="hidden sm:inline">Exceptions</span> ({exceptions.filter((e: any) => e.status === "open").length})
               </button>
             </div>
           </div>
@@ -897,6 +938,65 @@ export default function WorkingPapers() {
           </div>
         </div>
       </div>
+
+      {showExceptionsPanel && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
+          <div className="bg-white border border-amber-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50/50 px-5 py-3 border-b border-amber-200/60 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+                <h3 className="font-semibold text-slate-900">Exception Log</h3>
+                <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium">{exceptions.filter((e: any) => e.status === "open").length} open</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {exceptions.filter((e: any) => e.status === "open").length > 0 && (
+                  <Button variant="outline" size="sm" onClick={resolveAllExceptions} disabled={loading} className="h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-50">
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Clear All
+                  </Button>
+                )}
+                <button onClick={() => setShowExceptionsPanel(false)} className="text-slate-400 hover:text-slate-600 p-1">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+              {exceptions.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-sm">No exceptions recorded</div>
+              ) : (
+                exceptions.map((exc: any) => (
+                  <div key={exc.id} className={cn("px-5 py-3 flex items-start gap-3 transition-colors", exc.status === "open" ? "bg-white" : "bg-slate-50/50")}>
+                    <div className={cn("w-2 h-2 rounded-full mt-1.5 shrink-0", exc.status === "open" ? "bg-amber-500" : "bg-green-500")} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium text-slate-900">{exc.title}</span>
+                        <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-medium",
+                          exc.severity === "high" ? "bg-red-100 text-red-700" :
+                          exc.severity === "medium" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
+                        )}>{exc.severity}</span>
+                        {exc.headIndex !== null && exc.headIndex !== undefined && (
+                          <span className="text-[10px] text-slate-500">Head {exc.headIndex}</span>
+                        )}
+                        <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-medium capitalize",
+                          exc.status === "open" ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"
+                        )}>{exc.status?.replace(/_/g, " ")}</span>
+                      </div>
+                      {exc.description && <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{exc.description}</p>}
+                      {exc.resolution && <p className="text-xs text-emerald-600 mt-0.5">{exc.resolution}</p>}
+                    </div>
+                    {exc.status === "open" && (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button onClick={() => resolveException(exc.id, "cleared")} className="text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200 font-medium transition-colors">Clear</button>
+                        <button onClick={() => resolveException(exc.id, "override_approved")} className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 font-medium transition-colors">Override</button>
+                        <button onClick={() => resolveException(exc.id, "deferred")} className="text-xs px-2 py-1 rounded bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium transition-colors">Defer</button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-5">
 
@@ -972,8 +1072,9 @@ export default function WorkingPapers() {
           onApprove={approveHead}
           onExport={exportHead}
           onAutoProcessAll={autoProcessAll}
+          onResolveException={resolveException}
           loading={loading}
-          onRefresh={() => fetchSession(activeSession.id)}
+          onRefresh={() => { fetchSession(activeSession.id); fetchExceptions(); }}
         />
       )}
 
@@ -984,21 +1085,22 @@ export default function WorkingPapers() {
           exceptions={exceptions}
           onExportHead={exportHead}
           onExportBundle={exportBundle}
+          onResolveException={resolveException}
           onRefresh={() => { fetchSession(activeSession.id); fetchExceptions(); }}
           loading={loading}
         />
       )}
 
-      {exceptions.length > 0 && stage !== "generation" && stage !== "export" && (
-        <div className="fixed bottom-4 right-4 z-50">
-          <div className="bg-white border border-amber-200 rounded-xl p-3.5 shadow-xl shadow-amber-100/50 max-w-xs backdrop-blur-sm">
+      {exceptions.filter((e: any) => e.status === "open").length > 0 && !showExceptionsPanel && stage !== "generation" && stage !== "export" && (
+        <div className="fixed bottom-4 right-4 z-50 cursor-pointer" onClick={() => { fetchExceptions(); setShowExceptionsPanel(true); }}>
+          <div className="bg-white border border-amber-200 rounded-xl p-3.5 shadow-xl shadow-amber-100/50 max-w-xs backdrop-blur-sm hover:shadow-amber-200/70 transition-shadow">
             <div className="flex items-center gap-2.5 text-amber-800 text-sm font-medium">
               <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
                 <AlertTriangle className="w-4 h-4 text-amber-600" />
               </div>
               <div>
                 <p className="font-semibold text-sm">{exceptions.filter((e: any) => e.status === "open").length} open exceptions</p>
-                <p className="text-[11px] text-amber-600/80 font-normal">Click Exceptions button to review</p>
+                <p className="text-[11px] text-amber-600/80 font-normal">Click to review & resolve</p>
               </div>
             </div>
           </div>
@@ -1467,8 +1569,8 @@ function pillColor(val: string): string {
   return "bg-slate-100 text-slate-700 border-slate-200";
 }
 function statusColor(val: string): string {
-  const v = (val || "").toLowerCase();
-  if (["completed","exported","approved","locked","reviewed"].includes(v)) return "bg-green-100 text-green-800 border-green-300";
+  const v = (val || "").toLowerCase().replace(/_/g, " ");
+  if (["completed","exported","approved","locked","reviewed","arranged data"].includes(v)) return "bg-green-100 text-green-800 border-green-300";
   if (["in review","review","validating","in progress","pending","variables","generation"].includes(v)) return "bg-blue-100 text-blue-800 border-blue-300";
   if (["draft","upload","extraction","ready"].includes(v)) return "bg-slate-100 text-slate-700 border-slate-300";
   if (["reopened","exception","overdue","export"].includes(v)) return "bg-amber-100 text-amber-800 border-amber-300";
@@ -2204,7 +2306,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
   );
 }
 
-function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, onExport, onAutoProcessAll, loading, onRefresh }: any) {
+function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, onExport, onAutoProcessAll, onResolveException, loading, onRefresh }: any) {
   const allExceptions: any[] = exceptions || [];
   const allHeads: any[] = heads || [];
   const [approvalInProgress, setApprovalInProgress] = useState(false);
@@ -2508,10 +2610,13 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
                               <span className={cn("mt-0.5 w-2 h-2 rounded-full shrink-0",
                                 exc.severity === "critical" ? "bg-red-500" : exc.severity === "high" ? "bg-orange-500" : exc.severity === "medium" ? "bg-amber-500" : "bg-blue-400"
                               )} />
-                              <div className="min-w-0">
+                              <div className="flex-1 min-w-0">
                                 <span className="font-medium text-slate-700">{exc.title}</span>
                                 {exc.description && <span className="text-slate-500 ml-1">— {exc.description}</span>}
                               </div>
+                              {onResolveException && (
+                                <button onClick={() => onResolveException(exc.id, "cleared")} className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 hover:bg-green-200 font-medium">Clear</button>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -2528,7 +2633,7 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
   );
 }
 
-function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle, onRefresh, loading }: any) {
+function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle, onResolveException, onRefresh, loading }: any) {
   const completedHeads = (heads || []).filter((h: any) => ["approved", "exported", "completed"].includes(h.status));
   const openExceptions = (exceptions || []).filter((e: any) => e.status === "open");
   const totalHeads = (heads || []).length;
@@ -2645,13 +2750,21 @@ function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle,
           <div className="p-4 space-y-2 max-h-60 overflow-y-auto">
             {openExceptions.map((exc: any) => (
               <div key={exc.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <div className="flex items-center gap-2">
-                  <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide",
-                    exc.severity === "critical" ? "bg-red-100 text-red-800 border border-red-200" :
-                    exc.severity === "high" ? "bg-orange-100 text-orange-800 border border-orange-200" :
-                    "bg-yellow-100 text-yellow-800 border border-yellow-200"
-                  )}>{exc.severity}</span>
-                  <span className="text-sm font-medium text-slate-800">{exc.title}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide shrink-0",
+                      exc.severity === "critical" ? "bg-red-100 text-red-800 border border-red-200" :
+                      exc.severity === "high" ? "bg-orange-100 text-orange-800 border border-orange-200" :
+                      "bg-yellow-100 text-yellow-800 border border-yellow-200"
+                    )}>{exc.severity}</span>
+                    <span className="text-sm font-medium text-slate-800">{exc.title}</span>
+                  </div>
+                  {onResolveException && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button onClick={() => onResolveException(exc.id, "cleared")} className="text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200 font-medium">Clear</button>
+                      <button onClick={() => onResolveException(exc.id, "override_approved")} className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 font-medium">Override</button>
+                    </div>
+                  )}
                 </div>
                 {exc.description && <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{exc.description}</p>}
               </div>
