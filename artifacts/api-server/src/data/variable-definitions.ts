@@ -105,7 +105,7 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("company_secretary", "Ownership & Governance", "Key Personnel", "Company Secretary", { dataType: "text", inputMode: "text", aiExtractableFlag: AI, displayOrder: 12 }),
   v("audit_committee_exists", "Ownership & Governance", "Governance Bodies", "Audit Committee Exists", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 260", displayOrder: 13 }),
   v("internal_audit_function_exists", "Ownership & Governance", "Governance Bodies", "Internal Audit Function", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 610", displayOrder: 14 }),
-  v("governance_level", "Ownership & Governance", "Governance Bodies", "Governance Level", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Strong","Adequate","Weak","Not Assessed"]), displayOrder: 15 }),
+  v("governance_level", "Ownership & Governance", "Governance Bodies", "Governance Level", { dataType: "text", inputMode: "rating_level", dropdownOptionsJson: dd(["Strong","Adequate","Weak","Not Assessed"]), displayOrder: 15 }),
   v("key_management_personnel", "Ownership & Governance", "Key Personnel", "Key Management Personnel", { dataType: "text", inputMode: "textarea", displayOrder: 16 }),
   v("related_parties_exist", "Ownership & Governance", "Related Parties", "Related Parties Exist", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 550", affectsWorkingPapersJson: ["related_parties"], displayOrder: 17 }),
   v("related_parties_list", "Ownership & Governance", "Related Parties", "Related Parties List", { dataType: "textarea", inputMode: "textarea", displayOrder: 18 }),
@@ -130,8 +130,8 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("conflict_check_completed", "Engagement Acceptance", "Ethics", "Conflict Check Completed", { dataType: "boolean", inputMode: "toggle", displayOrder: 11 }),
   v("engagement_letter_signed", "Engagement Acceptance", "Terms", "Engagement Letter Signed", { dataType: "boolean", inputMode: "toggle", mandatoryFlag: M, standardReference: "ISA 210", displayOrder: 12 }),
   v("terms_of_engagement_agreed", "Engagement Acceptance", "Terms", "Terms of Engagement Agreed", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 210", displayOrder: 13 }),
-  v("management_integrity_risk", "Engagement Acceptance", "Risk", "Management Integrity Risk", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Low","Medium","High"]), reviewRequiredFlag: RV, displayOrder: 14 }),
-  v("client_risk_category", "Engagement Acceptance", "Risk", "Client Risk Category", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Low","Medium","High"]), displayOrder: 15 }),
+  v("management_integrity_risk", "Engagement Acceptance", "Risk", "Management Integrity Risk", { dataType: "text", inputMode: "risk_level", dropdownOptionsJson: dd(["Low","Medium","High"]), reviewRequiredFlag: RV, displayOrder: 14 }),
+  v("client_risk_category", "Engagement Acceptance", "Risk", "Client Risk Category", { dataType: "text", inputMode: "risk_level", dropdownOptionsJson: dd(["Low","Medium","High"]), displayOrder: 15 }),
   v("restricted_scope_flag", "Engagement Acceptance", "Scope", "Restricted Scope", { dataType: "boolean", inputMode: "toggle", affectsWorkingPapersJson: ["reporting"], displayOrder: 16 }),
   v("eqcr_required", "Engagement Acceptance", "Quality", "EQCR Required", { dataType: "boolean", inputMode: "toggle", standardReference: "ISQM 1 / ISA 220", affectsWorkingPapersJson: ["eqcr"], displayOrder: 17 }),
   v("specialist_required", "Engagement Acceptance", "Resources", "Specialist Required", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 620", displayOrder: 18 }),
@@ -163,10 +163,10 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("tax_records_available", "Accounting & Records", "Availability", "Tax Records Available", { dataType: "boolean", inputMode: "toggle", displayOrder: 13 }),
   v("bank_statements_available", "Accounting & Records", "Availability", "Bank Statements Available", { dataType: "boolean", inputMode: "toggle", displayOrder: 14 }),
   v("voucher_support_available", "Accounting & Records", "Availability", "Voucher Support Available", { dataType: "boolean", inputMode: "toggle", displayOrder: 15 }),
-  v("digital_document_quality", "Accounting & Records", "Quality", "Digital Document Quality", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Excellent","Good","Fair","Poor"]), displayOrder: 16 }),
+  v("digital_document_quality", "Accounting & Records", "Quality", "Digital Document Quality", { dataType: "text", inputMode: "rating_level", dropdownOptionsJson: dd(["Excellent","Good","Fair","Poor"]), displayOrder: 16 }),
   v("ocr_quality_score", "Accounting & Records", "Quality", "OCR Quality Score", { dataType: "number", inputMode: "percentage", aiExtractableFlag: AI, displayOrder: 17 }),
   v("missing_records_flag", "Accounting & Records", "Quality", "Missing Records", { dataType: "boolean", inputMode: "toggle", reviewRequiredFlag: RV, displayOrder: 18 }),
-  v("records_reliability_score", "Accounting & Records", "Quality", "Records Reliability Score", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["High","Medium","Low"]), reviewRequiredFlag: RV, displayOrder: 19 }),
+  v("records_reliability_score", "Accounting & Records", "Quality", "Records Reliability Score", { dataType: "text", inputMode: "risk_level", dropdownOptionsJson: dd(["High","Medium","Low"]), reviewRequiredFlag: RV, displayOrder: 19 }),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GROUP 5 — Trial Balance & COA Structure
@@ -378,8 +378,8 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("subsequent_events_review_done", "Audit Evidence", "Subsequent Events", "Subsequent Events Reviewed", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 560", displayOrder: 12 }),
   v("minutes_review_done", "Audit Evidence", "Minutes", "Minutes Review Done", { dataType: "boolean", inputMode: "toggle", displayOrder: 13 }),
   v("journal_testing_done", "Audit Evidence", "Journal Testing", "Journal Testing Done", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 240.32", displayOrder: 14 }),
-  v("evidence_sufficiency_rating", "Audit Evidence", "Assessment", "Evidence Sufficiency Rating", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Sufficient","Insufficient"]), standardReference: "ISA 330.26", displayOrder: 15 }),
-  v("evidence_appropriateness_rating", "Audit Evidence", "Assessment", "Evidence Appropriateness Rating", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Appropriate","Inappropriate"]), standardReference: "ISA 500.7", displayOrder: 16 }),
+  v("evidence_sufficiency_rating", "Audit Evidence", "Assessment", "Evidence Sufficiency Rating", { dataType: "text", inputMode: "pass_fail", dropdownOptionsJson: dd(["Sufficient","Insufficient"]), standardReference: "ISA 330.26", displayOrder: 15 }),
+  v("evidence_appropriateness_rating", "Audit Evidence", "Assessment", "Evidence Appropriateness Rating", { dataType: "text", inputMode: "pass_fail", dropdownOptionsJson: dd(["Appropriate","Inappropriate"]), standardReference: "ISA 500.7", displayOrder: 16 }),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GROUP 16 — Going Concern
@@ -394,7 +394,7 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("gc_financial_support_available", "Going Concern", "Support", "Financial Support Available", { dataType: "boolean", inputMode: "toggle", displayOrder: 8 }),
   v("gc_material_uncertainty_flag", "Going Concern", "Assessment", "Material Uncertainty", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 570.18", reviewRequiredFlag: RV, affectsWorkingPapersJson: ["reporting"], displayOrder: 9 }),
   v("gc_disclosure_adequate_flag", "Going Concern", "Disclosure", "GC Disclosure Adequate", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 570.20", displayOrder: 10 }),
-  v("going_concern_conclusion", "Going Concern", "Conclusion", "Going Concern Conclusion", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["No Material Uncertainty","Material Uncertainty — Adequate Disclosure","Material Uncertainty — Inadequate Disclosure","Inappropriate Basis"]), standardReference: "ISA 570", reviewRequiredFlag: RV, displayOrder: 11 }),
+  v("going_concern_conclusion", "Going Concern", "Conclusion", "Going Concern Conclusion", { dataType: "text", inputMode: "conclusion", dropdownOptionsJson: dd(["No Material Uncertainty","Material Uncertainty — Adequate Disclosure","Material Uncertainty — Inadequate Disclosure","Inappropriate Basis"]), standardReference: "ISA 570", reviewRequiredFlag: RV, displayOrder: 11 }),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GROUP 17 — Misstatements & Adjustments
@@ -424,7 +424,7 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("mrl_signed", "Completion & Reporting", "MRL", "MRL Signed", { dataType: "boolean", inputMode: "toggle", mandatoryFlag: M, standardReference: "ISA 580", displayOrder: 9 }),
   v("fs_disclosures_reviewed", "Completion & Reporting", "Disclosures", "FS Disclosures Reviewed", { dataType: "boolean", inputMode: "toggle", displayOrder: 10 }),
   v("report_type", "Completion & Reporting", "Report", "Report Type", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Independent Auditor's Report","Review Report","Compilation Report"]), mandatoryFlag: M, displayOrder: 11 }),
-  v("audit_opinion", "Completion & Reporting", "Opinion", "Audit Opinion", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Unmodified","Qualified","Adverse","Disclaimer"]), mandatoryFlag: M, standardReference: "ISA 700/705", reviewRequiredFlag: RV, displayOrder: 12 }),
+  v("audit_opinion", "Completion & Reporting", "Opinion", "Audit Opinion", { dataType: "text", inputMode: "conclusion", dropdownOptionsJson: dd(["Unmodified","Qualified","Adverse","Disclaimer"]), mandatoryFlag: M, standardReference: "ISA 700/705", reviewRequiredFlag: RV, displayOrder: 12 }),
   v("emphasis_of_matter_flag", "Completion & Reporting", "Paragraphs", "Emphasis of Matter", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 706", displayOrder: 13 }),
   v("other_matter_flag", "Completion & Reporting", "Paragraphs", "Other Matter", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 706", displayOrder: 14 }),
   v("key_audit_matters_flag", "Completion & Reporting", "KAM", "Key Audit Matters", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 701", displayOrder: 15 }),
@@ -460,11 +460,11 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("approver_name", "Workflow & Sign-offs", "Approver", "Approver Name", { dataType: "text", inputMode: "text", displayOrder: 7 }),
   v("approver_designation", "Workflow & Sign-offs", "Approver", "Approver Designation", { dataType: "text", inputMode: "text", displayOrder: 8 }),
   v("approval_date", "Workflow & Sign-offs", "Approver", "Approval Date", { dataType: "date", inputMode: "date", displayOrder: 9 }),
-  v("variable_pack_status", "Workflow & Sign-offs", "Status", "Variable Pack Status", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Draft","In Review","Reviewed","Locked","Reopened"]), defaultValue: "Draft", displayOrder: 10 }),
+  v("variable_pack_status", "Workflow & Sign-offs", "Status", "Variable Pack Status", { dataType: "text", inputMode: "status", dropdownOptionsJson: dd(["Draft","In Review","Reviewed","Locked","Reopened"]), defaultValue: "Draft", displayOrder: 10 }),
   v("variable_pack_locked", "Workflow & Sign-offs", "Status", "Variable Pack Locked", { dataType: "boolean", inputMode: "toggle", displayOrder: 11 }),
   v("lock_reason", "Workflow & Sign-offs", "Status", "Lock Reason", { dataType: "text", inputMode: "textarea", displayOrder: 12 }),
   v("reopen_reason", "Workflow & Sign-offs", "Status", "Reopen Reason", { dataType: "text", inputMode: "textarea", displayOrder: 13 }),
-  v("current_stage", "Workflow & Sign-offs", "Progress", "Current Stage", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Upload","Extraction","Variables","Generation","Export","Completed"]), displayOrder: 14 }),
+  v("current_stage", "Workflow & Sign-offs", "Progress", "Current Stage", { dataType: "text", inputMode: "status", dropdownOptionsJson: dd(["Upload","Extraction","Variables","Generation","Export","Completed"]), displayOrder: 14 }),
   v("current_substage", "Workflow & Sign-offs", "Progress", "Current Substage", { dataType: "text", inputMode: "text", displayOrder: 15 }),
 ];
 

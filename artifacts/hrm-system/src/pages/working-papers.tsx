@@ -5,10 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
-  Upload, FileSpreadsheet, FileText, CheckCircle2, AlertTriangle, Lock, Unlock,
+  Upload, FileText, CheckCircle2, AlertTriangle, Lock,
   ChevronRight, ChevronDown, Download, Loader2, Play, Eye, Shield, X, Plus,
   ArrowLeft, ArrowRight, RefreshCw, AlertCircle, Check, Clock, Settings2,
-  FileCheck, Layers, BarChart3, ClipboardCheck, Pencil, Save,
+  FileCheck, Layers, ClipboardCheck, Pencil, Save, Mail, Phone,
+  Globe, EyeOff, Calendar, Tag, Sparkles, Bot, Zap,
+  Info, AlertOctagon, Calculator, CircleDot,
+  ExternalLink, Gauge,
 } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
@@ -1144,184 +1147,470 @@ function normalizeNumeric(val: string | number | null | undefined): number | nul
   const n = parseFloat(cleaned);
   return isNaN(n) ? null : n;
 }
-
 function formatCurrency(val: string | number | null | undefined): string {
   const n = normalizeNumeric(val);
   if (n === null) return "—";
   return `PKR ${n.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
-
 function formatPercentage(val: string | number | null | undefined): string {
   const n = normalizeNumeric(val);
   if (n === null) return "—";
   return `${n}%`;
 }
-
-function riskColor(val: string): string {
+function pillColor(val: string): string {
   const v = (val || "").toLowerCase();
-  if (v === "low" || v === "strong") return "bg-green-100 text-green-800 border-green-200";
-  if (v === "medium" || v === "adequate") return "bg-amber-100 text-amber-800 border-amber-200";
-  if (v === "high" || v === "weak") return "bg-red-100 text-red-800 border-red-200";
+  if (["low","strong","pass","sufficient","appropriate","compliant","yes","approved","completed","exported","active","clean","unmodified"].includes(v)) return "bg-green-100 text-green-800 border-green-200";
+  if (["medium","adequate","partial","moderate","in review","in progress","pending","review","validating"].includes(v)) return "bg-amber-100 text-amber-800 border-amber-200";
+  if (["high","weak","fail","insufficient","inappropriate","non-compliant","no","exception","critical","rejected","overdue","material"].includes(v)) return "bg-red-100 text-red-800 border-red-200";
+  if (["n/a","not applicable","not assessed","none","draft","locked"].includes(v)) return "bg-slate-100 text-slate-600 border-slate-200";
+  if (["qualified","adverse","disclaimer","inappropriate basis","material uncertainty — inadequate disclosure"].includes(v)) return "bg-orange-100 text-orange-800 border-orange-200";
+  if (["unmodified","no material uncertainty","material uncertainty — adequate disclosure","excellent"].includes(v)) return "bg-green-100 text-green-800 border-green-200";
   return "bg-slate-100 text-slate-700 border-slate-200";
 }
-
+function statusColor(val: string): string {
+  const v = (val || "").toLowerCase();
+  if (["completed","exported","approved","locked","reviewed"].includes(v)) return "bg-green-100 text-green-800 border-green-300";
+  if (["in review","review","validating","in progress","pending","variables","generation"].includes(v)) return "bg-blue-100 text-blue-800 border-blue-300";
+  if (["draft","upload","extraction","ready"].includes(v)) return "bg-slate-100 text-slate-700 border-slate-300";
+  if (["reopened","exception","overdue","export"].includes(v)) return "bg-amber-100 text-amber-800 border-amber-300";
+  return "bg-slate-100 text-slate-700 border-slate-200";
+}
 function sourceIcon(sourceType: string | null | undefined): { label: string; cls: string } {
   if (!sourceType) return { label: "", cls: "" };
   switch (sourceType) {
-    case "ai_extraction": return { label: "AI Extracted", cls: "text-blue-600 bg-blue-50" };
+    case "ai_extraction": return { label: "AI", cls: "text-blue-600 bg-blue-50" };
     case "session": return { label: "Session", cls: "text-emerald-600 bg-emerald-50" };
     case "default": return { label: "Default", cls: "text-slate-500 bg-slate-50" };
     case "user_edit": return { label: "Manual", cls: "text-purple-600 bg-purple-50" };
+    case "formula": return { label: "Calc", cls: "text-indigo-600 bg-indigo-50" };
+    case "autofill": return { label: "Auto", cls: "text-cyan-600 bg-cyan-50" };
     default: return { label: sourceType.replace(/_/g, " "), cls: "text-slate-500 bg-slate-50" };
   }
 }
-
+const inputCls = "h-8 text-sm border rounded-md px-2 focus:ring-2 focus:ring-primary/20 focus:border-primary";
+const noSpin = "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+function PillSelector({ options, value, onChange, shape = "full" }: { options: string[]; value: string; onChange: (v: string) => void; shape?: "full" | "rounded" }) {
+  return (
+    <div className="flex items-center gap-2 mt-1 flex-wrap">
+      {options.map(opt => (
+        <button key={opt} onClick={() => onChange(opt)} className={cn(
+          "px-3 py-1 text-xs font-semibold border transition-all",
+          shape === "full" ? "rounded-full" : "rounded-lg",
+          value === opt ? pillColor(opt) + " ring-2 ring-offset-1 ring-current" : "bg-white text-muted-foreground border-slate-200 hover:bg-slate-50"
+        )}>{opt}</button>
+      ))}
+    </div>
+  );
+}
+function safeParseArray(val: string): string[] {
+  if (!val) return [];
+  try { const p = JSON.parse(val); return Array.isArray(p) ? p.map(String) : []; } catch { return val.split(",").map(s => s.trim()).filter(Boolean); }
+}
+function safeFormatDate(d: string, opts?: Intl.DateTimeFormatOptions): string {
+  if (!d || d === "—") return "—";
+  const date = new Date(d.includes("T") ? d : d + "T00:00:00");
+  return isNaN(date.getTime()) ? d : date.toLocaleDateString("en-GB", opts || { day: "2-digit", month: "short", year: "numeric" });
+}
+function MultiSelectInput({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
+  const selected: string[] = safeParseArray(value);
+  const toggle = (opt: string) => {
+    const next = selected.includes(opt) ? selected.filter(s => s !== opt) : [...selected, opt];
+    onChange(JSON.stringify(next));
+  };
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-1">
+      {options.map(opt => (
+        <button key={opt} onClick={() => toggle(opt)} className={cn("px-2.5 py-1 text-xs border rounded-md transition-all", selected.includes(opt) ? "bg-primary/10 text-primary border-primary/30 font-semibold" : "bg-white text-muted-foreground border-slate-200 hover:bg-slate-50")}>
+          {selected.includes(opt) && <Check className="w-3 h-3 inline mr-1" />}{opt}
+        </button>
+      ))}
+    </div>
+  );
+}
+function TagInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [input, setInput] = useState("");
+  const tags: string[] = safeParseArray(value);
+  const add = () => { if (input.trim()) { onChange(JSON.stringify([...tags, input.trim()])); setInput(""); } };
+  const remove = (tag: string) => onChange(JSON.stringify(tags.filter(t => t !== tag)));
+  return (
+    <div className="mt-1">
+      <div className="flex flex-wrap gap-1 mb-1.5">
+        {tags.map(tag => (
+          <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full border border-primary/20">
+            <Tag className="w-3 h-3" />{tag}<button onClick={() => remove(tag)} className="hover:text-red-500"><X className="w-3 h-3" /></button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-1">
+        <input className={cn(inputCls, "w-40")} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && (e.preventDefault(), add())} placeholder="Add tag..." />
+        <Button size="sm" variant="outline" className="h-8 px-2" onClick={add}><Plus className="w-3 h-3" /></Button>
+      </div>
+    </div>
+  );
+}
 function RenderEditInput({ def, value, onChange }: { def: any; value: string; onChange: (v: string) => void }) {
   const mode = def?.inputMode || "text";
   const options: string[] = def?.dropdownOptionsJson || [];
-
   switch (mode) {
     case "toggle":
-      return (
-        <div className="flex items-center gap-3 mt-1">
-          {[{ label: "Yes", val: "true", cls: "bg-green-100 text-green-800 border-green-300" }, { label: "No", val: "false", cls: "bg-red-100 text-red-800 border-red-300" }].map(opt => (
-            <button key={opt.val} onClick={() => onChange(opt.val)} className={cn("px-3 py-1 rounded-full text-xs font-semibold border transition-all", value === opt.val ? opt.cls + " ring-2 ring-offset-1 ring-current" : "bg-white text-muted-foreground border-slate-200 hover:bg-slate-50")}>{opt.label}</button>
-          ))}
-        </div>
-      );
-
+      return <PillSelector options={["true", "false"]} value={value} onChange={onChange} />;
+    case "yes_no_na":
+      return <PillSelector options={["Yes", "No", "N/A"]} value={value} onChange={onChange} />;
+    case "pass_fail":
+      return <PillSelector options={options.length ? options : ["Pass", "Fail", "Exception"]} value={value} onChange={onChange} />;
     case "risk_level":
-      return (
-        <div className="flex items-center gap-2 mt-1">
-          {options.map(opt => (
-            <button key={opt} onClick={() => onChange(opt)} className={cn("px-3 py-1 rounded-full text-xs font-semibold border transition-all", value === opt ? riskColor(opt) + " ring-2 ring-offset-1 ring-current" : "bg-white text-muted-foreground border-slate-200 hover:bg-slate-50")}>{opt}</button>
-          ))}
-        </div>
-      );
-
+      return <PillSelector options={options.length ? options : ["Low", "Medium", "High"]} value={value} onChange={onChange} />;
     case "rating_level":
+      return <PillSelector options={options.length ? options : ["Strong", "Adequate", "Weak"]} value={value} onChange={onChange} shape="rounded" />;
+    case "exception_flag":
+      return <PillSelector options={options.length ? options : ["No Exception", "Minor", "Major", "Critical"]} value={value} onChange={onChange} />;
+    case "conclusion":
+    case "status":
       return (
-        <div className="flex items-center gap-2 mt-1">
-          {options.map(opt => (
-            <button key={opt} onClick={() => onChange(opt)} className={cn("px-3 py-1 rounded-lg text-xs font-semibold border transition-all", value === opt ? riskColor(opt) + " ring-2 ring-offset-1 ring-current" : "bg-white text-muted-foreground border-slate-200 hover:bg-slate-50")}>{opt}</button>
-          ))}
-        </div>
-      );
-
-    case "dropdown":
-      return (
-        <select className="h-8 text-sm border rounded-md px-2 min-w-[200px] bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary" value={value} onChange={e => onChange(e.target.value)}>
+        <select className={cn(inputCls, "min-w-[220px] bg-white")} value={value} onChange={e => onChange(e.target.value)}>
           <option value="">-- Select --</option>
           {options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
         </select>
       );
-
-    case "currency":
+    case "dropdown":
       return (
-        <div className="flex items-center gap-1 mt-1">
-          <span className="text-xs font-semibold text-muted-foreground bg-slate-100 px-2 py-1.5 rounded-l-md border border-r-0">PKR</span>
-          <input type="number" className="h-8 text-sm border rounded-r-md px-2 w-44 focus:ring-2 focus:ring-primary/20 focus:border-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={value} onChange={e => onChange(e.target.value)} placeholder="0" />
+        <select className={cn(inputCls, "min-w-[200px] bg-white")} value={value} onChange={e => onChange(e.target.value)}>
+          <option value="">-- Select --</option>
+          {options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+        </select>
+      );
+    case "multi_select":
+      return <MultiSelectInput options={options} value={value} onChange={onChange} />;
+    case "radio":
+      return (
+        <div className="flex flex-col gap-1.5 mt-1">
+          {options.map(opt => (
+            <label key={opt} className="inline-flex items-center gap-2 cursor-pointer text-sm">
+              <input type="radio" name={def?.variableCode || "radio"} checked={value === opt} onChange={() => onChange(opt)} className="w-4 h-4 text-primary border-slate-300 focus:ring-primary" />
+              {opt}
+            </label>
+          ))}
         </div>
       );
-
+    case "checkbox":
+      return (
+        <label className="inline-flex items-center gap-2 mt-1 cursor-pointer text-sm">
+          <input type="checkbox" checked={value === "true"} onChange={e => onChange(e.target.checked ? "true" : "false")} className="w-4 h-4 rounded text-primary border-slate-300 focus:ring-primary" />
+          {def?.variableLabel || "Enabled"}
+        </label>
+      );
+    case "checkbox_group":
+      return <MultiSelectInput options={options} value={value} onChange={onChange} />;
+    case "currency":
+      return (
+        <div className="flex items-center mt-1">
+          <span className="text-xs font-semibold text-muted-foreground bg-slate-100 px-2 py-1.5 rounded-l-md border border-r-0">PKR</span>
+          <input type="number" className={cn("rounded-r-md w-44 border-l-0", inputCls, noSpin)} value={value} onChange={e => onChange(e.target.value)} placeholder="0" />
+        </div>
+      );
     case "percentage":
       return (
-        <div className="flex items-center gap-1 mt-1">
-          <input type="number" step="0.1" min="0" max="100" className="h-8 text-sm border rounded-l-md px-2 w-24 focus:ring-2 focus:ring-primary/20 focus:border-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={value} onChange={e => onChange(e.target.value)} placeholder="0" />
+        <div className="flex items-center mt-1">
+          <input type="number" step="0.1" min="0" max="100" className={cn("rounded-l-md w-24", inputCls, noSpin)} value={value} onChange={e => onChange(e.target.value)} placeholder="0" />
           <span className="text-xs font-semibold text-muted-foreground bg-slate-100 px-2 py-1.5 rounded-r-md border border-l-0">%</span>
         </div>
       );
-
-    case "textarea":
-      return <textarea className="mt-1 w-full text-sm border rounded-md px-3 py-2 min-h-[60px] resize-y focus:ring-2 focus:ring-primary/20 focus:border-primary" value={value} onChange={e => onChange(e.target.value)} placeholder="Enter details..." rows={3} />;
-
-    case "date":
-      return <input type="date" className="h-8 text-sm border rounded-md px-2 w-44 focus:ring-2 focus:ring-primary/20 focus:border-primary" value={value} onChange={e => onChange(e.target.value)} />;
-
     case "number":
-      return <input type="number" className="h-8 text-sm border rounded-md px-2 w-36 focus:ring-2 focus:ring-primary/20 focus:border-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={value} onChange={e => onChange(e.target.value)} placeholder="0" />;
-
+      return <input type="number" className={cn(inputCls, noSpin, "w-36")} value={value} onChange={e => onChange(e.target.value)} placeholder="0" />;
+    case "date":
+      return <input type="date" className={cn(inputCls, "w-44")} value={value} onChange={e => onChange(e.target.value)} />;
+    case "time":
+      return <input type="time" className={cn(inputCls, "w-36")} value={value} onChange={e => onChange(e.target.value)} />;
+    case "datetime":
+      return <input type="datetime-local" className={cn(inputCls, "w-56")} value={value} onChange={e => onChange(e.target.value)} />;
+    case "date_range": {
+      const parts = (value || "|").split("|");
+      return (
+        <div className="flex items-center gap-2 mt-1">
+          <input type="date" className={cn(inputCls, "w-40")} value={parts[0] || ""} onChange={e => onChange(`${e.target.value}|${parts[1] || ""}`)} />
+          <span className="text-xs text-muted-foreground">to</span>
+          <input type="date" className={cn(inputCls, "w-40")} value={parts[1] || ""} onChange={e => onChange(`${parts[0] || ""}|${e.target.value}`)} />
+        </div>
+      );
+    }
+    case "email":
+      return (
+        <div className="flex items-center mt-1">
+          <span className="text-muted-foreground bg-slate-100 px-2 py-1.5 rounded-l-md border border-r-0"><Mail className="w-3.5 h-3.5" /></span>
+          <input type="email" className={cn("rounded-r-md w-52", inputCls)} value={value} onChange={e => onChange(e.target.value)} placeholder="email@example.com" />
+        </div>
+      );
+    case "phone":
+      return (
+        <div className="flex items-center mt-1">
+          <span className="text-muted-foreground bg-slate-100 px-2 py-1.5 rounded-l-md border border-r-0"><Phone className="w-3.5 h-3.5" /></span>
+          <input type="tel" className={cn("rounded-r-md w-48", inputCls)} value={value} onChange={e => onChange(e.target.value)} placeholder="+92-XXX-XXXXXXX" />
+        </div>
+      );
+    case "url":
+      return (
+        <div className="flex items-center mt-1">
+          <span className="text-muted-foreground bg-slate-100 px-2 py-1.5 rounded-l-md border border-r-0"><Globe className="w-3.5 h-3.5" /></span>
+          <input type="url" className={cn("rounded-r-md w-64", inputCls)} value={value} onChange={e => onChange(e.target.value)} placeholder="https://..." />
+        </div>
+      );
+    case "masked":
+    case "password":
+      return (
+        <div className="flex items-center mt-1">
+          <span className="text-muted-foreground bg-slate-100 px-2 py-1.5 rounded-l-md border border-r-0"><EyeOff className="w-3.5 h-3.5" /></span>
+          <input type="password" className={cn("rounded-r-md w-48", inputCls)} value={value} onChange={e => onChange(e.target.value)} placeholder="••••••" />
+        </div>
+      );
+    case "textarea":
+    case "ai_narrative":
+    case "comment":
+      return <textarea className="mt-1 w-full text-sm border rounded-md px-3 py-2 min-h-[60px] resize-y focus:ring-2 focus:ring-primary/20 focus:border-primary" value={value} onChange={e => onChange(e.target.value)} placeholder={mode === "ai_narrative" ? "AI-generated narrative..." : mode === "comment" ? "Add comment..." : "Enter details..."} rows={3} />;
+    case "tag_input":
+      return <TagInput value={value} onChange={onChange} />;
+    case "manual_override":
+      return (
+        <div className="mt-1 space-y-1">
+          <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium"><AlertTriangle className="w-3 h-3" /> Manual override — original value will be logged</div>
+          <Input className="h-8 text-sm w-52 border-amber-300 focus:ring-amber-200" value={value} onChange={e => onChange(e.target.value)} placeholder="Override value" />
+        </div>
+      );
+    case "formula":
+    case "readonly":
+    case "locked":
+    case "autofill":
+    case "label":
+    case "ai_extracted":
+    case "ai_confidence":
+    case "ai_suggestion":
+    case "ai_reconciliation":
+    case "progress_bar":
+    case "validation_message":
+    case "info_banner":
+    case "error_alert":
+    case "summary_card":
+      return <span className="text-sm text-muted-foreground italic mt-1 block">This field is auto-managed and cannot be edited directly.</span>;
     default:
-      return <Input className="h-8 text-sm w-52 focus:ring-2 focus:ring-primary/20 focus:border-primary" value={value} onChange={e => onChange(e.target.value)} placeholder="Enter value" />;
+      return <Input className={cn(inputCls, "w-52")} value={value} onChange={e => onChange(e.target.value)} placeholder="Enter value" />;
   }
 }
-
 function RenderDisplayValue({ def, value, sourceType }: { def: any; value: string; sourceType?: string }) {
   const mode = def?.inputMode || "text";
-  const displayVal = value || "";
+  const dv = value || "";
   const src = sourceIcon(sourceType);
-
-  const renderSource = () => src.label ? <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-medium ml-1.5", src.cls)}>{src.label}</span> : null;
-
+  const renderSrc = () => src.label ? <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-medium ml-1.5 shrink-0", src.cls)}>{src.label}</span> : null;
+  const wrap = (children: React.ReactNode) => <div className="flex items-center gap-1.5">{children}{renderSrc()}</div>;
+  const wrapStart = (children: React.ReactNode) => <div className="flex items-start gap-1.5">{children}{renderSrc()}</div>;
+  const empty = () => wrap(<span className="text-sm text-muted-foreground">—</span>);
+  if (!dv && !["toggle","checkbox","progress_bar","info_banner","validation_message","label","formula","readonly","locked"].includes(mode)) return empty();
   switch (mode) {
     case "toggle":
-      return (
-        <div className="flex items-center gap-1.5">
-          {displayVal === "true" ? (
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200"><Check className="w-3 h-3" /> Yes</span>
-          ) : displayVal === "false" ? (
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-700 bg-red-50 px-2 py-0.5 rounded-full border border-red-200"><X className="w-3 h-3" /> No</span>
-          ) : <span className="text-sm text-muted-foreground">—</span>}
-          {renderSource()}
-        </div>
+    case "checkbox":
+      return wrap(
+        dv === "true" ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200"><Check className="w-3 h-3" /> Yes</span> :
+        dv === "false" ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-700 bg-red-50 px-2 py-0.5 rounded-full border border-red-200"><X className="w-3 h-3" /> No</span> :
+        <span className="text-sm text-muted-foreground">—</span>
       );
-
+    case "yes_no_na":
+      return wrap(<span className={cn("text-xs font-semibold px-2.5 py-0.5 rounded-full border", pillColor(dv))}>{dv}</span>);
+    case "pass_fail":
+      return wrap(
+        <span className={cn("inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full border", pillColor(dv))}>
+          {dv.toLowerCase() === "pass" ? <Check className="w-3 h-3" /> : dv.toLowerCase() === "fail" ? <X className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+          {dv}
+        </span>
+      );
     case "risk_level":
     case "rating_level":
-      return (
-        <div className="flex items-center gap-1.5">
-          {displayVal ? <span className={cn("text-xs font-semibold px-2.5 py-0.5 rounded-full border", riskColor(displayVal))}>{displayVal}</span> : <span className="text-sm text-muted-foreground">—</span>}
-          {renderSource()}
-        </div>
+    case "exception_flag":
+      return wrap(<span className={cn("text-xs font-semibold px-2.5 py-0.5 rounded-full border", pillColor(dv))}>{dv}</span>);
+    case "conclusion":
+      return wrap(
+        <span className={cn("inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-lg border", pillColor(dv))}>
+          <FileCheck className="w-3.5 h-3.5" />{dv}
+        </span>
       );
-
-    case "currency":
-      return (
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm font-mono tabular-nums text-foreground">{formatCurrency(displayVal)}</span>
-          {renderSource()}
-        </div>
+    case "status":
+      return wrap(
+        <span className={cn("inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full border", statusColor(dv))}>
+          <CircleDot className="w-3 h-3" />{dv}
+        </span>
       );
-
-    case "percentage":
-      return (
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm font-mono tabular-nums text-foreground">{formatPercentage(displayVal)}</span>
-          {renderSource()}
-        </div>
-      );
-
-    case "date":
-      return (
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm text-foreground">{displayVal && displayVal !== "—" ? new Date(displayVal + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</span>
-          {renderSource()}
-        </div>
-      );
-
-    case "textarea":
-      return (
-        <div className="flex items-start gap-1.5">
-          <p className="text-sm text-muted-foreground line-clamp-2 max-w-md">{displayVal || "—"}</p>
-          {renderSource()}
-        </div>
-      );
-
     case "dropdown":
-      return (
-        <div className="flex items-center gap-1.5">
-          {displayVal ? <span className="text-sm bg-slate-50 px-2 py-0.5 rounded border border-slate-200">{displayVal}</span> : <span className="text-sm text-muted-foreground">—</span>}
-          {renderSource()}
+    case "radio":
+      return wrap(<span className="text-sm bg-slate-50 px-2 py-0.5 rounded border border-slate-200">{dv}</span>);
+    case "multi_select":
+    case "checkbox_group": {
+      const items: string[] = safeParseArray(dv);
+      return wrap(
+        <div className="flex flex-wrap gap-1">
+          {items.length > 0 ? items.map((item: string) => <span key={item} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20">{item}</span>) : <span className="text-sm text-muted-foreground">—</span>}
         </div>
       );
-
+    }
+    case "tag_input": {
+      const tags: string[] = safeParseArray(dv);
+      return wrap(
+        <div className="flex flex-wrap gap-1">
+          {tags.length > 0 ? tags.map((tag: string) => <span key={tag} className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20"><Tag className="w-3 h-3" />{tag}</span>) : <span className="text-sm text-muted-foreground">—</span>}
+        </div>
+      );
+    }
+    case "currency":
+      return wrap(<span className="text-sm font-mono tabular-nums text-foreground">{formatCurrency(dv)}</span>);
+    case "percentage":
+      return wrap(
+        <span className="inline-flex items-center gap-1 text-sm font-mono tabular-nums text-foreground">
+          {formatPercentage(dv)}
+          {(() => { const n = normalizeNumeric(dv); return n !== null ? <span className="inline-block w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden ml-1"><span className="h-full bg-primary block rounded-full" style={{ width: `${Math.min(n, 100)}%` }} /></span> : null; })()}
+        </span>
+      );
+    case "number":
+      return wrap(<span className="text-sm font-mono tabular-nums text-foreground">{normalizeNumeric(dv)?.toLocaleString() ?? "—"}</span>);
+    case "date":
+      return wrap(
+        <span className="inline-flex items-center gap-1.5 text-sm text-foreground">
+          <Calendar className="w-3.5 h-3.5 text-muted-foreground" />{safeFormatDate(dv)}
+        </span>
+      );
+    case "time":
+      return wrap(<span className="inline-flex items-center gap-1.5 text-sm text-foreground"><Clock className="w-3.5 h-3.5 text-muted-foreground" />{dv}</span>);
+    case "datetime":
+      return wrap(
+        <span className="inline-flex items-center gap-1.5 text-sm text-foreground">
+          <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+          {safeFormatDate(dv, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+        </span>
+      );
+    case "date_range": {
+      const parts = (dv || "|").split("|");
+      return wrap(<span className="text-sm text-foreground">{safeFormatDate(parts[0] || "")} → {safeFormatDate(parts[1] || "")}</span>);
+    }
+    case "email":
+      return wrap(
+        <a href={`mailto:${dv}`} className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
+          <Mail className="w-3.5 h-3.5" />{dv}
+        </a>
+      );
+    case "phone":
+      return wrap(
+        <a href={`tel:${dv}`} className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
+          <Phone className="w-3.5 h-3.5" />{dv}
+        </a>
+      );
+    case "url":
+      return wrap(
+        <a href={dv} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
+          <Globe className="w-3.5 h-3.5" />{dv.length > 40 ? dv.substring(0, 40) + "…" : dv}<ExternalLink className="w-3 h-3" />
+        </a>
+      );
+    case "masked":
+    case "password":
+      return wrap(<span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"><EyeOff className="w-3.5 h-3.5" />{"•".repeat(Math.min(dv.length || 8, 12))}</span>);
+    case "textarea":
+    case "comment":
+      return wrapStart(<p className="text-sm text-muted-foreground line-clamp-2 max-w-md">{dv || "—"}</p>);
+    case "ai_narrative":
+      return wrapStart(
+        <div className="max-w-md">
+          <div className="flex items-center gap-1 text-[10px] text-blue-600 font-medium mb-0.5"><Sparkles className="w-3 h-3" /> AI Generated</div>
+          <p className="text-sm text-muted-foreground line-clamp-3">{dv}</p>
+        </div>
+      );
+    case "ai_extracted":
+      return wrap(
+        <span className="inline-flex items-center gap-1.5 text-sm">
+          <Bot className="w-3.5 h-3.5 text-blue-500" />
+          <span className="text-foreground">{dv}</span>
+        </span>
+      );
+    case "ai_suggestion":
+      return wrap(
+        <span className="inline-flex items-center gap-1.5 text-sm bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+          <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+          <span className="text-blue-800">{dv}</span>
+        </span>
+      );
+    case "ai_confidence": {
+      const n = normalizeNumeric(dv);
+      const pct = n !== null ? n : 0;
+      const color = pct >= 80 ? "bg-green-500" : pct >= 60 ? "bg-amber-500" : "bg-red-500";
+      return wrap(
+        <span className="inline-flex items-center gap-2 text-sm">
+          <Gauge className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="w-16 h-2 bg-slate-200 rounded-full overflow-hidden"><span className={cn("h-full block rounded-full", color)} style={{ width: `${pct}%` }} /></span>
+          <span className="font-mono text-xs tabular-nums">{pct}%</span>
+        </span>
+      );
+    }
+    case "ai_reconciliation":
+      return wrapStart(
+        <div className="max-w-md">
+          <div className="flex items-center gap-1 text-[10px] text-indigo-600 font-medium mb-0.5"><Zap className="w-3 h-3" /> AI Reconciliation</div>
+          <p className="text-sm text-muted-foreground line-clamp-2">{dv}</p>
+        </div>
+      );
+    case "formula":
+      return wrap(
+        <span className="inline-flex items-center gap-1.5 text-sm font-mono tabular-nums bg-indigo-50 text-indigo-800 px-2 py-0.5 rounded border border-indigo-200">
+          <Calculator className="w-3.5 h-3.5" />{dv}
+        </span>
+      );
+    case "readonly":
+    case "autofill":
+      return wrap(<span className="text-sm text-muted-foreground bg-slate-50 px-2 py-0.5 rounded border border-slate-200">{dv || "—"}</span>);
+    case "locked":
+      return wrap(
+        <span className="inline-flex items-center gap-1.5 text-sm text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-200">
+          <Lock className="w-3.5 h-3.5" />{dv}
+        </span>
+      );
+    case "manual_override":
+      return wrap(
+        <span className="inline-flex items-center gap-1.5 text-sm text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+          <AlertTriangle className="w-3.5 h-3.5" />{dv}
+        </span>
+      );
+    case "label":
+      return <div className="text-sm font-medium text-foreground">{dv}</div>;
+    case "info_banner":
+      return (
+        <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-md px-3 py-1.5 text-xs text-blue-800">
+          <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />{dv || "Information"}
+        </div>
+      );
+    case "error_alert":
+      return (
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-1.5 text-xs text-red-800">
+          <AlertOctagon className="w-3.5 h-3.5 mt-0.5 shrink-0" />{dv}
+        </div>
+      );
+    case "validation_message": {
+      const isOk = dv.toLowerCase().includes("pass") || dv.toLowerCase().includes("valid") || dv.toLowerCase().includes("ok");
+      return (
+        <div className={cn("flex items-start gap-2 rounded-md px-3 py-1.5 text-xs border", isOk ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-800")}>
+          {isOk ? <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />}{dv}
+        </div>
+      );
+    }
+    case "progress_bar": {
+      const n = normalizeNumeric(dv);
+      const pct = n !== null ? Math.min(n, 100) : 0;
+      return wrap(
+        <span className="inline-flex items-center gap-2 text-sm">
+          <span className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden"><span className="h-full bg-primary block rounded-full transition-all" style={{ width: `${pct}%` }} /></span>
+          <span className="font-mono text-xs tabular-nums">{pct}%</span>
+        </span>
+      );
+    }
+    case "summary_card":
+      return (
+        <div className="bg-slate-50 border rounded-lg px-3 py-2 text-sm max-w-md">
+          <p className="text-muted-foreground">{dv}</p>
+        </div>
+      );
     default:
-      return (
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm text-muted-foreground">{displayVal || "—"}</span>
-          {renderSource()}
-        </div>
-      );
+      return wrap(<span className="text-sm text-muted-foreground">{dv || "—"}</span>);
   }
 }
 
