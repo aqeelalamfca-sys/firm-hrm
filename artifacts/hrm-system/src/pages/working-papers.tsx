@@ -1101,17 +1101,17 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
           {[
-            { label: "Total", value: stats.total, color: "bg-slate-100 text-slate-800" },
-            { label: "Filled", value: stats.filled, color: "bg-green-100 text-green-800" },
-            { label: "Missing", value: stats.missing, color: "bg-red-100 text-red-800" },
-            { label: "Low Confidence", value: stats.lowConfidence, color: "bg-amber-100 text-amber-800" },
-            { label: "Needs Review", value: stats.needsReview, color: "bg-purple-100 text-purple-800" },
-            { label: "Locked", value: stats.locked, color: "bg-blue-100 text-blue-800" },
+            { label: "Total", value: stats.total, color: "bg-slate-100 text-slate-800", filterKey: "all" },
+            { label: "Filled", value: stats.filled, color: "bg-green-100 text-green-800", filterKey: "reviewed" },
+            { label: "Missing", value: stats.missing, color: "bg-red-100 text-red-800", filterKey: "missing" },
+            { label: "Low Confidence", value: stats.lowConfidence, color: "bg-amber-100 text-amber-800", filterKey: "low_confidence" },
+            { label: "Needs Review", value: stats.needsReview, color: "bg-purple-100 text-purple-800", filterKey: "needs_review" },
+            { label: "Locked", value: stats.locked, color: "bg-blue-100 text-blue-800", filterKey: "locked" },
           ].map(s => (
-            <div key={s.label} className={cn("rounded-lg p-3 text-center border", s.color)}>
+            <button key={s.label} onClick={() => setFilter(s.filterKey)} className={cn("rounded-lg p-3 text-center border cursor-pointer transition-all hover:scale-105 hover:shadow-md", s.color, filter === s.filterKey && "ring-2 ring-primary ring-offset-1")}>
               <p className="text-2xl font-bold">{s.value}</p>
               <p className="text-xs font-medium mt-0.5">{s.label}</p>
-            </div>
+            </button>
           ))}
         </div>
       )}
