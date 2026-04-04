@@ -4368,7 +4368,7 @@ router.post("/sessions/:id/extract-workbook", async (req: Request, res: Response
 router.get("/sessions/:id/extraction-report", async (req: Request, res: Response) => {
   const sessionId = parseInt(req.params.id);
   try {
-    const [journals, coa, tb, glAccts, fsMappings, fsExtraction, recon, wpIndex] = await Promise.all([
+    const [journals, coa, tb, glAccts, fsMappings, fsExtraction, recon, wpIndex, libWps] = await Promise.all([
       db.select().from(wpJournalImportTable).where(eq(wpJournalImportTable.sessionId, sessionId)),
       db.select().from(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, sessionId)),
       db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId)),
@@ -4377,6 +4377,7 @@ router.get("/sessions/:id/extraction-report", async (req: Request, res: Response
       db.select().from(wpFsExtractionTable).where(eq(wpFsExtractionTable.sessionId, sessionId)),
       db.select().from(reconEngineTable).where(eq(reconEngineTable.sessionId, sessionId)),
       db.select().from(wpTriggerSessionTable).where(eq(wpTriggerSessionTable.sessionId, sessionId)),
+      db.select().from(wpLibrarySessionTable).where(eq(wpLibrarySessionTable.sessionId, sessionId)),
     ]);
     const tbDebit = tb.reduce((s, t) => s + parseFloat(String(t.debit || 0)), 0);
     const tbCredit = tb.reduce((s, t) => s + parseFloat(String(t.credit || 0)), 0);
@@ -4386,7 +4387,7 @@ router.get("/sessions/:id/extraction-report", async (req: Request, res: Response
     const reconFails = recon.filter(r => r.status === "CHECK").length;
 
     res.json({
-      counts: { journals: journals.length, coaAccounts: coa.length, tbLines: tb.length, glAccounts: glAccts.length, fsMappings: fsMappings.length, fsExtractions: fsExtraction.length, reconChecks: recon.length, wpTriggered: wpIndex.filter(w => w.isTriggered).length },
+      counts: { journals: journals.length, coaAccounts: coa.length, tbLines: tb.length, glAccounts: glAccts.length, fsMappings: fsMappings.length, fsExtractions: fsExtraction.length, reconChecks: recon.length, wpTriggered: libWps.length > 0 ? libWps.length : wpIndex.filter(w => w.triggered === true).length },
       balances: { tbDebit, tbCredit, difference: tbDebit - tbCredit, balanced: Math.abs(tbDebit - tbCredit) < 1 },
       exceptions: { journals: jnlExceptions, coa: coaExceptions, fsMappings: fsMappingExceptions, reconFails, total: jnlExceptions + coaExceptions + fsMappingExceptions + reconFails },
       recon,
@@ -4756,10 +4757,14 @@ router.patch("/sessions/:id/wp-library-session/:wpCode", async (req: Request, re
   try {
     const sessionId = parseInt(req.params.id, 10);
     const { wpCode } = req.params;
-    const { status, preparedBy, reviewedBy, approvedBy, preparedDate, reviewedDate, conclusion, notes } = req.body;
+    const { status, preparedBy, reviewedBy, approvedBy, preparedDate, reviewedDate, approvedDate, conclusion, notes } = req.body;
+    const now = new Date().toISOString();
+    const updatePayload: any = { status, preparedBy, reviewedBy, approvedBy, preparedDate, reviewedDate, conclusion, notes, updatedAt: new Date() };
+    if (approvedDate) updatePayload.approvedDate = approvedDate;
+    else if (approvedBy && !approvedDate) updatePayload.approvedDate = now; // auto-stamp when approving
 
     await db.update(wpLibrarySessionTable)
-      .set({ status, preparedBy, reviewedBy, approvedBy, preparedDate, reviewedDate, conclusion, notes, updatedAt: new Date() } as any)
+      .set(updatePayload)
       .where(and(eq(wpLibrarySessionTable.sessionId, sessionId), eq(wpLibrarySessionTable.wpCode, wpCode)));
 
     return res.json({ message: "WP session record updated", wpCode, status });
@@ -5125,8 +5130,8 @@ router.post("/sessions/:id/lock", async (req: Request, res: Response) => {
       unlockAllowed: false,
     } as any);
 
-    // Update session master status
-    await db.execute(sql`UPDATE audit_engine_master SET current_stage = 'Locked', updated_at = NOW() WHERE session_id = ${sessionId}`);
+    // Update session master engagement status (use existing engagement_status column)
+    await db.execute(sql`UPDATE audit_engine_master SET engagement_status = 'Locked', updated_at = NOW() WHERE session_id = ${sessionId}`);
 
     return res.json({ message: "Session locked successfully under ISA 230", sessionId, lockedBy, archiveRef: archiveRef || `ISA230-${sessionId}-${Date.now()}`, retentionEndDate: retentionEnd.toISOString().split("T")[0] });
   } catch (err: any) {
@@ -5158,11 +5163,14 @@ router.post("/sessions/:id/generate-output", async (req: Request, res: Response)
     const { jobType, triggeredBy } = req.body;
     // jobType: "tb_excel" | "gl_excel" | "wp_index" | "full_file"
 
-    // Check validation gate
+    // Check validation gate — must have run at least once and passed
     const lastValidation = await db.select().from(wpValidationResultTable)
       .where(eq(wpValidationResultTable.sessionId, sessionId))
       .orderBy(sql`run_at DESC`).limit(1);
-    if (lastValidation.length > 0 && !lastValidation[0].generationAllowed) {
+    if (lastValidation.length === 0) {
+      return res.status(422).json({ error: "Generation blocked: no validation has been run yet. Run the Validate step first.", blockedReasons: ["No validation record found"] });
+    }
+    if (!lastValidation[0].generationAllowed) {
       return res.status(422).json({ error: "Generation blocked by validation gate", blockedReasons: JSON.parse(lastValidation[0].blockedReasons || "[]") });
     }
 
@@ -5209,23 +5217,76 @@ router.post("/sessions/:id/generate-output", async (req: Request, res: Response)
       else if (wp.status === "Pending" || wp.status === "In Progress") phaseSummary[ph].pending++;
     }
 
-    const output = {
-      generatedAt: new Date().toISOString(),
-      sessionId,
-      entityName: vars.entityName || "—",
-      financialYearEnd: vars.financialYearEnd || "—",
-      currency: vars.currency || "PKR",
-      tb: { columns: ["Account Code","Account Name","FS Head","FS Line","Assertions","Opening","Dr","Cr","Closing","Prior Year","Variance","Materiality","Risk","WP Code"], rows: tbData.rows || [], totalAccounts: (tbData.rows || []).length },
-      gl: { columns: ["Date","Account Code","Account Name","Narration","Dr","Cr","Journal ID","Voucher Type","Party","Doc No","Source","Confidence"], rows: glData.rows || [], totalTransactions: (glData.rows || []).length },
-      wpIndex: { totalWps: wpIndex.length, phaseSummary, papers: wpIndex.map(wp => ({ code: wp.wpCode, title: wp.wpTitle, phase: wp.wpPhase, category: wp.wpCategory, status: wp.status, mandatory: wp.mandatoryFlag, preparedBy: wp.preparedBy, reviewedBy: wp.reviewedBy, approvedBy: wp.approvedBy, conclusion: wp.conclusion })) },
+    // ── CSV helper ──────────────────────────────────────────────────────────
+    const toCSV = (cols: string[], rows: any[]): string => {
+      const esc = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const header = cols.map(esc).join(",");
+      const body = rows.map(r => {
+        const keys = Object.keys(r);
+        return cols.map((_, i) => esc(r[keys[i]] ?? "")).join(",");
+      }).join("\n");
+      return `${header}\n${body}`;
     };
 
-    // Complete the job
-    const recordCount = (output.tb.totalAccounts || 0) + (output.gl.totalTransactions || 0) + (output.wpIndex.totalWps || 0);
-    await db.update(wpOutputJobTable).set({ status: "complete", completedAt: new Date(), recordCount, metadata: JSON.stringify({ phases: Object.keys(phaseSummary), tbAccounts: output.tb.totalAccounts, glTxns: output.gl.totalTransactions }) } as any)
+    const tbCols  = ["account_code","account_name","fs_head","fs_line_mapping","opening_balance","debit","credit","closing_balance","prior_year_balance","data_source","confidence"];
+    const glCols  = ["entry_date","account_code","account_name","narration","debit","credit","voucher_no","running_balance"];
+    const wpCols  = ["WP Code","Title","Phase","Category","Status","Mandatory","Prepared By","Reviewed By","Approved By","Conclusion"];
+
+    const tbRows  = (tbData.rows || []) as any[];
+    const glRows  = (glData.rows || []) as any[];
+    const wpRows  = wpIndex.map(wp => ({
+      "WP Code": wp.wpCode, "Title": wp.wpTitle, "Phase": wp.wpPhase, "Category": wp.wpCategory,
+      "Status": wp.status, "Mandatory": wp.mandatoryFlag ? "Yes" : "No",
+      "Prepared By": wp.preparedBy || "", "Reviewed By": wp.reviewedBy || "",
+      "Approved By": wp.approvedBy || "", "Conclusion": wp.conclusion || "",
+    }));
+
+    const entityName = vars.entityName || `Session-${sessionId}`;
+    const fyEnd = (vars.financialYearEnd || new Date().toISOString().slice(0,10)).replace(/\//g,"-");
+    const safeName = entityName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 30);
+    const recordCount = tbRows.length + glRows.length + wpIndex.length;
+
+    // Determine what to return based on jobType
+    let fileContent: string;
+    let fileName: string;
+    let contentType: string;
+
+    if (jobType === "tb_excel") {
+      fileContent = toCSV(tbCols, tbRows);
+      fileName = `TB_${safeName}_${fyEnd}.csv`;
+      contentType = "text/csv";
+    } else if (jobType === "gl_excel") {
+      fileContent = toCSV(glCols, glRows);
+      fileName = `GL_${safeName}_${fyEnd}.csv`;
+      contentType = "text/csv";
+    } else if (jobType === "wp_index") {
+      fileContent = toCSV(wpCols, wpRows);
+      fileName = `WP_Index_${safeName}_${fyEnd}.csv`;
+      contentType = "text/csv";
+    } else {
+      // full_file — pack all three as a JSON file download
+      fileContent = JSON.stringify({
+        generatedAt: new Date().toISOString(), sessionId, entityName,
+        financialYearEnd: vars.financialYearEnd, reportingFramework: vars.reportingFramework,
+        tb: { totalAccounts: tbRows.length, data: tbRows },
+        gl: { totalTransactions: glRows.length, data: glRows },
+        wpIndex: { totalWps: wpIndex.length, phaseSummary, papers: wpRows },
+      }, null, 2);
+      fileName = `AuditFile_${safeName}_${fyEnd}.json`;
+      contentType = "application/json";
+    }
+
+    // Complete the job record
+    await db.update(wpOutputJobTable)
+      .set({ status: "complete", completedAt: new Date(), recordCount, outputPath: fileName, metadata: JSON.stringify({ phases: Object.keys(phaseSummary), tbAccounts: tbRows.length, glTxns: glRows.length }) } as any)
       .where(eq(wpOutputJobTable.id, jobId));
 
-    return res.json({ message: "Output generated", jobId, output });
+    // Return as downloadable file
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.setHeader("X-Job-Id", String(jobId));
+    res.setHeader("X-Record-Count", String(recordCount));
+    return res.send(fileContent);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -5259,7 +5320,7 @@ router.get("/sessions/:id/wp-audit-trail", async (req: Request, res: Response) =
     for (const wp of wps) {
       if (wp.preparedBy && wp.preparedDate) trail.push({ timestamp: wp.preparedDate, type: "WP_PREPARED", actor: wp.preparedBy, ref: wp.wpCode, detail: `${wp.wpCode} — ${wp.wpTitle} marked Prepared` });
       if (wp.reviewedBy && wp.reviewedDate) trail.push({ timestamp: wp.reviewedDate, type: "WP_REVIEWED", actor: wp.reviewedBy, ref: wp.wpCode, detail: `${wp.wpCode} — ${wp.wpTitle} reviewed` });
-      if (wp.approvedBy) trail.push({ timestamp: wp.updatedAt?.toISOString(), type: "WP_APPROVED", actor: wp.approvedBy, ref: wp.wpCode, detail: `${wp.wpCode} — ${wp.wpTitle} approved` });
+      if (wp.approvedBy) trail.push({ timestamp: (wp as any).approvedDate || wp.updatedAt?.toISOString(), type: "WP_APPROVED", actor: wp.approvedBy, ref: wp.wpCode, detail: `${wp.wpCode} — ${wp.wpTitle} approved` });
     }
 
     // Validation runs

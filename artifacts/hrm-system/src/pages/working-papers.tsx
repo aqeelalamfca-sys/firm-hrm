@@ -510,8 +510,6 @@ export default function WorkingPapers() {
   const fetchWpTriggers = async () => {
     if (!activeSession) return;
     try {
-      // Seed if needed, then fetch
-      await fetch(`${API_BASE}/working-papers/seed-audit-engine`, { method: "POST", headers: { ...headers, "Content-Type": "application/json" } });
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/wp-triggers`, { headers });
       if (res.ok) setWpTriggers(await res.json());
     } catch {}
@@ -855,7 +853,7 @@ export default function WorkingPapers() {
         ]);
         await fetchSession(activeSession.id);
         await fetchExceptions();
-        generateHead(2);
+        if (activeSession?.heads && activeSession.heads.length > 2) generateHead(2);
       } else {
         setTbGlProgress(prev => ({
           running: false,
@@ -2415,10 +2413,32 @@ function AuditEngineStage({
     await fetchSessionLibrary();
   };
 
+  const fetchSessionLibraryAndAutoActivate = async () => {
+    if (!session?.id) return;
+    setLibLoading(true);
+    try {
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/wp-library-session`);
+      const d = await r.json();
+      const papers = d.papers || [];
+      setSessionLibrary(papers);
+      if (papers.length === 0 && !libActivating) {
+        setLibActivating(true);
+        try {
+          const ar = await fetch(`/api/working-papers/sessions/${session.id}/activate-wp-library`, { method: "POST" });
+          const ad = await ar.json();
+          setLibActivationResult(ad);
+          const r2 = await fetch(`/api/working-papers/sessions/${session.id}/wp-library-session`);
+          const d2 = await r2.json();
+          setSessionLibrary(d2.papers || []);
+        } finally { setLibActivating(false); }
+      }
+    } catch { /* ignore */ } finally { setLibLoading(false); }
+  };
+
   useEffect(() => {
     if (activeEngineTab === "wp_library") {
       if (libView === "browse") fetchWpLibrary();
-      else fetchSessionLibrary();
+      else fetchSessionLibraryAndAutoActivate();
     }
   }, [activeEngineTab, libView]);
 
@@ -2502,10 +2522,29 @@ function AuditEngineStage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobType: genJobType, triggeredBy: "Audit Team" }),
       });
-      const d = await r.json();
-      setGenResult(d);
+      if (!r.ok) {
+        const errData = await r.json().catch(() => ({ error: "Generation failed" }));
+        toast({ title: "Generation blocked", description: (errData.blockedReasons || [errData.error]).join(" · "), variant: "destructive" });
+        setGenResult({ error: errData.error, blockedReasons: errData.blockedReasons });
+        return;
+      }
+      // Success — download the file
+      const blob = await r.blob();
+      const disposition = r.headers.get("Content-Disposition") || "";
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const fileName = match?.[1] || `audit-output.${genJobType === "full_file" ? "json" : "csv"}`;
+      const jobId = r.headers.get("X-Job-Id");
+      const recordCount = r.headers.get("X-Record-Count");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = fileName; a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Output generated & downloaded", description: `${fileName} · ${recordCount || "?"} records` });
+      setGenResult({ message: "Output generated", jobId, fileName, recordCount });
       await fetchOutputJobs();
-    } catch { /* ignore */ } finally { setGenLoading(false); }
+    } catch (e: any) {
+      toast({ title: "Generation failed", description: e?.message || "Unknown error", variant: "destructive" });
+    } finally { setGenLoading(false); }
   };
 
   const fetchOutputJobs = async () => {
@@ -2545,7 +2584,7 @@ function AuditEngineStage({
       const r = await fetch(`/api/working-papers/sessions/${session.id}/lock`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(lockForm),
+        body: JSON.stringify({ ...lockForm, eqcrCompleted: !!lockForm.eqcrCompleted }),
       });
       const d = await r.json();
       setLockResult(d);
@@ -3227,7 +3266,8 @@ function AuditEngineStage({
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <h3 className="text-base font-bold flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-red-300" /> ISA EXCEPTION MANAGEMENT</h3>
-                <p className="text-red-200 text-xs mt-0.5">Auto-flag unmapped FS lines · low-confidence entries · incomplete mandatory WPs · TB gaps</p>
+                <p className="text-red-200 text-xs mt-0.5">Audit procedure exceptions (ISA library) · separate from extraction exceptions in the main audit pipeline</p>
+                <p className="text-red-300/70 text-[10px] mt-0.5">Auto-flags: unmapped FS lines · low-confidence entries · incomplete mandatory WPs · TB gaps</p>
               </div>
               <button onClick={runExceptionScan} disabled={excScanning} className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white text-xs rounded-xl font-semibold flex items-center gap-1.5 border border-white/20 transition-colors disabled:opacity-60">
                 {excScanning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <AlertTriangle className="w-3.5 h-3.5" />}
@@ -3351,7 +3391,14 @@ function AuditEngineStage({
                   {validation.generationAllowed ? <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" /> : <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />}
                   <div>
                     <p className={cn("text-sm font-semibold", validation.generationAllowed ? "text-emerald-700" : "text-red-700")}>{validation.generationAllowed ? "All checks passed — generation allowed" : "Generation blocked — resolve issues below"}</p>
-                    {validation.blockedReasons?.length > 0 && <ul className="mt-1 space-y-0.5">{validation.blockedReasons.map((r: string, i: number) => <li key={i} className="text-xs text-red-600">· {r}</li>)}</ul>}
+                    {validation.blockedReasons?.length > 0 && (
+                      <>
+                        <ul className="mt-1 space-y-0.5">{validation.blockedReasons.map((r: string, i: number) => <li key={i} className="text-xs text-red-600">· {r}</li>)}</ul>
+                        {validation.blockedReasons.some((r: string) => r.includes("performanceMateriality") || r.includes("mandatory engagement")) && (
+                          <p className="text-xs text-slate-500 mt-1.5 italic">→ Set Performance Materiality in the <strong>Audit Engine</strong> tab to unblock generation.</p>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
                 {/* Individual checks */}
@@ -3369,7 +3416,13 @@ function AuditEngineStage({
                 {validation.warnings?.length > 0 && (
                   <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-1">
                     <p className="text-xs font-semibold text-amber-700 mb-1">Warnings (non-blocking):</p>
-                    {validation.warnings.map((w: string, i: number) => <p key={i} className="text-xs text-amber-600">· {w}</p>)}
+                    {validation.warnings.map((w: string, i: number) => (
+                      <div key={i}>
+                        <p className="text-xs text-amber-600">· {w}</p>
+                        {w.includes("mandatory WP") && <p className="text-[10px] text-slate-400 ml-3 italic">Expected for new sessions — update WP statuses in the WP Library tab as audit work progresses.</p>}
+                        {w.includes("not mapped to FS") && <p className="text-[10px] text-slate-400 ml-3 italic">Run the extract + FS mapping workflow to map TB accounts to financial statement lines.</p>}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

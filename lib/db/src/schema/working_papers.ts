@@ -595,6 +595,7 @@ export const wpLibrarySessionTable = pgTable("wp_library_session", {
   approvedBy: text("approved_by"),
   preparedDate: text("prepared_date"),
   reviewedDate: text("reviewed_date"),
+  approvedDate: text("approved_date"),
   conclusion: text("conclusion"),
   outputFormat: text("output_format"),
   reviewerLevel: text("reviewer_level"),
