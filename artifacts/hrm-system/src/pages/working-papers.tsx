@@ -425,6 +425,21 @@ export default function WorkingPapers() {
     } catch {}
   };
 
+  const reviewAllVariables = async () => {
+    if (!activeSession) return;
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/variables/review-all`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast({ title: data.message || "All variables marked as reviewed" });
+        await fetchVariables();
+      }
+    } catch {} finally { setLoading(false); }
+  };
+
   const validateVariables = async () => {
     if (!activeSession) return;
     try {
@@ -904,6 +919,7 @@ export default function WorkingPapers() {
           setEditReason={setEditReason}
           onSave={saveVariableEdit}
           onReview={markVariableReviewed}
+          onReviewAll={reviewAllVariables}
           onFetch={fetchVariables}
           onLockAll={lockAllVariables}
           onLockSection={lockSection}
@@ -1862,7 +1878,7 @@ function RenderDisplayValue({ def, value, sourceType }: { def: any; value: strin
   }
 }
 
-function VariablesStage({ variables, grouped, stats, changeLog, editingVar, editValue, editReason, setEditingVar, setEditValue, setEditReason, onSave, onReview, onFetch, onLockAll, onLockSection, onValidate, loading, confidenceBadge }: any) {
+function VariablesStage({ variables, grouped, stats, changeLog, editingVar, editValue, editReason, setEditingVar, setEditValue, setEditReason, onSave, onReview, onReviewAll, onFetch, onLockAll, onLockSection, onValidate, loading, confidenceBadge }: any) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("all");
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
@@ -1945,6 +1961,9 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
               </Button>
               <Button variant="outline" size="sm" onClick={() => setShowAuditTrail(!showAuditTrail)} className="h-8">
                 <ClipboardCheck className="w-3.5 h-3.5 mr-1" /> Trail ({changeLog.length})
+              </Button>
+              <Button size="sm" onClick={onReviewAll} disabled={loading} className="h-8 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 shadow-sm">
+                <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Review All
               </Button>
               <Button size="sm" onClick={onLockAll} disabled={loading} className="h-8 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-sm">
                 <Lock className="w-3.5 h-3.5 mr-1" /> Lock All

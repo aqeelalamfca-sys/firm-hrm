@@ -1613,6 +1613,26 @@ router.patch("/sessions/:id/variables/:varId/review", async (req: Request, res: 
   }
 });
 
+router.post("/sessions/:id/variables/review-all", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+
+    const vars = await db.select().from(wpVariablesTable).where(and(eq(wpVariablesTable.sessionId, sessionId), eq(wpVariablesTable.isLocked, false)));
+    const unreviewedIds = vars.filter(v => v.reviewStatus !== "reviewed" && v.reviewStatus !== "confirmed").map(v => v.id);
+
+    if (unreviewedIds.length === 0) {
+      return res.json({ reviewed: 0, message: "All variables already reviewed" });
+    }
+
+    await db.update(wpVariablesTable).set({ reviewStatus: "reviewed", updatedAt: new Date() }).where(inArray(wpVariablesTable.id, unreviewedIds));
+
+    res.json({ reviewed: unreviewedIds.length, message: `${unreviewedIds.length} variables marked as reviewed` });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to review all variables" });
+  }
+});
+
 router.post("/sessions/:id/variables/lock-section", async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(req.params.id);
