@@ -185,11 +185,29 @@ router.get("/sessions", async (_req: Request, res: Response) => {
   }
 });
 
+router.post("/upload-logo", upload.single("file"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const fs = await import("fs");
+    const path = await import("path");
+    const uploadsDir = path.join(process.cwd(), "uploads", "logos");
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    const ext = path.extname(req.file.originalname) || ".png";
+    const filename = `logo_${Date.now()}${ext}`;
+    const filepath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filepath, req.file.buffer);
+    res.json({ url: `/uploads/logos/${filename}`, filename });
+  } catch (err: any) {
+    logger.error({ err }, "Failed to upload logo");
+    res.status(500).json({ error: "Failed to upload logo" });
+  }
+});
+
 router.post("/sessions", async (req: Request, res: Response) => {
   try {
-    const { clientName, engagementYear, entityType, ntn, strn, periodStart, periodEnd, reportingFramework, engagementType } = req.body;
+    const { clientName, engagementYear, entityType, ntn, strn, periodStart, periodEnd, reportingFramework, engagementType, engagementContinuity, auditFirmName, auditFirmLogo } = req.body;
     if (!clientName || !engagementYear || !entityType || !ntn || !periodStart || !periodEnd || !reportingFramework || !engagementType) {
-      return res.status(400).json({ error: "All fields are required except STRN" });
+      return res.status(400).json({ error: "All fields are required except STRN, Audit Firm Name, and Logo" });
     }
     const [session] = await db.insert(wpSessionsTable).values({
       clientName, engagementYear,
@@ -200,6 +218,9 @@ router.post("/sessions", async (req: Request, res: Response) => {
       periodEnd,
       reportingFramework,
       engagementType,
+      engagementContinuity: engagementContinuity || "first_time",
+      auditFirmName: auditFirmName || null,
+      auditFirmLogo: auditFirmLogo || null,
       status: "upload",
     }).returning();
 
@@ -966,8 +987,14 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
 
     sessionMetaMap["variance_analysis_done"] = "false";
 
-    sessionMetaMap["first_year_audit"] = "false";
-    sessionMetaMap["recurring_engagement"] = "true";
+    const isFirstTime = session.engagementContinuity === "first_time";
+    sessionMetaMap["first_year_audit"] = isFirstTime ? "true" : "false";
+    sessionMetaMap["recurring_engagement"] = isFirstTime ? "false" : "true";
+    if (!isFirstTime) {
+      sessionMetaMap["previous_auditor"] = session.auditFirmName || "Same firm";
+      sessionMetaMap["predecessor_communication_done"] = "true";
+      sessionMetaMap["continuance_approved"] = "true";
+    }
 
     sessionMetaMap["emphasis_of_matter_flag"] = "false";
     sessionMetaMap["other_matter_flag"] = "false";

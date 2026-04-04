@@ -68,6 +68,11 @@ export default function WorkingPapers() {
   const [newPeriodEnd, setNewPeriodEnd] = useState("");
   const [newFramework, setNewFramework] = useState("IFRS");
   const [newEngagementType, setNewEngagementType] = useState("statutory_audit");
+  const [newEngagementContinuity, setNewEngagementContinuity] = useState("first_time");
+  const [newAuditFirmName, setNewAuditFirmName] = useState("");
+  const [newAuditFirmLogo, setNewAuditFirmLogo] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string>("");
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
 
   const [uploadFiles, setUploadFiles] = useState<{ file: File; category: string }[]>([]);
   const [extractionData, setExtractionData] = useState<any>(null);
@@ -127,6 +132,18 @@ export default function WorkingPapers() {
     }
     try {
       setLoading(true);
+      let logoUrl = "";
+      if (newAuditFirmLogo) {
+        const formData = new FormData();
+        formData.append("file", newAuditFirmLogo);
+        const uploadRes = await fetch(`${API_BASE}/working-papers/upload-logo`, {
+          method: "POST", headers, body: formData,
+        });
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          logoUrl = uploadData.url;
+        }
+      }
       const res = await fetch(`${API_BASE}/working-papers/sessions`, {
         method: "POST", headers: { ...headers, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -139,6 +156,9 @@ export default function WorkingPapers() {
           periodEnd: newPeriodEnd,
           reportingFramework: newFramework,
           engagementType: newEngagementType,
+          engagementContinuity: newEngagementContinuity,
+          auditFirmName: newAuditFirmName || undefined,
+          auditFirmLogo: logoUrl || undefined,
         }),
       });
       if (res.ok) {
@@ -149,6 +169,9 @@ export default function WorkingPapers() {
         setNewStrn("");
         setNewPeriodStart("");
         setNewPeriodEnd("");
+        setNewAuditFirmName("");
+        setNewAuditFirmLogo(null);
+        setLogoPreview("");
         await fetchSessions();
         await fetchSession(session.id);
       }
@@ -535,6 +558,30 @@ export default function WorkingPapers() {
                 <option value="group_audit">Group / Consolidated Audit</option>
               </select>
             </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Engagement Continuity *</label>
+              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newEngagementContinuity} onChange={e => setNewEngagementContinuity(e.target.value)}>
+                <option value="first_time">First Time Engagement</option>
+                <option value="recurring">Recurring (Same Auditor)</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Audit Firm Name</label>
+              <Input placeholder="e.g. Alam & Aulakh Chartered Accountants" value={newAuditFirmName} onChange={e => setNewAuditFirmName(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Audit Firm Logo</label>
+              <div className="flex items-center gap-3">
+                <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f) { setNewAuditFirmLogo(f); setLogoPreview(URL.createObjectURL(f)); }
+                }} />
+                <Button type="button" variant="outline" size="sm" onClick={() => logoInputRef.current?.click()}>
+                  <Upload className="w-3.5 h-3.5 mr-1.5" /> {newAuditFirmLogo ? "Change" : "Upload"}
+                </Button>
+                {logoPreview && <img src={logoPreview} alt="Logo preview" className="h-8 w-auto rounded border" />}
+              </div>
+            </div>
             <div className="flex items-end">
               <Button onClick={createSession} disabled={loading} className="w-full">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
@@ -592,7 +639,14 @@ export default function WorkingPapers() {
             {activeSession.engagementYear} — {activeSession.reportingFramework || "IFRS"}
             {activeSession.periodStart && activeSession.periodEnd && <span className="ml-1">— Period: {activeSession.periodStart} to {activeSession.periodEnd}</span>}
             {activeSession.ntn && <span className="ml-1">— NTN: {activeSession.ntn}</span>}
+            {activeSession.engagementContinuity && <span className="ml-1">— {activeSession.engagementContinuity === "recurring" ? "Recurring" : "First Time"}</span>}
           </p>
+          {activeSession.auditFirmName && (
+            <div className="flex items-center gap-2 mt-1">
+              {activeSession.auditFirmLogo && <img src={`${API_BASE.replace('/api', '')}${activeSession.auditFirmLogo}`} alt="Firm logo" className="h-6 w-auto rounded" />}
+              <span className="text-xs text-muted-foreground font-medium">{activeSession.auditFirmName}</span>
+            </div>
+          )}
         </div>
         <Button variant="outline" size="sm" onClick={() => fetchExceptions()}>
           <AlertTriangle className="w-4 h-4 mr-1" /> Exceptions ({exceptions.length})
