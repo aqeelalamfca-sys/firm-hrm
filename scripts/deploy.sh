@@ -145,6 +145,25 @@ for i in 1 2 3 4 5 6 7 8; do
   sleep 5
 done
 
+echo "[VPS] Seeding admin user..."
+docker exec ana-db psql -U ana_user -d ana_hrm -c "
+INSERT INTO users (email, password_hash, name, role, user_status, created_at, updated_at)
+VALUES (
+  'admin@calfirm.com',
+  '961c2b43f4d675b76fad6a74cb9797ca0c8e697254304c57b47e3b3adc13e66c',
+  'Admin',
+  'super_admin',
+  'active',
+  NOW(),
+  NOW()
+)
+ON CONFLICT (email) DO UPDATE
+  SET password_hash = EXCLUDED.password_hash,
+      role = EXCLUDED.role,
+      user_status = EXCLUDED.user_status,
+      updated_at = NOW();
+" 2>/dev/null && echo "[VPS] ✓ Admin user ensured" || echo "[VPS] ⚠ Admin seed skipped (db may not be ready)"
+
 echo "[VPS] Container status:"
 docker ps --filter "name=ana-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 REMOTE
