@@ -8,8 +8,9 @@ import {
   wpExtractedFieldsTable, wpArrangedDataTable, wpVariablesTable,
   wpVariableChangeLogTable, wpExceptionLogTable, wpTrialBalanceLinesTable,
   wpGlAccountsTable, wpGlEntriesTable, wpHeadsTable, wpHeadDocumentsTable,
-  wpExportJobsTable,
+  wpExportJobsTable, wpVariableDefinitionsTable, wpVariableDependencyRulesTable,
 } from "@workspace/db";
+import { VARIABLE_DEFINITIONS, EXTRACTION_FIELD_TO_VARIABLE_MAP, VARIABLE_GROUPS, DEPENDENCY_RULES } from "../data/variable-definitions";
 import { eq, and, inArray, asc } from "drizzle-orm";
 import OpenAI from "openai";
 import PDFDocument from "pdfkit";
@@ -645,49 +646,177 @@ router.post("/sessions/:id/arranged-data/approve-all", async (req: Request, res:
 
 
 // ═══════════════════════════════════════════════════════════════════════════
-// VARIABLES — AUTO-FILL + EDIT + LOCK
+// VARIABLE DEFINITIONS — SEED & MANAGE
+// ═══════════════════════════════════════════════════════════════════════════
+
+router.get("/variable-definitions", async (req: Request, res: Response) => {
+  try {
+    const defs = await db.select().from(wpVariableDefinitionsTable).where(eq(wpVariableDefinitionsTable.activeFlag, true));
+    if (defs.length === 0) {
+      res.json({ definitions: VARIABLE_DEFINITIONS, groups: VARIABLE_GROUPS, source: "static" });
+    } else {
+      res.json({ definitions: defs, groups: VARIABLE_GROUPS, source: "database" });
+    }
+  } catch (err: any) {
+    res.json({ definitions: VARIABLE_DEFINITIONS, groups: VARIABLE_GROUPS, source: "static" });
+  }
+});
+
+router.post("/variable-definitions/seed", async (req: Request, res: Response) => {
+  try {
+    const userRole = (req as any).user?.role;
+    if (!userRole || !["super_admin", "partner"].includes(userRole)) {
+      return res.status(403).json({ error: "Only super_admin or partner can seed variable definitions" });
+    }
+
+    const existing = await db.select().from(wpVariableDefinitionsTable);
+    if (existing.length > 0) {
+      await db.delete(wpVariableDefinitionsTable);
+    }
+    for (const def of VARIABLE_DEFINITIONS) {
+      await db.insert(wpVariableDefinitionsTable).values({
+        variableCode: def.variableCode,
+        variableGroup: def.variableGroup,
+        variableSubgroup: def.variableSubgroup || null,
+        variableName: def.variableName,
+        variableLabel: def.variableLabel,
+        description: def.description || null,
+        dataType: def.dataType,
+        inputMode: def.inputMode,
+        dropdownOptionsJson: def.dropdownOptionsJson || null,
+        defaultValue: def.defaultValue || null,
+        mandatoryFlag: def.mandatoryFlag,
+        editableFlag: def.editableFlag,
+        aiExtractableFlag: def.aiExtractableFlag,
+        reviewRequiredFlag: def.reviewRequiredFlag,
+        standardReference: def.standardReference || null,
+        pakistanReference: def.pakistanReference || null,
+        affectsModulesJson: def.affectsModulesJson || null,
+        affectsWorkingPapersJson: def.affectsWorkingPapersJson || null,
+        displayOrder: def.displayOrder,
+      });
+    }
+    res.json({ seeded: VARIABLE_DEFINITIONS.length });
+  } catch (err: any) {
+    logger.error({ err }, "Failed to seed variable definitions");
+    res.status(500).json({ error: "Failed to seed variable definitions" });
+  }
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VARIABLES — AUTO-FILL + EDIT + LOCK (UPGRADED ENGINE)
 // ═══════════════════════════════════════════════════════════════════════════
 
 router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(req.params.id);
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+
     const fields = await db.select().from(wpExtractedFieldsTable).where(eq(wpExtractedFieldsTable.sessionId, sessionId));
 
-    const varMap: Record<string, { value: string; confidence: string; category: string }> = {};
-
+    const extractedMap: Record<string, { value: string; confidence: string; sourceFile?: string; sourceSheet?: string; sourcePage?: number }> = {};
     for (const f of fields) {
-      let cat = "entity";
-      if (f.category === "FS Line Items" || f.category === "Prior Year Comparatives") cat = "financial";
-      else if (f.category === "Sales Tax Data" || f.category === "Tax Period Summary") cat = "tax";
-      else if (f.category === "Reporting Metadata") cat = "reporting";
-      else if (f.category === "Entity Profile") cat = "entity";
-
-      const key = `${cat}__${f.fieldName}`;
-      if (!varMap[key] || Number(f.confidence || 0) > Number(varMap[key].confidence)) {
-        varMap[key] = { value: f.finalValue || f.extractedValue || "", confidence: String(f.confidence || "80"), category: cat };
+      const mappedCode = EXTRACTION_FIELD_TO_VARIABLE_MAP[f.fieldName];
+      if (mappedCode) {
+        const existingConf = Number(extractedMap[mappedCode]?.confidence || 0);
+        const newConf = Number(f.confidence || 0);
+        if (!extractedMap[mappedCode] || newConf > existingConf) {
+          extractedMap[mappedCode] = {
+            value: f.finalValue || f.extractedValue || "",
+            confidence: String(f.confidence || "75"),
+            sourceFile: f.sourceFile || undefined,
+            sourceSheet: f.sourceSheet || undefined,
+            sourcePage: f.sourcePageNo || undefined,
+          };
+        }
       }
     }
 
     const existingVars = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
-    if (existingVars.length > 0) {
-      await db.delete(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
-    }
+    const existingByCode: Record<string, any> = {};
+    for (const ev of existingVars) existingByCode[ev.variableCode] = ev;
 
-    const created: any[] = [];
-    for (const [key, val] of Object.entries(varMap)) {
-      const [cat, ...nameParts] = key.split("__");
-      const varName = nameParts.join("__");
+    const results: any[] = [];
+    let created = 0, updated = 0, skipped = 0;
+
+    for (const def of VARIABLE_DEFINITIONS) {
+      const extracted = extractedMap[def.variableCode];
+      const existing = existingByCode[def.variableCode];
+
+      if (existing) {
+        if (extracted && !existing.userEditedValue && !existing.isLocked) {
+          await db.update(wpVariablesTable).set({
+            autoFilledValue: extracted.value,
+            rawExtractedValue: extracted.value,
+            finalValue: extracted.value,
+            confidence: extracted.confidence,
+            sourceType: "ai_extraction",
+            sourceSheet: extracted.sourceSheet || null,
+            sourcePage: extracted.sourcePage || null,
+            updatedAt: new Date(),
+          }).where(eq(wpVariablesTable.id, existing.id));
+          updated++;
+        } else {
+          skipped++;
+        }
+        continue;
+      }
+
+      const value = extracted?.value || def.defaultValue || null;
+      const conf = extracted ? extracted.confidence : (def.defaultValue ? "100" : null);
+
       const [v] = await db.insert(wpVariablesTable).values({
-        sessionId, category: cat, variableName: varName,
-        autoFilledValue: val.value, finalValue: val.value,
-        confidence: val.confidence,
+        sessionId,
+        variableCode: def.variableCode,
+        category: def.variableGroup,
+        variableName: def.variableName,
+        autoFilledValue: extracted?.value || null,
+        rawExtractedValue: extracted?.value || null,
+        finalValue: value,
+        confidence: conf,
+        sourceType: extracted ? "ai_extraction" : (def.defaultValue ? "default" : null),
+        sourceSheet: extracted?.sourceSheet || null,
+        sourcePage: extracted?.sourcePage || null,
+        reviewStatus: def.reviewRequiredFlag ? "needs_review" : (extracted ? "auto_filled" : "pending"),
       }).returning();
-      created.push(v);
+      results.push(v);
+      created++;
     }
 
-    await db.update(wpSessionsTable).set({ status: "variables", updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
-    res.json(created);
+    await db.update(wpSessionsTable).set({ status: "variables" as any, updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
+
+    const missingMandatory = VARIABLE_DEFINITIONS.filter(d => d.mandatoryFlag && !extractedMap[d.variableCode] && !d.defaultValue);
+    for (const mm of missingMandatory) {
+      const existingException = await db.select().from(wpExceptionLogTable).where(
+        and(eq(wpExceptionLogTable.sessionId, sessionId), eq(wpExceptionLogTable.title, `Missing mandatory: ${mm.variableLabel}`))
+      );
+      if (existingException.length === 0) {
+        await db.insert(wpExceptionLogTable).values({
+          sessionId, exceptionType: "missing_variable", severity: "high",
+          title: `Missing mandatory: ${mm.variableLabel}`,
+          description: `Variable ${mm.variableCode} (${mm.variableGroup}) is mandatory but has no value.`,
+          status: "open",
+        });
+      }
+    }
+
+    const lowConfVars = Object.entries(extractedMap).filter(([_, v]) => Number(v.confidence) < 70);
+    for (const [code, val] of lowConfVars) {
+      const def = VARIABLE_DEFINITIONS.find(d => d.variableCode === code);
+      if (def) {
+        await db.insert(wpExceptionLogTable).values({
+          sessionId, exceptionType: "low_confidence", severity: "medium",
+          title: `Low confidence: ${def.variableLabel}`,
+          description: `Variable ${code} has confidence ${val.confidence}%. Review recommended.`,
+          status: "open",
+        });
+      }
+    }
+
+    res.json({ created, updated, skipped, total: VARIABLE_DEFINITIONS.length, missingMandatory: missingMandatory.length });
   } catch (err: any) {
+    logger.error({ err }, "Failed to auto-fill variables");
     res.status(500).json({ error: "Failed to auto-fill variables" });
   }
 });
@@ -695,10 +824,53 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
 router.get("/sessions/:id/variables", async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(req.params.id);
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+
     const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
     const changeLog = await db.select().from(wpVariableChangeLogTable).where(eq(wpVariableChangeLogTable.sessionId, sessionId));
-    res.json({ variables, changeLog });
+
+    const defMap: Record<string, any> = {};
+    for (const d of VARIABLE_DEFINITIONS) defMap[d.variableCode] = d;
+
+    const grouped: Record<string, { group: string; subgroups: Record<string, any[]>; stats: { total: number; filled: number; missing: number; lowConf: number; locked: number; needsReview: number } }> = {};
+
+    for (const grp of VARIABLE_GROUPS) {
+      grouped[grp] = { group: grp, subgroups: {}, stats: { total: 0, filled: 0, missing: 0, lowConf: 0, locked: 0, needsReview: 0 } };
+    }
+
+    for (const v of variables) {
+      const def = defMap[v.variableCode];
+      const grp = v.category || "Other";
+      if (!grouped[grp]) grouped[grp] = { group: grp, subgroups: {}, stats: { total: 0, filled: 0, missing: 0, lowConf: 0, locked: 0, needsReview: 0 } };
+
+      const sub = def?.variableSubgroup || "General";
+      if (!grouped[grp].subgroups[sub]) grouped[grp].subgroups[sub] = [];
+
+      grouped[grp].subgroups[sub].push({
+        ...v,
+        definition: def || null,
+      });
+
+      grouped[grp].stats.total++;
+      if (v.finalValue) grouped[grp].stats.filled++;
+      else grouped[grp].stats.missing++;
+      if (v.confidence && Number(v.confidence) < 70) grouped[grp].stats.lowConf++;
+      if (v.isLocked) grouped[grp].stats.locked++;
+      if (v.reviewStatus === "needs_review") grouped[grp].stats.needsReview++;
+    }
+
+    const totalStats = {
+      total: variables.length,
+      filled: variables.filter(v => v.finalValue).length,
+      missing: variables.filter(v => !v.finalValue).length,
+      lowConfidence: variables.filter(v => v.confidence && Number(v.confidence) < 70).length,
+      needsReview: variables.filter(v => v.reviewStatus === "needs_review").length,
+      locked: variables.filter(v => v.isLocked).length,
+    };
+
+    res.json({ variables, grouped, stats: totalStats, changeLog, groups: VARIABLE_GROUPS });
   } catch (err: any) {
+    logger.error({ err }, "Failed to fetch variables");
     res.status(500).json({ error: "Failed to fetch variables" });
   }
 });
@@ -707,35 +879,126 @@ router.patch("/sessions/:id/variables/:varId", async (req: Request, res: Respons
   try {
     const sessionId = parseInt(req.params.id);
     const varId = parseInt(req.params.varId);
-    const { value, reason, editedBy } = req.body;
+    if (isNaN(sessionId) || isNaN(varId)) return res.status(400).json({ error: "Invalid ID" });
 
-    const existing = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.id, varId));
-    if (!existing[0]) return res.status(404).json({ error: "Variable not found" });
+    const { value, reason, editedBy, reviewStatus } = req.body;
+
+    const existing = await db.select().from(wpVariablesTable).where(and(eq(wpVariablesTable.id, varId), eq(wpVariablesTable.sessionId, sessionId)));
+    if (!existing[0]) return res.status(404).json({ error: "Variable not found in this session" });
     if (existing[0].isLocked) return res.status(400).json({ error: "Variable is locked. Unlock before editing." });
 
     const oldValue = existing[0].finalValue;
 
     await db.insert(wpVariableChangeLogTable).values({
       sessionId, variableId: varId,
+      variableCode: existing[0].variableCode,
       fieldName: existing[0].variableName,
       oldValue, newValue: value,
       editedBy: editedBy || null,
-      reason: reason || null,
+      reason: reason || "Manual edit",
+      sourceOfChange: "manual",
     });
 
-    const [updated] = await db.update(wpVariablesTable).set({
-      userEditedValue: value, finalValue: value, updatedAt: new Date(),
-    }).where(eq(wpVariablesTable.id, varId)).returning();
+    const updates: any = {
+      userEditedValue: value,
+      finalValue: value,
+      editedBy: editedBy || null,
+      editedAt: new Date(),
+      reasonForChange: reason || null,
+      versionNo: (existing[0].versionNo || 1) + 1,
+      updatedAt: new Date(),
+    };
+    if (reviewStatus) updates.reviewStatus = reviewStatus;
+    else updates.reviewStatus = "reviewed";
 
+    const [updated] = await db.update(wpVariablesTable).set(updates).where(eq(wpVariablesTable.id, varId)).returning();
+
+    const affectedHeads = await checkVariableImpact(sessionId, existing[0].variableCode);
+
+    res.json({ variable: updated, affectedHeads });
+  } catch (err: any) {
+    logger.error({ err }, "Failed to update variable");
+    res.status(500).json({ error: "Failed to update variable" });
+  }
+});
+
+router.patch("/sessions/:id/variables/:varId/review", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const varId = parseInt(req.params.varId);
+    if (isNaN(sessionId) || isNaN(varId)) return res.status(400).json({ error: "Invalid ID" });
+    const { reviewStatus } = req.body;
+    const validStatuses = ["pending", "auto_filled", "needs_review", "reviewed", "confirmed"];
+    if (!validStatuses.includes(reviewStatus)) return res.status(400).json({ error: "Invalid review status" });
+
+    const [updated] = await db.update(wpVariablesTable).set({ reviewStatus, updatedAt: new Date() }).where(and(eq(wpVariablesTable.id, varId), eq(wpVariablesTable.sessionId, sessionId))).returning();
     res.json(updated);
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to update variable" });
+    res.status(500).json({ error: "Failed to update review status" });
+  }
+});
+
+router.post("/sessions/:id/variables/lock-section", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+    const { group } = req.body;
+    if (!group) return res.status(400).json({ error: "Group name required" });
+
+    const vars = await db.select().from(wpVariablesTable).where(and(eq(wpVariablesTable.sessionId, sessionId), eq(wpVariablesTable.category, group)));
+
+    const mandatoryDefs = VARIABLE_DEFINITIONS.filter(d => d.variableGroup === group && d.mandatoryFlag);
+    const missingMandatory = mandatoryDefs.filter(d => {
+      const v = vars.find(vr => vr.variableCode === d.variableCode);
+      return !v || !v.finalValue;
+    });
+
+    if (missingMandatory.length > 0) {
+      return res.status(400).json({
+        error: "Cannot lock section — mandatory variables missing",
+        missing: missingMandatory.map(m => m.variableLabel),
+      });
+    }
+
+    const ids = vars.map(v => v.id);
+    if (ids.length > 0) {
+      await db.update(wpVariablesTable).set({ isLocked: true, lockedAt: new Date() }).where(inArray(wpVariablesTable.id, ids));
+    }
+
+    res.json({ locked: ids.length, group });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to lock section" });
   }
 });
 
 router.post("/sessions/:id/variables/lock-all", async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(req.params.id);
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+
+    const vars = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+
+    const mandatoryDefs = VARIABLE_DEFINITIONS.filter(d => d.mandatoryFlag);
+    const missingMandatory = mandatoryDefs.filter(d => {
+      const v = vars.find(vr => vr.variableCode === d.variableCode);
+      return !v || !v.finalValue;
+    });
+
+    if (missingMandatory.length > 0) {
+      return res.status(400).json({
+        error: "Cannot lock — mandatory variables missing",
+        missing: missingMandatory.map(m => ({ code: m.variableCode, label: m.variableLabel, group: m.variableGroup })),
+      });
+    }
+
+    const needsReview = vars.filter(v => v.reviewStatus === "needs_review");
+    if (needsReview.length > 0) {
+      return res.status(400).json({
+        error: "Cannot lock — variables pending review",
+        pendingReview: needsReview.length,
+      });
+    }
+
     await db.update(wpVariablesTable).set({ isLocked: true, lockedAt: new Date() }).where(eq(wpVariablesTable.sessionId, sessionId));
 
     const heads = await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, 0)));
@@ -743,12 +1006,107 @@ router.post("/sessions/:id/variables/lock-all", async (req: Request, res: Respon
       await db.update(wpHeadsTable).set({ status: "ready", updatedAt: new Date() }).where(eq(wpHeadsTable.id, heads[0].id));
     }
 
-    await db.update(wpSessionsTable).set({ status: "generation", updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
-    res.json({ success: true });
+    await db.update(wpSessionsTable).set({ status: "generation" as any, updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
+    res.json({ success: true, locked: vars.length });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to lock variables" });
   }
 });
+
+router.post("/sessions/:id/variables/validate", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+
+    const vars = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+    const varMap: Record<string, string | null> = {};
+    for (const v of vars) varMap[v.variableCode] = v.finalValue;
+
+    const issues: { code: string; label: string; issue: string; severity: string }[] = [];
+
+    const mandatoryDefs = VARIABLE_DEFINITIONS.filter(d => d.mandatoryFlag);
+    for (const d of mandatoryDefs) {
+      if (!varMap[d.variableCode]) {
+        issues.push({ code: d.variableCode, label: d.variableLabel, issue: "Mandatory variable missing", severity: "high" });
+      }
+    }
+
+    if (varMap["listed_status"] === "Listed" || varMap["public_interest_entity_flag"] === "true") {
+      if (!varMap["eqcr_required"] || varMap["eqcr_required"] !== "true") {
+        issues.push({ code: "eqcr_required", label: "EQCR Required", issue: "Listed/PIE entity requires EQCR", severity: "high" });
+      }
+    }
+
+    if (varMap["sales_tax_applicable"] === "true") {
+      if (!varMap["sales_tax_input"]) issues.push({ code: "sales_tax_input", label: "Sales Tax Input", issue: "Sales tax applicable but input not provided", severity: "medium" });
+      if (!varMap["sales_tax_output"]) issues.push({ code: "sales_tax_output", label: "Sales Tax Output", issue: "Sales tax applicable but output not provided", severity: "medium" });
+    }
+
+    if (varMap["related_parties_exist"] === "true") {
+      if (!varMap["related_party_register_available"]) {
+        issues.push({ code: "related_party_register_available", label: "RP Register", issue: "Related parties exist but register not confirmed", severity: "medium" });
+      }
+    }
+
+    if (varMap["going_concern_risk_flag"] === "true") {
+      if (!varMap["going_concern_conclusion"]) {
+        issues.push({ code: "going_concern_conclusion", label: "GC Conclusion", issue: "Going concern risk flagged but conclusion not provided", severity: "high" });
+      }
+    }
+
+    if (varMap["external_confirmations_required"] === "true") {
+      if (!varMap["bank_confirmations_sent"]) issues.push({ code: "bank_confirmations_sent", label: "Bank Confirmations", issue: "External confirmations required but bank confirmations not sent", severity: "medium" });
+    }
+
+    if (varMap["controls_reliance_planned"] === "true") {
+      if (!varMap["toc_planned"]) issues.push({ code: "toc_planned", label: "ToC Planned", issue: "Controls reliance planned but ToC not planned", severity: "medium" });
+    }
+
+    if (varMap["audit_opinion"] && varMap["audit_opinion"] !== "Unmodified") {
+      if (!varMap["modified_opinion_basis"]) issues.push({ code: "modified_opinion_basis", label: "Modified Opinion Basis", issue: "Modified opinion selected but basis not provided", severity: "high" });
+    }
+
+    if (varMap["materiality_basis_amount"] && varMap["overall_materiality_percent"]) {
+      const basis = Number(varMap["materiality_basis_amount"]);
+      const pct = Number(varMap["overall_materiality_percent"]);
+      if (basis > 0 && pct > 0) {
+        const suggested = Math.round(basis * pct / 100);
+        if (!varMap["overall_materiality_amount"]) {
+          issues.push({ code: "overall_materiality_amount", label: "Overall Materiality", issue: `Suggested: ${suggested.toLocaleString()}`, severity: "info" });
+        }
+      }
+    }
+
+    res.json({ issues, totalIssues: issues.length });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to validate variables" });
+  }
+});
+
+async function checkVariableImpact(sessionId: number, variableCode: string): Promise<string[]> {
+  const affectedWps: string[] = [];
+  for (const rule of DEPENDENCY_RULES) {
+    if (rule.trigger === variableCode) {
+      affectedWps.push(...(rule.wpImpacts || []));
+    }
+  }
+  if (affectedWps.length > 0) {
+    const heads = await db.select().from(wpHeadsTable).where(eq(wpHeadsTable.sessionId, sessionId));
+    const completedHeads = heads.filter(h => h.status === "approved" || h.status === "exported" || h.status === "completed");
+    if (completedHeads.length > 0) {
+      for (const h of completedHeads) {
+        await db.insert(wpExceptionLogTable).values({
+          sessionId, headIndex: h.headIndex,
+          exceptionType: "variable_change_impact", severity: "medium",
+          title: `Variable changed: ${variableCode}`,
+          description: `Head ${h.headName} may need regeneration due to variable change.`,
+          status: "open",
+        });
+      }
+    }
+  }
+  return affectedWps;
+}
 
 
 // ═══════════════════════════════════════════════════════════════════════════

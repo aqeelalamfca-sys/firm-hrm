@@ -66,6 +66,8 @@ export default function WorkingPapers() {
   const [extractionData, setExtractionData] = useState<any>(null);
   const [arrangedData, setArrangedData] = useState<any>(null);
   const [variables, setVariables] = useState<any[]>([]);
+  const [variableGroups, setVariableGroups] = useState<any>({});
+  const [variableStats, setVariableStats] = useState<any>(null);
   const [changeLog, setChangeLog] = useState<any[]>([]);
   const [heads, setHeads] = useState<any[]>([]);
   const [exceptions, setExceptions] = useState<any[]>([]);
@@ -246,9 +248,9 @@ export default function WorkingPapers() {
         method: "POST", headers: { ...headers, "Content-Type": "application/json" },
       });
       if (res.ok) {
-        const vars = await res.json();
-        setVariables(vars);
-        toast({ title: `${vars.length} variables auto-filled` });
+        const result = await res.json();
+        toast({ title: `Variables initialized`, description: `${result.created} created, ${result.updated} updated from extraction` });
+        await fetchVariables();
         setStage("variables");
       }
     } catch {} finally { setLoading(false); }
@@ -261,6 +263,8 @@ export default function WorkingPapers() {
       if (res.ok) {
         const data = await res.json();
         setVariables(data.variables || []);
+        setVariableGroups(data.grouped || {});
+        setVariableStats(data.stats || null);
         setChangeLog(data.changeLog || []);
       }
     } catch {}
@@ -279,6 +283,9 @@ export default function WorkingPapers() {
         setEditValue("");
         setEditReason("");
         await fetchVariables();
+      } else {
+        const err = await res.json();
+        toast({ title: "Update failed", description: err.error, variant: "destructive" });
       }
     } catch {}
   };
@@ -294,8 +301,42 @@ export default function WorkingPapers() {
         toast({ title: "Variables locked, generation unlocked" });
         await fetchSession(activeSession.id);
         setStage("generation");
+      } else {
+        const err = await res.json();
+        toast({ title: "Cannot lock", description: err.error || `${err.missing?.length || 0} mandatory variables missing`, variant: "destructive" });
       }
     } catch {} finally { setLoading(false); }
+  };
+
+  const lockSection = async (group: string) => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/variables/lock-section`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ group }),
+      });
+      if (res.ok) {
+        toast({ title: `${group} locked` });
+        await fetchVariables();
+      } else {
+        const err = await res.json();
+        toast({ title: "Cannot lock section", description: err.error, variant: "destructive" });
+      }
+    } catch {}
+  };
+
+  const validateVariables = async () => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/variables/validate`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data;
+      }
+    } catch {}
+    return { issues: [], totalIssues: 0 };
   };
 
   const generateHead = async (headIndex: number) => {
@@ -515,6 +556,8 @@ export default function WorkingPapers() {
       {stage === "variables" && (
         <VariablesStage
           variables={variables}
+          grouped={variableGroups}
+          stats={variableStats}
           changeLog={changeLog}
           editingVar={editingVar}
           editValue={editValue}
@@ -525,6 +568,8 @@ export default function WorkingPapers() {
           onSave={saveVariableEdit}
           onFetch={fetchVariables}
           onLockAll={lockAllVariables}
+          onLockSection={lockSection}
+          onValidate={validateVariables}
           loading={loading}
           confidenceBadge={confidenceBadge}
         />
@@ -839,69 +884,214 @@ function ArrangedDataStage({ data, activeTab, setActiveTab, onFetch, onApproveAl
   );
 }
 
-function VariablesStage({ variables, changeLog, editingVar, editValue, editReason, setEditingVar, setEditValue, setEditReason, onSave, onFetch, onLockAll, loading, confidenceBadge }: any) {
+function VariablesStage({ variables, grouped, stats, changeLog, editingVar, editValue, editReason, setEditingVar, setEditValue, setEditReason, onSave, onFetch, onLockAll, onLockSection, onValidate, loading, confidenceBadge }: any) {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<string>("all");
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [validationIssues, setValidationIssues] = useState<any[]>([]);
+  const [showAuditTrail, setShowAuditTrail] = useState(false);
+
   useEffect(() => { if (variables.length === 0) onFetch(); }, []);
 
-  const grouped = variables.reduce((acc: any, v: any) => {
-    const cat = v.category || "other";
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(v);
-    return acc;
-  }, {});
+  const toggleGroup = (g: string) => setExpandedGroups(prev => ({ ...prev, [g]: !prev[g] }));
+
+  const runValidation = async () => {
+    const result = await onValidate();
+    setValidationIssues(result.issues || []);
+  };
+
+  const filterVar = (v: any) => {
+    if (search) {
+      const s = search.toLowerCase();
+      const label = v.definition?.variableLabel || v.variableName || "";
+      const code = v.variableCode || "";
+      if (!label.toLowerCase().includes(s) && !code.toLowerCase().includes(s)) return false;
+    }
+    if (filter === "mandatory" && !v.definition?.mandatoryFlag) return false;
+    if (filter === "low_confidence" && (!v.confidence || Number(v.confidence) >= 70)) return false;
+    if (filter === "missing" && v.finalValue) return false;
+    if (filter === "reviewed" && v.reviewStatus !== "reviewed" && v.reviewStatus !== "confirmed") return false;
+    if (filter === "locked" && !v.isLocked) return false;
+    if (filter === "needs_review" && v.reviewStatus !== "needs_review") return false;
+    return true;
+  };
+
+  const groupEntries = Object.entries(grouped).filter(([, g]: any) => {
+    if (!g.subgroups) return false;
+    const allVars = Object.values(g.subgroups).flat() as any[];
+    return allVars.some(filterVar);
+  });
 
   return (
     <div className="space-y-4">
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+          {[
+            { label: "Total", value: stats.total, color: "bg-slate-100 text-slate-800" },
+            { label: "Filled", value: stats.filled, color: "bg-green-100 text-green-800" },
+            { label: "Missing", value: stats.missing, color: "bg-red-100 text-red-800" },
+            { label: "Low Confidence", value: stats.lowConfidence, color: "bg-amber-100 text-amber-800" },
+            { label: "Needs Review", value: stats.needsReview, color: "bg-purple-100 text-purple-800" },
+            { label: "Locked", value: stats.locked, color: "bg-blue-100 text-blue-800" },
+          ].map(s => (
+            <div key={s.label} className={cn("rounded-lg p-3 text-center border", s.color)}>
+              <p className="text-2xl font-bold">{s.value}</p>
+              <p className="text-xs font-medium mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="bg-card border rounded-xl p-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Settings2 className="w-5 h-5 text-primary" /> Engagement Variables
+            <Settings2 className="w-5 h-5 text-primary" /> Audit Variable Register
+            {stats && <span className="text-xs font-normal text-muted-foreground">({stats.filled}/{stats.total} filled)</span>}
           </h2>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="outline" size="sm" onClick={onFetch}><RefreshCw className="w-4 h-4 mr-1" /> Refresh</Button>
+            <Button variant="outline" size="sm" onClick={runValidation}><Shield className="w-4 h-4 mr-1" /> Validate</Button>
+            <Button variant="outline" size="sm" onClick={() => setShowAuditTrail(!showAuditTrail)}><ClipboardCheck className="w-4 h-4 mr-1" /> Trail ({changeLog.length})</Button>
             <Button size="sm" onClick={onLockAll} disabled={loading} className="bg-amber-600 hover:bg-amber-700">
               <Lock className="w-4 h-4 mr-1" /> Lock All & Proceed
             </Button>
           </div>
         </div>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
-          Review auto-filled variables. Click edit to change any value. All edits are logged for audit trail. Lock variables when satisfied to proceed to generation.
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Input className="h-8 w-64 text-sm" placeholder="Search variables..." value={search} onChange={e => setSearch(e.target.value)} />
+          {["all", "mandatory", "missing", "low_confidence", "needs_review", "reviewed", "locked"].map(f => (
+            <button key={f} onClick={() => setFilter(f)} className={cn("px-3 py-1 rounded-full text-xs font-medium border transition-colors", filter === f ? "bg-primary text-white border-primary" : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted")}>
+              {f.replace(/_/g, " ").replace(/^\w/, c => c.toUpperCase())}
+            </button>
+          ))}
         </div>
 
-        {Object.entries(grouped).map(([cat, vars]: any) => (
-          <div key={cat} className="mb-6">
-            <h3 className="text-sm font-semibold uppercase text-muted-foreground mb-2 flex items-center gap-2">
-              <FileCheck className="w-4 h-4" /> {cat.replace(/_/g, " ")}
-            </h3>
-            <div className="space-y-1">
-              {vars.map((v: any) => (
-                <div key={v.id} className={cn("flex items-center gap-3 p-2 rounded-lg border", v.isLocked ? "bg-green-50 border-green-200" : "hover:bg-muted/20")}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{(v.variableName || "").replace(/_/g, " ")}</p>
-                    {editingVar === v.id ? (
-                      <div className="mt-1 flex gap-2 flex-wrap">
-                        <Input className="h-8 text-sm w-48" value={editValue} onChange={e => setEditValue(e.target.value)} placeholder="New value" />
-                        <Input className="h-8 text-sm w-40" value={editReason} onChange={e => setEditReason(e.target.value)} placeholder="Reason for change" />
-                        <Button size="sm" variant="default" className="h-8" onClick={() => onSave(v.id)}><Save className="w-3 h-3 mr-1" /> Save</Button>
-                        <Button size="sm" variant="ghost" className="h-8" onClick={() => setEditingVar(null)}>Cancel</Button>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">{v.finalValue || v.autoFilledValue || "—"}</p>
-                    )}
-                  </div>
-                  {confidenceBadge(v.confidence ? Number(v.confidence) : null)}
-                  {v.isLocked ? (
-                    <Lock className="w-4 h-4 text-green-600" />
-                  ) : (
-                    <button onClick={() => { setEditingVar(v.id); setEditValue(v.finalValue || ""); setEditReason(""); }}>
-                      <Pencil className="w-4 h-4 text-muted-foreground hover:text-primary" />
-                    </button>
-                  )}
+        {validationIssues.length > 0 && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <h3 className="text-sm font-semibold text-amber-900 mb-2 flex items-center gap-1"><AlertTriangle className="w-4 h-4" /> Validation Issues ({validationIssues.length})</h3>
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {validationIssues.map((issue: any, i: number) => (
+                <div key={i} className="text-xs flex items-center gap-2 p-1">
+                  <span className={cn("w-2 h-2 rounded-full", issue.severity === "high" ? "bg-red-500" : issue.severity === "medium" ? "bg-amber-500" : "bg-blue-500")} />
+                  <span className="font-medium">{issue.label}</span>
+                  <span className="text-muted-foreground">{issue.issue}</span>
                 </div>
               ))}
             </div>
           </div>
-        ))}
+        )}
+
+        {groupEntries.map(([groupName, groupData]: any) => {
+          const isExpanded = expandedGroups[groupName] !== false;
+          const gs = groupData.stats || { total: 0, filled: 0, missing: 0, locked: 0 };
+          const pct = gs.total > 0 ? Math.round((gs.filled / gs.total) * 100) : 0;
+          const allLocked = gs.locked === gs.total && gs.total > 0;
+
+          return (
+            <div key={groupName} className="mb-3 border rounded-lg overflow-hidden">
+              <button onClick={() => toggleGroup(groupName)} className={cn("w-full flex items-center justify-between p-3 hover:bg-muted/30 transition-colors", allLocked ? "bg-green-50" : "bg-muted/10")}>
+                <div className="flex items-center gap-2">
+                  {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  <span className="font-semibold text-sm">{groupName}</span>
+                  {allLocked && <Lock className="w-3 h-3 text-green-600" />}
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-xs text-muted-foreground w-8">{pct}%</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{gs.filled}/{gs.total}</span>
+                  {gs.missing > 0 && <span className="text-xs bg-red-100 text-red-700 px-1.5 rounded">{gs.missing} missing</span>}
+                  {!allLocked && (
+                    <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={(e) => { e.stopPropagation(); onLockSection(groupName); }}>
+                      <Lock className="w-3 h-3 mr-1" /> Lock
+                    </Button>
+                  )}
+                </div>
+              </button>
+
+              {isExpanded && (
+                <div className="border-t">
+                  {Object.entries(groupData.subgroups || {}).map(([subName, subVars]: any) => {
+                    const filtered = subVars.filter(filterVar);
+                    if (filtered.length === 0) return null;
+                    return (
+                      <div key={subName} className="border-b last:border-b-0">
+                        <div className="px-4 py-1.5 bg-muted/20">
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{subName}</span>
+                        </div>
+                        <div className="divide-y">
+                          {filtered.map((v: any) => {
+                            const def = v.definition;
+                            const isMandatory = def?.mandatoryFlag;
+                            const isEditing = editingVar === v.id;
+
+                            return (
+                              <div key={v.id} className={cn("flex items-center gap-3 px-4 py-2", v.isLocked ? "bg-green-50/50" : "hover:bg-muted/10")}>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="text-sm font-medium">{def?.variableLabel || (v.variableName || "").replace(/_/g, " ")}</p>
+                                    {isMandatory && <span className="text-[10px] bg-red-100 text-red-700 px-1 rounded font-semibold">REQ</span>}
+                                    {v.reviewStatus === "needs_review" && <span className="text-[10px] bg-purple-100 text-purple-700 px-1 rounded">REVIEW</span>}
+                                    {def?.standardReference && <span className="text-[10px] text-muted-foreground">{def.standardReference}</span>}
+                                  </div>
+
+                                  {isEditing ? (
+                                    <div className="mt-1.5 flex gap-2 flex-wrap items-end">
+                                      {def?.inputMode === "dropdown" && def?.dropdownOptionsJson ? (
+                                        <select className="h-8 text-sm border rounded px-2 w-52" value={editValue} onChange={e => setEditValue(e.target.value)}>
+                                          <option value="">-- Select --</option>
+                                          {(def.dropdownOptionsJson as string[]).map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                                        </select>
+                                      ) : def?.inputMode === "toggle" ? (
+                                        <select className="h-8 text-sm border rounded px-2 w-32" value={editValue} onChange={e => setEditValue(e.target.value)}>
+                                          <option value="">-- Select --</option>
+                                          <option value="true">Yes</option>
+                                          <option value="false">No</option>
+                                        </select>
+                                      ) : (
+                                        <Input className="h-8 text-sm w-52" value={editValue} onChange={e => setEditValue(e.target.value)} placeholder="Enter value" type={def?.dataType === "number" ? "number" : def?.dataType === "date" ? "date" : "text"} />
+                                      )}
+                                      <Input className="h-8 text-sm w-44" value={editReason} onChange={e => setEditReason(e.target.value)} placeholder="Reason for change *" />
+                                      <Button size="sm" variant="default" className="h-8" onClick={() => onSave(v.id)} disabled={!editReason.trim()}><Save className="w-3 h-3 mr-1" /> Save</Button>
+                                      <Button size="sm" variant="ghost" className="h-8" onClick={() => setEditingVar(null)}>Cancel</Button>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-2">
+                                      <p className="text-sm text-muted-foreground">
+                                        {def?.inputMode === "toggle" ? (v.finalValue === "true" ? "Yes" : v.finalValue === "false" ? "No" : "—") :
+                                          (v.finalValue || v.autoFilledValue || "—")}
+                                      </p>
+                                      {v.sourceType && <span className="text-[10px] text-muted-foreground italic">({v.sourceType.replace(/_/g, " ")})</span>}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {confidenceBadge(v.confidence ? Number(v.confidence) : null)}
+                                  {v.isLocked ? (
+                                    <Lock className="w-4 h-4 text-green-600" />
+                                  ) : (
+                                    <button onClick={() => { setEditingVar(v.id); setEditValue(v.finalValue || ""); setEditReason(""); }}>
+                                      <Pencil className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         {variables.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
@@ -910,16 +1100,19 @@ function VariablesStage({ variables, changeLog, editingVar, editValue, editReaso
           </div>
         )}
 
-        {changeLog.length > 0 && (
+        {showAuditTrail && changeLog.length > 0 && (
           <div className="mt-6 p-4 bg-muted/30 rounded-lg">
-            <h3 className="text-sm font-semibold mb-2">Edit Audit Trail ({changeLog.length} changes)</h3>
-            <div className="space-y-1 max-h-40 overflow-y-auto">
+            <h3 className="text-sm font-semibold mb-2 flex items-center gap-2"><ClipboardCheck className="w-4 h-4" /> Audit Trail ({changeLog.length} changes)</h3>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
               {changeLog.map((c: any) => (
-                <div key={c.id} className="text-xs flex gap-3 p-1.5 rounded bg-white border">
+                <div key={c.id} className="text-xs flex gap-3 p-1.5 rounded bg-white border items-center">
+                  <span className="font-mono text-muted-foreground">{c.variableCode || c.fieldName}</span>
                   <span className="font-medium">{(c.fieldName || "").replace(/_/g, " ")}</span>
-                  <span className="text-red-600 line-through">{c.oldValue}</span>
+                  <span className="text-red-600 line-through">{c.oldValue || "—"}</span>
+                  <ArrowRight className="w-3 h-3 text-muted-foreground" />
                   <span className="text-green-600">{c.newValue}</span>
                   {c.reason && <span className="text-muted-foreground italic">({c.reason})</span>}
+                  {c.sourceOfChange && <span className="text-muted-foreground">[{c.sourceOfChange}]</span>}
                 </div>
               ))}
             </div>

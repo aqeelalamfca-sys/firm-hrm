@@ -35,13 +35,18 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 **AI Working Paper Generator (Audit-Grade Sequential Workflow) — V2 REBUILT:**
 - Frontend: `artifacts/hrm-system/src/pages/working-papers.tsx`
 - Backend: `artifacts/api-server/src/routes/working-papers.ts`
-- Schema: `lib/db/src/schema/working_papers.ts` (14 new tables)
+- Schema: `lib/db/src/schema/working_papers.ts` (16 tables incl. wp_variable_definitions, wp_variable_dependency_rules)
+- Variable definitions: `artifacts/api-server/src/data/variable-definitions.ts` (370+ variables, 20 groups, extraction mapping, dependency rules)
 - **6-stage flow**: Upload → AI Extraction → Arranged Data Review → Variables (Lock) → Head-wise Generation → Export
-- **Session-based**: All data persisted in PostgreSQL (wp_sessions, wp_uploaded_files, wp_extraction_runs, wp_extracted_fields, wp_arranged_data, wp_variables, wp_variable_change_log, wp_exception_log, wp_trial_balance_lines, wp_gl_accounts, wp_gl_entries, wp_heads, wp_head_documents, wp_export_jobs)
+- **Session-based**: All data persisted in PostgreSQL (wp_sessions, wp_uploaded_files, wp_extraction_runs, wp_extracted_fields, wp_arranged_data, wp_variables, wp_variable_change_log, wp_exception_log, wp_trial_balance_lines, wp_gl_accounts, wp_gl_entries, wp_heads, wp_head_documents, wp_export_jobs, wp_variable_definitions, wp_variable_dependency_rules)
 - **Strict upload rules**: Financial Statements/TB/GL/Bank → Excel only; Sales Tax/Notices/Annexures → PDF only
 - **OCR detection**: Scanned PDFs auto-detected (text < 100 chars with large buffer), source type classified as native_text_pdf/ocr_pdf/image_ocr/excel_native
 - **Arranged data staging**: 10 tabs (Entity Profile, Reporting Metadata, FS Line Items, Prior Year Comparatives, Sales Tax Data, Tax Period Summary, Notes/Schedules, Exceptions, Assumptions Register, Extraction Log) with field-level confidence scoring
-- **Variable management**: Auto-filled from extraction, editable with audit trail (wp_variable_change_log stores field, old/new value, reason, editor, timestamp), lockable before generation
+- **Audit Variable Engine (370+ variables across 20 groups)**: Entity & Constitution, Ownership & Governance, Engagement Acceptance, Accounting & Records, TB & COA, Financial Statements (CY+PY), Materiality, Risk Assessment, Internal Controls, Sampling, Analytical Procedures, Tax & Compliance, Related Parties, Laws & Regulations, Audit Evidence, Going Concern, Misstatements, Completion & Reporting, QC & Inspection, Workflow & Sign-offs
+- **Variable management**: Master definitions with dataType, inputMode (text/dropdown/toggle/date), mandatory flag, AI-extractable flag, review-required flag, ISA standard references, Pakistan law references, and working paper impact linkage. Auto-filled from extraction via EXTRACTION_FIELD_TO_VARIABLE_MAP, editable with mandatory reason-for-change, confidence scoring, review status workflow (pending → auto_filled → needs_review → reviewed → confirmed), section-wise and all-at-once locking with mandatory validation gate
+- **Validation rules engine**: Mandatory checks, conditional logic (listed/PIE → EQCR, sales_tax_applicable → ST variables, related_parties → RP register, controls_reliance → ToC, modified opinion → basis), materiality auto-calculation suggestions
+- **Variable dependency rules**: Trigger-based impact detection — when a variable changes after heads are approved, exceptions are auto-generated marking affected heads as needing regeneration
+- **Variable UI**: Collapsible groups with completion %, summary cards (total/filled/missing/low-confidence/needs-review/locked), search bar, filter pills (all/mandatory/missing/low-confidence/needs-review/reviewed/locked), inline editing with type-aware inputs (dropdown, toggle, date, number, text), audit trail viewer
 - **Confidence scoring**: Field-level 0-100%, color-coded (90-100% green, 70-89% amber/review, <70% red/confirm required)
 - **TB engine**: Rule-based first (deterministic from FS with Pakistan 4-digit COA mapping), AI-assisted second. Never silently force-balances — imbalances logged as critical exceptions
 - **GL engine**: AI generates per-account with controls: opening balance, monthly spread, voucher continuity, closing must match TB. Batch processing (6 accounts/batch). All synthetic entries flagged

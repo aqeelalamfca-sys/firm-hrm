@@ -1,0 +1,737 @@
+Ultimate Prompt for Replit
+
+Update the existing “Variables” module in the Working Papers app into a complete audit-variable engine that captures every variable required to generate end-to-end statutory audit working papers for Pakistan-compliant audits. Do not create a separate mini feature. Upgrade the existing Variables step, schema, UI, validations, extraction logic, and downstream linkage so all audit working papers are driven by variables.
+
+Core objective
+
+Expand the current variables screen from basic extracted fields into a full audit engagement variable register that supports:
+
+pre-engagement and continuance
+engagement setup
+planning
+materiality
+risk assessment
+internal controls
+sampling
+trial balance mapping
+GL logic
+analytical procedures
+substantive procedures
+audit evidence
+tax and regulatory compliance
+related parties
+going concern
+completion
+reporting
+EQCR
+inspection and archiving
+
+The system must allow:
+
+AI extraction from uploaded files
+manual editing by user
+confidence scoring
+review status
+lock/finalize variables
+audit trail for every edit
+recalculation/regeneration of affected working papers whenever a relevant variable changes
+1. Update the data model
+
+Create a normalized variable architecture, not a flat list only.
+
+A. Variable master table
+
+Add a master definition model for all variables with fields such as:
+
+variable_code
+variable_group
+variable_subgroup
+variable_name
+variable_label
+description
+data_type
+input_mode
+dropdown_options_json
+default_value
+mandatory_flag
+editable_flag
+ai_extractable_flag
+review_required_flag
+standard_reference
+pakistan_reference
+affects_modules_json
+affects_working_papers_json
+display_order
+active_flag
+B. Engagement variable values table
+
+Store engagement-specific values separately:
+
+id
+engagement_id
+variable_code
+current_value_json
+raw_extracted_value
+normalized_value
+confidence_score
+source_type
+source_file_id
+source_page
+source_sheet
+review_status
+locked_flag
+locked_by
+locked_at
+edited_by
+edited_at
+reason_for_change
+version_no
+C. Variable change log table
+
+Maintain full audit trail:
+
+engagement_id
+variable_code
+old_value
+new_value
+changed_by
+changed_at
+reason_for_change
+source_of_change
+ip_or_session_if_available
+D. Variable dependency rules table
+
+For dynamic generation:
+
+trigger_variable_code
+condition_expression
+impacted_variable_codes_json
+impacted_working_papers_json
+impacted_calculations_json
+impacted_risk_areas_json
+2. Add the complete variable universe
+
+Replace the limited existing set with grouped sections below.
+
+Group 1 — Entity and constitution
+
+Include:
+
+entity_name
+legal_name_as_per_secp
+short_name
+ntn
+strn
+sepc_registration_no
+incorporation_date
+commencement_date
+entity_legal_form
+listed_status
+public_interest_entity_flag
+principal_activity
+industry_sector
+registered_address
+business_address
+principal_place_of_business
+branch_offices_flag
+number_of_branches
+financial_year_start
+financial_year_end
+reporting_period_start
+reporting_period_end
+functional_currency
+presentation_currency
+reporting_framework
+applicable_company_law
+tax_jurisdiction
+group_entity_flag
+parent_entity_name
+subsidiary_flag
+associate_flag
+joint_venture_flag
+foreign_operations_flag
+Group 2 — Ownership and governance
+
+Include:
+
+share_capital
+authorized_capital
+paid_up_capital
+classes_of_shares
+number_of_shareholders
+shareholder_pattern_available
+beneficial_owners_identified
+board_exists
+number_of_directors
+ceo_name
+cfo_name
+company_secretary
+audit_committee_exists
+internal_audit_function_exists
+governance_level
+key_management_personnel
+related_parties_exist
+related_parties_list
+minutes_available
+board_minutes_reviewed
+agm_held
+statutory_registers_available
+Group 3 — Engagement acceptance and continuance
+
+Include:
+
+engagement_type
+assurance_level
+first_year_audit
+recurring_engagement
+previous_auditor
+predecessor_communication_done
+client_acceptance_approved
+continuance_approved
+independence_confirmed
+ethical_compliance_confirmed
+conflict_check_completed
+engagement_letter_signed
+terms_of_engagement_agreed
+management_integrity_risk
+client_risk_category
+restricted_scope_flag
+eqcr_required
+specialist_required
+component_auditor_required
+engagement_partner
+engagement_manager
+engagement_team_members
+reviewer
+approver
+engagement_start_date
+reporting_deadline
+expected_signing_date
+Group 4 — Accounting and records environment
+
+Include:
+
+accounting_software
+erp_name
+books_maintained_properly
+manual_or_system
+gl_available
+tb_available
+fs_uploaded
+prior_year_fs_available
+prior_year_audit_file_available
+fixed_asset_register_available
+inventory_records_available
+payroll_records_available
+tax_records_available
+bank_statements_available
+voucher_support_available
+digital_document_quality
+ocr_quality_score
+missing_records_flag
+records_reliability_score
+Group 5 — Trial balance and chart of accounts structure
+
+Include:
+
+coa_available
+account_code_present
+account_name_present
+account_type
+account_classification
+opening_balance_present
+movement_debit_present
+movement_credit_present
+closing_balance_present
+tb_balanced_flag
+unmapped_accounts_count
+unmapped_accounts_value
+fs_mapping_completed
+control_accounts_identified
+manual_tb_adjustments_flag
+adjusted_tb_flag
+Group 6 — Financial statement extracted figures
+
+Include current year and prior year for all major heads:
+
+total_assets
+non_current_assets
+current_assets
+fixed_assets
+right_of_use_assets
+capital_work_in_progress
+intangible_assets
+investments
+long_term_loans
+deposits_prepayments
+inventory
+trade_receivables
+advances
+other_receivables
+short_term_investments
+tax_refunds_due
+cash_and_bank
+total_equity
+share_capital
+reserves
+retained_earnings
+revaluation_surplus
+total_liabilities
+non_current_liabilities
+current_liabilities
+long_term_borrowings
+lease_liabilities
+trade_payables
+accruals
+taxation_payable
+short_term_borrowings
+current_portion_long_term_debt
+revenue
+cost_of_sales
+gross_profit
+admin_expenses
+selling_distribution_expenses
+finance_cost
+other_income
+other_expenses
+profit_before_tax
+tax_expense
+profit_after_tax
+other_comprehensive_income
+total_comprehensive_income
+operating_cash_flow
+investing_cash_flow
+financing_cash_flow
+
+Also store:
+
+prior_year equivalents for each line
+variance_amount
+variance_percent
+Group 7 — Materiality
+
+Include:
+
+materiality_basis
+materiality_basis_amount
+benchmark_reason
+overall_materiality_percent
+overall_materiality_amount
+performance_materiality_percent
+performance_materiality_amount
+trivial_threshold_percent
+trivial_threshold_amount
+specific_materiality_required
+specific_materiality_areas
+materiality_revision_flag
+revised_materiality_reason
+Group 8 — Risk assessment
+
+Include:
+
+inherent_risk_overall
+control_risk_overall
+risk_of_material_misstatement_overall
+fraud_risk_flag
+revenue_fraud_risk_flag
+management_override_risk_flag
+going_concern_risk_flag
+related_party_risk_flag
+litigation_risk_flag
+tax_risk_flag
+compliance_risk_flag
+going_concern_indicator_count
+significant_risk_areas
+risk_assessment_summary
+assertion_level_risk_required
+account_level_risk_mapping_done
+Group 9 — Internal controls and control environment
+
+Include:
+
+control_environment_rating
+segregation_of_duties
+authorization_controls
+access_controls
+it_general_controls
+application_controls
+bank_payment_controls
+procurement_controls
+sales_controls
+payroll_controls
+inventory_controls
+journal_entry_controls
+controls_documented
+walkthrough_completed
+toc_planned
+controls_reliance_planned
+control_deficiencies_identified
+significant_deficiency_flag
+material_weakness_flag
+Group 10 — Sampling
+
+Include:
+
+sampling_required
+population_count
+population_value
+key_item_count
+key_item_value
+sample_method
+sample_size
+expected_misstatement
+tolerable_misstatement
+confidence_level
+selection_interval
+stratification_used
+sampling_basis
+sample_generated_by_ai
+sample_reviewed_by_user
+Group 11 — Analytical procedures
+
+Include:
+
+planning_analytics_performed
+substantive_analytics_planned
+final_analytics_performed
+ratio_analysis_required
+trend_analysis_required
+monthwise_analysis_required
+expectation_developed
+threshold_for_investigation
+unusual_fluctuations_identified
+analytics_conclusion
+Group 12 — Tax and statutory compliance
+
+Include:
+
+income_tax_return_filed
+sales_tax_return_filed
+withholding_statements_filed
+annual_return_filed
+secp_forms_filed
+sales_tax_applicable
+further_tax_applicable
+minimum_tax_applicable
+final_tax_regime_flag
+normal_tax_regime_flag
+deferred_tax_applicable
+current_tax_provision
+advance_tax
+withholding_tax_deducted
+withholding_tax_paid
+sales_tax_input
+sales_tax_output
+sales_tax_payable_or_refundable
+tax_litigation_exists
+notices_received
+tax_exposure_estimated
+non_compliance_identified
+Group 13 — Related parties
+
+Include:
+
+related_party_register_available
+related_party_transactions_exist
+related_party_balances_exist
+directors_loan_exists
+sponsor_transactions_exist
+common_control_transactions_exist
+arm_length_support_available
+disclosure_complete_flag
+Group 14 — Laws and regulations
+
+Include:
+
+companies_act_applicable
+ifrs_applicable
+ifrs_for_smes_applicable
+sector_regulator
+sector_specific_compliance_required
+licenses_required
+licenses_valid
+legal_cases_exist
+contingent_liabilities_exist
+non_compliance_with_laws_flag
+Group 15 — Audit evidence and confirmations
+
+Include:
+
+external_confirmations_required
+bank_confirmations_sent
+bank_confirmations_received
+receivable_confirmations_sent
+receivable_confirmations_received
+payable_confirmations_sent
+payable_confirmations_received
+legal_letter_sent
+legal_letter_received
+physical_verification_done
+management_representation_letter_received
+subsequent_events_review_done
+minutes_review_done
+journal_testing_done
+evidence_sufficiency_rating
+evidence_appropriateness_rating
+Group 16 — Going concern
+
+Include:
+
+going_concern_basis_used
+gc_losses_flag
+gc_negative_equity_flag
+gc_negative_operating_cashflows_flag
+gc_default_on_loans_flag
+gc_overdue_liabilities_flag
+gc_management_plans_available
+gc_financial_support_available
+gc_material_uncertainty_flag
+gc_disclosure_adequate_flag
+going_concern_conclusion
+Group 17 — Misstatements and adjustments
+
+Include:
+
+identified_misstatements_count
+identified_misstatements_value
+corrected_misstatements_value
+uncorrected_misstatements_value
+clearly_trivial_items_value
+proposed_adjusting_entries_count
+passed_adjustments_count
+waived_adjustments_count
+misstatement_material_flag
+summary_of_uncorrected_misstatements_done
+Group 18 — Completion and reporting
+
+Include:
+
+all_planned_procedures_completed
+review_completed
+partner_review_completed
+eqcr_completed
+final_analytics_completed
+subsequent_events_cleared
+contingencies_reviewed
+going_concern_finalized
+mrl_signed
+fs_disclosures_reviewed
+report_type
+audit_opinion
+emphasis_of_matter_flag
+other_matter_flag
+key_audit_matters_flag
+modified_opinion_basis
+reporting_framework_disclosed
+report_date
+signing_partner_name
+Group 19 — Quality control, archiving, inspection
+
+Include:
+
+engagement_quality_objectives_met
+consultation_required
+consultation_completed
+independence_reconfirmed
+differences_of_opinion_flag
+archiving_due_date
+file_archived
+archiving_completed_date
+inspection_ready_flag
+unresolved_review_notes_count
+unresolved_exceptions_count
+Group 20 — Workflow and sign-offs
+
+Include:
+
+preparer_name
+preparer_designation
+preparation_date
+reviewer_name
+reviewer_designation
+review_date
+approver_name
+approver_designation
+approval_date
+variable_pack_status
+variable_pack_locked
+lock_reason
+reopen_reason
+current_stage
+current_substage
+3. UI/UX update required
+
+Upgrade the current Variables screen into a structured audit form.
+
+Required UI changes
+Keep the current extraction-and-review concept
+Replace long ungrouped list with collapsible sections by variable group
+Show section-wise completion percentage
+Show confidence score beside each field
+Show source reference if extracted from file
+Show mandatory badge
+Show review badge
+Show edit icon
+Show reason-for-change popup before saving manual edits
+Add search bar for variables
+Add filter by:
+all
+mandatory
+low confidence
+missing
+reviewed
+locked
+Add “review all low-confidence items” action
+Add “lock section” and “lock all & proceed”
+Add top summary cards:
+total variables
+filled
+missing
+low confidence
+pending review
+locked
+Preserve existing clean look but make it fit for 150+ variables without becoming cluttered
+4. Extraction logic update
+
+Enhance the AI extraction pipeline.
+
+Extraction requirements
+Extract variables from:
+financial statements
+trial balance
+general ledger
+tax returns
+sales tax returns
+bank statements
+incorporation/SECP documents
+engagement documents
+Support OCR where needed
+Normalize values into correct types
+Map synonyms to standard variable codes
+Store raw extracted text separately
+Store source page, source sheet, and source file
+Calculate confidence score per variable
+Flag conflicting values from multiple files
+If multiple candidate values exist, do not overwrite silently; create an exception for review
+5. Validation and logic rules
+
+Add rules engine.
+
+Mandatory validations
+financial year dates must be valid
+reporting period must align with year-end logic
+TB must balance before lock
+if first_year_audit = yes, enable opening balance working papers
+if listed_status = listed or PIE = yes, stricter reporting and EQCR variables become mandatory
+if sales_tax_applicable = yes, sales tax variables and working papers become mandatory
+if related_parties_exist = yes, related party section becomes mandatory
+if going_concern risk = yes, going concern section becomes mandatory
+if external confirmations required = yes, confirmation variables become mandatory
+if control reliance planned = yes, ToC variables become mandatory
+if modified opinion selected, basis paragraph fields become mandatory
+Auto-calculations
+calculate materiality suggestions from benchmark
+calculate prior year variances
+calculate working paper triggers from selected variables
+calculate required audit sections based on entity type and engagement type
+calculate sample size suggestion based on risk, population, materiality, and audit approach
+6. Downstream linkage
+
+This is critical. The variables must drive all outputs.
+
+Every variable must be linked to:
+working paper templates
+risk register
+materiality memo
+planning memo
+TB mapping
+GL generation logic
+control testing
+substantive testing
+analytical procedures
+completion checklist
+reporting templates
+EQCR checklist
+inspection file checklist
+Build trigger rules such that:
+variable changes update affected working papers automatically
+affected items are marked “regeneration required”
+locked/generated documents show “outdated due to variable changes” if relevant variables changed after generation
+7. Exceptions and audit trail
+
+Add a proper exceptions layer.
+
+Exceptions to generate automatically
+missing mandatory variables
+conflicting extracted values
+low-confidence critical variables
+TB not balanced
+unmapped TB accounts
+materiality benchmark missing
+required sections not completed
+mandatory sign-offs missing
+
+Each exception should have:
+
+severity
+variable link
+description
+suggested action
+assigned_to
+status
+resolved_by
+resolved_at
+8. Migration and backward compatibility
+
+Do not break existing engagements.
+
+Required migration behavior
+map old fields into new variable codes
+preserve existing values
+preserve existing UI data where possible
+auto-place current entity/financial/tax fields into the new grouped sections
+fill missing variable definitions with defaults
+add seed data for all variable definitions
+9. Seed the system with full variable definitions
+
+Create a seed file with all variable definitions including:
+
+code
+label
+group
+subgroup
+datatype
+dropdown options
+mandatory rules
+extraction aliases
+standard references
+Pakistan law references
+working paper triggers
+10. Deliverables expected from this update
+
+Implement fully and do not stop at schema only. Complete all of the following:
+
+backend schema changes
+migrations
+seed data for all variables
+variable API endpoints
+extraction mapping updates
+UI grouped variable screen
+review/edit/lock workflow
+audit trail logging
+validation rules
+trigger/regeneration logic
+exception engine
+backward compatibility mapping
+tested working version without runtime errors
+11. Acceptance criteria
+
+The update is complete only when:
+
+the Variables step contains the full audit-variable universe
+user can review and edit all variables in grouped sections
+all edits are logged
+low-confidence and missing variables are visible instantly
+lock and proceed works properly
+variable changes trigger downstream update requirements
+the system is ready to drive complete statutory audit working papers for Pakistan-based engagements
