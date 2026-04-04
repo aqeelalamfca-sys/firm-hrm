@@ -823,6 +823,41 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
       sessionMetaMap["financial_year_end"] = session.periodEnd;
     }
 
+    const periodEnd = session.periodEnd || "";
+    const periodStart = session.periodStart || "";
+    const year = parseInt(session.engagementYear) || new Date().getFullYear();
+
+    if (periodEnd) {
+      const peDate = new Date(periodEnd);
+      const pe30 = new Date(peDate); pe30.setDate(pe30.getDate() + 30);
+      const pe60 = new Date(peDate); pe60.setDate(pe60.getDate() + 60);
+      const pe90 = new Date(peDate); pe90.setDate(pe90.getDate() + 90);
+      const pe120 = new Date(peDate); pe120.setDate(pe120.getDate() + 120);
+      const fmt = (d: Date) => d.toISOString().split("T")[0];
+
+      sessionMetaMap["report_date"] = fmt(pe90);
+      sessionMetaMap["expected_signing_date"] = fmt(pe90);
+      sessionMetaMap["reporting_deadline"] = fmt(pe120);
+      sessionMetaMap["archiving_due_date"] = fmt(new Date(peDate.getFullYear(), peDate.getMonth() + 2, peDate.getDate() + 60));
+    }
+
+    if (periodStart) {
+      const psDate = new Date(periodStart);
+      const fmt = (d: Date) => d.toISOString().split("T")[0];
+      const engStart = new Date(psDate); engStart.setMonth(engStart.getMonth() - 1);
+      sessionMetaMap["engagement_start_date"] = fmt(engStart);
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+    sessionMetaMap["preparation_date"] = today;
+
+    if (session.preparerName) sessionMetaMap["preparer_name"] = session.preparerName;
+    if (session.reviewerName) sessionMetaMap["reviewer_name"] = session.reviewerName;
+    if (session.approverName) {
+      sessionMetaMap["approver_name"] = session.approverName;
+      sessionMetaMap["engagement_partner"] = session.approverName;
+    }
+
     sessionMetaMap["functional_currency"] = "PKR";
     sessionMetaMap["presentation_currency"] = "PKR";
     sessionMetaMap["applicable_company_law"] = "Companies Act 2017";
