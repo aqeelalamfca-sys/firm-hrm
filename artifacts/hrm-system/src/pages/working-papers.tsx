@@ -337,7 +337,7 @@ export default function WorkingPapers() {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/variables/${varId}`, {
         method: "PATCH", headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ value: editValue, reason: editReason, editedBy: user?.id }),
+        body: JSON.stringify({ value: editValue, reason: "Manual edit", editedBy: user?.id }),
       });
       if (res.ok) {
         toast({ title: "Variable updated" });
@@ -1229,8 +1229,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
                                       ) : (
                                         <Input className="h-8 text-sm w-52" value={editValue} onChange={e => setEditValue(e.target.value)} placeholder="Enter value" type={def?.dataType === "number" ? "number" : def?.dataType === "date" ? "date" : "text"} />
                                       )}
-                                      <Input className="h-8 text-sm w-44" value={editReason} onChange={e => setEditReason(e.target.value)} placeholder="Reason for change *" />
-                                      <Button size="sm" variant="default" className="h-8" onClick={() => onSave(v.id)} disabled={!editReason.trim()}><Save className="w-3 h-3 mr-1" /> Save</Button>
+                                      <Button size="sm" variant="default" className="h-8" onClick={() => onSave(v.id)}><Save className="w-3 h-3 mr-1" /> Save</Button>
                                       <Button size="sm" variant="ghost" className="h-8" onClick={() => setEditingVar(null)}>Cancel</Button>
                                     </div>
                                   ) : (
