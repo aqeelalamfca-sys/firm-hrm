@@ -509,11 +509,7 @@ export default function WorkingPapers() {
               <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newEngagementType} onChange={e => setNewEngagementType(e.target.value)}>
                 <option value="statutory_audit">Statutory Audit</option>
                 <option value="limited_review">Limited Review / Review Engagement</option>
-                <option value="agreed_upon_procedures">Agreed-Upon Procedures</option>
-                <option value="compilation">Compilation Engagement</option>
-                <option value="special_purpose">Special Purpose Audit</option>
                 <option value="group_audit">Group / Consolidated Audit</option>
-                <option value="ipo_due_diligence">IPO / Due Diligence</option>
               </select>
             </div>
             <div className="flex items-end">

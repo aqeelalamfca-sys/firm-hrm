@@ -117,7 +117,7 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   // ═══════════════════════════════════════════════════════════════════════════
   // GROUP 3 — Engagement Acceptance & Continuance
   // ═══════════════════════════════════════════════════════════════════════════
-  v("engagement_type", "Engagement Acceptance", "Engagement Setup", "Engagement Type", { inputMode: "dropdown", dropdownOptionsJson: dd(["statutory_audit","limited_review","agreed_upon_procedures","compilation","special_purpose","group_audit","ipo_due_diligence"]), mandatoryFlag: M, displayOrder: 1 }),
+  v("engagement_type", "Engagement Acceptance", "Engagement Setup", "Engagement Type", { inputMode: "dropdown", dropdownOptionsJson: dd(["statutory_audit","limited_review","group_audit"]), mandatoryFlag: M, displayOrder: 1 }),
   v("assurance_level", "Engagement Acceptance", "Engagement Setup", "Assurance Level", { inputMode: "dropdown", dropdownOptionsJson: dd(["Reasonable","Limited","None"]), defaultValue: "Reasonable", displayOrder: 2 }),
   v("first_year_audit", "Engagement Acceptance", "History", "First Year Audit", { dataType: "boolean", inputMode: "toggle", affectsWorkingPapersJson: ["ob_verification"], displayOrder: 3 }),
   v("recurring_engagement", "Engagement Acceptance", "History", "Recurring Engagement", { dataType: "boolean", inputMode: "toggle", displayOrder: 4 }),
