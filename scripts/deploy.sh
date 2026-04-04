@@ -140,6 +140,10 @@ echo "[VPS] Commit: $(git log --oneline -1)"
 docker network create auditwise_auditwise 2>/dev/null || true
 
 cd "$DEPLOY_DIR"
+echo "[VPS] Stopping and removing old ana-backend container if it exists..."
+docker stop ana-backend 2>/dev/null || true
+docker rm -f ana-backend 2>/dev/null || true
+
 echo "[VPS] Building ana-backend..."
 docker compose --env-file .env build --no-cache ana-backend
 docker compose --env-file .env up -d --force-recreate --no-deps ana-backend
