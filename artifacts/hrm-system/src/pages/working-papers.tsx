@@ -64,8 +64,17 @@ export default function WorkingPapers() {
   const [newEntityType, setNewEntityType] = useState("Private Limited");
   const [newNtn, setNewNtn] = useState("");
   const [newStrn, setNewStrn] = useState("");
-  const [newPeriodStart, setNewPeriodStart] = useState("");
-  const [newPeriodEnd, setNewPeriodEnd] = useState("");
+  const [newPeriodStart, setNewPeriodStart] = useState(`${2025 - 1}-07-01`);
+  const [newPeriodEnd, setNewPeriodEnd] = useState("2025-06-30");
+
+  const handleYearChange = (year: string) => {
+    setNewYear(year);
+    const y = parseInt(year);
+    if (!isNaN(y)) {
+      setNewPeriodStart(`${y - 1}-07-01`);
+      setNewPeriodEnd(`${y}-06-30`);
+    }
+  };
   const [newFramework, setNewFramework] = useState("IFRS");
   const [newEngagementType, setNewEngagementType] = useState("statutory_audit");
   const [newEngagementContinuity, setNewEngagementContinuity] = useState("first_time");
@@ -522,7 +531,11 @@ export default function WorkingPapers() {
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Engagement Year *</label>
-              <Input placeholder="2025" value={newYear} onChange={e => setNewYear(e.target.value)} />
+              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newYear} onChange={e => handleYearChange(e.target.value)}>
+                {[2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030].map(y => (
+                  <option key={y} value={String(y)}>{y}</option>
+                ))}
+              </select>
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">NTN (National Tax Number) *</label>
