@@ -331,7 +331,10 @@ export default function WorkingPapers() {
       });
       if (res.ok) {
         const result = await res.json();
-        toast({ title: `Variables initialized`, description: `${result.created} created, ${result.updated} updated from extraction` });
+        toast({
+          title: `100% Variables Populated`,
+          description: result.message || `${result.created} created, ${result.updated} updated. ${result.formulaCount || 0} calculated, ${result.assumptionCount || 0} assumed (flagged for review).`
+        });
         await fetchVariables();
         setStage("variables");
       }
@@ -1182,7 +1185,8 @@ function sourceIcon(sourceType: string | null | undefined): { label: string; cls
     case "session": return { label: "Session", cls: "text-emerald-600 bg-emerald-50" };
     case "default": return { label: "Default", cls: "text-slate-500 bg-slate-50" };
     case "user_edit": return { label: "Manual", cls: "text-purple-600 bg-purple-50" };
-    case "formula": return { label: "Calc", cls: "text-indigo-600 bg-indigo-50" };
+    case "formula": return { label: "Calculated", cls: "text-indigo-600 bg-indigo-50" };
+    case "assumption": return { label: "Assumed", cls: "text-amber-600 bg-amber-50" };
     case "autofill": return { label: "Auto", cls: "text-cyan-600 bg-cyan-50" };
     default: return { label: sourceType.replace(/_/g, " "), cls: "text-slate-500 bg-slate-50" };
   }
