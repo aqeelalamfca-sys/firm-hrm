@@ -82,6 +82,10 @@ export default function WorkingPapers() {
   const [newAuditFirmLogo, setNewAuditFirmLogo] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>("");
   const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const [newPreparerId, setNewPreparerId] = useState<string>("");
+  const [newReviewerId, setNewReviewerId] = useState<string>("");
+  const [newApproverId, setNewApproverId] = useState<string>("");
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
   const [uploadFiles, setUploadFiles] = useState<{ file: File; category: string }[]>([]);
   const [extractionData, setExtractionData] = useState<any>(null);
@@ -99,7 +103,14 @@ export default function WorkingPapers() {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => { fetchSessions(); }, []);
+  useEffect(() => { fetchSessions(); fetchTeamMembers(); }, []);
+
+  const fetchTeamMembers = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/team-members`, { headers });
+      if (res.ok) setTeamMembers(await res.json());
+    } catch {}
+  };
 
   useEffect(() => {
     if (activeSession) {
@@ -168,6 +179,12 @@ export default function WorkingPapers() {
           engagementContinuity: newEngagementContinuity,
           auditFirmName: newAuditFirmName || undefined,
           auditFirmLogo: logoUrl || undefined,
+          preparerId: newPreparerId ? parseInt(newPreparerId) : undefined,
+          preparerName: newPreparerId ? teamMembers.find((m: any) => m.id === parseInt(newPreparerId))?.name : undefined,
+          reviewerId: newReviewerId ? parseInt(newReviewerId) : undefined,
+          reviewerName: newReviewerId ? teamMembers.find((m: any) => m.id === parseInt(newReviewerId))?.name : undefined,
+          approverId: newApproverId ? parseInt(newApproverId) : undefined,
+          approverName: newApproverId ? teamMembers.find((m: any) => m.id === parseInt(newApproverId))?.name : undefined,
         }),
       });
       if (res.ok) {
@@ -609,6 +626,33 @@ export default function WorkingPapers() {
                 {logoPreview && <img src={logoPreview} alt="Logo preview" className="h-8 w-auto rounded border" />}
               </div>
             </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Preparer (Prepared By)</label>
+              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newPreparerId} onChange={e => setNewPreparerId(e.target.value)}>
+                <option value="">-- Select Preparer --</option>
+                {teamMembers.map((m: any) => (
+                  <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Reviewer (Reviewed By)</label>
+              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newReviewerId} onChange={e => setNewReviewerId(e.target.value)}>
+                <option value="">-- Select Reviewer --</option>
+                {teamMembers.filter((m: any) => ["super_admin", "manager", "partner", "hr_admin"].includes(m.role)).map((m: any) => (
+                  <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Approver (Approved By)</label>
+              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newApproverId} onChange={e => setNewApproverId(e.target.value)}>
+                <option value="">-- Select Approver --</option>
+                {teamMembers.filter((m: any) => ["super_admin", "partner"].includes(m.role)).map((m: any) => (
+                  <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
+                ))}
+              </select>
+            </div>
             <div className="flex items-end">
               <Button onClick={createSession} disabled={loading} className="w-full">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
@@ -638,6 +682,13 @@ export default function WorkingPapers() {
                     Year: {s.engagementYear} — {s.reportingFramework || "IFRS"} — Stage: {s.status}
                     {s.ntn && <span className="ml-2">NTN: {s.ntn}</span>}
                   </p>
+                  {(s.preparerName || s.reviewerName || s.approverName) && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {s.preparerName && <span>Preparer: {s.preparerName}</span>}
+                      {s.reviewerName && <span className="ml-3">Reviewer: {s.reviewerName}</span>}
+                      {s.approverName && <span className="ml-3">Approver: {s.approverName}</span>}
+                    </p>
+                  )}
                 </div>
                 <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
               </div>
@@ -672,6 +723,19 @@ export default function WorkingPapers() {
             <div className="flex items-center gap-2 mt-1">
               {activeSession.auditFirmLogo && <img src={`${API_BASE.replace('/api', '')}${activeSession.auditFirmLogo}`} alt="Firm logo" className="h-6 w-auto rounded" />}
               <span className="text-xs text-muted-foreground font-medium">{activeSession.auditFirmName}</span>
+            </div>
+          )}
+          {(activeSession.preparerName || activeSession.reviewerName || activeSession.approverName) && (
+            <div className="flex items-center gap-4 mt-1 flex-wrap">
+              {activeSession.preparerName && (
+                <span className="text-xs"><span className="text-muted-foreground">Prepared by:</span> <span className="font-medium">{activeSession.preparerName}</span></span>
+              )}
+              {activeSession.reviewerName && (
+                <span className="text-xs"><span className="text-muted-foreground">Reviewed by:</span> <span className="font-medium">{activeSession.reviewerName}</span></span>
+              )}
+              {activeSession.approverName && (
+                <span className="text-xs"><span className="text-muted-foreground">Approved by:</span> <span className="font-medium">{activeSession.approverName}</span></span>
+              )}
             </div>
           )}
         </div>

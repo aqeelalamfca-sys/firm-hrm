@@ -3,7 +3,7 @@ import multer from "multer";
 import { logger } from "../lib/logger";
 import { db } from "@workspace/db";
 import {
-  systemSettingsTable,
+  systemSettingsTable, usersTable, employeesTable,
   wpSessionsTable, wpUploadedFilesTable, wpExtractionRunsTable,
   wpExtractedFieldsTable, wpArrangedDataTable, wpVariablesTable,
   wpVariableChangeLogTable, wpExceptionLogTable, wpTrialBalanceLinesTable,
@@ -203,9 +203,28 @@ router.post("/upload-logo", upload.single("file"), async (req: Request, res: Res
   }
 });
 
+router.get("/team-members", async (_req: Request, res: Response) => {
+  try {
+    const users = await db.select({
+      id: usersTable.id,
+      name: usersTable.name,
+      email: usersTable.email,
+      role: usersTable.role,
+      designation: employeesTable.designation,
+      department: employeesTable.department,
+    }).from(usersTable)
+      .leftJoin(employeesTable, eq(usersTable.employeeId, employeesTable.id))
+      .where(eq(usersTable.status, "active"));
+    res.json(users);
+  } catch (err: any) {
+    logger.error({ err }, "Failed to fetch team members");
+    res.status(500).json({ error: "Failed to fetch team members" });
+  }
+});
+
 router.post("/sessions", async (req: Request, res: Response) => {
   try {
-    const { clientName, engagementYear, entityType, ntn, strn, periodStart, periodEnd, reportingFramework, engagementType, engagementContinuity, auditFirmName, auditFirmLogo } = req.body;
+    const { clientName, engagementYear, entityType, ntn, strn, periodStart, periodEnd, reportingFramework, engagementType, engagementContinuity, auditFirmName, auditFirmLogo, preparerId, preparerName, reviewerId, reviewerName, approverId, approverName } = req.body;
     if (!clientName || !engagementYear || !entityType || !ntn || !periodStart || !periodEnd || !reportingFramework || !engagementType) {
       return res.status(400).json({ error: "All fields are required except STRN, Audit Firm Name, and Logo" });
     }
@@ -221,6 +240,12 @@ router.post("/sessions", async (req: Request, res: Response) => {
       engagementContinuity: engagementContinuity || "first_time",
       auditFirmName: auditFirmName || null,
       auditFirmLogo: auditFirmLogo || null,
+      preparerId: preparerId || null,
+      preparerName: preparerName || null,
+      reviewerId: reviewerId || null,
+      reviewerName: reviewerName || null,
+      approverId: approverId || null,
+      approverName: approverName || null,
       status: "upload",
     }).returning();
 
