@@ -542,6 +542,69 @@ export const reconEngineTable = pgTable("recon_engine", {
   runAt: timestamp("run_at").defaultNow(),
 });
 
+// ── WP Library Master (global ISA/ICAP/Pakistan reference library — 1000+ papers) ──────────
+export const wpLibraryMasterTable = pgTable("wp_library_master", {
+  id: serial("id").primaryKey(),
+  wpCode: varchar("wp_code", { length: 20 }).notNull().unique(),
+  wpPhase: text("wp_phase"),                         // Pre-engagement | Planning | Execution | Completion | Reporting | QC | Regulatory
+  wpTitle: text("wp_title").notNull(),
+  wpCategory: text("wp_category"),                   // Checklist | Memo | Lead schedule | Reconciliation | ToC | ToD | Analytics | Confirmation | Representation | Report
+  isaReference: text("isa_reference"),               // e.g. ISA 315, ISA 530
+  secondaryReference: text("secondary_reference"),   // Related ISA / ISQM / IESBA / local law
+  codeFamily: varchar("code_family", { length: 4 }), // A, B, C, D, E, F, G, H, I, J, K, L, M, N, Z
+  displayOrder: integer("display_order").default(0),
+  triggerEntityType: text("trigger_entity_type"),    // CSV: Pvt Ltd, Listed, SMC, LLP, Bank, Insurance, NGO, SOE, Branch
+  triggerIndustry: text("trigger_industry"),         // CSV: Manufacturing, Trading, Services, Construction…
+  triggerRisk: text("trigger_risk"),                 // CSV: Low, Medium, High, Fraud, Going concern, Related party, Tax, IT reliance
+  triggerFsHead: text("trigger_fs_head"),            // CSV: Revenue, Inventory, PPE, Receivables, Payables, Cash, Equity, Borrowings, Taxation
+  triggerControlMode: text("trigger_control_mode"),  // Manual | IT-dependent | ERP | Mixed
+  triggerMateriality: text("trigger_materiality"),   // Above PM | Above Trivial | Always
+  mandatoryFlag: boolean("mandatory_flag").default(false),
+  outputFormat: text("output_format").default("Word"), // Word | Excel | PDF
+  parentWpCode: varchar("parent_wp_code", { length: 20 }),
+  linkedWpCodes: text("linked_wp_codes"),            // CSV of related WP codes
+  linkedAssertion: text("linked_assertion"),         // Existence | Completeness | Accuracy | Cut-off | Valuation | Rights | Presentation
+  linkedAuditProcedureType: text("linked_audit_procedure_type"), // Risk | ToC | ToD | Analytics | External confirmation
+  linkedEvidenceType: text("linked_evidence_type"),  // Invoice | GRN | Contract | Bank statement | Tax return | Board minutes
+  linkedReportArea: text("linked_report_area"),      // Main report | CAR | Emphasis | KAM | Other legal report
+  pakistanLawTag: text("pakistan_law_tag"),          // Companies Act 2017 | Listed Regulations | NGO | Tax | Sales tax | SOE
+  reviewerLevel: text("reviewer_level"),             // Associate | Senior | Manager | Partner | EQCR
+  autoGenerateFlag: boolean("auto_generate_flag").default(false),
+  aiInputSource: text("ai_input_source"),            // FS | TB | GL | Variables | OCR | Tax returns
+  status: text("status").default("Draft"),           // Draft | Active | Deprecated
+  versionNo: text("version_no").default("v1.0"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ── WP Library Session (activated WPs per session from library) ───────────────────────────
+export const wpLibrarySessionTable = pgTable("wp_library_session", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  wpCode: varchar("wp_code", { length: 20 }).notNull(),
+  wpTitle: text("wp_title"),
+  wpPhase: text("wp_phase"),
+  wpCategory: text("wp_category"),
+  isaReference: text("isa_reference"),
+  triggerReason: text("trigger_reason"),             // Which rule activated this WP
+  mandatoryFlag: boolean("mandatory_flag").default(false),
+  status: text("status").default("Pending"),         // Pending | In Progress | Prepared | Reviewed | Approved | N/A
+  preparedBy: text("prepared_by"),
+  reviewedBy: text("reviewed_by"),
+  approvedBy: text("approved_by"),
+  preparedDate: text("prepared_date"),
+  reviewedDate: text("reviewed_date"),
+  conclusion: text("conclusion"),
+  outputFormat: text("output_format"),
+  reviewerLevel: text("reviewer_level"),
+  evidenceCount: integer("evidence_count").default(0),
+  autoGenerateFlag: boolean("auto_generate_flag").default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // ── Journal Import (raw double-entry from workbook template Journal_Import sheet) ──────────
 export const wpJournalImportTable = pgTable("wp_journal_import", {
   id: serial("id").primaryKey(),

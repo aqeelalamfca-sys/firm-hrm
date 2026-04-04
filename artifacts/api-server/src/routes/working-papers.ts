@@ -14,7 +14,9 @@ import {
   assertionLinkageTable, samplingRulesTable, analyticsEngineTable,
   analyticsSessionTable, controlMatrixTable, evidenceLogTable, reconEngineTable,
   wpJournalImportTable, wpFsExtractionTable, wpFsMappingTable,
+  wpLibraryMasterTable, wpLibrarySessionTable,
 } from "@workspace/db";
+import { WP_LIBRARY, type WpLibraryEntry } from "../data/wp-library-seed";
 import { VARIABLE_DEFINITIONS, EXTRACTION_FIELD_TO_VARIABLE_MAP, VARIABLE_GROUPS, DEPENDENCY_RULES } from "../data/variable-definitions";
 import {
   runTBEngine, runGLEngine, runReconciliation, checkFinalEnforcement,
@@ -4442,6 +4444,323 @@ router.post("/seed-audit-engine", async (_req: Request, res: Response) => {
     else results.analytics = `Already has ${analyticsCount.length}`;
 
     return res.json({ message: "Audit engine seed complete", results });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /seed-wp-library
+// Idempotently seeds wp_library_master from WP_LIBRARY seed array
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/seed-wp-library", async (_req: Request, res: Response) => {
+  try {
+    const existing = await db.select({ wpCode: wpLibraryMasterTable.wpCode }).from(wpLibraryMasterTable);
+    const existingCodes = new Set(existing.map((r) => r.wpCode));
+
+    const toInsert = WP_LIBRARY.filter((wp) => !existingCodes.has(wp.wpCode));
+    const toUpdate = WP_LIBRARY.filter((wp) => existingCodes.has(wp.wpCode));
+
+    let inserted = 0;
+    let updated = 0;
+
+    if (toInsert.length > 0) {
+      await db.insert(wpLibraryMasterTable).values(toInsert as any);
+      inserted = toInsert.length;
+    }
+
+    for (const wp of toUpdate) {
+      await db.update(wpLibraryMasterTable)
+        .set({ ...wp, updatedAt: new Date() } as any)
+        .where(eq(wpLibraryMasterTable.wpCode, wp.wpCode));
+      updated++;
+    }
+
+    const total = await db.select().from(wpLibraryMasterTable);
+    return res.json({
+      message: "WP Library seed complete",
+      inserted,
+      updated,
+      total: total.length,
+      families: [...new Set(WP_LIBRARY.map((w) => w.codeFamily))].sort().join(", "),
+    });
+  } catch (err: any) {
+    logger.error("seed-wp-library error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /wp-library  — Browse full library with optional filters
+// Query params: family, phase, mandatory, search, entityType, industry, risk, fsHead
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/wp-library", async (req: Request, res: Response) => {
+  try {
+    const all = await db.select().from(wpLibraryMasterTable).orderBy(asc(wpLibraryMasterTable.displayOrder));
+
+    const { family, phase, mandatory, search, entityType, industry, risk, fsHead } = req.query as Record<string, string>;
+
+    let filtered = all;
+    if (family) filtered = filtered.filter((r) => r.codeFamily === family);
+    if (phase) filtered = filtered.filter((r) => r.wpPhase?.toLowerCase().includes(phase.toLowerCase()));
+    if (mandatory === "true") filtered = filtered.filter((r) => r.mandatoryFlag);
+    if (search) {
+      const q = search.toLowerCase();
+      filtered = filtered.filter((r) =>
+        r.wpCode.toLowerCase().includes(q) ||
+        r.wpTitle.toLowerCase().includes(q) ||
+        (r.isaReference || "").toLowerCase().includes(q)
+      );
+    }
+    if (entityType) filtered = filtered.filter((r) => !r.triggerEntityType || r.triggerEntityType === "All" || r.triggerEntityType.split(",").some((t) => t.trim().toLowerCase().includes(entityType.toLowerCase())));
+    if (industry) filtered = filtered.filter((r) => !r.triggerIndustry || r.triggerIndustry.split(",").some((t) => t.trim().toLowerCase().includes(industry.toLowerCase())));
+    if (risk) filtered = filtered.filter((r) => !r.triggerRisk || r.triggerRisk.split(",").some((t) => t.trim().toLowerCase().includes(risk.toLowerCase())));
+    if (fsHead) filtered = filtered.filter((r) => !r.triggerFsHead || r.triggerFsHead.split(",").some((t) => t.trim().toLowerCase().includes(fsHead.toLowerCase())));
+
+    const byFamily = filtered.reduce((acc: any, r) => {
+      const f = r.codeFamily || "?";
+      if (!acc[f]) acc[f] = 0;
+      acc[f]++;
+      return acc;
+    }, {});
+
+    return res.json({ total: filtered.length, byFamily, papers: filtered });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/activate-wp-library
+// Trigger engine: evaluates audit master + COA + analytics flags
+// → activates relevant WPs from wp_library_master into wp_library_session
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/sessions/:id/activate-wp-library", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+
+    const [session] = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    // Load audit master flags
+    const [master] = await db.select().from(auditEngineMasterTable).where(eq(auditEngineMasterTable.sessionId, sessionId));
+
+    // Load COA to determine which FS heads are present
+    const coaRows = await db.select({ fsHead: wpMasterCoaTable.fsHead }).from(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, sessionId));
+    const presentFsHeads = [...new Set(coaRows.map((r) => r.fsHead).filter(Boolean))];
+
+    // Load full library
+    const library = await db.select().from(wpLibraryMasterTable).orderBy(asc(wpLibraryMasterTable.displayOrder));
+
+    // Build evaluation context from master flags
+    const ctx = {
+      entityType: (master?.entityType || session.entityType || "Pvt Ltd").toLowerCase(),
+      industry: (master?.industryType || "").toLowerCase(),
+      riskFlags: {
+        goingConcern: master?.goingConcernFlag === true,
+        fraud: master?.fraudRiskFlag === true,
+        relatedParty: master?.relatedPartyFlag === true,
+        tax: master?.taxComplexityFlag === true || false,
+        it: master?.itDependenceFlag === true,
+        high: (master?.inherentRiskLevel || "").toLowerCase() === "high",
+        medium: (master?.inherentRiskLevel || "").toLowerCase() === "medium",
+      },
+      controlMode: (master?.controlMode || "Mixed").toLowerCase(),
+      fsHeads: presentFsHeads.map((h) => (h || "").toLowerCase()),
+      isListed: false,
+      isGroup: false,
+      isNgo: false,
+      isSoe: false,
+    };
+
+    // Entity type overlays
+    const et = ctx.entityType;
+    if (et.includes("listed")) ctx.isListed = true;
+    if (et.includes("group")) ctx.isGroup = true;
+    if (et.includes("ngo") || et.includes("npo") || et.includes("section 42") || et.includes("donor")) ctx.isNgo = true;
+    if (et.includes("soe")) ctx.isSoe = true;
+
+    // ── Trigger evaluation ──────────────────────────────────────────────────
+    const activated: { wp: typeof library[0]; reason: string }[] = [];
+
+    for (const wp of library) {
+      const reasons: string[] = [];
+
+      // Mandatory papers always activate
+      if (wp.mandatoryFlag || wp.triggerMateriality === "Always") {
+        reasons.push("Mandatory");
+      }
+
+      // Entity type check
+      if (wp.triggerEntityType && wp.triggerEntityType !== "All") {
+        const etList = wp.triggerEntityType.split(",").map((s) => s.trim().toLowerCase());
+        const matched = etList.some((t) =>
+          et.includes(t) ||
+          (t === "listed" && ctx.isListed) ||
+          (t === "group" && ctx.isGroup) ||
+          ((t === "ngo" || t === "npo" || t === "section 42") && ctx.isNgo) ||
+          (t === "soe" && ctx.isSoe)
+        );
+        if (matched) reasons.push(`Entity:${wp.triggerEntityType}`);
+      }
+
+      // Risk flags
+      if (wp.triggerRisk) {
+        const rList = wp.triggerRisk.split(",").map((s) => s.trim().toLowerCase());
+        if (rList.includes("going concern") && ctx.riskFlags.goingConcern) reasons.push("Risk:GoingConcern");
+        if (rList.includes("fraud") && ctx.riskFlags.fraud) reasons.push("Risk:Fraud");
+        if (rList.includes("related party") && ctx.riskFlags.relatedParty) reasons.push("Risk:RelatedParty");
+        if (rList.includes("tax") && ctx.riskFlags.tax) reasons.push("Risk:Tax");
+        if (rList.includes("it reliance") && ctx.riskFlags.it) reasons.push("Risk:IT");
+        if (rList.includes("high") && ctx.riskFlags.high) reasons.push("Risk:High");
+        if (rList.includes("medium") && (ctx.riskFlags.medium || ctx.riskFlags.high)) reasons.push("Risk:Medium");
+      }
+
+      // FS head presence
+      if (wp.triggerFsHead) {
+        const fhList = wp.triggerFsHead.split(",").map((s) => s.trim().toLowerCase());
+        const hasHead = fhList.some((h) => ctx.fsHeads.some((f) => f.includes(h) || h.includes(f)));
+        if (hasHead) reasons.push(`FSHead:${wp.triggerFsHead}`);
+      }
+
+      // Control mode
+      if (wp.triggerControlMode) {
+        const cmList = wp.triggerControlMode.split(",").map((s) => s.trim().toLowerCase());
+        if (cmList.some((c) => ctx.controlMode.includes(c))) reasons.push(`ControlMode:${wp.triggerControlMode}`);
+      }
+
+      // Industry
+      if (ctx.industry && wp.triggerIndustry) {
+        const indList = wp.triggerIndustry.split(",").map((s) => s.trim().toLowerCase());
+        if (indList.some((i) => ctx.industry.includes(i) || i.includes(ctx.industry))) reasons.push(`Industry:${wp.triggerIndustry}`);
+      }
+
+      if (reasons.length > 0) {
+        activated.push({ wp, reason: reasons.join(" | ") });
+      }
+    }
+
+    // ── Upsert into wp_library_session ──────────────────────────────────────
+    const existing = await db.select({ wpCode: wpLibrarySessionTable.wpCode }).from(wpLibrarySessionTable).where(eq(wpLibrarySessionTable.sessionId, sessionId));
+    const existingSet = new Set(existing.map((r) => r.wpCode));
+
+    let inserted = 0;
+    let skipped = 0;
+
+    for (const { wp, reason } of activated) {
+      if (existingSet.has(wp.wpCode)) {
+        // Update trigger reason
+        await db.update(wpLibrarySessionTable)
+          .set({ triggerReason: reason, updatedAt: new Date() })
+          .where(and(eq(wpLibrarySessionTable.sessionId, sessionId), eq(wpLibrarySessionTable.wpCode, wp.wpCode)));
+        skipped++;
+      } else {
+        await db.insert(wpLibrarySessionTable).values({
+          sessionId,
+          wpCode: wp.wpCode,
+          wpTitle: wp.wpTitle,
+          wpPhase: wp.wpPhase,
+          wpCategory: wp.wpCategory,
+          isaReference: wp.isaReference,
+          mandatoryFlag: wp.mandatoryFlag,
+          outputFormat: wp.outputFormat,
+          reviewerLevel: wp.reviewerLevel,
+          autoGenerateFlag: wp.autoGenerateFlag,
+          triggerReason: reason,
+          status: "Pending",
+        } as any);
+        inserted++;
+      }
+    }
+
+    // Summary by phase
+    const summary = activated.reduce((acc: any, { wp }) => {
+      const phase = wp.wpPhase || "Other";
+      if (!acc[phase]) acc[phase] = 0;
+      acc[phase]++;
+      return acc;
+    }, {});
+
+    return res.json({
+      message: "WP Library activation complete",
+      totalActivated: activated.length,
+      inserted,
+      updated: skipped,
+      byPhase: summary,
+      context: {
+        entityType: ctx.entityType,
+        industry: ctx.industry || "(not set)",
+        riskFlags: ctx.riskFlags,
+        fsHeadsDetected: ctx.fsHeads.length,
+      },
+    });
+  } catch (err: any) {
+    logger.error("activate-wp-library error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /sessions/:id/wp-library-session  — Activated WPs for a session
+// Query params: phase, status, mandatory, search
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/sessions/:id/wp-library-session", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+
+    const all = await db.select().from(wpLibrarySessionTable)
+      .where(eq(wpLibrarySessionTable.sessionId, sessionId))
+      .orderBy(asc(wpLibrarySessionTable.wpCode));
+
+    const { phase, status, mandatory, search } = req.query as Record<string, string>;
+    let filtered = all;
+    if (phase) filtered = filtered.filter((r) => r.wpPhase?.toLowerCase().includes(phase.toLowerCase()));
+    if (status) filtered = filtered.filter((r) => r.status?.toLowerCase() === status.toLowerCase());
+    if (mandatory === "true") filtered = filtered.filter((r) => r.mandatoryFlag);
+    if (search) {
+      const q = search.toLowerCase();
+      filtered = filtered.filter((r) =>
+        r.wpCode.toLowerCase().includes(q) ||
+        (r.wpTitle || "").toLowerCase().includes(q)
+      );
+    }
+
+    const byPhase = all.reduce((acc: any, r) => {
+      const ph = r.wpPhase || "Other";
+      if (!acc[ph]) acc[ph] = { total: 0, pending: 0, prepared: 0, reviewed: 0, approved: 0, na: 0 };
+      acc[ph].total++;
+      const s = (r.status || "Pending").toLowerCase();
+      if (s === "pending") acc[ph].pending++;
+      else if (s === "in progress") acc[ph].pending++;
+      else if (s === "prepared") acc[ph].prepared++;
+      else if (s === "reviewed") acc[ph].reviewed++;
+      else if (s === "approved") acc[ph].approved++;
+      else if (s === "n/a") acc[ph].na++;
+      return acc;
+    }, {});
+
+    return res.json({ total: all.length, filtered: filtered.length, byPhase, papers: filtered });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /sessions/:id/wp-library-session/:wpCode  — Update session WP status
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch("/sessions/:id/wp-library-session/:wpCode", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    const { wpCode } = req.params;
+    const { status, preparedBy, reviewedBy, approvedBy, preparedDate, reviewedDate, conclusion, notes } = req.body;
+
+    await db.update(wpLibrarySessionTable)
+      .set({ status, preparedBy, reviewedBy, approvedBy, preparedDate, reviewedDate, conclusion, notes, updatedAt: new Date() } as any)
+      .where(and(eq(wpLibrarySessionTable.sessionId, sessionId), eq(wpLibrarySessionTable.wpCode, wpCode)));
+
+    return res.json({ message: "WP session record updated", wpCode, status });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

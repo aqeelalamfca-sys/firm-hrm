@@ -2350,6 +2350,80 @@ function AuditEngineStage({
   const [newCtrl, setNewCtrl] = useState<any>({ processName: "", controlDescription: "", controlFrequency: "Per transaction", testType: "ToC" });
   const [showCtrlForm, setShowCtrlForm] = useState(false);
 
+  // ── WP Library state ───────────────────────────────────────────────────────
+  const [wpLibrary, setWpLibrary] = useState<any[]>([]);
+  const [sessionLibrary, setSessionLibrary] = useState<any[]>([]);
+  const [libLoading, setLibLoading] = useState(false);
+  const [libActivating, setLibActivating] = useState(false);
+  const [libSeeding, setLibSeeding] = useState(false);
+  const [libSearch, setLibSearch] = useState("");
+  const [libFamily, setLibFamily] = useState("");
+  const [libView, setLibView] = useState<"browse" | "session">("session");
+  const [libActivationResult, setLibActivationResult] = useState<any>(null);
+  const [libSeedResult, setLibSeedResult] = useState<any>(null);
+
+  const fetchWpLibrary = async () => {
+    setLibLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (libSearch) params.set("search", libSearch);
+      if (libFamily) params.set("family", libFamily);
+      const r = await fetch(`/api/working-papers/wp-library?${params}`);
+      const d = await r.json();
+      setWpLibrary(d.papers || []);
+    } catch { /* ignore */ } finally { setLibLoading(false); }
+  };
+
+  const fetchSessionLibrary = async () => {
+    if (!session?.id) return;
+    setLibLoading(true);
+    try {
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/wp-library-session`);
+      const d = await r.json();
+      setSessionLibrary(d.papers || []);
+    } catch { /* ignore */ } finally { setLibLoading(false); }
+  };
+
+  const seedLibrary = async () => {
+    setLibSeeding(true);
+    try {
+      const r = await fetch("/api/working-papers/seed-wp-library", { method: "POST" });
+      const d = await r.json();
+      setLibSeedResult(d);
+      await fetchWpLibrary();
+    } catch { /* ignore */ } finally { setLibSeeding(false); }
+  };
+
+  const activateLibrary = async () => {
+    if (!session?.id) return;
+    setLibActivating(true);
+    try {
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/activate-wp-library`, { method: "POST" });
+      const d = await r.json();
+      setLibActivationResult(d);
+      await fetchSessionLibrary();
+    } catch { /* ignore */ } finally { setLibActivating(false); }
+  };
+
+  const updateSessionWp = async (wpCode: string, payload: any) => {
+    if (!session?.id) return;
+    await fetch(`/api/working-papers/sessions/${session.id}/wp-library-session/${wpCode}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    await fetchSessionLibrary();
+  };
+
+  useEffect(() => {
+    if (activeEngineTab === "wp_library") {
+      if (libView === "browse") fetchWpLibrary();
+      else fetchSessionLibrary();
+    }
+  }, [activeEngineTab, libView]);
+
+  // ── End WP Library state ───────────────────────────────────────────────────
+
   useEffect(() => { if (auditMaster && !masterForm) setMasterForm({ ...auditMaster }); }, [auditMaster]);
 
   const saveMaster = async () => { setSaving(true); await onUpdateMaster(masterForm); setSaving(false); };
@@ -2363,6 +2437,7 @@ function AuditEngineStage({
     { key: "controls", label: "Control Testing", icon: Shield },
     { key: "evidence", label: "Evidence Vault", icon: FileCheck },
     { key: "recon", label: "Reconciliation", icon: RefreshCw },
+    { key: "wp_library", label: "ISA Library", icon: BookOpen },
   ];
 
   const fmt = (v: any) => { const n = Number(v || 0); return isNaN(n) ? "—" : n.toLocaleString("en-PK"); };
@@ -2853,6 +2928,251 @@ function AuditEngineStage({
             </div>
           )}
         </div>
+      )}
+
+      {/* ── TAB: ISA Working Paper Library ── */}
+      {activeEngineTab === "wp_library" && (
+        <div className="space-y-4">
+          {/* Library Header */}
+          <div className="bg-gradient-to-r from-indigo-900 to-violet-900 rounded-2xl p-5 text-white">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h3 className="text-base font-bold flex items-center gap-2"><BookOpen className="w-5 h-5 text-violet-300" /> ISA WORKING PAPER LIBRARY</h3>
+                <p className="text-indigo-200 text-xs mt-0.5">IAASB 2025 Handbook · ISAs as applicable in Pakistan (ICAP) · 240+ papers · 14 code families · A–N + Z</p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="text-center px-3 py-1.5 bg-white/10 rounded-lg">
+                  <div className="text-lg font-bold">{libView === "browse" ? wpLibrary.length : sessionLibrary.length}</div>
+                  <div className="text-[10px] text-indigo-200">{libView === "browse" ? "In Library" : "Activated"}</div>
+                </div>
+                <div className="text-center px-3 py-1.5 bg-white/10 rounded-lg">
+                  <div className="text-lg font-bold text-emerald-300">{sessionLibrary.filter((p: any) => p.mandatoryFlag).length}</div>
+                  <div className="text-[10px] text-indigo-200">Mandatory</div>
+                </div>
+                <div className="text-center px-3 py-1.5 bg-white/10 rounded-lg">
+                  <div className="text-lg font-bold text-amber-300">{sessionLibrary.filter((p: any) => p.status === "Pending").length}</div>
+                  <div className="text-[10px] text-indigo-200">Pending</div>
+                </div>
+                <div className="text-center px-3 py-1.5 bg-white/10 rounded-lg">
+                  <div className="text-lg font-bold text-emerald-300">{sessionLibrary.filter((p: any) => p.status === "Approved").length}</div>
+                  <div className="text-[10px] text-indigo-200">Approved</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-2 mt-4 flex-wrap">
+              <button onClick={seedLibrary} disabled={libSeeding} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 rounded-lg text-xs font-medium transition-colors disabled:opacity-60">
+                {libSeeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookOpen className="w-3.5 h-3.5" />}
+                {libSeeding ? "Seeding..." : "Seed Library (240 papers)"}
+              </button>
+              <button onClick={activateLibrary} disabled={libActivating} className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-500 hover:bg-violet-400 rounded-lg text-xs font-medium transition-colors disabled:opacity-60">
+                {libActivating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                {libActivating ? "Activating..." : "Activate WPs for This Engagement"}
+              </button>
+              <button onClick={libView === "browse" ? fetchWpLibrary : fetchSessionLibrary} disabled={libLoading} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium transition-colors disabled:opacity-60">
+                <RefreshCw className={cn("w-3.5 h-3.5", libLoading && "animate-spin")} />
+                Refresh
+              </button>
+            </div>
+
+            {/* Seed / Activation Result toast */}
+            {libSeedResult && (
+              <div className="mt-3 bg-white/10 rounded-lg px-3 py-2 text-xs text-indigo-100 flex items-center gap-2">
+                <Check className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+                Library: {libSeedResult.total} total papers · Inserted {libSeedResult.inserted} · Updated {libSeedResult.updated} · Families: {libSeedResult.families}
+              </div>
+            )}
+            {libActivationResult && (
+              <div className="mt-2 bg-white/10 rounded-lg px-3 py-2 text-xs text-indigo-100">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-3.5 h-3.5 text-yellow-300 shrink-0" />
+                  <span><strong>{libActivationResult.totalActivated}</strong> WPs activated · {libActivationResult.inserted} new · {libActivationResult.updated} updated</span>
+                </div>
+                {libActivationResult.byPhase && (
+                  <div className="flex flex-wrap gap-2 mt-1.5">
+                    {Object.entries(libActivationResult.byPhase).map(([phase, count]: any) => (
+                      <span key={phase} className="bg-white/10 px-2 py-0.5 rounded text-[10px]">{phase}: <strong>{count}</strong></span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* View toggle + Filters */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+              <button onClick={() => setLibView("session")} className={cn("px-3 py-1.5 text-xs font-medium transition-colors", libView === "session" ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>
+                <span className="flex items-center gap-1.5"><Zap className="w-3 h-3" />Session WPs ({sessionLibrary.length})</span>
+              </button>
+              <button onClick={() => setLibView("browse")} className={cn("px-3 py-1.5 text-xs font-medium transition-colors", libView === "browse" ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>
+                <span className="flex items-center gap-1.5"><BookOpen className="w-3 h-3" />Full Library ({wpLibrary.length || "240+"})</span>
+              </button>
+            </div>
+
+            <div className="flex-1 flex gap-2 flex-wrap">
+              <input value={libSearch} onChange={(e) => setLibSearch(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (libView === "browse" ? fetchWpLibrary() : undefined)}
+                placeholder="Search code or title..." className="flex-1 min-w-[160px] px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+              <select value={libFamily} onChange={(e) => { setLibFamily(e.target.value); }}
+                className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300 bg-white">
+                <option value="">All Families</option>
+                {["A","B","C","D","E","F","G","H","I","J","K","L","M","N","Z"].map((f) => (
+                  <option key={f} value={f}>{f} — {{A:"Pre-engagement",B:"Planning",C:"Materiality",D:"Controls",E:"Substantive",F:"Completion",G:"Reporting",H:"QC/EQCR",I:"Pakistan Reg.",J:"Sector",K:"Group/Branch",L:"NGO/Donor",M:"Tax",N:"Data Engine",Z:"Dynamic"}[f] || f}</option>
+                ))}
+              </select>
+              {libView === "browse" && (
+                <button onClick={fetchWpLibrary} disabled={libLoading} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-60">
+                  {libLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Search"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Papers list */}
+          {libLoading ? (
+            <div className="py-12 text-center"><Loader2 className="w-8 h-8 animate-spin text-indigo-400 mx-auto mb-2" /><p className="text-sm text-slate-500">Loading library...</p></div>
+          ) : libView === "session" ? (
+            <>
+              {sessionLibrary.length === 0 ? (
+                <div className="py-14 text-center border border-dashed border-slate-200 rounded-2xl">
+                  <BookOpen className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                  <p className="text-slate-500 text-sm font-medium">No WPs activated yet</p>
+                  <p className="text-slate-400 text-xs mt-1 mb-4">First seed the library, then click "Activate WPs for This Engagement" to trigger context-aware papers based on entity type, risk flags, FS heads, and industry</p>
+                  <div className="flex justify-center gap-2">
+                    <button onClick={seedLibrary} disabled={libSeeding} className="px-4 py-2 bg-slate-800 text-white text-xs rounded-lg hover:bg-slate-900 disabled:opacity-60 flex items-center gap-1.5">
+                      {libSeeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookOpen className="w-3.5 h-3.5" />}Seed Library
+                    </button>
+                    <button onClick={activateLibrary} disabled={libActivating} className="px-4 py-2 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-1.5">
+                      {libActivating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}Activate
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <WpLibraryList papers={sessionLibrary.filter((p: any) => {
+                  if (!libSearch) return !libFamily || p.wpCode?.startsWith(libFamily);
+                  const q = libSearch.toLowerCase();
+                  return (p.wpCode?.toLowerCase().includes(q) || (p.wpTitle || "").toLowerCase().includes(q)) && (!libFamily || p.wpCode?.startsWith(libFamily));
+                })} isSession onStatusChange={updateSessionWp} />
+              )}
+            </>
+          ) : (
+            <>
+              {wpLibrary.length === 0 ? (
+                <div className="py-14 text-center border border-dashed border-slate-200 rounded-2xl">
+                  <BookOpen className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                  <p className="text-slate-500 text-sm font-medium">Library not seeded</p>
+                  <p className="text-slate-400 text-xs mt-1 mb-4">Click "Seed Library" to load all 240 ISA/ICAP papers into the database</p>
+                  <button onClick={seedLibrary} disabled={libSeeding} className="px-4 py-2 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-1.5 mx-auto">
+                    {libSeeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookOpen className="w-3.5 h-3.5" />}Seed Library (240 papers)
+                  </button>
+                </div>
+              ) : (
+                <WpLibraryList papers={wpLibrary} isSession={false} onStatusChange={updateSessionWp} />
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WpLibraryList({ papers, isSession, onStatusChange }: { papers: any[]; isSession: boolean; onStatusChange?: (code: string, payload: any) => void }) {
+  const PHASE_COLORS: Record<string, string> = {
+    "Pre-engagement": "bg-blue-100 text-blue-700",
+    "Planning": "bg-violet-100 text-violet-700",
+    "Execution": "bg-indigo-100 text-indigo-700",
+    "Completion": "bg-amber-100 text-amber-700",
+    "Reporting": "bg-orange-100 text-orange-700",
+    "QC": "bg-rose-100 text-rose-700",
+    "Regulatory": "bg-teal-100 text-teal-700",
+  };
+  const CAT_COLORS: Record<string, string> = {
+    "Checklist": "border-emerald-200 text-emerald-700 bg-emerald-50",
+    "Memo": "border-blue-200 text-blue-700 bg-blue-50",
+    "Lead schedule": "border-indigo-200 text-indigo-700 bg-indigo-50",
+    "Reconciliation": "border-amber-200 text-amber-700 bg-amber-50",
+    "Analytics": "border-teal-200 text-teal-700 bg-teal-50",
+    "Confirmation": "border-violet-200 text-violet-700 bg-violet-50",
+    "Report": "border-orange-200 text-orange-700 bg-orange-50",
+    "Representation": "border-rose-200 text-rose-700 bg-rose-50",
+    "ToD": "border-sky-200 text-sky-700 bg-sky-50",
+    "ToC": "border-cyan-200 text-cyan-700 bg-cyan-50",
+  };
+  const STATUS_COLORS: Record<string, string> = {
+    "Pending": "bg-slate-100 text-slate-600",
+    "In Progress": "bg-blue-100 text-blue-700",
+    "Prepared": "bg-amber-100 text-amber-700",
+    "Reviewed": "bg-violet-100 text-violet-700",
+    "Approved": "bg-emerald-100 text-emerald-700",
+    "N/A": "bg-slate-50 text-slate-400",
+  };
+
+  // Group by phase
+  const grouped = papers.reduce((acc: any, p: any) => {
+    const ph = p.wpPhase || "Other";
+    if (!acc[ph]) acc[ph] = [];
+    acc[ph].push(p);
+    return acc;
+  }, {});
+
+  const PHASE_ORDER = ["Pre-engagement","Planning","Execution","Completion","Reporting","QC","Regulatory","Other"];
+
+  return (
+    <div className="space-y-4">
+      {PHASE_ORDER.filter((ph) => grouped[ph]?.length > 0).map((phase) => (
+        <div key={phase} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className={cn("px-4 py-2.5 flex items-center justify-between border-b border-slate-100", PHASE_COLORS[phase] || "bg-slate-50 text-slate-700")}>
+            <span className="font-semibold text-sm">{phase}</span>
+            <span className="text-xs font-medium opacity-75">{grouped[phase].length} paper{grouped[phase].length !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {grouped[phase].map((p: any) => (
+              <div key={p.wpCode} className={cn("px-4 py-3 hover:bg-slate-50/60 transition-colors", p.mandatoryFlag && "border-l-2 border-l-red-400")}>
+                <div className="flex items-start gap-3">
+                  <div className="shrink-0 mt-0.5">
+                    <span className="text-[11px] font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{p.wpCode}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-slate-800 leading-tight">{p.wpTitle}</span>
+                      {p.mandatoryFlag && <span className="text-[9px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded font-semibold shrink-0">MANDATORY</span>}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      {p.wpCategory && <span className={cn("text-[10px] px-2 py-0.5 rounded border font-medium", CAT_COLORS[p.wpCategory] || "border-slate-200 text-slate-500 bg-slate-50")}>{p.wpCategory}</span>}
+                      {p.isaReference && <span className="text-[10px] text-slate-400 font-mono">{p.isaReference}</span>}
+                      {p.reviewerLevel && <span className="text-[10px] text-slate-400">· {p.reviewerLevel}</span>}
+                      {p.outputFormat && <span className="text-[10px] text-slate-400">· {p.outputFormat}</span>}
+                      {p.autoGenerateFlag && <span className="text-[10px] px-1.5 py-0.5 bg-violet-50 text-violet-600 rounded border border-violet-100 font-medium">AI Auto-gen</span>}
+                    </div>
+                    {p.linkedAssertion && (
+                      <div className="flex gap-1 mt-1.5 flex-wrap">
+                        {p.linkedAssertion.split(",").map((a: string) => (
+                          <span key={a} className="text-[9px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded border border-blue-100">{a.trim()}</span>
+                        ))}
+                      </div>
+                    )}
+                    {isSession && p.triggerReason && (
+                      <p className="text-[10px] text-slate-400 mt-1 italic">Triggered by: {p.triggerReason.split(" | ").slice(0, 3).join(" · ")}</p>
+                    )}
+                  </div>
+                  {isSession && (
+                    <div className="shrink-0">
+                      <select value={p.status || "Pending"} onChange={(e) => onStatusChange?.(p.wpCode, { status: e.target.value })}
+                        className={cn("text-[10px] px-2 py-1 rounded-lg border-0 font-medium cursor-pointer", STATUS_COLORS[p.status] || "bg-slate-100 text-slate-600")}>
+                        {["Pending","In Progress","Prepared","Reviewed","Approved","N/A"].map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      {papers.length === 0 && (
+        <div className="py-10 text-center text-slate-400 text-sm">No papers match the current filter.</div>
       )}
     </div>
   );
