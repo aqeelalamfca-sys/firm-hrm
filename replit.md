@@ -32,24 +32,24 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 
 **Admin Credentials (seeded):** `admin@calfirm.com` / `Admin@123` (role: `super_admin`). Password hashed as `SHA256(password + "hrm_salt_2024")`. DB column is `password_hash`; role enum values: `super_admin`, `hr_admin`, `finance_officer`, `manager`, `employee`, `partner`, `trainee`.
 
-**AI Working Paper Generator (7-Step, A-L+AI Structure) — REBUILT:**
-- Frontend: `artifacts/hrm-system/src/pages/working-papers.tsx` (~3300 lines)
-- Backend: `artifacts/api-server/src/routes/working-papers.ts` (~2570 lines)
-- **7-step flow**: Upload → Variables → AI Extraction → Trial Balance → General Ledger → Working Papers → Export
-- **URL routing**: `/working-papers/upload`, `/variables`, `/extraction`, `/trial-balance`, `/general-ledger`, `/working-papers-review` (wait — actually `working-papers`), `/export`
-- **User uploads only**: Financial Statements + Sales Tax Returns — AI does everything else
-- **Variable Matrix (A-J groups)**: 80+ variables covering Engagement Profile, Entity Profile, Financial Reporting, Tax, FS Components, Risk Assessment, Audit Approach, Sales Tax Data, Document Availability, Output Control
-- **Data source badges**: Every AI value tagged as Extracted (blue) / Derived (green) / Estimated (amber) / User-confirmed (purple)
-- **Working Paper Index (A-L + AI)**: A=Pre-Engagement, B=Planning, C=TB & Financials, D=GL & Analytics, E=Substantive, F=Tax, G=Controls, H=Completion, I=Reporting, J=Quality Control, K=Client Communication, L=Inspection/QCR, AI=AI Control Papers
-- **Draft key**: `ana_wp_v3` (localStorage)
-- **Traceability**: FS → Extracted Data → TB → GL → Working Papers (all linked)
-- **Editable tables**: TB (inline cell editing, source tag update) and GL (expandable account view with entries)
-- **File storage**: Files stored in React ref (fsFilesRef / stFilesRef) — persist in-session only; extracted data preserved in draft so users can resume
-- **Backend**: `smartChunk()` for doc truncation; 6000 chars/file in extract-entity; 8000 chars/file in analyze; 14000 token WP generation
-- **Batch generation**: 4-batch approach (A-D, E, F-H, I-L+AI) to stay within token limits per batch
-- **AI prompts**: extract-entity (50+ fields), analyze (6000 tokens, 0.15 temp, full ISA 315 suite), generate-gl-tb (3-phase multi-call: Phase 1=COA+TB 12K tokens, Phase 2=batched GL 12 accounts/batch 12K tokens each, Phase 3=server-side reconciliation with auto-balance via Retained Earnings; Pakistan ICAP-aligned COA), /generate (14000 tokens, AuditWise system message, no-placeholder enforcement)
-- **Legacy file**: `artifacts/hrm-system/src/lib/engagement-variable-defs.ts` (121 variables) retained for backward compatibility only
-- Export formats: PDF, DOCX, Excel
+**AI Working Paper Generator (Audit-Grade Sequential Workflow) — V2 REBUILT:**
+- Frontend: `artifacts/hrm-system/src/pages/working-papers.tsx`
+- Backend: `artifacts/api-server/src/routes/working-papers.ts`
+- Schema: `lib/db/src/schema/working_papers.ts` (14 new tables)
+- **6-stage flow**: Upload → AI Extraction → Arranged Data Review → Variables (Lock) → Head-wise Generation → Export
+- **Session-based**: All data persisted in PostgreSQL (wp_sessions, wp_uploaded_files, wp_extraction_runs, wp_extracted_fields, wp_arranged_data, wp_variables, wp_variable_change_log, wp_exception_log, wp_trial_balance_lines, wp_gl_accounts, wp_gl_entries, wp_heads, wp_head_documents, wp_export_jobs)
+- **Strict upload rules**: Financial Statements/TB/GL/Bank → Excel only; Sales Tax/Notices/Annexures → PDF only
+- **OCR detection**: Scanned PDFs auto-detected (text < 100 chars with large buffer), source type classified as native_text_pdf/ocr_pdf/image_ocr/excel_native
+- **Arranged data staging**: 10 tabs (Entity Profile, Reporting Metadata, FS Line Items, Prior Year Comparatives, Sales Tax Data, Tax Period Summary, Notes/Schedules, Exceptions, Assumptions Register, Extraction Log) with field-level confidence scoring
+- **Variable management**: Auto-filled from extraction, editable with audit trail (wp_variable_change_log stores field, old/new value, reason, editor, timestamp), lockable before generation
+- **Confidence scoring**: Field-level 0-100%, color-coded (90-100% green, 70-89% amber/review, <70% red/confirm required)
+- **TB engine**: Rule-based first (deterministic from FS with Pakistan 4-digit COA mapping), AI-assisted second. Never silently force-balances — imbalances logged as critical exceptions
+- **GL engine**: AI generates per-account with controls: opening balance, monthly spread, voucher continuity, closing must match TB. Batch processing (6 accounts/batch). All synthetic entries flagged
+- **12 audit heads (sequential)**: Trial Balance → General Ledger → Pre-Planning → TB&GL → Client Documents → OB Verification → Planning → Execution → Finalization → Deliverables → EQCR → Inspection. Each: generate → validate → approve → export → unlock next
+- **Dependency gates**: Each head requires all prerequisite heads approved, extraction done, variables locked
+- **Exception center**: Types include extraction_flag, tb_imbalance, gl_issue, generation_issue with severity levels and status workflow (open/cleared/override_approved/deferred/not_applicable)
+- **Export**: TB→Excel, GL→Excel (per-account sheets), Pre-Planning→Word, mixed heads→Word+Excel. Full bundle export with index sheet, TB, exceptions log, and audit trail
+- **AI prompts**: extract (8000 tokens, 0.1 temp, Pakistan-focused forensic extraction), GL (6000 tokens/batch, 0.3 temp), WP generation (4000 tokens/paper, 0.3 temp, ISA-compliant)
 - Docker: `deploy/Dockerfile` uses `--no-frozen-lockfile` (patched for pnpm lockfile drift)
 
 **Key Features & Implementations:**
