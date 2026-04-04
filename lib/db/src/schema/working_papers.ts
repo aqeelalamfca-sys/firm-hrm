@@ -352,6 +352,196 @@ export const wpExportJobsTable = pgTable("wp_export_jobs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// AUDIT ENGINE MASTER TABLES
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const auditEngineMasterTable = pgTable("audit_engine_master", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull().unique(),
+  // Engagement Identity
+  engagementId: varchar("engagement_id", { length: 50 }),
+  clientName: text("client_name"),
+  entityType: text("entity_type"), // Pvt Ltd, Listed, NGO, Bank, etc.
+  industryType: text("industry_type"), // Manufacturing, Services, Retail, etc.
+  financialYearStart: text("financial_year_start"),
+  financialYearEnd: text("financial_year_end"),
+  reportingFramework: text("reporting_framework").default("IFRS"), // IFRS, IFRS for SMEs, etc.
+  auditType: text("audit_type").default("Statutory"), // Statutory, Internal, etc.
+  engagementStatus: text("engagement_status").default("Planning"), // Planning, Execution, Completed
+  // Materiality
+  materialityAmount: decimal("materiality_amount", { precision: 18, scale: 2 }),
+  performanceMateriality: decimal("performance_materiality", { precision: 18, scale: 2 }),
+  trivialityThreshold: decimal("triviality_threshold", { precision: 18, scale: 2 }),
+  // Risk Flags
+  riskLevelOverall: text("risk_level_overall").default("Medium"), // Low, Medium, High
+  goingConcernFlag: boolean("going_concern_flag").default(false),
+  fraudRiskFlag: boolean("fraud_risk_flag").default(false),
+  relatedPartyFlag: boolean("related_party_flag").default(false),
+  lawsRegulationFlag: boolean("laws_regulation_flag").default(false),
+  componentAuditFlag: boolean("component_audit_flag").default(false),
+  groupAuditFlag: boolean("group_audit_flag").default(false),
+  // Systems & Methods
+  itSystemType: text("it_system_type").default("ERP"), // ERP, Manual, Hybrid
+  internalAuditFlag: boolean("internal_audit_flag").default(false),
+  useOfExpertFlag: boolean("use_of_expert_flag").default(false),
+  samplingMethod: text("sampling_method").default("MUS"), // Random, MUS, Judgmental
+  dataSource: text("data_source").default("OCR"), // OCR, Manual
+  // QA
+  confidenceLevel: decimal("confidence_level", { precision: 5, scale: 2 }),
+  exceptionFlag: boolean("exception_flag").default(false),
+  // Sign-off
+  preparedBy: text("prepared_by"),
+  reviewedBy: text("reviewed_by"),
+  approvedBy: text("approved_by"),
+  // Meta
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const wpTriggerDefsTable = pgTable("wp_trigger_defs", {
+  id: serial("id").primaryKey(),
+  wpCode: varchar("wp_code", { length: 20 }).notNull().unique(),
+  wpName: text("wp_name").notNull(),
+  triggerCondition: text("trigger_condition").notNull(), // always | var:fieldName=value | risk:High | ratio:gp_percent
+  triggerDescription: text("trigger_description"),
+  isaReference: text("isa_reference"),
+  outputFormat: text("output_format").default("Word"), // Word, Excel
+  mandatoryFlag: boolean("mandatory_flag").default(true),
+  category: text("category"), // Planning, Risk, Substantive, Analytical, Completion
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const wpTriggerSessionTable = pgTable("wp_trigger_session", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  wpCode: varchar("wp_code", { length: 20 }).notNull(),
+  triggered: boolean("triggered").default(false),
+  triggerReason: text("trigger_reason"),
+  status: text("status").default("pending"), // pending, in_progress, completed, n_a
+  preparedBy: text("prepared_by"),
+  reviewedBy: text("reviewed_by"),
+  completedAt: timestamp("completed_at"),
+  conclusion: text("conclusion"),
+  exceptionNote: text("exception_note"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const assertionLinkageTable = pgTable("assertion_linkage", {
+  id: serial("id").primaryKey(),
+  accountType: text("account_type").notNull(), // Asset, Liability, Revenue, Expense, Equity
+  fsLineItem: text("fs_line_item"), // Receivables, Inventory, etc.
+  assertion: text("assertion").notNull(), // Existence, Completeness, Valuation, etc.
+  wpCode: varchar("wp_code", { length: 20 }),
+  wpLink: text("wp_link"), // Human description
+  testingProcedure: text("testing_procedure"),
+  isaReference: text("isa_reference"),
+  riskTag: text("risk_tag"),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const samplingRulesTable = pgTable("sampling_rules", {
+  id: serial("id").primaryKey(),
+  riskLevel: text("risk_level").notNull(), // High, Medium, Low
+  materialityBand: text("materiality_band").notNull(), // GT_PM, LTE_PM, LT_TRIVIAL
+  sampleSizeMin: integer("sample_size_min").notNull(),
+  sampleSizeMax: integer("sample_size_max").notNull(),
+  coveragePct: decimal("coverage_pct", { precision: 5, scale: 2 }),
+  samplingMethod: text("sampling_method"), // MUS, Random, Judgmental
+  testingApproach: text("testing_approach"), // Full, Moderate, Analytical
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const analyticsEngineTable = pgTable("analytics_engine", {
+  id: serial("id").primaryKey(),
+  ratioCode: varchar("ratio_code", { length: 30 }).notNull().unique(),
+  ratioName: text("ratio_name").notNull(),
+  formula: text("formula").notNull(), // e.g. "GP / Sales"
+  numeratorField: text("numerator_field"), // variable/account name
+  denominatorField: text("denominator_field"),
+  thresholdMin: decimal("threshold_min", { precision: 10, scale: 4 }),
+  thresholdMax: decimal("threshold_max", { precision: 10, scale: 4 }),
+  thresholdDescription: text("threshold_description"), // e.g. "±10%"
+  wpTrigger: varchar("wp_trigger", { length: 20 }), // WP code to trigger if breached
+  category: text("category"), // Profitability, Liquidity, Efficiency, Solvency
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const analyticsSessionTable = pgTable("analytics_session", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  ratioCode: varchar("ratio_code", { length: 30 }).notNull(),
+  computedValue: decimal("computed_value", { precision: 15, scale: 4 }),
+  priorYearValue: decimal("prior_year_value", { precision: 15, scale: 4 }),
+  variance: decimal("variance", { precision: 15, scale: 4 }),
+  breached: boolean("breached").default(false),
+  explanation: text("explanation"),
+  wpTriggered: boolean("wp_triggered").default(false),
+  reviewedBy: text("reviewed_by"),
+  conclusion: text("conclusion"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const controlMatrixTable = pgTable("control_matrix", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  processName: text("process_name").notNull(), // Sales, Purchases, Payroll, etc.
+  controlDescription: text("control_description").notNull(),
+  controlFrequency: text("control_frequency"), // Daily, Monthly, Per transaction
+  controlOwner: text("control_owner"),
+  testType: text("test_type").default("ToC"), // ToC (Test of Controls), ToD (Test of Details)
+  sampleSize: integer("sample_size"),
+  testingResult: text("testing_result"), // Effective, Deficient, Not Tested
+  exceptionCount: integer("exception_count").default(0),
+  relatedWpCode: varchar("related_wp_code", { length: 20 }),
+  isaReference: text("isa_reference"),
+  testedBy: text("tested_by"),
+  conclusion: text("conclusion"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const evidenceLogTable = pgTable("evidence_log", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  wpCode: varchar("wp_code", { length: 20 }),
+  headId: integer("head_id").references(() => wpHeadsTable.id),
+  evidenceId: varchar("evidence_id", { length: 50 }),
+  documentType: text("document_type"), // Invoice, Contract, Confirmation, etc.
+  documentRef: text("document_ref"),
+  source: text("source").default("Client"), // Client, External, Self-generated
+  description: text("description"),
+  obtainedDate: text("obtained_date"),
+  verifiedFlag: boolean("verified_flag").default(false),
+  verifiedBy: text("verified_by"),
+  reviewerComment: text("reviewer_comment"),
+  exceptionFlag: boolean("exception_flag").default(false),
+  attachmentPath: text("attachment_path"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const reconEngineTable = pgTable("recon_engine", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  checkName: text("check_name").notNull(), // FS vs TB, TB vs GL, etc.
+  sourceA: text("source_a").notNull(),
+  sourceB: text("source_b").notNull(),
+  amountA: decimal("amount_a", { precision: 18, scale: 2 }),
+  amountB: decimal("amount_b", { precision: 18, scale: 2 }),
+  difference: decimal("difference", { precision: 18, scale: 2 }),
+  passed: boolean("passed").default(false),
+  rule: text("rule"), // Must match, Within materiality, etc.
+  notes: text("notes"),
+  runAt: timestamp("run_at").defaultNow(),
+});
+
 export const wpMasterCoaTable = pgTable("wp_master_coa", {
   id: serial("id").primaryKey(),
   sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),

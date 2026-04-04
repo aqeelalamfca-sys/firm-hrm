@@ -22,6 +22,7 @@ const STAGES = [
   { key: "data_sheet", label: "Data Sheet", icon: Database },
   { key: "arranged_data", label: "Arranged Data", icon: Layers },
   { key: "variables", label: "Variables", icon: Settings2 },
+  { key: "audit_engine", label: "Audit Engine", icon: Shield },
   { key: "generation", label: "Generation", icon: Play },
   { key: "export", label: "Export", icon: Download },
 ] as const;
@@ -96,6 +97,15 @@ export default function WorkingPapers() {
   const [coaData, setCoaData] = useState<any[]>([]);
   const [coaLoading, setCoaLoading] = useState(false);
   const [arrangedData, setArrangedData] = useState<any>(null);
+  // Audit Engine state
+  const [auditMaster, setAuditMaster] = useState<any>(null);
+  const [auditMasterLoading, setAuditMasterLoading] = useState(false);
+  const [wpTriggers, setWpTriggers] = useState<any[]>([]);
+  const [samplingData, setSamplingData] = useState<any>(null);
+  const [analyticsData, setAnalyticsData] = useState<any[]>([]);
+  const [controlMatrix, setControlMatrix] = useState<any[]>([]);
+  const [evidenceLog, setEvidenceLog] = useState<any[]>([]);
+  const [reconResults, setReconResults] = useState<any[]>([]);
   const [variables, setVariables] = useState<any[]>([]);
   const [variableGroups, setVariableGroups] = useState<any>({});
   const [variableStats, setVariableStats] = useState<any>(null);
@@ -422,6 +432,165 @@ export default function WorkingPapers() {
         const data = await res.json();
         setArrangedData(data);
         if (data.tabNames?.length > 0 && !activeTab) setActiveTab(data.tabNames[0]);
+      }
+    } catch {}
+  };
+
+  const fetchAuditMaster = async () => {
+    if (!activeSession) return;
+    try {
+      setAuditMasterLoading(true);
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/audit-engine`, { headers });
+      if (res.ok) setAuditMaster(await res.json());
+    } catch {} finally { setAuditMasterLoading(false); }
+  };
+
+  const updateAuditMaster = async (updates: any) => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/audit-engine`, {
+        method: "PATCH", headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) { setAuditMaster(await res.json()); toast({ title: "Audit engine updated" }); }
+    } catch {}
+  };
+
+  const autoPopulateAuditMaster = async () => {
+    if (!activeSession) return;
+    try {
+      setAuditMasterLoading(true);
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/audit-engine/auto-populate`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAuditMaster(data.data);
+        toast({ title: "Auto-populated from variables", description: data.message });
+      }
+    } catch { toast({ title: "Auto-populate failed", variant: "destructive" }); }
+    finally { setAuditMasterLoading(false); }
+  };
+
+  const fetchWpTriggers = async () => {
+    if (!activeSession) return;
+    try {
+      // Seed if needed, then fetch
+      await fetch(`${API_BASE}/working-papers/seed-audit-engine`, { method: "POST", headers: { ...headers, "Content-Type": "application/json" } });
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/wp-triggers`, { headers });
+      if (res.ok) setWpTriggers(await res.json());
+    } catch {}
+  };
+
+  const evaluateWpTriggers = async () => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/wp-triggers/evaluate`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (res.ok) { toast({ title: "WP Triggers Evaluated", description: data.message }); await fetchWpTriggers(); }
+      else toast({ title: "Evaluation failed", description: data.error, variant: "destructive" });
+    } catch {}
+  };
+
+  const updateWpTrigger = async (wpCode: string, updates: any) => {
+    if (!activeSession) return;
+    await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/wp-triggers/${wpCode}`, {
+      method: "PATCH", headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    await fetchWpTriggers();
+  };
+
+  const fetchSampling = async () => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/sampling`, { headers });
+      if (res.ok) setSamplingData(await res.json());
+    } catch {}
+  };
+
+  const fetchAnalytics = async () => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/analytics`, { headers });
+      if (res.ok) setAnalyticsData(await res.json());
+    } catch {}
+  };
+
+  const fetchControlMatrix = async () => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/control-matrix`, { headers });
+      if (res.ok) setControlMatrix(await res.json());
+    } catch {}
+  };
+
+  const updateControlMatrix = async (id: number, updates: any) => {
+    if (!activeSession) return;
+    const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/control-matrix/${id}`, {
+      method: "PATCH", headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    if (res.ok) setControlMatrix(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+  };
+
+  const addControlRow = async (row: any) => {
+    if (!activeSession) return;
+    const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/control-matrix`, {
+      method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify(row),
+    });
+    if (res.ok) { const inserted = await res.json(); setControlMatrix(prev => [...prev, inserted]); toast({ title: "Control added" }); }
+  };
+
+  const deleteControlRow = async (id: number) => {
+    if (!activeSession) return;
+    await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/control-matrix/${id}`, { method: "DELETE", headers });
+    setControlMatrix(prev => prev.filter(r => r.id !== id));
+  };
+
+  const fetchEvidence = async () => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/evidence`, { headers });
+      if (res.ok) setEvidenceLog(await res.json());
+    } catch {}
+  };
+
+  const addEvidence = async (ev: any) => {
+    if (!activeSession) return;
+    const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/evidence`, {
+      method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(ev),
+    });
+    if (res.ok) { const inserted = await res.json(); setEvidenceLog(prev => [...prev, inserted]); toast({ title: "Evidence logged" }); }
+  };
+
+  const updateEvidence = async (id: number, updates: any) => {
+    if (!activeSession) return;
+    const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/evidence/${id}`, {
+      method: "PATCH", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(updates),
+    });
+    if (res.ok) setEvidenceLog(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+  };
+
+  const deleteEvidence = async (id: number) => {
+    if (!activeSession) return;
+    await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/evidence/${id}`, { method: "DELETE", headers });
+    setEvidenceLog(prev => prev.filter(r => r.id !== id));
+  };
+
+  const runRecon = async () => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/recon/run`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setReconResults(data.checks);
+        toast({ title: data.allPassed ? "All checks passed ✓" : "Issues found", description: data.summary, variant: data.allPassed ? "default" : "destructive" });
       }
     } catch {}
   };
@@ -1112,6 +1281,7 @@ export default function WorkingPapers() {
                     if (s.key === "variables" && variables.length === 0) fetchVariables();
                     if (s.key === "arranged_data" && !arrangedData) fetchArrangedData();
                     if (s.key === "data_sheet" && coaData.length === 0) fetchCoaData();
+                    if (s.key === "audit_engine" && !auditMaster) { fetchAuditMaster(); fetchWpTriggers(); fetchSampling(); fetchAnalytics(); fetchControlMatrix(); fetchEvidence(); }
                     if (s.key === "generation" || s.key === "export") { fetchSession(activeSession.id); fetchExceptions(); }
                   }}
                 >
@@ -1225,6 +1395,34 @@ export default function WorkingPapers() {
           onApprove={approveCoa}
           onRefresh={fetchCoaData}
           session={activeSession}
+        />
+      )}
+
+      {stage === "audit_engine" && (
+        <AuditEngineStage
+          auditMaster={auditMaster}
+          wpTriggers={wpTriggers}
+          samplingData={samplingData}
+          analyticsData={analyticsData}
+          controlMatrix={controlMatrix}
+          evidenceLog={evidenceLog}
+          reconResults={reconResults}
+          loading={auditMasterLoading || loading}
+          session={activeSession}
+          onUpdateMaster={updateAuditMaster}
+          onAutoPopulate={autoPopulateAuditMaster}
+          onEvaluateTriggers={evaluateWpTriggers}
+          onUpdateTrigger={updateWpTrigger}
+          onRefreshTriggers={fetchWpTriggers}
+          onRefreshSampling={fetchSampling}
+          onRefreshAnalytics={fetchAnalytics}
+          onUpdateControl={updateControlMatrix}
+          onAddControl={addControlRow}
+          onDeleteControl={deleteControlRow}
+          onAddEvidence={addEvidence}
+          onUpdateEvidence={updateEvidence}
+          onDeleteEvidence={deleteEvidence}
+          onRunRecon={runRecon}
         />
       )}
 
@@ -1867,6 +2065,528 @@ function DataSheetStage({ coaData, loading, onPopulate, onUpdate, onDelete, onAd
             Approve Data Sheet & Continue
             <ArrowRight className="w-4 h-4" />
           </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AuditEngineStage({
+  auditMaster, wpTriggers, samplingData, analyticsData, controlMatrix, evidenceLog, reconResults,
+  loading, session, onUpdateMaster, onAutoPopulate, onEvaluateTriggers, onUpdateTrigger, onRefreshTriggers,
+  onRefreshSampling, onRefreshAnalytics, onUpdateControl, onAddControl, onDeleteControl,
+  onAddEvidence, onUpdateEvidence, onDeleteEvidence, onRunRecon
+}: any) {
+  const [activeEngineTab, setActiveEngineTab] = useState("engagement");
+  const [masterForm, setMasterForm] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const [newEvForm, setNewEvForm] = useState<any>({ documentType: "Invoice", source: "Client", wpCode: "", description: "" });
+  const [showEvForm, setShowEvForm] = useState(false);
+  const [newCtrl, setNewCtrl] = useState<any>({ processName: "", controlDescription: "", controlFrequency: "Per transaction", testType: "ToC" });
+  const [showCtrlForm, setShowCtrlForm] = useState(false);
+
+  useEffect(() => { if (auditMaster && !masterForm) setMasterForm({ ...auditMaster }); }, [auditMaster]);
+
+  const saveMaster = async () => { setSaving(true); await onUpdateMaster(masterForm); setSaving(false); };
+  const setMF = (field: string, val: any) => setMasterForm((p: any) => ({ ...p, [field]: val }));
+
+  const TABS = [
+    { key: "engagement", label: "Engagement Control", icon: ClipboardCheck },
+    { key: "wp_triggers", label: "WP Trigger Matrix", icon: Zap },
+    { key: "sampling", label: "Sampling Engine", icon: Calculator },
+    { key: "analytics", label: "Analytical Review", icon: Gauge },
+    { key: "controls", label: "Control Testing", icon: Shield },
+    { key: "evidence", label: "Evidence Vault", icon: FileCheck },
+    { key: "recon", label: "Reconciliation", icon: RefreshCw },
+  ];
+
+  const fmt = (v: any) => { const n = Number(v || 0); return isNaN(n) ? "—" : n.toLocaleString("en-PK"); };
+  const statusColor = (s: string) => s === "completed" ? "bg-emerald-100 text-emerald-700" : s === "in_progress" ? "bg-blue-100 text-blue-700" : s === "n_a" ? "bg-slate-100 text-slate-400" : "bg-amber-100 text-amber-700";
+  const riskBg = (r: string) => r === "High" ? "bg-red-50 border-red-200 text-red-700" : r === "Medium" ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-green-50 border-green-200 text-green-700";
+  const catColor = (c: string) => c === "Planning" ? "text-purple-600" : c === "Risk" ? "text-red-600" : c === "Substantive" ? "text-blue-600" : c === "Analytical" ? "text-teal-600" : "text-emerald-600";
+
+  const triggered = wpTriggers.filter((t: any) => t.triggered);
+  const notTriggered = wpTriggers.filter((t: any) => !t.triggered);
+  const completed = wpTriggers.filter((t: any) => t.status === "completed");
+  const breachedRatios = analyticsData.filter((r: any) => r.breached);
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-slate-800 to-indigo-900 rounded-2xl p-5 text-white">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-lg font-bold flex items-center gap-2"><Shield className="w-5 h-5 text-indigo-300" /> AUDIT ENGINE MASTER CONTROL</h2>
+            <p className="text-slate-300 text-sm mt-0.5">ISA-aligned audit logic • WP triggers • Sampling • Analytics • Evidence vault</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="text-center px-3 py-1.5 bg-white/10 rounded-lg"><div className="text-lg font-bold">{triggered.length}</div><div className="text-[10px] text-slate-300">WPs Triggered</div></div>
+            <div className="text-center px-3 py-1.5 bg-white/10 rounded-lg"><div className="text-lg font-bold">{completed.length}</div><div className="text-[10px] text-slate-300">Completed</div></div>
+            <div className="text-center px-3 py-1.5 bg-white/10 rounded-lg"><div className={cn("text-lg font-bold", breachedRatios.length > 0 ? "text-red-300" : "text-emerald-300")}>{breachedRatios.length}</div><div className="text-[10px] text-slate-300">Ratio Alerts</div></div>
+            <div className="text-center px-3 py-1.5 bg-white/10 rounded-lg"><div className="text-lg font-bold">{evidenceLog.length}</div><div className="text-[10px] text-slate-300">Evidence Items</div></div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1.5 flex-wrap border-b border-slate-200 pb-0">
+        {TABS.map(tab => (
+          <button key={tab.key} onClick={() => setActiveEngineTab(tab.key)} className={cn("flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-t-lg border border-b-0 transition-colors", activeEngineTab === tab.key ? "bg-white border-slate-200 text-indigo-700 shadow-sm -mb-px" : "bg-slate-50 border-transparent text-slate-500 hover:text-slate-700 hover:bg-white")}>
+            <tab.icon className="w-3.5 h-3.5" />{tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── TAB: Engagement Control ── */}
+      {activeEngineTab === "engagement" && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-5">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2"><ClipboardCheck className="w-4 h-4 text-indigo-600" /> Engagement Control Master</h3>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={onAutoPopulate} disabled={loading} className="h-8 text-xs gap-1.5 border-violet-200 text-violet-700 hover:bg-violet-50"><Sparkles className="w-3.5 h-3.5" />Auto-populate</Button>
+              <Button size="sm" onClick={saveMaster} disabled={saving || !masterForm} className="h-8 text-xs gap-1.5 bg-indigo-600 hover:bg-indigo-700">{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}Save</Button>
+            </div>
+          </div>
+          {!masterForm && loading ? (
+            <div className="py-8 text-center"><Loader2 className="w-6 h-6 animate-spin text-indigo-600 mx-auto" /></div>
+          ) : masterForm ? (
+            <div className="space-y-5">
+              {/* Identity */}
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-3">Engagement Identity</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {[
+                    { label: "Engagement ID", field: "engagementId" },
+                    { label: "Client Name", field: "clientName" },
+                    { label: "FY Start", field: "financialYearStart", placeholder: "01-Jul-2024" },
+                    { label: "FY End", field: "financialYearEnd", placeholder: "30-Jun-2025" },
+                  ].map(f => (
+                    <div key={f.field}>
+                      <label className="text-[11px] text-slate-500 font-medium block mb-1">{f.label}</label>
+                      <input className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" value={masterForm[f.field] || ""} placeholder={f.placeholder} onChange={e => setMF(f.field, e.target.value)} />
+                    </div>
+                  ))}
+                  {[
+                    { label: "Entity Type", field: "entityType", options: ["Pvt Ltd", "Listed", "NGO", "Bank", "Trust", "Sole Proprietor", "Partnership"] },
+                    { label: "Industry", field: "industryType", options: ["Manufacturing", "Services", "Retail", "Banking", "Insurance", "Healthcare", "Construction", "Technology"] },
+                    { label: "Reporting Framework", field: "reportingFramework", options: ["IFRS", "IFRS for SMEs", "SECP Regulations", "SBP Guidelines"] },
+                    { label: "Audit Type", field: "auditType", options: ["Statutory", "Internal", "Tax", "Forensic", "Due Diligence"] },
+                    { label: "Engagement Status", field: "engagementStatus", options: ["Planning", "Fieldwork", "Completion", "Reporting", "Completed"] },
+                    { label: "IT System", field: "itSystemType", options: ["ERP", "Manual", "Hybrid", "Spreadsheet"] },
+                    { label: "Sampling Method", field: "samplingMethod", options: ["MUS", "Random", "Judgmental", "Stratified"] },
+                    { label: "Data Source", field: "dataSource", options: ["OCR", "Manual", "Excel Extract", "ERP Export"] },
+                  ].map(f => (
+                    <div key={f.field}>
+                      <label className="text-[11px] text-slate-500 font-medium block mb-1">{f.label}</label>
+                      <select className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-300 outline-none" value={masterForm[f.field] || ""} onChange={e => setMF(f.field, e.target.value)}>
+                        <option value="">— Select —</option>
+                        {f.options.map(o => <option key={o}>{o}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Materiality */}
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-3">Materiality</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: "Overall Materiality (PKR)", field: "materialityAmount" },
+                    { label: "Performance Materiality (PKR)", field: "performanceMateriality" },
+                    { label: "Triviality Threshold (PKR)", field: "trivialityThreshold" },
+                  ].map(f => (
+                    <div key={f.field}>
+                      <label className="text-[11px] text-slate-500 font-medium block mb-1">{f.label}</label>
+                      <input type="number" className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-right font-mono focus:ring-2 focus:ring-indigo-300 outline-none" value={masterForm[f.field] || ""} onChange={e => setMF(f.field, e.target.value)} />
+                    </div>
+                  ))}
+                </div>
+                {masterForm.materialityAmount && (
+                  <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-500">
+                    <Info className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Overall: <strong className="text-indigo-700">PKR {fmt(masterForm.materialityAmount)}</strong> | PM: <strong className="text-blue-700">PKR {fmt(masterForm.performanceMateriality)}</strong> | Trivial: <strong className="text-slate-600">PKR {fmt(masterForm.trivialityThreshold)}</strong></span>
+                  </div>
+                )}
+              </div>
+
+              {/* Risk & Flags */}
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-3">Risk Level & ISA Flags</p>
+                <div className="flex items-center gap-3 mb-3">
+                  <label className="text-sm text-slate-600 font-medium">Overall Risk Level:</label>
+                  {["Low", "Medium", "High"].map(r => (
+                    <button key={r} onClick={() => setMF("riskLevelOverall", r)} className={cn("px-4 py-1.5 rounded-full text-xs font-semibold border transition-colors", masterForm.riskLevelOverall === r ? r === "High" ? "bg-red-600 text-white border-red-600" : r === "Medium" ? "bg-amber-500 text-white border-amber-500" : "bg-green-600 text-white border-green-600" : "border-slate-300 text-slate-600 hover:border-slate-400")}>{r}</button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {[
+                    { label: "Going Concern (ISA 570)", field: "goingConcernFlag", isa: "ISA 570" },
+                    { label: "Fraud Risk (ISA 240)", field: "fraudRiskFlag", isa: "ISA 240" },
+                    { label: "Related Parties (ISA 550)", field: "relatedPartyFlag", isa: "ISA 550" },
+                    { label: "Laws & Regulations (ISA 250)", field: "lawsRegulationFlag", isa: "ISA 250" },
+                    { label: "Component Audit (ISA 600)", field: "componentAuditFlag", isa: "ISA 600" },
+                    { label: "Group Audit (ISA 600)", field: "groupAuditFlag", isa: "ISA 600" },
+                    { label: "Internal Audit (ISA 610)", field: "internalAuditFlag", isa: "ISA 610" },
+                    { label: "Use of Expert (ISA 620)", field: "useOfExpertFlag", isa: "ISA 620" },
+                  ].map(f => (
+                    <button key={f.field} onClick={() => setMF(f.field, !masterForm[f.field])} className={cn("flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-all text-left", masterForm[f.field] ? "bg-red-50 border-red-300 text-red-700 shadow-sm" : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-white hover:border-slate-300")}>
+                      <div className={cn("w-4 h-4 rounded flex items-center justify-center shrink-0", masterForm[f.field] ? "bg-red-500" : "bg-slate-200")}>{masterForm[f.field] && <Check className="w-2.5 h-2.5 text-white" />}</div>
+                      <div><div className="leading-tight">{f.label}</div><div className="text-[9px] opacity-60 font-normal">{f.isa}</div></div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sign-off */}
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-3">Sign-off & QA</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: "Prepared By", field: "preparedBy" },
+                    { label: "Reviewed By", field: "reviewedBy" },
+                    { label: "Approved By (Partner)", field: "approvedBy" },
+                  ].map(f => (
+                    <div key={f.field}>
+                      <label className="text-[11px] text-slate-500 font-medium block mb-1">{f.label}</label>
+                      <input className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-300 outline-none" value={masterForm[f.field] || ""} onChange={e => setMF(f.field, e.target.value)} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center">
+              <p className="text-slate-500 text-sm">No audit engine data — click Auto-populate to start</p>
+              <Button onClick={onAutoPopulate} disabled={loading} className="mt-3 gap-1.5 bg-indigo-600 hover:bg-indigo-700"><Sparkles className="w-4 h-4" />Auto-populate from Variables</Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB: WP Trigger Matrix ── */}
+      {activeEngineTab === "wp_triggers" && (
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50/40 px-5 py-4 border-b border-slate-200/60 flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2"><Zap className="w-4 h-4 text-indigo-600" /> Working Paper Trigger Matrix</h3>
+              <p className="text-xs text-slate-500 mt-0.5">{triggered.length} WPs triggered • {completed.length} completed • {notTriggered.length} not applicable</p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={onRefreshTriggers} className="h-8 text-xs gap-1"><RefreshCw className="w-3 h-3" />Refresh</Button>
+              <Button size="sm" onClick={onEvaluateTriggers} disabled={!auditMaster} className="h-8 text-xs gap-1 bg-indigo-600 hover:bg-indigo-700"><Zap className="w-3 h-3" />Re-evaluate Triggers</Button>
+            </div>
+          </div>
+
+          {wpTriggers.length === 0 ? (
+            <div className="py-16 text-center">
+              <Zap className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 text-sm mb-4">Set up the Engagement Control first, then evaluate triggers</p>
+              <Button onClick={onEvaluateTriggers} disabled={!auditMaster} className="gap-1.5"><Zap className="w-4 h-4" />Evaluate WP Triggers</Button>
+            </div>
+          ) : (
+            <div>
+              {["Planning", "Risk", "Substantive", "Analytical", "Completion"].map(cat => {
+                const catItems = wpTriggers.filter((t: any) => t.category === cat);
+                if (!catItems.length) return null;
+                return (
+                  <div key={cat}>
+                    <div className={cn("px-5 py-2 text-[11px] font-semibold uppercase tracking-wider border-b border-slate-100", catColor(cat))} style={{ background: "rgba(0,0,0,0.02)" }}>{cat} ({catItems.length})</div>
+                    {catItems.map((t: any) => (
+                      <div key={t.wpCode} className={cn("flex items-start gap-3 px-5 py-3 border-b border-slate-50 hover:bg-slate-50/60 transition-colors", !t.triggered && "opacity-50")}>
+                        <div className={cn("mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-bold", t.triggered ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-400")}>{t.wpCode}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-slate-800">{t.wpName}</span>
+                            {t.mandatoryFlag && <span className="px-1.5 py-0.5 bg-red-50 text-red-600 text-[10px] rounded font-semibold">MANDATORY</span>}
+                            <span className="text-[10px] text-slate-400">{t.isaReference}</span>
+                            <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", statusColor(t.status))}>{t.status?.replace("_", " ").toUpperCase() || "PENDING"}</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5">{t.triggerReason || t.triggerDescription}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className={cn("w-5 h-5 rounded-full flex items-center justify-center", t.triggered ? "bg-emerald-500" : "bg-slate-200")}>
+                            {t.triggered ? <Check className="w-3 h-3 text-white" /> : <X className="w-3 h-3 text-slate-400" />}
+                          </div>
+                          {t.triggered && (
+                            <select className="text-[11px] border border-slate-200 rounded px-1.5 py-1 bg-white" value={t.status || "pending"} onChange={e => onUpdateTrigger(t.wpCode, { status: e.target.value })}>
+                              <option value="pending">Pending</option>
+                              <option value="in_progress">In Progress</option>
+                              <option value="completed">Completed</option>
+                              <option value="n_a">N/A</option>
+                            </select>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB: Sampling Engine ── */}
+      {activeEngineTab === "sampling" && (
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50/40 px-5 py-4 border-b border-slate-200/60 flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2"><Calculator className="w-4 h-4 text-blue-600" /> Sampling Engine</h3>
+              <p className="text-xs text-slate-500 mt-0.5">ISA 530 compliant — MUS, Random, Judgmental sampling rules</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={onRefreshSampling} className="h-8 text-xs gap-1"><RefreshCw className="w-3 h-3" />Refresh</Button>
+          </div>
+
+          {samplingData?.context && (
+            <div className="px-5 py-3 bg-blue-50/50 border-b border-blue-100 flex items-center gap-4 flex-wrap text-xs">
+              <span className={cn("px-2.5 py-1 rounded-full font-semibold border text-xs", riskBg(samplingData.context.riskLevel))}>Risk: {samplingData.context.riskLevel}</span>
+              <span className="text-slate-600">PM: <strong>PKR {fmt(samplingData.context.performanceMateriality)}</strong></span>
+              <span className="text-slate-600">Trivial: <strong>PKR {fmt(samplingData.context.trivialityThreshold)}</strong></span>
+              <span className="text-slate-600">Method: <strong>{samplingData.context.samplingMethod}</strong></span>
+            </div>
+          )}
+
+          {samplingData?.context?.recommendation && (
+            <div className="px-5 py-2.5 bg-indigo-50 border-b border-indigo-100 flex items-center gap-2">
+              <Info className="w-4 h-4 text-indigo-600 shrink-0" />
+              <p className="text-xs text-indigo-700">{samplingData.context.recommendation}</p>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Risk Level</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Materiality Band</th>
+                  <th className="text-center px-4 py-2.5 font-semibold text-slate-600">Sample Range</th>
+                  <th className="text-center px-4 py-2.5 font-semibold text-slate-600">Coverage %</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Method</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Approach</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Notes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {(samplingData?.rules || []).map((r: any) => (
+                  <tr key={r.id} className={cn("hover:bg-slate-50/50", samplingData?.context?.riskLevel === r.riskLevel && "bg-indigo-50/30 font-medium")}>
+                    <td className="px-4 py-2.5"><span className={cn("px-2 py-0.5 rounded-full text-[11px] font-semibold", r.riskLevel === "High" ? "bg-red-100 text-red-700" : r.riskLevel === "Medium" ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700")}>{r.riskLevel}</span></td>
+                    <td className="px-4 py-2.5 text-slate-700">{r.materialityBand === "GT_PM" ? "Above PM (>PM)" : r.materialityBand === "LTE_PM" ? "At / Below PM" : "Below Trivial"}</td>
+                    <td className="px-4 py-2.5 text-center font-mono font-semibold text-indigo-700">{r.sampleSizeMin}–{r.sampleSizeMax}</td>
+                    <td className="px-4 py-2.5 text-center"><div className="w-full bg-slate-100 rounded-full h-1.5 mb-0.5"><div className="bg-indigo-500 rounded-full h-1.5" style={{ width: `${Math.min(Number(r.coveragePct), 100)}%` }} /></div><span className="text-[10px]">{r.coveragePct}%</span></td>
+                    <td className="px-4 py-2.5 text-slate-600">{r.samplingMethod}</td>
+                    <td className="px-4 py-2.5"><span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", r.testingApproach === "Full" ? "bg-red-50 text-red-700" : r.testingApproach === "Moderate" ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600")}>{r.testingApproach}</span></td>
+                    <td className="px-4 py-2.5 text-slate-500 text-[11px]">{r.notes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: Analytical Review ── */}
+      {activeEngineTab === "analytics" && (
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="bg-gradient-to-r from-teal-50 to-emerald-50/40 px-5 py-4 border-b border-slate-200/60 flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2"><Gauge className="w-4 h-4 text-teal-600" /> Analytical Procedure Engine</h3>
+              <p className="text-xs text-slate-500 mt-0.5">ISA 520 — computed from session variables • {breachedRatios.length} ratio alert{breachedRatios.length !== 1 ? "s" : ""}</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={onRefreshAnalytics} className="h-8 text-xs gap-1"><RefreshCw className="w-3 h-3" />Refresh</Button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Ratio</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Category</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Formula</th>
+                  <th className="text-right px-4 py-2.5 font-semibold text-slate-600">Computed</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Threshold</th>
+                  <th className="text-center px-4 py-2.5 font-semibold text-slate-600">Status</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-600">WP Link</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {analyticsData.map((r: any) => (
+                  <tr key={r.ratioCode} className={cn("hover:bg-slate-50/50", r.breached && "bg-red-50/30")}>
+                    <td className="px-4 py-2.5 font-medium text-slate-800">{r.ratioName}</td>
+                    <td className="px-4 py-2.5"><span className="text-[10px] text-slate-500">{r.category}</span></td>
+                    <td className="px-4 py-2.5 font-mono text-[11px] text-slate-500">{r.formula}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      {r.computedValue != null ? (
+                        <span className={cn("font-bold font-mono text-sm", r.breached ? "text-red-700" : "text-emerald-700")}>{Number(r.computedValue).toFixed(2)}{r.ratioCode?.endsWith("_percent") ? "%" : r.ratioCode?.endsWith("_days") ? "d" : "x"}</span>
+                      ) : <span className="text-slate-300 text-sm">— N/A</span>}
+                    </td>
+                    <td className="px-4 py-2.5 text-[11px] text-slate-500 max-w-[120px]" title={r.thresholdDescription}><div className="truncate">{r.thresholdDescription}</div></td>
+                    <td className="px-4 py-2.5 text-center">
+                      {r.computedValue == null ? <span className="text-[10px] text-slate-300">No data</span> : r.breached ? <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-[10px] font-semibold flex items-center gap-1 justify-center"><AlertTriangle className="w-3 h-3" />Alert</span> : <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-semibold flex items-center gap-1 justify-center"><Check className="w-3 h-3" />OK</span>}
+                    </td>
+                    <td className="px-4 py-2.5"><span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-mono">{r.wpTrigger || "—"}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: Control Testing ── */}
+      {activeEngineTab === "controls" && (
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="bg-gradient-to-r from-purple-50 to-violet-50/40 px-5 py-4 border-b border-slate-200/60 flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2"><Shield className="w-4 h-4 text-purple-600" /> Control Testing Matrix</h3>
+              <p className="text-xs text-slate-500 mt-0.5">ISA 315 — ToC (Test of Controls) & ToD (Test of Details)</p>
+            </div>
+            <Button size="sm" onClick={() => setShowCtrlForm(true)} className="h-8 text-xs gap-1 bg-purple-600 hover:bg-purple-700"><Plus className="w-3.5 h-3.5" />Add Control</Button>
+          </div>
+
+          {showCtrlForm && (
+            <div className="px-5 py-4 bg-purple-50 border-b border-purple-100">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div><label className="text-[11px] text-slate-500 font-medium block mb-1">Process</label><input className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs" value={newCtrl.processName} onChange={e => setNewCtrl((p: any) => ({ ...p, processName: e.target.value }))} placeholder="e.g. Sales" /></div>
+                <div><label className="text-[11px] text-slate-500 font-medium block mb-1">Control Description</label><input className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs" value={newCtrl.controlDescription} onChange={e => setNewCtrl((p: any) => ({ ...p, controlDescription: e.target.value }))} /></div>
+                <div><label className="text-[11px] text-slate-500 font-medium block mb-1">Frequency</label><select className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs" value={newCtrl.controlFrequency} onChange={e => setNewCtrl((p: any) => ({ ...p, controlFrequency: e.target.value }))}><option>Daily</option><option>Per transaction</option><option>Weekly</option><option>Monthly</option><option>Annual</option></select></div>
+                <div><label className="text-[11px] text-slate-500 font-medium block mb-1">Test Type</label><select className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs" value={newCtrl.testType} onChange={e => setNewCtrl((p: any) => ({ ...p, testType: e.target.value }))}><option>ToC</option><option>ToD</option><option>Both</option></select></div>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <Button size="sm" onClick={() => { onAddControl(newCtrl); setShowCtrlForm(false); setNewCtrl({ processName: "", controlDescription: "", controlFrequency: "Per transaction", testType: "ToC" }); }} className="h-7 text-xs bg-purple-600 hover:bg-purple-700">Add</Button>
+                <Button variant="outline" size="sm" onClick={() => setShowCtrlForm(false)} className="h-7 text-xs">Cancel</Button>
+              </div>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse min-w-[900px]">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Process</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Control</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Frequency</th>
+                  <th className="text-center px-4 py-2.5 font-semibold text-slate-600">Type</th>
+                  <th className="text-center px-4 py-2.5 font-semibold text-slate-600">Sample</th>
+                  <th className="text-center px-4 py-2.5 font-semibold text-slate-600">Result</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-600">WP</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Conclusion</th>
+                  <th className="text-center px-4 py-2.5 font-semibold text-slate-600">Del</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {controlMatrix.map((r: any) => (
+                  <tr key={r.id} className="hover:bg-slate-50/50">
+                    <td className="px-4 py-2 font-medium text-slate-800">{r.processName}</td>
+                    <td className="px-4 py-2 text-slate-600 max-w-[180px]"><div className="truncate" title={r.controlDescription}>{r.controlDescription}</div></td>
+                    <td className="px-4 py-2 text-slate-500">{r.controlFrequency}</td>
+                    <td className="px-4 py-2 text-center"><span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold", r.testType === "ToC" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700")}>{r.testType}</span></td>
+                    <td className="px-4 py-2 text-center"><input type="number" className="w-14 text-center border border-slate-200 rounded px-1.5 py-0.5 text-xs" value={r.sampleSize || ""} onChange={e => onUpdateControl(r.id, { sampleSize: Number(e.target.value) })} placeholder="n" /></td>
+                    <td className="px-4 py-2 text-center"><select className="text-[11px] border border-slate-200 rounded px-1.5 py-0.5" value={r.testingResult || ""} onChange={e => onUpdateControl(r.id, { testingResult: e.target.value })}><option value="">—</option><option>Effective</option><option>Deficient</option><option>Not Tested</option></select></td>
+                    <td className="px-4 py-2"><span className="font-mono text-[10px] text-indigo-600">{r.relatedWpCode || "—"}</span></td>
+                    <td className="px-4 py-2"><input className="w-full border border-slate-200 rounded px-1.5 py-0.5 text-xs" placeholder="Conclusion…" value={r.conclusion || ""} onChange={e => onUpdateControl(r.id, { conclusion: e.target.value })} /></td>
+                    <td className="px-4 py-2 text-center"><button onClick={() => onDeleteControl(r.id)} className="p-1 hover:bg-red-100 rounded text-red-400 hover:text-red-600 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: Evidence Vault ── */}
+      {activeEngineTab === "evidence" && (
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50/40 px-5 py-4 border-b border-slate-200/60 flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2"><FileCheck className="w-4 h-4 text-amber-600" /> Evidence Vault</h3>
+              <p className="text-xs text-slate-500 mt-0.5">{evidenceLog.length} evidence item{evidenceLog.length !== 1 ? "s" : ""} logged across all working papers</p>
+            </div>
+            <Button size="sm" onClick={() => setShowEvForm(v => !v)} className="h-8 text-xs gap-1 bg-amber-600 hover:bg-amber-700"><Plus className="w-3.5 h-3.5" />{showEvForm ? "Cancel" : "Log Evidence"}</Button>
+          </div>
+
+          {showEvForm && (
+            <div className="px-5 py-4 bg-amber-50 border-b border-amber-100">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div><label className="text-[11px] text-slate-500 font-medium block mb-1">WP Code</label><input className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs" placeholder="C2" value={newEvForm.wpCode} onChange={e => setNewEvForm((p: any) => ({ ...p, wpCode: e.target.value }))} /></div>
+                <div><label className="text-[11px] text-slate-500 font-medium block mb-1">Document Type</label><select className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs" value={newEvForm.documentType} onChange={e => setNewEvForm((p: any) => ({ ...p, documentType: e.target.value }))}>{["Invoice","Contract","Confirmation","Bank Statement","Management Letter","Voucher","Schedule","Agreement","Certificate"].map(o => <option key={o}>{o}</option>)}</select></div>
+                <div><label className="text-[11px] text-slate-500 font-medium block mb-1">Source</label><select className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs" value={newEvForm.source} onChange={e => setNewEvForm((p: any) => ({ ...p, source: e.target.value }))}><option>Client</option><option>External</option><option>Self-generated</option><option>Third Party</option></select></div>
+                <div><label className="text-[11px] text-slate-500 font-medium block mb-1">Document Ref</label><input className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs" placeholder="INV-0012345" value={newEvForm.documentRef || ""} onChange={e => setNewEvForm((p: any) => ({ ...p, documentRef: e.target.value }))} /></div>
+                <div><label className="text-[11px] text-slate-500 font-medium block mb-1">Obtained Date</label><input type="date" className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs" value={newEvForm.obtainedDate || ""} onChange={e => setNewEvForm((p: any) => ({ ...p, obtainedDate: e.target.value }))} /></div>
+                <div><label className="text-[11px] text-slate-500 font-medium block mb-1">Description</label><input className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs" placeholder="e.g. Debtor confirmation from ABC Ltd" value={newEvForm.description} onChange={e => setNewEvForm((p: any) => ({ ...p, description: e.target.value }))} /></div>
+              </div>
+              <Button size="sm" onClick={() => { onAddEvidence(newEvForm); setShowEvForm(false); setNewEvForm({ documentType: "Invoice", source: "Client", wpCode: "", description: "" }); }} className="mt-3 h-7 text-xs bg-amber-600 hover:bg-amber-700">Save Evidence</Button>
+            </div>
+          )}
+
+          {evidenceLog.length === 0 ? (
+            <div className="py-14 text-center"><FileCheck className="w-8 h-8 text-slate-200 mx-auto mb-3" /><p className="text-slate-500 text-sm">No evidence logged yet. Start logging obtained documents here.</p></div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {evidenceLog.map((ev: any) => (
+                <div key={ev.id} className="flex items-start gap-3 px-5 py-3 hover:bg-slate-50/50">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0 mt-0.5"><FileText className="w-4 h-4 text-amber-700" /></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">{ev.wpCode || "—"}</span>
+                      <span className="text-sm font-medium text-slate-800">{ev.documentType}</span>
+                      <span className="text-[11px] text-slate-500">{ev.documentRef}</span>
+                      <span className={cn("text-[10px] px-1.5 py-0.5 rounded", ev.source === "External" ? "bg-purple-50 text-purple-700" : ev.source === "Client" ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-500")}>{ev.source}</span>
+                      {ev.verifiedFlag && <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-0.5"><Check className="w-2.5 h-2.5" />Verified</span>}
+                    </div>
+                    {ev.description && <p className="text-[11px] text-slate-500 mt-0.5">{ev.description}</p>}
+                    {ev.reviewerComment && <p className="text-[11px] text-amber-700 mt-0.5 italic">{ev.reviewerComment}</p>}
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => onUpdateEvidence(ev.id, { verifiedFlag: !ev.verifiedFlag })} className={cn("p-1.5 rounded-lg transition-colors text-[10px] font-medium", ev.verifiedFlag ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-slate-100 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600")} title={ev.verifiedFlag ? "Mark unverified" : "Mark verified"}><Check className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => onDeleteEvidence(ev.id)} className="p-1.5 rounded-lg bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB: Reconciliation ── */}
+      {activeEngineTab === "recon" && (
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="bg-gradient-to-r from-slate-50 to-blue-50/40 px-5 py-4 border-b border-slate-200/60 flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2"><RefreshCw className="w-4 h-4 text-slate-700" /> Reconciliation Engine</h3>
+              <p className="text-xs text-slate-500 mt-0.5">3-way reconciliation: FS ↔ TB ↔ GL ↔ COA</p>
+            </div>
+            <Button size="sm" onClick={onRunRecon} className="h-8 text-xs gap-1 bg-slate-800 hover:bg-slate-900"><RefreshCw className="w-3.5 h-3.5" />Run All Checks</Button>
+          </div>
+
+          {reconResults.length === 0 ? (
+            <div className="py-14 text-center">
+              <RefreshCw className="w-8 h-8 text-slate-200 mx-auto mb-3" />
+              <p className="text-slate-500 text-sm mb-4">Click "Run All Checks" to verify FS vs TB vs GL vs COA reconciliation</p>
+              <Button onClick={onRunRecon} className="gap-1.5 bg-slate-800 hover:bg-slate-900"><RefreshCw className="w-4 h-4" />Run Reconciliation</Button>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {reconResults.map((r: any) => (
+                <div key={r.id} className={cn("flex items-start gap-4 px-5 py-4", r.passed ? "bg-emerald-50/30" : "bg-red-50/30")}>
+                  <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5", r.passed ? "bg-emerald-100" : "bg-red-100")}>
+                    {r.passed ? <Check className="w-4 h-4 text-emerald-600" /> : <AlertTriangle className="w-4 h-4 text-red-600" />}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm text-slate-800">{r.checkName}</span>
+                      <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-semibold", r.passed ? "bg-emerald-200 text-emerald-800" : "bg-red-200 text-red-800")}>{r.passed ? "PASS" : "FAIL"}</span>
+                    </div>
+                    <div className="mt-1 flex items-center gap-4 text-[11px] text-slate-500">
+                      <span>{r.sourceA}: <strong className="text-slate-700">{Number(r.amountA || 0).toLocaleString()}</strong></span>
+                      <span>{r.sourceB}: <strong className="text-slate-700">{Number(r.amountB || 0).toLocaleString()}</strong></span>
+                      {!r.passed && <span className="text-red-600 font-semibold">Diff: {Number(r.difference || 0).toLocaleString()}</span>}
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">{r.notes}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

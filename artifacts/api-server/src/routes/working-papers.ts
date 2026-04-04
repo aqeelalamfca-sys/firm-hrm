@@ -10,6 +10,9 @@ import {
   wpGlAccountsTable, wpGlEntriesTable, wpHeadsTable, wpHeadDocumentsTable,
   wpExportJobsTable, wpVariableDefinitionsTable, wpVariableDependencyRulesTable,
   wpMasterCoaTable,
+  auditEngineMasterTable, wpTriggerDefsTable, wpTriggerSessionTable,
+  assertionLinkageTable, samplingRulesTable, analyticsEngineTable,
+  analyticsSessionTable, controlMatrixTable, evidenceLogTable, reconEngineTable,
 } from "@workspace/db";
 import { VARIABLE_DEFINITIONS, EXTRACTION_FIELD_TO_VARIABLE_MAP, VARIABLE_GROUPS, DEPENDENCY_RULES } from "../data/variable-definitions";
 import {
@@ -3061,6 +3064,630 @@ router.post("/sessions/:id/export-bundle", async (req: Request, res: Response) =
 
 router.get("/heads-definition", (_req: Request, res: Response) => {
   res.json(AUDIT_HEADS);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUDIT ENGINE MASTER
+// ═══════════════════════════════════════════════════════════════════════════
+
+const DEFAULT_WP_TRIGGERS = [
+  { wpCode: "A1", wpName: "Engagement Letter & Terms", triggerCondition: "always", triggerDescription: "Required for all engagements", isaReference: "ISA 210", outputFormat: "Word", mandatoryFlag: true, category: "Planning", displayOrder: 1 },
+  { wpCode: "A2", wpName: "Independence Declaration", triggerCondition: "always", triggerDescription: "Required for all engagements", isaReference: "ISA 200", outputFormat: "Word", mandatoryFlag: true, category: "Planning", displayOrder: 2 },
+  { wpCode: "A3", wpName: "Audit Planning Memorandum", triggerCondition: "always", triggerDescription: "Required for all statutory audits", isaReference: "ISA 300", outputFormat: "Word", mandatoryFlag: true, category: "Planning", displayOrder: 3 },
+  { wpCode: "B1", wpName: "Understanding the Entity & Environment", triggerCondition: "always", triggerDescription: "Required for all engagements", isaReference: "ISA 315", outputFormat: "Word", mandatoryFlag: true, category: "Risk", displayOrder: 4 },
+  { wpCode: "B2", wpName: "Internal Controls Assessment", triggerCondition: "always", triggerDescription: "Required for all engagements", isaReference: "ISA 315", outputFormat: "Word", mandatoryFlag: true, category: "Risk", displayOrder: 5 },
+  { wpCode: "B3", wpName: "Risk Assessment — High Risk Areas", triggerCondition: "risk:High", triggerDescription: "Triggered when overall risk is High", isaReference: "ISA 315", outputFormat: "Word", mandatoryFlag: false, category: "Risk", displayOrder: 6 },
+  { wpCode: "B4", wpName: "Analytical Procedures — Planning Stage", triggerCondition: "always", triggerDescription: "Required for all engagements", isaReference: "ISA 520", outputFormat: "Excel", mandatoryFlag: true, category: "Risk", displayOrder: 7 },
+  { wpCode: "C1", wpName: "Cash & Bank Verification", triggerCondition: "always", isaReference: "ISA 501", outputFormat: "Excel", mandatoryFlag: true, category: "Substantive", displayOrder: 8 },
+  { wpCode: "C2", wpName: "Accounts Receivable & Debtors", triggerCondition: "always", isaReference: "ISA 505", outputFormat: "Excel", mandatoryFlag: true, category: "Substantive", displayOrder: 9 },
+  { wpCode: "C3", wpName: "Inventory & Stock Valuation", triggerCondition: "industry:Manufacturing", triggerDescription: "Triggered for Manufacturing entities", isaReference: "ISA 501", outputFormat: "Excel", mandatoryFlag: false, category: "Substantive", displayOrder: 10 },
+  { wpCode: "C4", wpName: "Property Plant & Equipment", triggerCondition: "always", isaReference: "ISA 500", outputFormat: "Excel", mandatoryFlag: true, category: "Substantive", displayOrder: 11 },
+  { wpCode: "C5", wpName: "Accounts Payable & Creditors", triggerCondition: "always", isaReference: "ISA 500", outputFormat: "Excel", mandatoryFlag: true, category: "Substantive", displayOrder: 12 },
+  { wpCode: "C6", wpName: "Revenue & Income Testing", triggerCondition: "always", isaReference: "ISA 240", outputFormat: "Excel", mandatoryFlag: true, category: "Substantive", displayOrder: 13 },
+  { wpCode: "C7", wpName: "Payroll & Staff Costs Testing", triggerCondition: "always", isaReference: "ISA 500", outputFormat: "Excel", mandatoryFlag: true, category: "Substantive", displayOrder: 14 },
+  { wpCode: "C8", wpName: "Borrowings & Finance Costs", triggerCondition: "always", isaReference: "ISA 500", outputFormat: "Excel", mandatoryFlag: true, category: "Substantive", displayOrder: 15 },
+  { wpCode: "C9", wpName: "Related Party Transactions", triggerCondition: "flag:relatedPartyFlag", triggerDescription: "Triggered when Related Party Flag is set", isaReference: "ISA 550", outputFormat: "Word", mandatoryFlag: false, category: "Substantive", displayOrder: 16 },
+  { wpCode: "C10", wpName: "Provisions & Contingencies", triggerCondition: "always", isaReference: "ISA 500", outputFormat: "Word", mandatoryFlag: true, category: "Substantive", displayOrder: 17 },
+  { wpCode: "D1", wpName: "Going Concern Assessment", triggerCondition: "flag:goingConcernFlag", triggerDescription: "Triggered when Going Concern Flag is set", isaReference: "ISA 570", outputFormat: "Word", mandatoryFlag: false, category: "Analytical", displayOrder: 18 },
+  { wpCode: "D2", wpName: "Fraud Risk Assessment & Response", triggerCondition: "flag:fraudRiskFlag", triggerDescription: "Triggered when Fraud Risk Flag is set", isaReference: "ISA 240", outputFormat: "Word", mandatoryFlag: false, category: "Analytical", displayOrder: 19 },
+  { wpCode: "D3", wpName: "Compliance — Laws & Regulations", triggerCondition: "flag:lawsRegulationFlag", isaReference: "ISA 250", outputFormat: "Word", mandatoryFlag: false, category: "Analytical", displayOrder: 20 },
+  { wpCode: "D4", wpName: "Final Analytical Review", triggerCondition: "always", isaReference: "ISA 520", outputFormat: "Excel", mandatoryFlag: true, category: "Completion", displayOrder: 21 },
+  { wpCode: "D5", wpName: "Subsequent Events Review", triggerCondition: "always", isaReference: "ISA 560", outputFormat: "Word", mandatoryFlag: true, category: "Completion", displayOrder: 22 },
+  { wpCode: "E1", wpName: "Management Representation Letter", triggerCondition: "always", isaReference: "ISA 580", outputFormat: "Word", mandatoryFlag: true, category: "Completion", displayOrder: 23 },
+  { wpCode: "E2", wpName: "Communication with Those Charged with Governance", triggerCondition: "always", isaReference: "ISA 265", outputFormat: "Word", mandatoryFlag: true, category: "Completion", displayOrder: 24 },
+  { wpCode: "E3", wpName: "Audit Report & Opinion", triggerCondition: "always", isaReference: "ISA 700", outputFormat: "Word", mandatoryFlag: true, category: "Completion", displayOrder: 25 },
+  { wpCode: "E4", wpName: "Use of Expert Documentation", triggerCondition: "flag:useOfExpertFlag", isaReference: "ISA 620", outputFormat: "Word", mandatoryFlag: false, category: "Planning", displayOrder: 26 },
+  { wpCode: "E5", wpName: "Internal Audit Reliance Assessment", triggerCondition: "flag:internalAuditFlag", isaReference: "ISA 610", outputFormat: "Word", mandatoryFlag: false, category: "Planning", displayOrder: 27 },
+];
+
+const DEFAULT_ASSERTION_LINKAGE = [
+  { accountType: "Asset", fsLineItem: "Cash & Bank", assertion: "Existence", wpCode: "C1", wpLink: "Cash Verification", testingProcedure: "Bank confirmation, physical count", isaReference: "ISA 501", riskTag: "High", displayOrder: 1 },
+  { accountType: "Asset", fsLineItem: "Accounts Receivable", assertion: "Existence", wpCode: "C2", wpLink: "Debtor Confirmation", testingProcedure: "Positive confirmation letters", isaReference: "ISA 505", riskTag: "High", displayOrder: 2 },
+  { accountType: "Asset", fsLineItem: "Accounts Receivable", assertion: "Valuation", wpCode: "C2", wpLink: "Bad Debt Review", testingProcedure: "Ageing analysis, review of provisions", isaReference: "ISA 540", riskTag: "Medium", displayOrder: 3 },
+  { accountType: "Asset", fsLineItem: "Inventory", assertion: "Existence", wpCode: "C3", wpLink: "Physical Inventory Count", testingProcedure: "Attendance at stock-take", isaReference: "ISA 501", riskTag: "High", displayOrder: 4 },
+  { accountType: "Asset", fsLineItem: "Inventory", assertion: "Valuation", wpCode: "C3", wpLink: "NRV Testing", testingProcedure: "Compare cost with NRV, review write-downs", isaReference: "ISA 540", riskTag: "Medium", displayOrder: 5 },
+  { accountType: "Asset", fsLineItem: "PPE", assertion: "Existence", wpCode: "C4", wpLink: "Asset Verification", testingProcedure: "Physical inspection, title documents", isaReference: "ISA 500", riskTag: "Low", displayOrder: 6 },
+  { accountType: "Asset", fsLineItem: "PPE", assertion: "Valuation", wpCode: "C4", wpLink: "Depreciation Review", testingProcedure: "Recalculate depreciation, review useful lives", isaReference: "ISA 540", riskTag: "Medium", displayOrder: 7 },
+  { accountType: "Liability", fsLineItem: "Accounts Payable", assertion: "Completeness", wpCode: "C5", wpLink: "Supplier Reconciliation", testingProcedure: "Supplier statements reconciliation, cut-off", isaReference: "ISA 500", riskTag: "High", displayOrder: 8 },
+  { accountType: "Liability", fsLineItem: "Borrowings", assertion: "Completeness", wpCode: "C8", wpLink: "Loan Confirmation", testingProcedure: "Bank confirmation, review loan agreements", isaReference: "ISA 505", riskTag: "High", displayOrder: 9 },
+  { accountType: "Revenue", fsLineItem: "Sales Revenue", assertion: "Occurrence", wpCode: "C6", wpLink: "Sales Testing", testingProcedure: "Vouching sales invoices, cut-off testing", isaReference: "ISA 240", riskTag: "High", displayOrder: 10 },
+  { accountType: "Revenue", fsLineItem: "Sales Revenue", assertion: "Completeness", wpCode: "C6", wpLink: "Revenue Completeness", testingProcedure: "Analytical review, cut-off testing", isaReference: "ISA 240", riskTag: "High", displayOrder: 11 },
+  { accountType: "Expense", fsLineItem: "Staff Costs", assertion: "Occurrence", wpCode: "C7", wpLink: "Payroll Testing", testingProcedure: "Review payroll records, HR authorization", isaReference: "ISA 500", riskTag: "Medium", displayOrder: 12 },
+  { accountType: "Expense", fsLineItem: "Finance Costs", assertion: "Accuracy", wpCode: "C8", wpLink: "Finance Cost Recalculation", testingProcedure: "Recalculate interest, review loan terms", isaReference: "ISA 500", riskTag: "Low", displayOrder: 13 },
+  { accountType: "Equity", fsLineItem: "Share Capital", assertion: "Existence", wpCode: "A1", wpLink: "Corporate Records Review", testingProcedure: "Review MOA/AOA, company registrar records", isaReference: "ISA 500", riskTag: "Low", displayOrder: 14 },
+];
+
+const DEFAULT_SAMPLING_RULES = [
+  { riskLevel: "High", materialityBand: "GT_PM", sampleSizeMin: 60, sampleSizeMax: 100, coveragePct: "90", samplingMethod: "MUS", testingApproach: "Full", notes: "High risk + above PM: near-full coverage" },
+  { riskLevel: "High", materialityBand: "LTE_PM", sampleSizeMin: 40, sampleSizeMax: 60, coveragePct: "70", samplingMethod: "MUS", testingApproach: "Moderate", notes: "High risk + at/below PM: substantial testing" },
+  { riskLevel: "High", materialityBand: "LT_TRIVIAL", sampleSizeMin: 20, sampleSizeMax: 30, coveragePct: "40", samplingMethod: "Judgmental", testingApproach: "Analytical", notes: "High risk but trivial amount: analytical focus" },
+  { riskLevel: "Medium", materialityBand: "GT_PM", sampleSizeMin: 30, sampleSizeMax: 50, coveragePct: "60", samplingMethod: "Random", testingApproach: "Moderate", notes: "Medium risk + above PM: moderate testing" },
+  { riskLevel: "Medium", materialityBand: "LTE_PM", sampleSizeMin: 15, sampleSizeMax: 30, coveragePct: "40", samplingMethod: "Random", testingApproach: "Moderate", notes: "Medium risk + at/below PM: targeted sampling" },
+  { riskLevel: "Medium", materialityBand: "LT_TRIVIAL", sampleSizeMin: 5, sampleSizeMax: 15, coveragePct: "20", samplingMethod: "Judgmental", testingApproach: "Analytical", notes: "Medium risk but trivial: analytical only" },
+  { riskLevel: "Low", materialityBand: "GT_PM", sampleSizeMin: 15, sampleSizeMax: 25, coveragePct: "30", samplingMethod: "Random", testingApproach: "Analytical", notes: "Low risk + above PM: analytical with limited testing" },
+  { riskLevel: "Low", materialityBand: "LTE_PM", sampleSizeMin: 5, sampleSizeMax: 15, coveragePct: "15", samplingMethod: "Judgmental", testingApproach: "Analytical", notes: "Low risk + at/below PM: analytical review" },
+  { riskLevel: "Low", materialityBand: "LT_TRIVIAL", sampleSizeMin: 0, sampleSizeMax: 5, coveragePct: "5", samplingMethod: "Judgmental", testingApproach: "Analytical", notes: "Low risk + trivial: no substantive testing required" },
+];
+
+const DEFAULT_ANALYTICS = [
+  { ratioCode: "gp_percent", ratioName: "Gross Profit %", formula: "GP / Sales × 100", numeratorField: "gross_profit", denominatorField: "revenue", thresholdMin: "-10", thresholdMax: "10", thresholdDescription: "±10% variance from prior year triggers review", wpTrigger: "B4", category: "Profitability", displayOrder: 1 },
+  { ratioCode: "np_percent", ratioName: "Net Profit %", formula: "Net Profit / Sales × 100", numeratorField: "profit_after_tax", denominatorField: "revenue", thresholdMin: "-15", thresholdMax: "15", thresholdDescription: "±15% variance from prior year", wpTrigger: "B4", category: "Profitability", displayOrder: 2 },
+  { ratioCode: "current_ratio", ratioName: "Current Ratio", formula: "Current Assets / Current Liabilities", numeratorField: "current_assets", denominatorField: "current_liabilities", thresholdMin: "1", thresholdMax: null, thresholdDescription: "<1 triggers risk review (liquidity concern)", wpTrigger: "B3", category: "Liquidity", displayOrder: 3 },
+  { ratioCode: "quick_ratio", ratioName: "Quick Ratio", formula: "(CA − Inventory) / CL", numeratorField: "quick_assets", denominatorField: "current_liabilities", thresholdMin: "0.5", thresholdMax: null, thresholdDescription: "<0.5 triggers going concern assessment", wpTrigger: "D1", category: "Liquidity", displayOrder: 4 },
+  { ratioCode: "debtor_days", ratioName: "Debtor Days", formula: "Receivables / Sales × 365", numeratorField: "accounts_receivable", denominatorField: "revenue", thresholdMin: null, thresholdMax: "90", thresholdDescription: ">90 days indicates collection risk", wpTrigger: "C2", category: "Efficiency", displayOrder: 5 },
+  { ratioCode: "creditor_days", ratioName: "Creditor Days", formula: "Payables / Purchases × 365", numeratorField: "accounts_payable", denominatorField: "purchases", thresholdMin: null, thresholdMax: "120", thresholdDescription: ">120 days indicates liquidity pressure", wpTrigger: "C5", category: "Efficiency", displayOrder: 6 },
+  { ratioCode: "inventory_days", ratioName: "Inventory Days", formula: "Inventory / COGS × 365", numeratorField: "inventory", denominatorField: "cost_of_goods_sold", thresholdMin: null, thresholdMax: "90", thresholdDescription: ">90 days indicates slow-moving stock risk", wpTrigger: "C3", category: "Efficiency", displayOrder: 7 },
+  { ratioCode: "debt_to_equity", ratioName: "Debt to Equity Ratio", formula: "Total Debt / Equity", numeratorField: "total_liabilities", denominatorField: "equity", thresholdMin: null, thresholdMax: "2", thresholdDescription: ">2x triggers solvency risk review", wpTrigger: "C8", category: "Solvency", displayOrder: 8 },
+  { ratioCode: "interest_cover", ratioName: "Interest Coverage Ratio", formula: "EBIT / Interest Expense", numeratorField: "ebit", denominatorField: "finance_costs", thresholdMin: "1.5", thresholdMax: null, thresholdDescription: "<1.5x triggers going concern concern", wpTrigger: "D1", category: "Solvency", displayOrder: 9 },
+];
+
+// Helper: evaluate WP trigger condition against audit engine master
+function evaluateTrigger(triggerCondition: string, auditMaster: any, variables: any[]): { triggered: boolean; reason: string } {
+  const cond = triggerCondition.trim().toLowerCase();
+  if (cond === "always") return { triggered: true, reason: "Mandatory — required for all engagements" };
+
+  if (cond.startsWith("flag:")) {
+    const flagName = cond.replace("flag:", "");
+    const flagValue = auditMaster[flagName];
+    if (flagValue === true) return { triggered: true, reason: `Triggered: ${flagName} = true` };
+    return { triggered: false, reason: `Not triggered: ${flagName} = false` };
+  }
+
+  if (cond.startsWith("risk:")) {
+    const riskLevel = cond.replace("risk:", "").trim();
+    const match = (auditMaster.riskLevelOverall || "").toLowerCase() === riskLevel.toLowerCase();
+    return { triggered: match, reason: match ? `Overall risk level is ${auditMaster.riskLevelOverall}` : `Risk level is ${auditMaster.riskLevelOverall}, not ${riskLevel}` };
+  }
+
+  if (cond.startsWith("industry:")) {
+    const ind = cond.replace("industry:", "").trim();
+    const match = (auditMaster.industryType || "").toLowerCase().includes(ind.toLowerCase());
+    return { triggered: match, reason: match ? `Industry is ${auditMaster.industryType}` : `Industry ${auditMaster.industryType} does not require this WP` };
+  }
+
+  if (cond.startsWith("var:")) {
+    // var:fieldName=value
+    const rest = cond.replace("var:", "");
+    const [field, val] = rest.split("=");
+    const v = variables.find((x: any) => x.variableCode?.toLowerCase() === field.trim().toLowerCase());
+    if (!v) return { triggered: false, reason: `Variable ${field} not found` };
+    const match = String(v.value || "").toLowerCase() === (val || "").trim().toLowerCase();
+    return { triggered: match, reason: match ? `Variable ${field} = ${v.value}` : `Variable ${field} = ${v.value}, expected ${val}` };
+  }
+
+  return { triggered: true, reason: "Condition evaluated as true" };
+}
+
+// ── Audit Engine Master: GET (create if missing)
+router.get("/sessions/:id/audit-engine", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const rows = await db.select().from(auditEngineMasterTable).where(eq(auditEngineMasterTable.sessionId, sessionId));
+    if (rows.length > 0) return res.json(rows[0]);
+
+    // Auto-create from session data
+    const sessions = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
+    if (!sessions.length) return res.status(404).json({ error: "Session not found" });
+    const session = sessions[0];
+
+    const [inserted] = await db.insert(auditEngineMasterTable).values({
+      sessionId,
+      clientName: session.clientName,
+      engagementId: `ENG-${String(sessionId).padStart(4, "0")}`,
+      financialYearStart: `01-Jul-${Number(session.engagementYear || new Date().getFullYear()) - 1}`,
+      financialYearEnd: `30-Jun-${session.engagementYear || new Date().getFullYear()}`,
+    }).returning();
+    return res.json(inserted);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Audit Engine Master: PATCH
+router.patch("/sessions/:id/audit-engine", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const updates = req.body;
+    delete updates.id; delete updates.sessionId; delete updates.createdAt;
+    updates.updatedAt = new Date();
+    const rows = await db.update(auditEngineMasterTable).set(updates).where(eq(auditEngineMasterTable.sessionId, sessionId)).returning();
+    if (!rows.length) return res.status(404).json({ error: "Audit engine not found — call GET first to auto-create" });
+    return res.json(rows[0]);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Audit Engine Master: Auto-populate from session variables
+router.post("/sessions/:id/audit-engine/auto-populate", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+    const sessions = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
+    if (!sessions.length) return res.status(404).json({ error: "Session not found" });
+    const session = sessions[0];
+
+    const getVar = (code: string) => variables.find((v: any) => v.variableCode?.toLowerCase().includes(code.toLowerCase()))?.value;
+    const revenue = Number(getVar("revenue") || getVar("turnover") || getVar("sales") || 0);
+    const materiality = revenue > 0 ? Math.round(revenue * 0.02) : null;
+
+    const updates: any = {
+      clientName: session.clientName || getVar("client_name"),
+      reportingFramework: getVar("reporting_framework") || getVar("framework") || "IFRS",
+      auditType: getVar("audit_type") || "Statutory",
+      financialYearStart: `01-Jul-${Number(session.engagementYear || new Date().getFullYear()) - 1}`,
+      financialYearEnd: `30-Jun-${session.engagementYear || new Date().getFullYear()}`,
+      materialityAmount: materiality ? String(materiality) : undefined,
+      performanceMateriality: materiality ? String(Math.round(materiality * 0.75)) : undefined,
+      trivialityThreshold: materiality ? String(Math.round(materiality * 0.025)) : undefined,
+      updatedAt: new Date(),
+    };
+
+    const existing = await db.select().from(auditEngineMasterTable).where(eq(auditEngineMasterTable.sessionId, sessionId));
+    if (existing.length) {
+      const [updated] = await db.update(auditEngineMasterTable).set(updates).where(eq(auditEngineMasterTable.sessionId, sessionId)).returning();
+      return res.json({ message: "Audit engine populated from variables", data: updated });
+    } else {
+      const [inserted] = await db.insert(auditEngineMasterTable).values({ sessionId, engagementId: `ENG-${String(sessionId).padStart(4, "0")}`, ...updates }).returning();
+      return res.json({ message: "Audit engine created and populated", data: inserted });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── WP Trigger Defs: Seed
+router.post("/wp-trigger-defs/seed", async (_req: Request, res: Response) => {
+  try {
+    const existing = await db.select().from(wpTriggerDefsTable);
+    if (existing.length > 0) return res.json({ message: `Already seeded with ${existing.length} WP trigger definitions` });
+    await db.insert(wpTriggerDefsTable).values(DEFAULT_WP_TRIGGERS as any);
+    return res.json({ message: `Seeded ${DEFAULT_WP_TRIGGERS.length} WP trigger definitions` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── WP Trigger Defs: GET all
+router.get("/wp-trigger-defs", async (_req: Request, res: Response) => {
+  try {
+    const rows = await db.select().from(wpTriggerDefsTable).orderBy(asc(wpTriggerDefsTable.displayOrder));
+    return res.json(rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── WP Trigger Session: GET (evaluate triggers)
+router.get("/sessions/:id/wp-triggers", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const defs = await db.select().from(wpTriggerDefsTable).orderBy(asc(wpTriggerDefsTable.displayOrder));
+    if (defs.length === 0) return res.json([]);
+
+    const [auditMaster] = await db.select().from(auditEngineMasterTable).where(eq(auditEngineMasterTable.sessionId, sessionId));
+    const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+    const sessionTriggers = await db.select().from(wpTriggerSessionTable).where(eq(wpTriggerSessionTable.sessionId, sessionId));
+
+    const result = defs.map((def: any) => {
+      const existing = sessionTriggers.find((t: any) => t.wpCode === def.wpCode);
+      const evaluated = auditMaster ? evaluateTrigger(def.triggerCondition, auditMaster, variables) : { triggered: def.mandatoryFlag, reason: "Audit master not set up yet" };
+      return {
+        ...def,
+        sessionId,
+        sessionTriggerId: existing?.id,
+        triggered: existing ? existing.triggered : evaluated.triggered,
+        triggerReason: existing ? existing.triggerReason : evaluated.reason,
+        status: existing?.status || (evaluated.triggered ? "pending" : "n_a"),
+        preparedBy: existing?.preparedBy,
+        reviewedBy: existing?.reviewedBy,
+        completedAt: existing?.completedAt,
+        conclusion: existing?.conclusion,
+        exceptionNote: existing?.exceptionNote,
+      };
+    });
+    return res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── WP Trigger Session: Evaluate & persist all triggers
+router.post("/sessions/:id/wp-triggers/evaluate", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const defs = await db.select().from(wpTriggerDefsTable).orderBy(asc(wpTriggerDefsTable.displayOrder));
+    const [auditMaster] = await db.select().from(auditEngineMasterTable).where(eq(auditEngineMasterTable.sessionId, sessionId));
+    const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+
+    if (!auditMaster) return res.status(400).json({ error: "Set up Audit Engine Master first" });
+
+    let inserted = 0, updated = 0;
+    for (const def of defs) {
+      const { triggered, reason } = evaluateTrigger(def.triggerCondition, auditMaster, variables);
+      const existing = await db.select().from(wpTriggerSessionTable).where(and(eq(wpTriggerSessionTable.sessionId, sessionId), eq(wpTriggerSessionTable.wpCode, def.wpCode)));
+      if (existing.length) {
+        await db.update(wpTriggerSessionTable).set({ triggered, triggerReason: reason, status: triggered ? "pending" : "n_a", updatedAt: new Date() }).where(eq(wpTriggerSessionTable.id, existing[0].id));
+        updated++;
+      } else {
+        await db.insert(wpTriggerSessionTable).values({ sessionId, wpCode: def.wpCode, triggered, triggerReason: reason, status: triggered ? "pending" : "n_a" });
+        inserted++;
+      }
+    }
+    return res.json({ message: `Evaluated ${defs.length} WP triggers — ${inserted} created, ${updated} updated` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── WP Trigger Session: PATCH status/conclusion
+router.patch("/sessions/:id/wp-triggers/:wpCode", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const { wpCode } = req.params;
+    const { status, preparedBy, reviewedBy, conclusion, exceptionNote } = req.body;
+    const updates: any = { updatedAt: new Date() };
+    if (status !== undefined) updates.status = status;
+    if (preparedBy !== undefined) updates.preparedBy = preparedBy;
+    if (reviewedBy !== undefined) updates.reviewedBy = reviewedBy;
+    if (conclusion !== undefined) updates.conclusion = conclusion;
+    if (exceptionNote !== undefined) updates.exceptionNote = exceptionNote;
+    if (status === "completed") updates.completedAt = new Date();
+
+    const rows = await db.update(wpTriggerSessionTable).set(updates).where(and(eq(wpTriggerSessionTable.sessionId, sessionId), eq(wpTriggerSessionTable.wpCode, wpCode))).returning();
+    if (!rows.length) {
+      const [inserted] = await db.insert(wpTriggerSessionTable).values({ sessionId, wpCode, ...updates }).returning();
+      return res.json(inserted);
+    }
+    return res.json(rows[0]);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Assertion Linkage: Seed
+router.post("/assertion-linkage/seed", async (_req: Request, res: Response) => {
+  try {
+    const existing = await db.select().from(assertionLinkageTable);
+    if (existing.length > 0) return res.json({ message: `Already seeded with ${existing.length} assertion mappings` });
+    await db.insert(assertionLinkageTable).values(DEFAULT_ASSERTION_LINKAGE as any);
+    return res.json({ message: `Seeded ${DEFAULT_ASSERTION_LINKAGE.length} assertion linkage records` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Assertion Linkage: GET all
+router.get("/assertion-linkage", async (_req: Request, res: Response) => {
+  try {
+    const rows = await db.select().from(assertionLinkageTable).orderBy(asc(assertionLinkageTable.displayOrder));
+    return res.json(rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Sampling Rules: Seed
+router.post("/sampling-rules/seed", async (_req: Request, res: Response) => {
+  try {
+    const existing = await db.select().from(samplingRulesTable);
+    if (existing.length > 0) return res.json({ message: `Already seeded with ${existing.length} sampling rules` });
+    await db.insert(samplingRulesTable).values(DEFAULT_SAMPLING_RULES as any);
+    return res.json({ message: `Seeded ${DEFAULT_SAMPLING_RULES.length} sampling rules` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Sampling Rules: GET + compute for session
+router.get("/sessions/:id/sampling", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const rules = await db.select().from(samplingRulesTable);
+    const [auditMaster] = await db.select().from(auditEngineMasterTable).where(eq(auditEngineMasterTable.sessionId, sessionId));
+
+    if (!auditMaster) return res.json({ rules, computed: null, message: "Set up Audit Engine Master to get computed sample sizes" });
+
+    const pm = Number(auditMaster.performanceMateriality || 0);
+    const trivial = Number(auditMaster.trivialityThreshold || 0);
+    const risk = auditMaster.riskLevelOverall || "Medium";
+    const samplingMethod = auditMaster.samplingMethod || "MUS";
+
+    const getMaterialityBand = (amount: number) => {
+      if (amount > pm) return "GT_PM";
+      if (amount > trivial) return "LTE_PM";
+      return "LT_TRIVIAL";
+    };
+
+    const computed = rules.filter((r: any) => r.riskLevel === risk).map((r: any) => ({
+      ...r,
+      applicableToCurrentRisk: true,
+      materialityBandLabel: r.materialityBand === "GT_PM" ? `Above PM (>${pm.toLocaleString()})` : r.materialityBand === "LTE_PM" ? `At/Below PM (≤${pm.toLocaleString()})` : `Trivial (≤${trivial.toLocaleString()})`,
+    }));
+
+    return res.json({
+      rules, computed,
+      context: { riskLevel: risk, performanceMateriality: pm, trivialityThreshold: trivial, samplingMethod, recommendation: `For ${risk} risk engagements using ${samplingMethod}, apply samples above ≥ ${computed[0]?.sampleSizeMin || 30} items for material areas` }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Analytics Defs: Seed
+router.post("/analytics-defs/seed", async (_req: Request, res: Response) => {
+  try {
+    const existing = await db.select().from(analyticsEngineTable);
+    if (existing.length > 0) return res.json({ message: `Already seeded with ${existing.length} ratio definitions` });
+    await db.insert(analyticsEngineTable).values(DEFAULT_ANALYTICS as any);
+    return res.json({ message: `Seeded ${DEFAULT_ANALYTICS.length} analytical ratio definitions` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Analytics Defs: GET all
+router.get("/analytics-defs", async (_req: Request, res: Response) => {
+  try {
+    const rows = await db.select().from(analyticsEngineTable).orderBy(asc(analyticsEngineTable.displayOrder));
+    return res.json(rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Analytics Session: GET computed results
+router.get("/sessions/:id/analytics", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const defs = await db.select().from(analyticsEngineTable).orderBy(asc(analyticsEngineTable.displayOrder));
+    const existing = await db.select().from(analyticsSessionTable).where(eq(analyticsSessionTable.sessionId, sessionId));
+    const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+
+    const getVal = (field: string) => {
+      if (!field) return null;
+      const v = variables.find((x: any) => x.variableCode?.toLowerCase().replace(/[\s_-]/g, "").includes(field.toLowerCase().replace(/[\s_-]/g, "")));
+      return v ? Number(v.value || 0) : null;
+    };
+
+    const results = defs.map((def: any) => {
+      const saved = existing.find((e: any) => e.ratioCode === def.ratioCode);
+      if (saved) return { ...def, ...saved };
+
+      const num = getVal(def.numeratorField);
+      const den = getVal(def.denominatorField);
+      let computed = null, breached = false;
+
+      if (num !== null && den !== null && den !== 0) {
+        if (def.ratioCode.endsWith("_percent")) computed = (num / den) * 100;
+        else if (def.ratioCode.endsWith("_days")) computed = (num / den) * 365;
+        else computed = num / den;
+        if (def.thresholdMin && computed < Number(def.thresholdMin)) breached = true;
+        if (def.thresholdMax && computed > Number(def.thresholdMax)) breached = true;
+      }
+
+      return { ...def, computedValue: computed?.toFixed(2) ?? null, breached, sessionId, ratioCode: def.ratioCode };
+    });
+
+    return res.json(results);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Analytics Session: Save/update result
+router.patch("/sessions/:id/analytics/:ratioCode", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const { ratioCode } = req.params;
+    const updates = req.body;
+    const existing = await db.select().from(analyticsSessionTable).where(and(eq(analyticsSessionTable.sessionId, sessionId), eq(analyticsSessionTable.ratioCode, ratioCode)));
+    if (existing.length) {
+      const [updated] = await db.update(analyticsSessionTable).set(updates).where(and(eq(analyticsSessionTable.sessionId, sessionId), eq(analyticsSessionTable.ratioCode, ratioCode))).returning();
+      return res.json(updated);
+    } else {
+      const [inserted] = await db.insert(analyticsSessionTable).values({ sessionId, ratioCode, ...updates }).returning();
+      return res.json(inserted);
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Control Matrix: GET
+router.get("/sessions/:id/control-matrix", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const rows = await db.select().from(controlMatrixTable).where(eq(controlMatrixTable.sessionId, sessionId));
+
+    // Seed with defaults if empty
+    if (rows.length === 0) {
+      const defaults = [
+        { sessionId, processName: "Revenue/Sales", controlDescription: "Sales invoice approval and authorization", controlFrequency: "Per transaction", testType: "ToC", relatedWpCode: "C6", isaReference: "ISA 315" },
+        { sessionId, processName: "Purchases", controlDescription: "Purchase order approval before procurement", controlFrequency: "Per transaction", testType: "ToC", relatedWpCode: "C5", isaReference: "ISA 315" },
+        { sessionId, processName: "Payroll", controlDescription: "Payroll authorization and HR sign-off", controlFrequency: "Monthly", testType: "ToC", relatedWpCode: "C7", isaReference: "ISA 315" },
+        { sessionId, processName: "Cash & Banking", controlDescription: "Bank reconciliation and cash counts", controlFrequency: "Monthly", testType: "ToC", relatedWpCode: "C1", isaReference: "ISA 315" },
+        { sessionId, processName: "Fixed Assets", controlDescription: "Capital expenditure authorization", controlFrequency: "Per transaction", testType: "ToC", relatedWpCode: "C4", isaReference: "ISA 315" },
+        { sessionId, processName: "Financial Reporting", controlDescription: "Month-end close and trial balance review", controlFrequency: "Monthly", testType: "ToC", relatedWpCode: "B2", isaReference: "ISA 315" },
+      ];
+      await db.insert(controlMatrixTable).values(defaults);
+      return res.json(await db.select().from(controlMatrixTable).where(eq(controlMatrixTable.sessionId, sessionId)));
+    }
+    return res.json(rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Control Matrix: POST
+router.post("/sessions/:id/control-matrix", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const [inserted] = await db.insert(controlMatrixTable).values({ sessionId, ...req.body }).returning();
+    return res.status(201).json(inserted);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Control Matrix: PATCH
+router.patch("/sessions/:id/control-matrix/:cmId", async (req: Request, res: Response) => {
+  try {
+    const cmId = parseInt(req.params.cmId);
+    const updates = { ...req.body, updatedAt: new Date() };
+    const [updated] = await db.update(controlMatrixTable).set(updates).where(eq(controlMatrixTable.id, cmId)).returning();
+    return res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Control Matrix: DELETE
+router.delete("/sessions/:id/control-matrix/:cmId", async (req: Request, res: Response) => {
+  try {
+    await db.delete(controlMatrixTable).where(eq(controlMatrixTable.id, parseInt(req.params.cmId)));
+    return res.json({ deleted: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Evidence Log: GET
+router.get("/sessions/:id/evidence", async (req: Request, res: Response) => {
+  try {
+    const rows = await db.select().from(evidenceLogTable).where(eq(evidenceLogTable.sessionId, parseInt(req.params.id)));
+    return res.json(rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Evidence Log: POST
+router.post("/sessions/:id/evidence", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const evidenceId = `EV-${Date.now().toString(36).toUpperCase()}`;
+    const [inserted] = await db.insert(evidenceLogTable).values({ sessionId, evidenceId, ...req.body }).returning();
+    return res.status(201).json(inserted);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Evidence Log: PATCH
+router.patch("/sessions/:id/evidence/:evId", async (req: Request, res: Response) => {
+  try {
+    const [updated] = await db.update(evidenceLogTable).set(req.body).where(eq(evidenceLogTable.id, parseInt(req.params.evId))).returning();
+    return res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Evidence Log: DELETE
+router.delete("/sessions/:id/evidence/:evId", async (req: Request, res: Response) => {
+  try {
+    await db.delete(evidenceLogTable).where(eq(evidenceLogTable.id, parseInt(req.params.evId)));
+    return res.json({ deleted: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Reconciliation Engine: GET results
+router.get("/sessions/:id/recon", async (req: Request, res: Response) => {
+  try {
+    const rows = await db.select().from(reconEngineTable).where(eq(reconEngineTable.sessionId, parseInt(req.params.id)));
+    return res.json(rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Reconciliation Engine: Run all checks
+router.post("/sessions/:id/recon/run", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+    const glAccounts = await db.select().from(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, sessionId));
+    const coaRows = await db.select().from(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, sessionId));
+    const extracted = await db.select().from(wpExtractedFieldsTable).where(eq(wpExtractedFieldsTable.sessionId, sessionId));
+
+    const checks: any[] = [];
+
+    // TB balance check
+    const tbDebit = tbLines.reduce((s: number, r: any) => s + Number(r.debit || 0), 0);
+    const tbCredit = tbLines.reduce((s: number, r: any) => s + Number(r.credit || 0), 0);
+    const tbDiff = Math.abs(tbDebit - tbCredit);
+    checks.push({ sessionId, checkName: "TB Self-Balance", sourceA: "TB Debit Total", sourceB: "TB Credit Total", amountA: String(tbDebit.toFixed(2)), amountB: String(tbCredit.toFixed(2)), difference: String(tbDiff.toFixed(2)), passed: tbDiff < 1, rule: "Total Dr must equal Total Cr", notes: tbDiff < 1 ? "TB is balanced" : `Imbalance of ${tbDiff.toFixed(2)}`, runAt: new Date() });
+
+    // COA vs TB
+    const coaTotal = coaRows.reduce((s: number, r: any) => s + Number(r.closingBalance || 0), 0);
+    const tbNetBalance = tbDebit - tbCredit;
+    const coaTbDiff = Math.abs(coaTotal - tbNetBalance);
+    checks.push({ sessionId, checkName: "COA vs TB Reconciliation", sourceA: "Master COA Closing Balance", sourceB: "TB Net Balance", amountA: String(coaTotal.toFixed(2)), amountB: String(tbNetBalance.toFixed(2)), difference: String(coaTbDiff.toFixed(2)), passed: coaTbDiff < 1 || coaRows.length === 0, rule: "COA closing balances must reconcile to TB", notes: coaRows.length === 0 ? "COA not yet populated" : coaTbDiff < 1 ? "COA matches TB" : `Difference of ${coaTbDiff.toFixed(2)}`, runAt: new Date() });
+
+    // GL vs TB
+    const glDebit = glAccounts.reduce((s: number, a: any) => s + Number(a.totalDebit || 0), 0);
+    const glCredit = glAccounts.reduce((s: number, a: any) => s + Number(a.totalCredit || 0), 0);
+    const glTbDebitDiff = Math.abs(glDebit - tbDebit);
+    checks.push({ sessionId, checkName: "GL vs TB — Debit Total", sourceA: "GL Total Debit", sourceB: "TB Total Debit", amountA: String(glDebit.toFixed(2)), amountB: String(tbDebit.toFixed(2)), difference: String(glTbDebitDiff.toFixed(2)), passed: glTbDebitDiff < 1 || glAccounts.length === 0, rule: "GL total debits must equal TB total debits", notes: glAccounts.length === 0 ? "GL not yet generated" : glTbDebitDiff < 1 ? "GL matches TB (Dr)" : `Difference of ${glTbDebitDiff.toFixed(2)}`, runAt: new Date() });
+
+    // Delete old and insert fresh
+    await db.delete(reconEngineTable).where(eq(reconEngineTable.sessionId, sessionId));
+    const inserted = await db.insert(reconEngineTable).values(checks).returning();
+
+    const allPassed = inserted.every((c: any) => c.passed);
+    return res.json({ checks: inserted, allPassed, summary: `${inserted.filter((c: any) => c.passed).length}/${inserted.length} checks passed` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Seed all global reference data in one call
+router.post("/seed-audit-engine", async (_req: Request, res: Response) => {
+  try {
+    const results: any = {};
+    const triggerCount = await db.select().from(wpTriggerDefsTable);
+    if (triggerCount.length === 0) { await db.insert(wpTriggerDefsTable).values(DEFAULT_WP_TRIGGERS as any); results.wpTriggers = `Seeded ${DEFAULT_WP_TRIGGERS.length}`; }
+    else results.wpTriggers = `Already has ${triggerCount.length}`;
+
+    const assertionCount = await db.select().from(assertionLinkageTable);
+    if (assertionCount.length === 0) { await db.insert(assertionLinkageTable).values(DEFAULT_ASSERTION_LINKAGE as any); results.assertions = `Seeded ${DEFAULT_ASSERTION_LINKAGE.length}`; }
+    else results.assertions = `Already has ${assertionCount.length}`;
+
+    const samplingCount = await db.select().from(samplingRulesTable);
+    if (samplingCount.length === 0) { await db.insert(samplingRulesTable).values(DEFAULT_SAMPLING_RULES as any); results.sampling = `Seeded ${DEFAULT_SAMPLING_RULES.length}`; }
+    else results.sampling = `Already has ${samplingCount.length}`;
+
+    const analyticsCount = await db.select().from(analyticsEngineTable);
+    if (analyticsCount.length === 0) { await db.insert(analyticsEngineTable).values(DEFAULT_ANALYTICS as any); results.analytics = `Seeded ${DEFAULT_ANALYTICS.length}`; }
+    else results.analytics = `Already has ${analyticsCount.length}`;
+
+    return res.json({ message: "Audit engine seed complete", results });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;
