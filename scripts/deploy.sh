@@ -27,17 +27,30 @@ setup_ssh() {
   mkdir -p ~/.ssh
   ssh-keyscan -p "$VPS_PORT" -T 10 "$VPS_IP" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-  if [ -s "$SSH_KEY" ]; then
-    ok "SSH key already on disk — using key auth"
-    SSH_CMD="ssh -i $SSH_KEY -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=20 -p $VPS_PORT"
-    return
-  fi
-
+  # Always prefer writing fresh from VPS_SSH_KEY secret if it is set
   if [ -n "$VPS_SSH_KEY" ]; then
     log "Writing VPS_SSH_KEY secret to disk..."
-    printf '%s\n' "$VPS_SSH_KEY" > "$SSH_KEY"
+    # Handle keys where newlines are stored as literal \n or spaces
+    printf '%s' "$VPS_SSH_KEY" \
+      | sed 's/\\n/\n/g' \
+      | awk '{
+          if (/BEGIN .* PRIVATE KEY/) { print; next }
+          if (/END .* PRIVATE KEY/)   { print; next }
+          gsub(/ /, "\n"); print
+        }' \
+      | grep -v "^$" \
+      > "$SSH_KEY"
+    # Ensure trailing newline
+    echo "" >> "$SSH_KEY"
     chmod 600 "$SSH_KEY"
-    ok "SSH key written from VPS_SSH_KEY secret"
+    # Validate key was written correctly
+    if ssh-keygen -y -f "$SSH_KEY" > /dev/null 2>&1; then
+      ok "SSH key written and validated from VPS_SSH_KEY secret"
+    else
+      warn "SSH key validation failed — attempting raw write..."
+      printf '%s\n' "$VPS_SSH_KEY" | sed 's/\\n/\n/g' > "$SSH_KEY"
+      chmod 600 "$SSH_KEY"
+    fi
     SSH_CMD="ssh -i $SSH_KEY -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=20 -p $VPS_PORT"
     return
   fi
