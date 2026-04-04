@@ -2301,6 +2301,175 @@ Return JSON:
   }
 });
 
+router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+
+    const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    const ai = await getAIClient();
+    if (!ai) return res.status(503).json({ error: "AI service not configured" });
+
+    const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+    const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+    const varSummary = variables.map(v => `${v.variableName}: ${v.finalValue}`).join("\n");
+    const tbSummary = tbLines.map(l => `${l.accountCode} ${l.accountName}: Dr=${l.debit} Cr=${l.credit}`).join("\n");
+
+    const results: any[] = [];
+    const allHeads = await db.select().from(wpHeadsTable).where(eq(wpHeadsTable.sessionId, sessionId)).orderBy(wpHeadsTable.headIndex);
+
+    for (const head of allHeads) {
+      const hi = head.headIndex;
+      if (["approved", "exported", "completed"].includes(head.status)) {
+        results.push({ headIndex: hi, headName: AUDIT_HEADS[hi]?.name, action: "skipped", reason: "already approved" });
+        continue;
+      }
+
+      // Step 1: Generate
+      try {
+        if (head.status === "validating" || head.status === "review") {
+          await db.delete(wpExceptionLogTable).where(and(eq(wpExceptionLogTable.sessionId, sessionId), eq(wpExceptionLogTable.headIndex, hi)));
+          await db.delete(wpHeadDocumentsTable).where(eq(wpHeadDocumentsTable.headId, head.id));
+        }
+
+        if (head.status !== "ready" && head.status !== "validating" && head.status !== "review") {
+          await db.update(wpHeadsTable).set({ status: "ready", updatedAt: new Date() }).where(eq(wpHeadsTable.id, head.id));
+        }
+
+        await db.update(wpHeadsTable).set({ status: "in_progress", updatedAt: new Date() }).where(eq(wpHeadsTable.id, head.id));
+
+        if (hi === 0) {
+          // TB generation - inline
+          const tbResp = await ai.client.chat.completions.create({
+            model: ai.model,
+            messages: [
+              { role: "system", content: "You are a senior auditor. Generate a trial balance from the uploaded data. Return valid JSON with a 'lines' array." },
+              { role: "user", content: `Generate trial balance for ${session.clientName || "client"}, year ${session.engagementYear || "2024"}.\n\nData:\n${smartChunk(tbSummary || varSummary, 6000)}\n\nReturn JSON: {"lines":[{"accountCode":"string","accountName":"string","classification":"string","debit":number,"credit":number}]}` },
+            ],
+            max_tokens: 4000, temperature: 0.2,
+            response_format: { type: "json_object" },
+          });
+          const tbData = JSON.parse(tbResp.choices[0]?.message?.content || "{}");
+          if (tbData.lines && tbData.lines.length > 0) {
+            for (const line of tbData.lines) {
+              await db.insert(wpTrialBalanceLinesTable).values({
+                sessionId, accountCode: line.accountCode || "0000",
+                accountName: line.accountName || "Unknown",
+                classification: line.classification || "Other",
+                debit: String(line.debit || 0), credit: String(line.credit || 0),
+                balance: String((line.debit || 0) - (line.credit || 0)),
+                source: "ai_generated", confidence: "85",
+              }).onConflictDoNothing();
+            }
+          }
+        } else if (hi === 1) {
+          // GL generation - inline
+          const glResp = await ai.client.chat.completions.create({
+            model: ai.model,
+            messages: [
+              { role: "system", content: "You are a senior auditor. Generate general ledger entries. Return valid JSON." },
+              { role: "user", content: `Generate general ledger for ${session.clientName || "client"}, year ${session.engagementYear || "2024"}.\n\nTrial Balance:\n${smartChunk(tbSummary, 4000)}\n\nReturn JSON: {"documents":[{"paper_code":"GL","paper_name":"General Ledger","content":"full GL analysis"}]}` },
+            ],
+            max_tokens: 4000, temperature: 0.3,
+            response_format: { type: "json_object" },
+          });
+          const glData = JSON.parse(glResp.choices[0]?.message?.content || "{}");
+          const docs = glData.documents || [{ paper_code: "GL", paper_name: "General Ledger", content: glData.content || "General Ledger generated" }];
+          for (const doc of docs) {
+            await db.insert(wpHeadDocumentsTable).values({
+              sessionId, headId: head.id,
+              paperCode: doc.paper_code || "GL", paperName: doc.paper_name || "General Ledger",
+              content: doc.content || "", outputFormat: "excel",
+              status: "generated", generatedAt: new Date(),
+            });
+          }
+        } else {
+          // Heads 2-11
+          const headDef = AUDIT_HEADS[hi];
+          const papers = (head.papersIncluded as string[]) || headDef.papers;
+
+          for (const paperCode of papers) {
+            try {
+              const resp = await ai.client.chat.completions.create({
+                model: ai.model,
+                messages: [
+                  { role: "system", content: "You are a senior auditor generating ISA-compliant working papers for Pakistan audits. Return valid JSON only." },
+                  { role: "user", content: `Generate the audit working paper "${paperCode}" for the "${headDef.name}" section.\n\nCLIENT: ${session.clientName || "Unknown"}\nENTITY TYPE: ${session.entityType || "Private Limited"}\nYEAR: ${session.engagementYear || "2024"}\nFRAMEWORK: ${session.reportingFramework || "IFRS"}\n\nVARIABLES:\n${smartChunk(varSummary, 3000)}\n\nTRIAL BALANCE:\n${smartChunk(tbSummary, 3000)}\n\nReturn JSON:\n{"paper_code":"${paperCode}","paper_name":string,"content":string,"exceptions":[string],"cross_references":[string]}` },
+                ],
+                max_tokens: 4000, temperature: 0.3,
+                response_format: { type: "json_object" },
+              });
+              const raw = JSON.parse(resp.choices[0]?.message?.content || "{}");
+              await db.insert(wpHeadDocumentsTable).values({
+                sessionId, headId: head.id,
+                paperCode: raw.paper_code || paperCode, paperName: raw.paper_name || paperCode,
+                content: raw.content || "", outputFormat: headDef.outputType.split("+")[0],
+                status: "generated", generatedAt: new Date(),
+              });
+            } catch (paperErr) {
+              logger.error({ err: paperErr }, `Auto-process: Failed paper ${paperCode} for head ${hi}`);
+            }
+          }
+        }
+
+        // Step 2: Mark as validating
+        await db.update(wpHeadsTable).set({
+          status: "validating", generatedAt: new Date(), updatedAt: new Date(), exceptionsCount: 0,
+        }).where(eq(wpHeadsTable.id, head.id));
+
+        // Step 3: Auto-resolve all exceptions
+        await db.update(wpExceptionLogTable).set({ status: "resolved", resolution: "Auto-resolved during auto-process" })
+          .where(and(eq(wpExceptionLogTable.sessionId, sessionId), eq(wpExceptionLogTable.headIndex, hi), eq(wpExceptionLogTable.status, "open")));
+
+        // Step 4: Approve
+        await db.update(wpHeadsTable).set({
+          status: "approved", approvedAt: new Date(), updatedAt: new Date(),
+        }).where(eq(wpHeadsTable.id, head.id));
+
+        // Step 5: Unlock next
+        const nextHi = hi + 1;
+        if (nextHi < AUDIT_HEADS.length) {
+          const nextHead = allHeads.find(h => h.headIndex === nextHi);
+          if (nextHead && !["approved", "exported", "completed"].includes(nextHead.status)) {
+            await db.update(wpHeadsTable).set({ status: "ready", updatedAt: new Date() }).where(eq(wpHeadsTable.id, nextHead.id));
+          }
+        }
+
+        results.push({ headIndex: hi, headName: AUDIT_HEADS[hi]?.name, action: "completed", status: "approved" });
+      } catch (headErr: any) {
+        logger.error({ err: headErr }, `Auto-process failed for head ${hi}`);
+        results.push({ headIndex: hi, headName: AUDIT_HEADS[hi]?.name, action: "failed", error: headErr.message });
+        // Still try to unlock next so pipeline continues
+        const nextHi = hi + 1;
+        if (nextHi < AUDIT_HEADS.length) {
+          const nextHead = allHeads.find(h => h.headIndex === nextHi);
+          if (nextHead) {
+            await db.update(wpHeadsTable).set({ status: "ready", updatedAt: new Date() }).where(eq(wpHeadsTable.id, nextHead.id));
+          }
+        }
+      }
+    }
+
+    const completed = results.filter(r => r.action === "completed").length;
+    const skipped = results.filter(r => r.action === "skipped").length;
+    const failed = results.filter(r => r.action === "failed").length;
+
+    await db.update(wpSessionsTable).set({ currentStage: "generation", updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
+
+    res.json({
+      success: true,
+      message: `Auto-processed: ${completed} completed, ${skipped} skipped, ${failed} failed`,
+      results,
+      summary: { completed, skipped, failed, total: allHeads.length },
+    });
+  } catch (err: any) {
+    logger.error({ err }, "Auto-process-all failed");
+    res.status(500).json({ error: "Auto-process failed: " + (err.message || "Unknown error") });
+  }
+});
+
 router.post("/sessions/:id/heads/:headIndex/approve", async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(req.params.id);

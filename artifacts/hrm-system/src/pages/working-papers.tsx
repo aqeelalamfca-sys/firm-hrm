@@ -515,6 +515,27 @@ export default function WorkingPapers() {
     } catch {}
   };
 
+  const autoProcessAll = async () => {
+    if (!activeSession) return;
+    try {
+      setLoading(true);
+      toast({ title: "Auto Processing All Heads", description: "AI is generating, reviewing, and approving all heads sequentially. This may take a few minutes..." });
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/heads/auto-process-all`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast({ title: "Auto Process Complete", description: data.message });
+        await fetchSession(activeSession.id);
+        await fetchExceptions();
+      } else {
+        const err = await res.json();
+        toast({ title: "Auto Process Failed", description: err.error, variant: "destructive" });
+      }
+    } catch { toast({ title: "Auto Process Failed", variant: "destructive" }); }
+    finally { setLoading(false); }
+  };
+
   const exportBundle = async () => {
     if (!activeSession) return;
     try {
@@ -937,6 +958,7 @@ export default function WorkingPapers() {
           onGenerate={generateHead}
           onApprove={approveHead}
           onExport={exportHead}
+          onAutoProcessAll={autoProcessAll}
           loading={loading}
           onRefresh={() => fetchSession(activeSession.id)}
         />
@@ -2168,7 +2190,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
   );
 }
 
-function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, onExport, loading, onRefresh }: any) {
+function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, onExport, onAutoProcessAll, loading, onRefresh }: any) {
   const allExceptions: any[] = exceptions || [];
   const allHeads: any[] = heads || [];
   const [approvalInProgress, setApprovalInProgress] = useState(false);
@@ -2270,9 +2292,13 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">Generate → Review → Approve → Export</p>
             </div>
-            <div className="flex items-center gap-2 self-start">
+            <div className="flex items-center gap-2 self-start flex-wrap">
               <Button variant="outline" size="sm" onClick={onRefresh} className="h-8">
                 <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
+              </Button>
+              <Button size="sm" onClick={onAutoProcessAll} disabled={loading || completed === total} className="h-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-sm text-white">
+                {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Play className="w-3.5 h-3.5 mr-1.5" />}
+                Auto Process All
               </Button>
             </div>
           </div>
