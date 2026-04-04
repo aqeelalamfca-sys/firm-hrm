@@ -28,6 +28,7 @@ import { eq, and, inArray, asc, sql } from "drizzle-orm";
 import OpenAI from "openai";
 import PDFDocument from "pdfkit";
 import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 // @ts-ignore
 import pdfParse from "pdf-parse";
 import {
@@ -5349,256 +5350,620 @@ router.get("/sessions/:id/wp-audit-trail", async (req: Request, res: Response) =
   }
 });
 
-// ── Download blank Excel upload template ─────────────────────────────────────
-router.get("/download-template", (_req: Request, res: Response) => {
+// ── Download Excel upload template (ExcelJS — real demo data + cell protection) ──
+router.get("/download-template", async (_req: Request, res: Response) => {
   try {
-    const wb = XLSX.utils.book_new();
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "Alam & Aulakh Chartered Accountants";
+    wb.created = new Date();
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-    const H = (v: string) => ({ v, t: "s" as const });
-    const N = (v: number) => ({ v, t: "n" as const });
-    const mkSheet = (rows: any[][]): XLSX.WorkSheet => {
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      return ws;
+    // ── Shared styles ─────────────────────────────────────────────────────────
+    const C = {
+      headerBg:  "FF1E3A8A", headerFg:  "FFFFFFFF",
+      sectionBg: "FF3B82F6", sectionFg: "FFFFFFFF",
+      labelBg:   "FFE2E8F0", labelFg:   "FF1E293B",
+      editBg:    "FFFEF9C3", editFg:    "FF1E293B", editBorder: "FFF59E0B",
+      totalBg:   "FFDBEAFE", totalFg:   "FF1E40AF",
+      noteBg:    "FFF0FDF4", noteFg:    "FF166534",
+      warnBg:    "FFFEF3C7", warnFg:    "FF92400E",
+    };
+    const thin = { style: "thin" as const, color: { argb: "FFCBD5E1" } };
+    const editBorderStyle = { style: "medium" as const, color: { argb: C.editBorder } };
+    const allThin = { top: thin, left: thin, bottom: thin, right: thin };
+    const allEditBorder = { top: editBorderStyle, left: editBorderStyle, bottom: editBorderStyle, right: editBorderStyle };
+
+    const fmtNum = "#,##0";
+    const fmtDate = "YYYY-MM-DD";
+
+    function hdr(cell: ExcelJS.Cell, v: any, center = false) {
+      cell.value = v; cell.protection = { locked: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.headerBg } };
+      cell.font = { bold: true, color: { argb: C.headerFg }, size: 11 };
+      cell.border = allThin;
+      cell.alignment = { vertical: "middle", horizontal: center ? "center" : "left", wrapText: true };
+    }
+    function sect(cell: ExcelJS.Cell, v: any) {
+      cell.value = v; cell.protection = { locked: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.sectionBg } };
+      cell.font = { bold: true, color: { argb: C.sectionFg }, size: 10 };
+      cell.border = allThin;
+      cell.alignment = { vertical: "middle", horizontal: "left" };
+    }
+    function lbl(cell: ExcelJS.Cell, v: any) {
+      cell.value = v; cell.protection = { locked: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.labelBg } };
+      cell.font = { bold: true, color: { argb: C.labelFg }, size: 10 };
+      cell.border = allThin;
+      cell.alignment = { vertical: "middle", horizontal: "left" };
+    }
+    function edit(cell: ExcelJS.Cell, v: any, numFmt?: string) {
+      cell.value = v; cell.protection = { locked: false };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.editBg } };
+      cell.font = { color: { argb: C.editFg }, size: 10 };
+      cell.border = allEditBorder;
+      cell.alignment = { vertical: "middle", horizontal: typeof v === "number" ? "right" : "left" };
+      if (numFmt) cell.numFmt = numFmt;
+    }
+    function total(cell: ExcelJS.Cell, v: any) {
+      cell.value = v; cell.protection = { locked: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.totalBg } };
+      cell.font = { bold: true, color: { argb: C.totalFg }, size: 10 };
+      cell.border = allThin;
+      cell.alignment = { vertical: "middle", horizontal: typeof v === "number" ? "right" : "left" };
+      if (typeof v === "number") cell.numFmt = fmtNum;
+    }
+    function locked(cell: ExcelJS.Cell, v: any, numFmt?: string) {
+      cell.value = v; cell.protection = { locked: true };
+      cell.font = { color: { argb: C.editFg }, size: 10 };
+      cell.border = allThin;
+      cell.alignment = { vertical: "middle", horizontal: typeof v === "number" ? "right" : "left" };
+      if (numFmt) cell.numFmt = numFmt;
+    }
+    function note(cell: ExcelJS.Cell, v: any) {
+      cell.value = v; cell.protection = { locked: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.noteBg } };
+      cell.font = { italic: true, color: { argb: C.noteFg }, size: 9 };
+      cell.alignment = { vertical: "middle", wrapText: true };
+    }
+    async function protect(ws: ExcelJS.Worksheet) {
+      await ws.protect("", {
+        sheet: true, selectLockedCells: true, selectUnlockedCells: true,
+        formatCells: false, formatColumns: false, formatRows: false,
+        insertRows: false, insertColumns: false, deleteRows: false, deleteColumns: false,
+        sort: false, autoFilter: false,
+      });
+    }
+
+    // ── DEMO COMPANY DATA ─────────────────────────────────────────────────────
+    const co = {
+      name:    "Pak Textile Holdings (Pvt) Ltd",
+      ntn:     "3456789-0",
+      strn:    "42-00-9876-543-21",
+      address: "Plot 45-B, Sundar Industrial Estate, Raiwind Road",
+      city:    "Lahore",
+      period:  "2025",
+      pStart:  "2024-07-01",
+      pEnd:    "2025-06-30",
+      type:    "Private Limited",
+      listed:  "Unlisted",
+      industry:"Textile Manufacturing",
+      framework:"IFRS",
+      engagement:"Statutory Audit",
     };
 
-    // ── Sheet 1: INSTRUCTIONS ─────────────────────────────────────────────────
-    const instrRows = [
-      ["ANA WORKING PAPERS — DATA UPLOAD TEMPLATE"],
-      ["Alam & Aulakh Chartered Accountants"],
-      [""],
-      ["HOW TO USE THIS TEMPLATE"],
-      ["1. Fill each sheet with the relevant financial data for your client."],
-      ["2. Keep ALL column headers exactly as shown — do not rename or reorder."],
-      ["3. Use plain numbers only — no PKR, Rs., commas or currency symbols."],
-      ["4. Dates must be in YYYY-MM-DD format (e.g. 2024-06-30)."],
-      ["5. Delete the SAMPLE ROW (row 3 of each data sheet) before uploading."],
-      ["6. Save as .xlsx before uploading."],
-      ["7. Upload each sheet as a SEPARATE file with the matching category."],
-      [""],
-      ["FILE CATEGORY MAP (select when uploading)"],
-      ["Sheet Name",     "Upload Category",      "File Name Hint"],
-      ["Entity Info",    "financial_statements",  "entity_info.xlsx"],
-      ["Trial Balance",  "trial_balance",         "trial_balance.xlsx"],
-      ["General Ledger", "general_ledger",        "general_ledger.xlsx"],
-      ["Balance Sheet",  "financial_statements",  "balance_sheet.xlsx"],
-      ["Profit & Loss",  "financial_statements",  "profit_loss.xlsx"],
-      ["Bank Statement", "bank_statement",        "bank_statement.xlsx"],
-      ["Tax Data",       "financial_statements",  "tax_data.xlsx"],
-      [""],
-      ["CLASSIFICATION VALUES (for Trial Balance sheet)"],
-      ["Use exactly one of:", "Asset", "Liability", "Equity", "Revenue", "Cost of Sales", "Operating Expense", "Finance Cost", "Tax"],
-      [""],
-      ["TIP: You may also upload the real printed financials (PDF/Excel)."],
-      ["The AI will extract data automatically from any uploaded document."],
-      ["This template ensures 100% accurate structured extraction."],
-    ];
-    const wsInstr = mkSheet(instrRows);
-    wsInstr["!cols"] = [{ wch: 55 }, { wch: 25 }, { wch: 30 }];
-    XLSX.utils.book_append_sheet(wb, wsInstr, "INSTRUCTIONS");
+    // ══════════════════════════════════════════════════════════════════════════
+    // SHEET 1 — INSTRUCTIONS
+    // ══════════════════════════════════════════════════════════════════════════
+    {
+      const ws = wb.addWorksheet("INSTRUCTIONS", { properties: { tabColor: { argb: "FF1E3A8A" } } });
+      ws.columns = [{ width: 6 }, { width: 48 }, { width: 30 }, { width: 30 }];
 
-    // ── Sheet 2: Entity Info ──────────────────────────────────────────────────
-    const entityRows = [
-      ["ENTITY INFO — Fill all fields. Leave blank if not applicable."],
-      ["Field", "Value", "Notes"],
-      ["Company / Client Name", "ABC Manufacturing (Pvt) Ltd", "Full legal name"],
-      ["NTN", "1234567-8", "National Tax Number"],
-      ["STRN", "12-34-5678-001-87", "Sales Tax Registration Number (if registered)"],
-      ["CNIC (sole proprietor)", "", "Only for individuals / sole traders"],
-      ["Financial Year", "2024", "e.g. 2024"],
-      ["Period Start", "2024-07-01", "YYYY-MM-DD"],
-      ["Period End", "2025-06-30", "YYYY-MM-DD"],
-      ["Address", "Plot 12, Industrial Estate, Lahore", ""],
-      ["City", "Lahore", ""],
-      ["Industry", "Manufacturing", "e.g. Manufacturing, Services, Trading, Real Estate"],
-      ["Entity Type", "Private Limited", "Private Limited / Public Limited / Partnership / Sole Proprietor"],
-      ["Listed Status", "Unlisted", "Listed / Unlisted"],
-      ["Reporting Framework", "IFRS", "IFRS / IFRS for SMEs / Companies Act 2017"],
-      ["Engagement Type", "Statutory Audit", "Statutory Audit / Tax Audit / Review / Agreed Procedures"],
-      ["", "", ""],
-      ["DIRECTORS / PARTNERS (one per row)"],
-      ["Name", "Designation", ""],
-      ["Mr. Ali Alam", "CEO / MD", ""],
-      ["Mr. Bilal Aulakh", "Director Finance", ""],
-      ["", "", ""],
-      ["BANKERS (one per row)"],
-      ["Bank Name", "Account Number", "Branch"],
-      ["Habib Bank Limited", "01234567890123", "Gulberg, Lahore"],
-      ["MCB Bank", "9876543210", "Garden Town, Lahore"],
-    ];
-    const wsEntity = mkSheet(entityRows);
-    wsEntity["!cols"] = [{ wch: 32 }, { wch: 40 }, { wch: 35 }];
-    XLSX.utils.book_append_sheet(wb, wsEntity, "Entity Info");
+      const title = ws.getCell("B1");
+      title.value = "ANA WORKING PAPERS — DATA UPLOAD TEMPLATE";
+      title.font = { bold: true, size: 16, color: { argb: C.headerBg } };
+      ws.getCell("B2").value = "Alam & Aulakh Chartered Accountants | Powered by ANA Audit Intelligence";
+      ws.getCell("B2").font = { italic: true, size: 10, color: { argb: "FF64748B" } };
+      ws.getRow(1).height = 30; ws.getRow(2).height = 18;
 
-    // ── Sheet 3: Trial Balance ────────────────────────────────────────────────
-    const tbHeader = ["Account Code", "Account Name", "Classification", "Debit (PKR)", "Credit (PKR)", "Closing Balance (PKR)", "Prior Year Balance (PKR)", "FS Line Mapping"];
-    const tbSample = ["1001", "Cash in Hand", "Asset", 250000, 0, 250000, 200000, "Cash and Bank Balances"];
-    const tbRows = [
-      ["TRIAL BALANCE — One row per account. Delete sample rows before uploading."],
-      tbHeader,
-      tbSample,
-      // Common account stubs
-      ["1002", "Bank - HBL Current", "Asset", 1500000, 0, 1500000, 1200000, "Cash and Bank Balances"],
-      ["1101", "Trade Receivables", "Asset", 3200000, 0, 3200000, 2800000, "Trade Debts"],
-      ["1201", "Stock in Trade", "Asset", 5500000, 0, 5500000, 4900000, "Inventories"],
-      ["1301", "Property Plant & Equipment - Net", "Asset", 12000000, 0, 12000000, 13500000, "Property, Plant & Equipment"],
-      ["2001", "Trade Payables", "Liability", 0, 2400000, 2400000, 2100000, "Trade and Other Payables"],
-      ["2101", "Long Term Financing", "Liability", 0, 5000000, 5000000, 6000000, "Long-Term Borrowings"],
-      ["3001", "Share Capital", "Equity", 0, 10000000, 10000000, 10000000, "Share Capital"],
-      ["3101", "Retained Earnings", "Equity", 0, 4050000, 4050000, 3600000, "Retained Earnings"],
-      ["4001", "Revenue - Sales", "Revenue", 0, 25000000, 25000000, 22000000, "Revenue"],
-      ["5001", "Cost of Goods Sold", "Cost of Sales", 16000000, 0, 16000000, 14000000, "Cost of Sales"],
-      ["6001", "Salaries & Wages", "Operating Expense", 3000000, 0, 3000000, 2700000, "Administrative Expenses"],
-      ["6002", "Rent & Utilities", "Operating Expense", 800000, 0, 800000, 720000, "Administrative Expenses"],
-      ["6003", "Depreciation", "Operating Expense", 1500000, 0, 1500000, 1400000, "Administrative Expenses"],
-      ["7001", "Finance Cost - Interest", "Finance Cost", 450000, 0, 450000, 500000, "Finance Costs"],
-      ["8001", "Income Tax Expense", "Tax", 200000, 0, 200000, 180000, "Income Tax"],
-    ];
-    const wsTB = mkSheet(tbRows);
-    wsTB["!cols"] = [{ wch: 14 }, { wch: 36 }, { wch: 20 }, { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 24 }, { wch: 30 }];
-    XLSX.utils.book_append_sheet(wb, wsTB, "Trial Balance");
+      const steps = [
+        ["", "", ""],
+        ["HOW TO USE THIS TEMPLATE", "", ""],
+        ["Step 1", "Open each sheet and replace the YELLOW cells with your client's actual data.", "Yellow cells = editable"],
+        ["Step 2", "Do NOT change any column headers, labels, or non-yellow cells.", "Grey/blue = locked"],
+        ["Step 3", "Use plain numbers only — no PKR, Rs., commas or currency symbols (e.g. 875250000, not 8.75 Crore).", "Numbers only"],
+        ["Step 4", "All dates must be in YYYY-MM-DD format (e.g. 2024-07-01).", "YYYY-MM-DD"],
+        ["Step 5", "Each sheet must be saved as a separate .xlsx file and uploaded with the matching category.", "One file per sheet"],
+        ["Step 6", "The demo data shown is for 'Pak Textile Holdings (Pvt) Ltd' — a large manufacturing company.", "Replace all yellow cells"],
+        ["", "", ""],
+        ["SHEET → UPLOAD CATEGORY MAP", "", ""],
+        ["Entity Info",    "Upload as: Financial Statements",  "Filename: entity_info.xlsx"],
+        ["Trial Balance",  "Upload as: Trial Balance",          "Filename: trial_balance.xlsx"],
+        ["General Ledger", "Upload as: General Ledger",         "Filename: general_ledger.xlsx"],
+        ["Balance Sheet",  "Upload as: Financial Statements",   "Filename: balance_sheet.xlsx"],
+        ["Profit & Loss",  "Upload as: Financial Statements",   "Filename: profit_loss.xlsx"],
+        ["Bank Statement", "Upload as: Bank Statement",         "Filename: bank_statement.xlsx"],
+        ["Tax Data",       "Upload as: Financial Statements",   "Filename: tax_data.xlsx"],
+        ["", "", ""],
+        ["CLASSIFICATION VALUES (Trial Balance)", "", ""],
+        ["Use exactly one of →", "Asset | Liability | Equity | Revenue | Cost of Sales | Operating Expense | Finance Cost | Tax", ""],
+      ];
+      steps.forEach((row, i) => {
+        const r = ws.getRow(i + 3);
+        if (row[0] === "HOW TO USE THIS TEMPLATE" || row[0] === "SHEET → UPLOAD CATEGORY MAP" || row[0] === "CLASSIFICATION VALUES (Trial Balance)") {
+          const c = r.getCell(2); sect(c, row[0]); ws.mergeCells(`B${r.number}:D${r.number}`);
+        } else if (row[0] === "") {
+          r.height = 8;
+        } else {
+          lbl(r.getCell(2), row[0]);
+          locked(r.getCell(3), row[1]);
+          note(r.getCell(4), row[2]);
+        }
+        r.height = r.height || 18;
+      });
+      await protect(ws);
+    }
 
-    // ── Sheet 4: General Ledger ───────────────────────────────────────────────
-    const glHeader = ["Entry Date", "Account Code", "Account Name", "Voucher No.", "Narration / Description", "Debit (PKR)", "Credit (PKR)", "Running Balance (PKR)", "Reference"];
-    const glRows = [
-      ["GENERAL LEDGER — One row per journal line. Delete sample rows before uploading."],
-      glHeader,
-      ["2024-07-01", "1002", "Bank - HBL Current", "BPV-001", "Opening balance c/f", 0, 0, 1500000, ""],
-      ["2024-07-05", "4001", "Revenue - Sales", "SIV-001", "Sales to Khan Traders - Invoice 1001", 0, 500000, 24500000, "INV-1001"],
-      ["2024-07-05", "1101", "Trade Receivables", "SIV-001", "Sales to Khan Traders - Invoice 1001", 500000, 0, 3700000, "INV-1001"],
-      ["2024-07-10", "5001", "Cost of Goods Sold", "JV-010", "Monthly COGS allocation July 2024", 1200000, 0, 17200000, ""],
-      ["2024-07-10", "1201", "Stock in Trade", "JV-010", "Monthly COGS allocation July 2024", 0, 1200000, 4300000, ""],
-      ["2024-07-15", "6001", "Salaries & Wages", "CPV-015", "Salaries July 2024", 250000, 0, 3250000, ""],
-      ["2024-07-15", "1002", "Bank - HBL Current", "CPV-015", "Salaries July 2024", 0, 250000, 1250000, ""],
-      ["2024-07-31", "2001", "Trade Payables", "BPV-031", "Payment to supplier - XYZ Co.", 200000, 0, 2200000, ""],
-      ["2024-07-31", "1002", "Bank - HBL Current", "BPV-031", "Payment to supplier - XYZ Co.", 0, 200000, 1050000, ""],
-    ];
-    const wsGL = mkSheet(glRows);
-    wsGL["!cols"] = [{ wch: 14 }, { wch: 14 }, { wch: 32 }, { wch: 14 }, { wch: 42 }, { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 18 }];
-    XLSX.utils.book_append_sheet(wb, wsGL, "General Ledger");
+    // ══════════════════════════════════════════════════════════════════════════
+    // SHEET 2 — ENTITY INFO
+    // ══════════════════════════════════════════════════════════════════════════
+    {
+      const ws = wb.addWorksheet("Entity Info", { properties: { tabColor: { argb: "FF7C3AED" } } });
+      ws.columns = [{ width: 6 }, { width: 35 }, { width: 45 }, { width: 35 }];
 
-    // ── Sheet 5: Balance Sheet ────────────────────────────────────────────────
-    const bsRows = [
-      ["BALANCE SHEET — Fill all amounts in PKR. Delete sample text rows before uploading."],
-      ["Line Item", "Note Ref", "Current Year (PKR)", "Prior Year (PKR)", "Section"],
-      ["NON-CURRENT ASSETS", "", "", "", ""],
-      ["Property, Plant & Equipment", "4", 12000000, 13500000, "Non-Current Assets"],
-      ["Intangible Assets", "5", 500000, 600000, "Non-Current Assets"],
-      ["Long-Term Investments", "6", 1000000, 1000000, "Non-Current Assets"],
-      ["CURRENT ASSETS", "", "", "", ""],
-      ["Inventories / Stock in Trade", "7", 5500000, 4900000, "Current Assets"],
-      ["Trade Debts / Receivables", "8", 3200000, 2800000, "Current Assets"],
-      ["Advances, Deposits & Prepayments", "9", 300000, 250000, "Current Assets"],
-      ["Sales Tax Refundable", "10", 120000, 80000, "Current Assets"],
-      ["Cash and Bank Balances", "11", 1750000, 1400000, "Current Assets"],
-      ["TOTAL ASSETS", "", 24370000, 24530000, ""],
-      ["", "", "", "", ""],
-      ["EQUITY", "", "", "", ""],
-      ["Share Capital", "12", 10000000, 10000000, "Equity"],
-      ["General Reserve", "13", 2000000, 1500000, "Equity"],
-      ["Unappropriated Profit", "14", 4050000, 3600000, "Equity"],
-      ["TOTAL EQUITY", "", 16050000, 15100000, ""],
-      ["", "", "", "", ""],
-      ["NON-CURRENT LIABILITIES", "", "", "", ""],
-      ["Long-Term Financing", "15", 5000000, 6000000, "Non-Current Liabilities"],
-      ["Deferred Tax Liability", "16", 320000, 430000, "Non-Current Liabilities"],
-      ["CURRENT LIABILITIES", "", "", "", ""],
-      ["Trade and Other Payables", "17", 2400000, 2100000, "Current Liabilities"],
-      ["Short-Term Borrowings", "18", 400000, 600000, "Current Liabilities"],
-      ["Accrued Liabilities", "19", 200000, 300000, "Current Liabilities"],
-      ["TOTAL LIABILITIES", "", 8320000, 9430000, ""],
-      ["TOTAL EQUITY & LIABILITIES", "", 24370000, 24530000, ""],
-    ];
-    const wsBS = mkSheet(bsRows);
-    wsBS["!cols"] = [{ wch: 38 }, { wch: 10 }, { wch: 22 }, { wch: 22 }, { wch: 25 }];
-    XLSX.utils.book_append_sheet(wb, wsBS, "Balance Sheet");
+      hdr(ws.getCell("B1"), "ENTITY INFORMATION");
+      ws.mergeCells("B1:D1"); ws.getRow(1).height = 28;
+      hdr(ws.getCell("B2"), "Field"); hdr(ws.getCell("C2"), "▶  Replace yellow cells with actual client data  ◀", true); hdr(ws.getCell("D2"), "Notes / Guidance");
+      ws.getRow(2).height = 20;
 
-    // ── Sheet 6: Profit & Loss ────────────────────────────────────────────────
-    const plRows = [
-      ["PROFIT & LOSS / INCOME STATEMENT — Fill all amounts in PKR."],
-      ["Line Item", "Note Ref", "Current Year (PKR)", "Prior Year (PKR)"],
-      ["Revenue / Net Sales", "20", 25000000, 22000000],
-      ["Cost of Sales / COGS", "21", 16000000, 14000000],
-      ["GROSS PROFIT", "", 9000000, 8000000],
-      ["", "", "", ""],
-      ["OPERATING EXPENSES", "", "", ""],
-      ["Distribution / Selling Expenses", "22", 800000, 720000],
-      ["Administrative Expenses", "23", 4300000, 3820000],
-      ["Other Operating Expenses", "", 150000, 130000],
-      ["TOTAL OPERATING EXPENSES", "", 5250000, 4670000],
-      ["", "", "", ""],
-      ["OPERATING PROFIT / EBIT", "", 3750000, 3330000],
-      ["Other Income", "24", 200000, 150000],
-      ["Finance Costs / Interest", "25", 450000, 500000],
-      ["PROFIT BEFORE TAX", "", 3500000, 2980000],
-      ["Income Tax Expense - Current", "26", 150000, 130000],
-      ["Income Tax Expense - Deferred", "", 50000, 50000],
-      ["PROFIT AFTER TAX / NET PROFIT", "", 3300000, 2800000],
-      ["", "", "", ""],
-      ["Other Comprehensive Income (if any)", "", 0, 0],
-      ["TOTAL COMPREHENSIVE INCOME", "", 3300000, 2800000],
-      ["", "", "", ""],
-      ["Earnings Per Share (if applicable)", "", 33, 28],
-    ];
-    const wsPL = mkSheet(plRows);
-    wsPL["!cols"] = [{ wch: 40 }, { wch: 10 }, { wch: 22 }, { wch: 22 }];
-    XLSX.utils.book_append_sheet(wb, wsPL, "Profit & Loss");
+      const entityFields: [string, any, string][] = [
+        ["Company / Client Name", co.name, "Full legal registered name"],
+        ["NTN (National Tax Number)", co.ntn, "Format: 1234567-8"],
+        ["STRN (Sales Tax Reg. No.)", co.strn, "Format: 42-00-1234-567-89 (leave blank if not registered)"],
+        ["CNIC (Solo Proprietor only)", "", "Leave blank for companies"],
+        ["Financial Year", co.period, "e.g. 2025 (for FY July 2024 – June 2025)"],
+        ["Period Start Date", co.pStart, "YYYY-MM-DD  (e.g. 2024-07-01)"],
+        ["Period End Date", co.pEnd, "YYYY-MM-DD  (e.g. 2025-06-30)"],
+        ["Registered Address", co.address, "Full street address"],
+        ["City", co.city, "e.g. Karachi, Lahore, Islamabad"],
+        ["Industry / Sector", co.industry, "e.g. Manufacturing, Services, Trading, Real Estate"],
+        ["Entity Type", co.type, "Private Limited / Public Limited / Partnership / Sole Proprietor"],
+        ["Listed / Unlisted", co.listed, "PSX Listed / Unlisted"],
+        ["Reporting Framework", co.framework, "IFRS / IFRS for SMEs / Companies Act 2017"],
+        ["Engagement Type", co.engagement, "Statutory Audit / Tax Audit / Review / AUP"],
+      ];
+      entityFields.forEach(([field, val, hint], i) => {
+        const r = ws.getRow(i + 3); r.height = 20;
+        lbl(r.getCell(2), field);
+        edit(r.getCell(3), val);
+        note(r.getCell(4), hint);
+      });
 
-    // ── Sheet 7: Bank Statement ───────────────────────────────────────────────
-    const bankHeader = ["Date", "Narration / Description", "Reference / Cheque No.", "Debit (PKR)", "Credit (PKR)", "Balance (PKR)", "Bank Name", "Account Number"];
-    const bankRows = [
-      ["BANK STATEMENT — One row per transaction. Delete sample rows before uploading."],
-      bankHeader,
-      ["2024-07-01", "Opening Balance", "", 0, 0, 1200000, "Habib Bank Limited", "01234567890123"],
-      ["2024-07-05", "Received from Khan Traders - Invoice 1001", "CHQ-112233", 0, 500000, 1700000, "Habib Bank Limited", "01234567890123"],
-      ["2024-07-10", "Salary Payment July 2024", "TT-223344", 250000, 0, 1450000, "Habib Bank Limited", "01234567890123"],
-      ["2024-07-15", "Payment to XYZ Suppliers", "CHQ-334455", 200000, 0, 1250000, "Habib Bank Limited", "01234567890123"],
-      ["2024-07-20", "Received from Ali Enterprises", "RTGS-445566", 0, 750000, 2000000, "Habib Bank Limited", "01234567890123"],
-      ["2024-07-25", "Rent - July 2024", "CHQ-556677", 80000, 0, 1920000, "Habib Bank Limited", "01234567890123"],
-      ["2024-07-31", "Bank Charges", "", 2500, 0, 1917500, "Habib Bank Limited", "01234567890123"],
-      ["2024-07-31", "Profit on Deposit", "", 0, 12000, 1929500, "Habib Bank Limited", "01234567890123"],
-    ];
-    const wsBank = mkSheet(bankRows);
-    wsBank["!cols"] = [{ wch: 14 }, { wch: 44 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 24 }, { wch: 20 }];
-    XLSX.utils.book_append_sheet(wb, wsBank, "Bank Statement");
+      ws.getRow(17).height = 12;
+      sect(ws.getCell("B17"), "DIRECTORS / PARTNERS  (one per row)"); ws.mergeCells("B17:D17");
+      hdr(ws.getCell("B18"), "Full Name"); hdr(ws.getCell("C18"), "Designation"); hdr(ws.getCell("D18"), "CNIC (optional)");
+      const directors = [
+        ["Mr. Tariq Mehmood", "Chief Executive Officer", ""],
+        ["Mr. Asif Raza", "Chief Financial Officer", ""],
+        ["Mr. Zulfiqar Ahmed", "Non-Executive Director", ""],
+        ["Ms. Amina Siddiqui", "Independent Director", ""],
+      ];
+      directors.forEach(([n, d, c], i) => {
+        const r = ws.getRow(19 + i); r.height = 18;
+        edit(r.getCell(2), n); edit(r.getCell(3), d); edit(r.getCell(4), c);
+      });
 
-    // ── Sheet 8: Tax Data ─────────────────────────────────────────────────────
-    const taxRows = [
-      ["TAX DATA — Fill all relevant fields. Leave blank if not applicable."],
-      ["Field", "Value", "Notes"],
-      ["Tax Period From", "2024-07-01", "YYYY-MM-DD"],
-      ["Tax Period To", "2025-06-30", "YYYY-MM-DD"],
-      ["Sales Tax (Output Tax) PKR", 2000000, "Total GST/Sales Tax charged on sales"],
-      ["Sales Tax (Input Tax) PKR", 1500000, "Total Input Tax credits claimed"],
-      ["Net Sales Tax Payable PKR", 500000, "Output Tax minus Input Tax"],
-      ["", "", ""],
-      ["INCOME TAX", "", ""],
-      ["Advance Tax Paid (u/s 147) PKR", 100000, ""],
-      ["WHT Deducted by Clients PKR", 75000, "Withholding Tax deducted at source"],
-      ["Income Tax Provision PKR", 200000, "Provision charged in P&L"],
-      ["", "", ""],
-      ["TAX RETURNS FILED", "", ""],
-      ["Monthly ST Return Filing Date 1", "2024-08-15", "YYYY-MM-DD"],
-      ["Monthly ST Return Filing Date 2", "2024-09-15", ""],
-      ["Annual Income Tax Return Filing Date", "2025-01-15", ""],
-      ["", "", ""],
-      ["ADJUSTMENTS / ANNEXURES", "", ""],
-      ["Annexures Summary", "Annex-B: WHT Agents; Annex-C: Import; Annex-G: Exports", "Brief description"],
-      ["Other Adjustments PKR", 0, "Any other tax adjustments"],
-      ["", "", ""],
-      ["ADDITIONAL NOTES", "", ""],
-      ["Tax Notices / Orders Reference", "", "Reference numbers of any notices received"],
-      ["Appeal Status", "", "Pending / Decided / None"],
-    ];
-    const wsTax = mkSheet(taxRows);
-    wsTax["!cols"] = [{ wch: 38 }, { wch: 40 }, { wch: 42 }];
-    XLSX.utils.book_append_sheet(wb, wsTax, "Tax Data");
+      ws.getRow(23).height = 12;
+      sect(ws.getCell("B23"), "BANKERS  (one per row)"); ws.mergeCells("B23:D23");
+      hdr(ws.getCell("B24"), "Bank Name"); hdr(ws.getCell("C24"), "Account Number"); hdr(ws.getCell("D24"), "Branch");
+      const banks = [
+        ["Habib Bank Limited (HBL)", "01430007900003", "Sundar Estate, Lahore"],
+        ["MCB Bank Limited", "0670-0221456780", "Raiwind Road, Lahore"],
+        ["United Bank Limited (UBL)", "1520-1-547892100", "Export Branch, Lahore"],
+      ];
+      banks.forEach(([n, a, b], i) => {
+        const r = ws.getRow(25 + i); r.height = 18;
+        edit(r.getCell(2), n); edit(r.getCell(3), a); edit(r.getCell(4), b);
+      });
+      await protect(ws);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // SHEET 3 — TRIAL BALANCE
+    // ══════════════════════════════════════════════════════════════════════════
+    {
+      const ws = wb.addWorksheet("Trial Balance", { properties: { tabColor: { argb: "FF059669" } } });
+      ws.columns = [
+        { width: 14 }, { width: 38 }, { width: 22 }, { width: 18 },
+        { width: 18 }, { width: 22 }, { width: 24 }, { width: 30 },
+      ];
+      const cols = ["Account Code", "Account Name", "Classification", "Debit (PKR)", "Credit (PKR)", "Closing Balance (PKR)", "Prior Year Balance (PKR)", "FS Line Mapping"];
+      hdr(ws.getCell("A1"), "TRIAL BALANCE — Pak Textile Holdings (Pvt) Ltd  |  FY 2024-25"); ws.mergeCells("A1:H1"); ws.getRow(1).height = 26;
+      note(ws.getCell("A2"), "All yellow cells are editable. Add or delete rows as needed. Do NOT change column headers. Classification must be exactly: Asset / Liability / Equity / Revenue / Cost of Sales / Operating Expense / Finance Cost / Tax"); ws.mergeCells("A2:H2"); ws.getRow(2).height = 30;
+      cols.forEach((c, i) => hdr(ws.getRow(3).getCell(i + 1), c));
+      ws.getRow(3).height = 22;
+
+      const tbData: [string, string, string, number, number, number, number, string][] = [
+        ["1001","Cash in Hand","Asset",2450000,0,2450000,1850000,"Cash and Bank Balances"],
+        ["1002","Bank — HBL Current Account","Asset",45800000,0,45800000,38500000,"Cash and Bank Balances"],
+        ["1003","Bank — MCB Operating Account","Asset",28350000,0,28350000,22100000,"Cash and Bank Balances"],
+        ["1004","Bank — UBL Export Account","Asset",39200000,0,39200000,29750000,"Cash and Bank Balances"],
+        ["1101","Trade Debtors — Local","Asset",98500000,0,98500000,82000000,"Trade Debts"],
+        ["1102","Trade Debtors — Export","Asset",46500000,0,46500000,38200000,"Trade Debts"],
+        ["1103","Advances to Suppliers","Asset",28500000,0,28500000,22000000,"Advances, Deposits & Prepayments"],
+        ["1104","Short-Term Investments","Asset",35000000,0,35000000,25000000,"Short-Term Investments"],
+        ["1105","Advance Income Tax","Asset",30225000,0,30225000,25500000,"Advance Tax / Tax Receivable"],
+        ["1201","Raw Material Stock","Asset",95000000,0,95000000,78000000,"Inventories"],
+        ["1202","Work in Process","Asset",42000000,0,42000000,36000000,"Inventories"],
+        ["1203","Finished Goods","Asset",88500000,0,88500000,72000000,"Inventories"],
+        ["1301","Plant & Machinery — at Cost","Asset",520000000,0,520000000,475000000,"Property, Plant & Equipment"],
+        ["1302","Less: Accumulated Depreciation — P&M","Asset",0,185000000,-185000000,-162000000,"Property, Plant & Equipment"],
+        ["1303","Land & Building — at Cost","Asset",285000000,0,285000000,285000000,"Property, Plant & Equipment"],
+        ["1304","Capital Work in Progress","Asset",48000000,0,48000000,32000000,"Capital Work in Progress"],
+        ["1305","Intangible Assets — ERP System","Asset",12000000,0,12000000,14500000,"Intangible Assets"],
+        ["2001","Trade Creditors","Liability",0,85000000,85000000,70000000,"Trade and Other Payables"],
+        ["2002","Accrued Liabilities","Liability",0,42500000,42500000,35000000,"Trade and Other Payables"],
+        ["2003","Short-Term Borrowings — Running Finance","Liability",0,120000000,120000000,95000000,"Short-Term Borrowings"],
+        ["2004","Current Portion — Long Term Loan","Liability",0,25000000,25000000,25000000,"Current Portion of Long-Term Loan"],
+        ["2005","Income Tax Payable","Liability",0,11550000,11550000,8500000,"Income Tax Payable"],
+        ["2101","Long-Term Financing — HBL","Liability",0,225000000,225000000,250000000,"Long-Term Borrowings"],
+        ["2102","Deferred Tax Liability","Liability",0,38500000,38500000,35000000,"Deferred Tax"],
+        ["3001","Ordinary Share Capital","Equity",0,500000000,500000000,500000000,"Share Capital"],
+        ["3002","Capital Reserve","Equity",0,35000000,35000000,35000000,"Capital Reserve"],
+        ["3003","Revenue Reserve / General Reserve","Equity",0,50000000,50000000,30000000,"Revenue Reserve"],
+        ["3004","Unappropriated Profit (Opening)","Equity",0,45225000,45225000,30500000,"Retained Earnings"],
+        ["4001","Sales — Local (Net of Returns)","Revenue",0,625250000,625250000,530000000,"Revenue from Contracts with Customers"],
+        ["4002","Sales — Export (FOB)","Revenue",0,250000000,250000000,212100000,"Revenue from Contracts with Customers"],
+        ["4003","Other Income — Exchange Gain","Revenue",0,2500000,2500000,1800000,"Other Income"],
+        ["5001","Raw Material Consumed","Cost of Sales",435000000,0,435000000,368000000,"Cost of Sales"],
+        ["5002","Direct Labour — Wages","Cost of Sales",98500000,0,98500000,83000000,"Cost of Sales"],
+        ["5003","Factory Overheads","Cost of Sales",79000000,0,79000000,67000000,"Cost of Sales"],
+        ["6001","Salaries — Administrative Staff","Operating Expense",42000000,0,42000000,36000000,"Administrative Expenses"],
+        ["6002","Salaries — Sales & Marketing","Operating Expense",18500000,0,18500000,15500000,"Selling & Distribution Expenses"],
+        ["6003","Rent, Rates & Utilities","Operating Expense",15200000,0,15200000,12800000,"Administrative Expenses"],
+        ["6004","Depreciation — Admin Allocation","Operating Expense",8500000,0,8500000,7200000,"Administrative Expenses"],
+        ["6005","Marketing & Advertising","Operating Expense",6800000,0,6800000,5500000,"Selling & Distribution Expenses"],
+        ["6006","Traveling & Conveyance","Operating Expense",3250000,0,3250000,2800000,"Administrative Expenses"],
+        ["6007","Legal & Professional Charges","Operating Expense",2500000,0,2500000,2200000,"Administrative Expenses"],
+        ["7001","Bank Charges & Commission","Finance Cost",5800000,0,5800000,5200000,"Finance Costs"],
+        ["7002","Interest on Long-Term Financing","Finance Cost",18700000,0,18700000,20500000,"Finance Costs"],
+        ["8001","Income Tax — Current Year","Tax",38500000,0,38500000,32000000,"Income Tax"],
+        ["8002","Deferred Tax — Charge","Tax",3275000,0,3275000,2800000,"Income Tax"],
+      ];
+      tbData.forEach((row, i) => {
+        const r = ws.getRow(i + 4); r.height = 18;
+        edit(r.getCell(1), row[0]);
+        edit(r.getCell(2), row[1]);
+        edit(r.getCell(3), row[2]);
+        edit(r.getCell(4), row[3] || null, fmtNum);
+        edit(r.getCell(5), row[4] || null, fmtNum);
+        edit(r.getCell(6), row[5], fmtNum);
+        edit(r.getCell(7), row[6], fmtNum);
+        edit(r.getCell(8), row[7]);
+      });
+      const totRow = tbData.length + 4;
+      const debitTotal = tbData.reduce((s, r) => s + r[3], 0);
+      const creditTotal = tbData.reduce((s, r) => s + r[4], 0);
+      ws.getRow(totRow).height = 20;
+      total(ws.getRow(totRow).getCell(1), "TOTAL"); ws.mergeCells(`A${totRow}:C${totRow}`);
+      total(ws.getRow(totRow).getCell(4), debitTotal);
+      total(ws.getRow(totRow).getCell(5), creditTotal);
+      total(ws.getRow(totRow).getCell(6), debitTotal - creditTotal);
+      await protect(ws);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // SHEET 4 — GENERAL LEDGER
+    // ══════════════════════════════════════════════════════════════════════════
+    {
+      const ws = wb.addWorksheet("General Ledger", { properties: { tabColor: { argb: "FF0891B2" } } });
+      ws.columns = [
+        { width: 14 }, { width: 14 }, { width: 36 }, { width: 14 },
+        { width: 44 }, { width: 18 }, { width: 18 }, { width: 20 }, { width: 18 },
+      ];
+      hdr(ws.getCell("A1"), "GENERAL LEDGER — Pak Textile Holdings (Pvt) Ltd  |  FY 2024-25"); ws.mergeCells("A1:I1"); ws.getRow(1).height = 26;
+      note(ws.getCell("A2"), "One row per journal line. All yellow cells are editable. Add rows as needed. Running Balance = cumulative balance for each account."); ws.mergeCells("A2:I2"); ws.getRow(2).height = 24;
+      ["Entry Date","Account Code","Account Name","Voucher No.","Narration / Description","Debit (PKR)","Credit (PKR)","Running Balance (PKR)","Reference"].forEach((c, i) => hdr(ws.getRow(3).getCell(i+1), c));
+      ws.getRow(3).height = 22;
+
+      const glData: [string,string,string,string,string,number,number,number,string][] = [
+        ["2024-07-01","4001","Sales — Local","SIV-0001","July 2024 Local Sales — Invoice Batch 1",0,52104167,572895833,"INV-BATCH-01"],
+        ["2024-07-01","1101","Trade Debtors — Local","SIV-0001","July 2024 Local Sales — Invoice Batch 1",52104167,0,150604167,"INV-BATCH-01"],
+        ["2024-07-05","5001","Raw Material Consumed","JV-0701","July 2024 RM Consumption — Production Run",36250000,0,471250000,"WO-JUL-01"],
+        ["2024-07-05","1201","Raw Material Stock","JV-0701","July 2024 RM Consumption — Production Run",0,36250000,58750000,"WO-JUL-01"],
+        ["2024-07-10","6001","Salaries — Administrative","CPV-0710","July 2024 Admin Salaries — 87 Staff",3500000,0,45500000,"SAL-ADMIN-JUL"],
+        ["2024-07-10","1002","Bank — HBL Current Account","CPV-0710","July 2024 Admin Salaries — 87 Staff",0,3500000,42300000,"SAL-ADMIN-JUL"],
+        ["2024-07-15","2001","Trade Creditors","BPV-0715","Payment to Sitara Chemicals Ltd",12500000,0,72500000,"PO-2024-089"],
+        ["2024-07-15","1002","Bank — HBL Current Account","BPV-0715","Payment to Sitara Chemicals Ltd",0,12500000,29800000,"PO-2024-089"],
+        ["2024-07-20","1004","Bank — UBL Export Account","BPV-0720","Export Proceeds — Invoice EXP-0045 (USD 88,000)",24500000,0,63700000,"EXP-0045"],
+        ["2024-07-20","4002","Sales — Export (FOB)","BPV-0720","Export Proceeds — Invoice EXP-0045",0,24500000,225500000,"EXP-0045"],
+        ["2024-07-25","7002","Interest on Long-Term Financing","JV-0725","HBL LT Loan Interest — July 2024",1558333,0,20258333,"LOAN-HBL-01"],
+        ["2024-07-25","2101","Long-Term Financing — HBL","JV-0725","HBL LT Loan Interest — July 2024",0,1558333,226558333,"LOAN-HBL-01"],
+        ["2024-07-31","5002","Direct Labour — Wages","CPV-0731","July 2024 Worker Wages — 263 Workers",8208333,0,106708333,"WAGES-JUL"],
+        ["2024-07-31","1002","Bank — HBL Current Account","CPV-0731","July 2024 Worker Wages — 263 Workers",0,8208333,21591667,"WAGES-JUL"],
+        ["2024-08-05","1201","Raw Material Stock","GRN-0801","Receipt: Indus Dyeing — Cotton 45,000 Kg",18750000,0,77500000,"GRN-0801"],
+        ["2024-08-05","2001","Trade Creditors","GRN-0801","Receipt: Indus Dyeing — Cotton 45,000 Kg",0,18750000,91250000,"GRN-0801"],
+        ["2024-08-15","1101","Trade Debtors — Local","BRV-0815","Receipt: Kohinoor Mills — Inv 1012",28500000,0,179104167,"INV-1012"],
+        ["2024-08-15","1002","Bank — HBL Current Account","BRV-0815","Receipt: Kohinoor Mills — Inv 1012",0,28500000,50291667,"BRV-0815"],
+        ["2024-09-30","6003","Rent, Rates & Utilities","CPV-0930","Q1 Factory Rent — Sundar Estate (3 months)",3800000,0,19000000,"RENT-Q1"],
+        ["2024-09-30","1002","Bank — HBL Current Account","CPV-0930","Q1 Factory Rent — Sundar Estate (3 months)",0,3800000,46491667,"RENT-Q1"],
+        ["2024-10-31","6005","Marketing & Advertising","CPV-1031","H1 Marketing Campaign — Textile Expo 2024",1700000,0,8500000,"MKTG-001"],
+        ["2024-10-31","1003","Bank — MCB Operating Account","CPV-1031","H1 Marketing Campaign — Textile Expo 2024",0,1700000,26650000,"MKTG-001"],
+        ["2024-12-31","8001","Income Tax — Current Year","JV-1231","H1 Advance Tax Provision — Dec 2024",19250000,0,57750000,"TAX-H1"],
+        ["2024-12-31","2005","Income Tax Payable","JV-1231","H1 Advance Tax Provision — Dec 2024",0,19250000,30800000,"TAX-H1"],
+        ["2025-03-31","1304","Capital Work in Progress","JV-0331","New Weaving Line — Progress Billing Q3",8000000,0,56000000,"CWIP-2025-01"],
+        ["2025-03-31","2101","Long-Term Financing — HBL","JV-0331","Drawdown: New Weaving Line Financing",0,8000000,234558333,"CWIP-2025-01"],
+        ["2025-06-30","8002","Deferred Tax — Charge","JV-0630","FY2025 Deferred Tax Charge — Year End",3275000,0,3275000,"DT-2025"],
+        ["2025-06-30","2102","Deferred Tax Liability","JV-0630","FY2025 Deferred Tax — Closing Balance",0,3275000,41775000,"DT-2025"],
+        ["2025-06-30","3003","Revenue Reserve / General Reserve","JV-0631","Transfer to General Reserve — FY2025",20000000,0,70000000,"TR-GR-2025"],
+        ["2025-06-30","3004","Unappropriated Profit (Opening)","JV-0631","Transfer to General Reserve — FY2025",0,20000000,65225000,"TR-GR-2025"],
+      ];
+      glData.forEach((row, i) => {
+        const r = ws.getRow(i + 4); r.height = 18;
+        edit(r.getCell(1), row[0], fmtDate);
+        edit(r.getCell(2), row[1]);
+        edit(r.getCell(3), row[2]);
+        edit(r.getCell(4), row[3]);
+        edit(r.getCell(5), row[4]);
+        edit(r.getCell(6), row[5] || null, fmtNum);
+        edit(r.getCell(7), row[6] || null, fmtNum);
+        edit(r.getCell(8), row[7], fmtNum);
+        edit(r.getCell(9), row[8]);
+      });
+      await protect(ws);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // SHEET 5 — BALANCE SHEET
+    // ══════════════════════════════════════════════════════════════════════════
+    {
+      const ws = wb.addWorksheet("Balance Sheet", { properties: { tabColor: { argb: "FFD97706" } } });
+      ws.columns = [{ width: 6 }, { width: 46 }, { width: 10 }, { width: 22 }, { width: 22 }, { width: 28 }];
+      hdr(ws.getCell("B1"), "BALANCE SHEET — Pak Textile Holdings (Pvt) Ltd"); ws.mergeCells("B1:F1"); ws.getRow(1).height = 26;
+      hdr(ws.getCell("B2"), "As at 30 June 2025"); ws.mergeCells("B2:F2"); ws.getRow(2).height = 20;
+      hdr(ws.getCell("B3"), "Line Item"); hdr(ws.getCell("C3"), "Note"); hdr(ws.getCell("D3"), "FY 2024-25 (PKR)"); hdr(ws.getCell("E3"), "FY 2023-24 (PKR)"); hdr(ws.getCell("F3"), "Section");
+      ws.getRow(3).height = 22;
+
+      type BSRow = ["sect"|"lbl"|"edit"|"total"|"blank", string, string, number|null, number|null, string];
+      const bsRows: BSRow[] = [
+        ["sect","NON-CURRENT ASSETS","",null,null,""],
+        ["lbl","Property, Plant & Equipment (Net)","4",null,null,"Non-Current Assets"],
+        ["edit","  — Plant & Machinery (Net of Depreciation)","",335000000,313000000,"Non-Current Assets"],
+        ["edit","  — Land & Building","",285000000,285000000,"Non-Current Assets"],
+        ["total","  Sub-total PPE","",620000000,598000000,""],
+        ["edit","Capital Work in Progress","5",48000000,32000000,"Non-Current Assets"],
+        ["edit","Intangible Assets — ERP System (Net)","6",12000000,14500000,"Non-Current Assets"],
+        ["total","TOTAL NON-CURRENT ASSETS","",680000000,644500000,""],
+        ["blank","","",null,null,""],
+        ["sect","CURRENT ASSETS","",null,null,""],
+        ["edit","Inventories — Raw Material","7",95000000,78000000,"Current Assets"],
+        ["edit","Inventories — Work in Process","7",42000000,36000000,"Current Assets"],
+        ["edit","Inventories — Finished Goods","7",88500000,72000000,"Current Assets"],
+        ["total","  Total Inventories","",225500000,186000000,""],
+        ["edit","Trade Debtors (Net of Provision)","8",145000000,120200000,"Current Assets"],
+        ["edit","Advances, Deposits & Prepayments","9",28500000,22000000,"Current Assets"],
+        ["edit","Short-Term Investments","10",35000000,25000000,"Current Assets"],
+        ["edit","Advance Income Tax","11",30225000,25500000,"Current Assets"],
+        ["edit","Cash and Bank Balances","12",115800000,92200000,"Current Assets"],
+        ["total","TOTAL CURRENT ASSETS","",580025000,470900000,""],
+        ["blank","","",null,null,""],
+        ["total","TOTAL ASSETS","",1260025000,1115400000,""],
+        ["blank","","",null,null,""],
+        ["sect","EQUITY","",null,null,""],
+        ["edit","Ordinary Share Capital","13",500000000,500000000,"Equity"],
+        ["edit","Capital Reserve","14",35000000,35000000,"Equity"],
+        ["edit","Revenue Reserve / General Reserve","15",50000000,30000000,"Equity"],
+        ["edit","Unappropriated Profit — Current Year","16",97225000,45225000,"Equity"],
+        ["total","TOTAL EQUITY","",682225000,610225000,""],
+        ["blank","","",null,null,""],
+        ["sect","NON-CURRENT LIABILITIES","",null,null,""],
+        ["edit","Long-Term Financing — HBL","17",225000000,250000000,"Non-Current Liabilities"],
+        ["edit","Deferred Tax Liability","18",38500000,35000000,"Non-Current Liabilities"],
+        ["total","TOTAL NON-CURRENT LIABILITIES","",263500000,285000000,""],
+        ["blank","","",null,null,""],
+        ["sect","CURRENT LIABILITIES","",null,null,""],
+        ["edit","Trade and Other Payables","19",85000000,70000000,"Current Liabilities"],
+        ["edit","Accrued Liabilities","20",42500000,35000000,"Current Liabilities"],
+        ["edit","Short-Term Borrowings — Running Finance","21",120000000,95000000,"Current Liabilities"],
+        ["edit","Current Portion of Long-Term Loan","22",25000000,25000000,"Current Liabilities"],
+        ["edit","Income Tax Payable","23",41800000,30175000,"Current Liabilities"],
+        ["total","TOTAL CURRENT LIABILITIES","",314300000,255175000,""],
+        ["blank","","",null,null,""],
+        ["total","TOTAL LIABILITIES","",577800000,540175000,""],
+        ["total","TOTAL EQUITY & LIABILITIES","",1260025000,1150400000,""],
+      ];
+      bsRows.forEach((row, i) => {
+        const r = ws.getRow(i + 4); r.height = row[0] === "blank" ? 8 : 18;
+        if (row[0] === "blank") return;
+        if (row[0] === "sect") { sect(r.getCell(2), row[1]); ws.mergeCells(`B${r.number}:F${r.number}`); return; }
+        const [type, label, noteRef, cur, prev, section] = row;
+        if (type === "lbl") { lbl(r.getCell(2), label); locked(r.getCell(3), noteRef); locked(r.getCell(4), ""); locked(r.getCell(5), ""); locked(r.getCell(6), section); }
+        else if (type === "edit") { locked(r.getCell(2), label); lbl(r.getCell(3), noteRef); edit(r.getCell(4), cur, fmtNum); edit(r.getCell(5), prev, fmtNum); edit(r.getCell(6), section); }
+        else if (type === "total") { total(r.getCell(2), label); ws.mergeCells(`B${r.number}:C${r.number}`); total(r.getCell(4), cur); total(r.getCell(5), prev); locked(r.getCell(6), ""); }
+      });
+      await protect(ws);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // SHEET 6 — PROFIT & LOSS
+    // ══════════════════════════════════════════════════════════════════════════
+    {
+      const ws = wb.addWorksheet("Profit & Loss", { properties: { tabColor: { argb: "FF0F766E" } } });
+      ws.columns = [{ width: 6 }, { width: 46 }, { width: 10 }, { width: 22 }, { width: 22 }];
+      hdr(ws.getCell("B1"), "PROFIT & LOSS ACCOUNT — Pak Textile Holdings (Pvt) Ltd"); ws.mergeCells("B1:E1"); ws.getRow(1).height = 26;
+      hdr(ws.getCell("B2"), "For the Year Ended 30 June 2025"); ws.mergeCells("B2:E2"); ws.getRow(2).height = 20;
+      hdr(ws.getCell("B3"), "Line Item"); hdr(ws.getCell("C3"), "Note"); hdr(ws.getCell("D3"), "FY 2024-25 (PKR)"); hdr(ws.getCell("E3"), "FY 2023-24 (PKR)");
+      ws.getRow(3).height = 22;
+
+      type PLRow = ["sect"|"edit"|"total"|"blank", string, string, number|null, number|null];
+      const plRows: PLRow[] = [
+        ["edit","Revenue — Local Sales (Net)","20",625250000,530000000],
+        ["edit","Revenue — Export Sales (FOB)","20",250000000,212100000],
+        ["total","TOTAL REVENUE","",875250000,742100000],
+        ["blank","","",null,null],
+        ["sect","COST OF SALES","",null,null],
+        ["edit","  Raw Material Consumed","21",435000000,368000000],
+        ["edit","  Direct Labour — Wages","21",98500000,83000000],
+        ["edit","  Factory Overheads","21",79000000,67000000],
+        ["total","TOTAL COST OF SALES","",612500000,518000000],
+        ["blank","","",null,null],
+        ["total","GROSS PROFIT","",262750000,224100000],
+        ["blank","","",null,null],
+        ["sect","OPERATING EXPENSES","",null,null],
+        ["edit","  Administrative Expenses — Salaries","22",42000000,36000000],
+        ["edit","  Administrative Expenses — Rent & Utilities","22",15200000,12800000],
+        ["edit","  Administrative Expenses — Depreciation","22",8500000,7200000],
+        ["edit","  Administrative Expenses — Traveling","22",3250000,2800000],
+        ["edit","  Administrative Expenses — Legal & Professional","22",2500000,2200000],
+        ["edit","  Selling Expenses — Sales Salaries","23",18500000,15500000],
+        ["edit","  Selling Expenses — Marketing & Advertising","23",6800000,5500000],
+        ["total","TOTAL OPERATING EXPENSES","",96750000,82000000],
+        ["blank","","",null,null],
+        ["total","OPERATING PROFIT (EBIT)","",166000000,142100000],
+        ["blank","","",null,null],
+        ["edit","Other Income — Foreign Exchange Gain","24",2500000,1800000],
+        ["edit","Finance Costs — Bank Charges","25",5800000,5200000],
+        ["edit","Finance Costs — Interest on LT Loans","25",18700000,20500000],
+        ["total","PROFIT BEFORE TAX","",144000000,118200000],
+        ["blank","","",null,null],
+        ["edit","Income Tax — Current Year","26",38500000,32000000],
+        ["edit","Income Tax — Deferred","26",3275000,2800000],
+        ["total","TOTAL TAX EXPENSE","",41775000,34800000],
+        ["blank","","",null,null],
+        ["total","PROFIT AFTER TAX (NET PROFIT)","",102225000,83400000],
+        ["blank","","",null,null],
+        ["edit","Other Comprehensive Income","",0,0],
+        ["total","TOTAL COMPREHENSIVE INCOME","",102225000,83400000],
+        ["blank","","",null,null],
+        ["edit","Earnings Per Share (Basic) — PKR","",20.45,16.68],
+      ];
+      plRows.forEach((row, i) => {
+        const r = ws.getRow(i + 4); r.height = row[0] === "blank" ? 8 : 18;
+        if (row[0] === "blank") return;
+        if (row[0] === "sect") { sect(r.getCell(2), row[1]); ws.mergeCells(`B${r.number}:E${r.number}`); return; }
+        const [type, label, noteRef, cur, prev] = row;
+        if (type === "edit") { locked(r.getCell(2), label); lbl(r.getCell(3), noteRef); edit(r.getCell(4), cur, fmtNum); edit(r.getCell(5), prev, fmtNum); }
+        else if (type === "total") { total(r.getCell(2), label); ws.mergeCells(`B${r.number}:C${r.number}`); total(r.getCell(4), cur); total(r.getCell(5), prev); }
+      });
+      await protect(ws);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // SHEET 7 — BANK STATEMENT
+    // ══════════════════════════════════════════════════════════════════════════
+    {
+      const ws = wb.addWorksheet("Bank Statement", { properties: { tabColor: { argb: "FF9333EA" } } });
+      ws.columns = [
+        { width: 14 }, { width: 44 }, { width: 20 }, { width: 16 },
+        { width: 16 }, { width: 20 }, { width: 26 }, { width: 22 },
+      ];
+      hdr(ws.getCell("A1"), "BANK STATEMENT — Pak Textile Holdings (Pvt) Ltd  |  HBL Current Account No. 01430007900003"); ws.mergeCells("A1:H1"); ws.getRow(1).height = 26;
+      note(ws.getCell("A2"), "One row per transaction. Add one separate sheet per bank account. All yellow cells are editable."); ws.mergeCells("A2:H2"); ws.getRow(2).height = 22;
+      ["Date","Narration / Description","Cheque / Ref No.","Debit (PKR)","Credit (PKR)","Balance (PKR)","Bank Name","Account Number"].forEach((c, i) => hdr(ws.getRow(3).getCell(i+1), c));
+      ws.getRow(3).height = 22;
+
+      const bankData: [string,string,string,number,number,number,string,string][] = [
+        ["2024-07-01","Opening Balance b/f","",0,0,38500000,"Habib Bank Limited","01430007900003"],
+        ["2024-07-05","Sales Proceeds — Kohinoor Mills Inv 0987","CHQ-00112",0,28500000,67000000,"Habib Bank Limited","01430007900003"],
+        ["2024-07-10","Salary — Admin Staff July 2024","TT-00713",3500000,0,63500000,"Habib Bank Limited","01430007900003"],
+        ["2024-07-12","Supplier Payment — Sitara Chemicals","CHQ-00114",12500000,0,51000000,"Habib Bank Limited","01430007900003"],
+        ["2024-07-18","Export Proceeds (from UBL — transfer)","IBFT-071",0,15000000,66000000,"Habib Bank Limited","01430007900003"],
+        ["2024-07-25","Factory Utility Bill — LESCO","AUTO-PAY",1850000,0,64150000,"Habib Bank Limited","01430007900003"],
+        ["2024-07-28","Worker Wages — July 2024","TT-00720",8208333,0,55941667,"Habib Bank Limited","01430007900003"],
+        ["2024-07-31","Bank Charges — July 2024","BC-JUL24",38500,0,55903167,"Habib Bank Limited","01430007900003"],
+        ["2024-07-31","Mark-up earned on deposit","MARKUP",0,248000,56151167,"Habib Bank Limited","01430007900003"],
+        ["2024-08-07","Running Finance Drawdown — RF-0824","RF-0824",0,10000000,66151167,"Habib Bank Limited","01430007900003"],
+        ["2024-08-15","Sales Proceeds — Al-Baraka Textiles","BRV-0815",0,42500000,108651167,"Habib Bank Limited","01430007900003"],
+        ["2024-08-20","Advance Tax (u/s 147) — Q1","AT-Q1",9000000,0,99651167,"Habib Bank Limited","01430007900003"],
+        ["2024-09-30","Q1 Factory Rent — Sundar Estate","CHQ-00918",3800000,0,95851167,"Habib Bank Limited","01430007900003"],
+        ["2024-10-15","Sales Proceeds — Gulshan Fabrics Inv 1105","BRV-1015",0,35000000,130851167,"Habib Bank Limited","01430007900003"],
+        ["2024-10-31","Loan Installment — HBL LT Loan","EMI-OCT",8333333,0,122517834,"Habib Bank Limited","01430007900003"],
+        ["2024-11-30","Interest on LT Loan — November","INT-NOV",1558333,0,120959501,"Habib Bank Limited","01430007900003"],
+        ["2024-12-31","Advance Tax (u/s 147) — Q2","AT-Q2",9000000,0,111959501,"Habib Bank Limited","01430007900003"],
+        ["2025-01-15","Sales Proceeds — North Star Garments","BRV-0115",0,68000000,179959501,"Habib Bank Limited","01430007900003"],
+        ["2025-03-31","Advance Tax (u/s 147) — Q3","AT-Q3",9000000,0,170959501,"Habib Bank Limited","01430007900003"],
+        ["2025-06-30","Closing Balance","",0,0,45800000,"Habib Bank Limited","01430007900003"],
+      ];
+      bankData.forEach((row, i) => {
+        const r = ws.getRow(i + 4); r.height = 18;
+        edit(r.getCell(1), row[0], fmtDate);
+        edit(r.getCell(2), row[1]);
+        edit(r.getCell(3), row[2]);
+        edit(r.getCell(4), row[3] || null, fmtNum);
+        edit(r.getCell(5), row[4] || null, fmtNum);
+        edit(r.getCell(6), row[5], fmtNum);
+        edit(r.getCell(7), row[6]);
+        edit(r.getCell(8), row[7]);
+      });
+      await protect(ws);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // SHEET 8 — TAX DATA
+    // ══════════════════════════════════════════════════════════════════════════
+    {
+      const ws = wb.addWorksheet("Tax Data", { properties: { tabColor: { argb: "FFDC2626" } } });
+      ws.columns = [{ width: 6 }, { width: 42 }, { width: 30 }, { width: 38 }];
+      hdr(ws.getCell("B1"), "TAX DATA — Pak Textile Holdings (Pvt) Ltd  |  FY 2024-25"); ws.mergeCells("B1:D1"); ws.getRow(1).height = 26;
+      hdr(ws.getCell("B2"), "Field"); hdr(ws.getCell("C2"), "▶  Replace yellow cells with actual figures  ◀", true); hdr(ws.getCell("D2"), "Notes");
+      ws.getRow(2).height = 20;
+
+      const taxFields: [string, any, string][] = [
+        ["Tax Period From", "2024-07-01", "YYYY-MM-DD"],
+        ["Tax Period To", "2025-06-30", "YYYY-MM-DD"],
+        ["", "", ""],
+        ["SALES TAX (GST)", "", ""],
+        ["Output Tax (Sales Tax Charged on Sales) PKR", 105030000, "17% on local taxable sales"],
+        ["Input Tax (ST Paid on Purchases) PKR", 74500000, "Input tax claimable"],
+        ["Net Sales Tax Payable / (Refundable) PKR", 30530000, "Output Tax minus Input Tax"],
+        ["", "", ""],
+        ["INCOME TAX", "", ""],
+        ["Income Tax Provision (Current Year) PKR", 38500000, "Charged to P&L"],
+        ["Advance Tax Paid (u/s 147) PKR", 27000000, "Q1+Q2+Q3+Q4 installments"],
+        ["WHT Deducted by Customers PKR", 3225000, "u/s 153 — deducted at source"],
+        ["Net Tax Payable / (Advance) at Year End PKR", 8275000, "Provision minus advance & WHT"],
+        ["", "", ""],
+        ["RETURN FILING", "", ""],
+        ["Annual Income Tax Return Filing Date", "2025-12-31", "Due date for companies"],
+        ["Monthly Sales Tax Return — Jul 2024", "2024-08-18", "Filed (YYYY-MM-DD)"],
+        ["Monthly Sales Tax Return — Aug 2024", "2024-09-18", ""],
+        ["Monthly Sales Tax Return — Sep 2024", "2024-10-18", ""],
+        ["Monthly Sales Tax Return — Oct 2024", "2024-11-18", ""],
+        ["Monthly Sales Tax Return — Nov 2024", "2024-12-18", ""],
+        ["Monthly Sales Tax Return — Dec 2024", "2025-01-18", ""],
+        ["Monthly Sales Tax Return — Jan 2025", "2025-02-18", ""],
+        ["Monthly Sales Tax Return — Feb 2025", "2025-03-18", ""],
+        ["Monthly Sales Tax Return — Mar 2025", "2025-04-18", ""],
+        ["Monthly Sales Tax Return — Apr 2025", "2025-05-18", ""],
+        ["Monthly Sales Tax Return — May 2025", "2025-06-18", ""],
+        ["Monthly Sales Tax Return — Jun 2025", "2025-07-18", ""],
+        ["", "", ""],
+        ["WITHHOLDING TAX AGENTS", "", ""],
+        ["Major WHT Agent 1", "Kohinoor Textile Mills Ltd", "Customer deducting u/s 153"],
+        ["Major WHT Agent 2", "Al-Baraka Textiles (Pvt) Ltd", ""],
+        ["Major WHT Agent 3", "North Star Garments Ltd", ""],
+        ["", "", ""],
+        ["OTHER", "", ""],
+        ["Tax Notices Received", "None outstanding", "Reference numbers if any"],
+        ["Appeal Status", "None", "Pending / Decided / None"],
+        ["Annexures Filed", "Annex-B (WHT Agents), Annex-C (Imports), Annex-G (Exports)", "List Annexures submitted"],
+      ];
+      let rowIdx = 3;
+      taxFields.forEach(([field, val, hint]) => {
+        const r = ws.getRow(rowIdx++); r.height = 18;
+        if (field === "" && val === "") { r.height = 8; return; }
+        if (val === "" && hint === "") { sect(r.getCell(2), field); ws.mergeCells(`B${r.number}:D${r.number}`); return; }
+        lbl(r.getCell(2), field);
+        edit(r.getCell(3), val, typeof val === "number" ? fmtNum : undefined);
+        note(r.getCell(4), hint);
+      });
+      await protect(ws);
+    }
 
     // ── Serialize & send ─────────────────────────────────────────────────────
-    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", 'attachment; filename="ANA_Upload_Template.xlsx"');
-    res.send(buf);
+    await wb.xlsx.write(res);
+    res.end();
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
