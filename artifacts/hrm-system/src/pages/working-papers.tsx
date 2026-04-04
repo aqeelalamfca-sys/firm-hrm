@@ -64,6 +64,8 @@ export default function WorkingPapers() {
   const [newEntityType, setNewEntityType] = useState("Private Limited");
   const [newNtn, setNewNtn] = useState("");
   const [newStrn, setNewStrn] = useState("");
+  const [newPeriodStart, setNewPeriodStart] = useState("");
+  const [newPeriodEnd, setNewPeriodEnd] = useState("");
   const [newFramework, setNewFramework] = useState("IFRS");
   const [newEngagementType, setNewEngagementType] = useState("statutory_audit");
 
@@ -113,7 +115,16 @@ export default function WorkingPapers() {
   };
 
   const createSession = async () => {
-    if (!newClientName.trim()) { toast({ title: "Enter client name", variant: "destructive" }); return; }
+    const missing: string[] = [];
+    if (!newClientName.trim()) missing.push("Client Name");
+    if (!newYear.trim()) missing.push("Engagement Year");
+    if (!newNtn.trim()) missing.push("NTN");
+    if (!newPeriodStart) missing.push("Period Start");
+    if (!newPeriodEnd) missing.push("Period End");
+    if (missing.length > 0) {
+      toast({ title: "Required fields missing", description: missing.join(", "), variant: "destructive" });
+      return;
+    }
     try {
       setLoading(true);
       const res = await fetch(`${API_BASE}/working-papers/sessions`, {
@@ -122,8 +133,10 @@ export default function WorkingPapers() {
           clientName: newClientName,
           engagementYear: newYear,
           entityType: newEntityType,
-          ntn: newNtn || undefined,
+          ntn: newNtn,
           strn: newStrn || undefined,
+          periodStart: newPeriodStart,
+          periodEnd: newPeriodEnd,
           reportingFramework: newFramework,
           engagementType: newEngagementType,
         }),
@@ -134,6 +147,8 @@ export default function WorkingPapers() {
         setNewClientName("");
         setNewNtn("");
         setNewStrn("");
+        setNewPeriodStart("");
+        setNewPeriodEnd("");
         await fetchSessions();
         await fetchSession(session.id);
       }
@@ -487,7 +502,7 @@ export default function WorkingPapers() {
               <Input placeholder="2025" value={newYear} onChange={e => setNewYear(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">NTN (National Tax Number)</label>
+              <label className="text-xs font-medium text-muted-foreground">NTN (National Tax Number) *</label>
               <Input placeholder="e.g. 1234567-8" value={newNtn} onChange={e => setNewNtn(e.target.value)} />
             </div>
             <div className="space-y-1">
@@ -495,7 +510,15 @@ export default function WorkingPapers() {
               <Input placeholder="e.g. 32-00-1234-567-89" value={newStrn} onChange={e => setNewStrn(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Reporting Framework</label>
+              <label className="text-xs font-medium text-muted-foreground">Period Start *</label>
+              <Input type="date" value={newPeriodStart} onChange={e => setNewPeriodStart(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Period End *</label>
+              <Input type="date" value={newPeriodEnd} onChange={e => setNewPeriodEnd(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Reporting Framework *</label>
               <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newFramework} onChange={e => setNewFramework(e.target.value)}>
                 <option value="IFRS">IFRS (Full)</option>
                 <option value="IFRS for SMEs">IFRS for SMEs</option>
@@ -505,7 +528,7 @@ export default function WorkingPapers() {
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Engagement Type</label>
+              <label className="text-xs font-medium text-muted-foreground">Engagement Type *</label>
               <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newEngagementType} onChange={e => setNewEngagementType(e.target.value)}>
                 <option value="statutory_audit">Statutory Audit</option>
                 <option value="limited_review">Limited Review / Review Engagement</option>
@@ -566,9 +589,9 @@ export default function WorkingPapers() {
             {activeSession.entityType && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium">{activeSession.entityType}</span>}
           </div>
           <p className="text-sm text-muted-foreground">
-            Year: {activeSession.engagementYear} — {activeSession.reportingFramework || "IFRS"}
-            {activeSession.ntn && <span className="ml-2">— NTN: {activeSession.ntn}</span>}
-            {activeSession.strn && <span className="ml-1">— STRN: {activeSession.strn}</span>}
+            {activeSession.engagementYear} — {activeSession.reportingFramework || "IFRS"}
+            {activeSession.periodStart && activeSession.periodEnd && <span className="ml-1">— Period: {activeSession.periodStart} to {activeSession.periodEnd}</span>}
+            {activeSession.ntn && <span className="ml-1">— NTN: {activeSession.ntn}</span>}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => fetchExceptions()}>

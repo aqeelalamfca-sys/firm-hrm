@@ -187,17 +187,19 @@ router.get("/sessions", async (_req: Request, res: Response) => {
 
 router.post("/sessions", async (req: Request, res: Response) => {
   try {
-    const { clientName, engagementYear, entityType, ntn, strn, reportingFramework, engagementType } = req.body;
-    if (!clientName || !engagementYear) {
-      return res.status(400).json({ error: "Client name and engagement year are required" });
+    const { clientName, engagementYear, entityType, ntn, strn, periodStart, periodEnd, reportingFramework, engagementType } = req.body;
+    if (!clientName || !engagementYear || !entityType || !ntn || !periodStart || !periodEnd || !reportingFramework || !engagementType) {
+      return res.status(400).json({ error: "All fields are required except STRN" });
     }
     const [session] = await db.insert(wpSessionsTable).values({
       clientName, engagementYear,
-      entityType: entityType || null,
-      ntn: ntn || null,
+      entityType,
+      ntn,
       strn: strn || null,
-      reportingFramework: reportingFramework || "IFRS",
-      engagementType: engagementType || "statutory_audit",
+      periodStart,
+      periodEnd,
+      reportingFramework,
+      engagementType,
       status: "upload",
     }).returning();
 
@@ -740,8 +742,10 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
     if (session.strn) sessionMetaMap["strn"] = session.strn;
     if (session.reportingFramework) sessionMetaMap["reporting_framework"] = session.reportingFramework;
     if (session.engagementType) sessionMetaMap["engagement_type"] = session.engagementType;
-    if (session.engagementYear) sessionMetaMap["financial_year_end"] = `June 30, ${session.engagementYear}`;
-    if (session.engagementYear) sessionMetaMap["reporting_period_end"] = `June 30, ${session.engagementYear}`;
+    if (session.periodStart) sessionMetaMap["reporting_period_start"] = session.periodStart;
+    if (session.periodEnd) sessionMetaMap["reporting_period_end"] = session.periodEnd;
+    if (session.periodStart) sessionMetaMap["financial_year_start"] = session.periodStart;
+    if (session.periodEnd) sessionMetaMap["financial_year_end"] = session.periodEnd;
     if (session.strn) sessionMetaMap["sales_tax_applicable"] = "true";
 
     for (const [code, value] of Object.entries(sessionMetaMap)) {
