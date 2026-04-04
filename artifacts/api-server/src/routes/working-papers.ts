@@ -15,6 +15,8 @@ import {
   analyticsSessionTable, controlMatrixTable, evidenceLogTable, reconEngineTable,
   wpJournalImportTable, wpFsExtractionTable, wpFsMappingTable,
   wpLibraryMasterTable, wpLibrarySessionTable,
+  wpTriggerRulesTable, wpValidationResultTable, wpExceptionsTable,
+  wpSessionLockTable, wpOutputJobTable,
 } from "@workspace/db";
 import { WP_LIBRARY, type WpLibraryEntry } from "../data/wp-library-seed";
 import { VARIABLE_DEFINITIONS, EXTRACTION_FIELD_TO_VARIABLE_MAP, VARIABLE_GROUPS, DEPENDENCY_RULES } from "../data/variable-definitions";
@@ -22,7 +24,7 @@ import {
   runTBEngine, runGLEngine, runReconciliation, checkFinalEnforcement,
   PAKISTAN_COA, mapFsToCoa,
 } from "./tb-gl-engine";
-import { eq, and, inArray, asc } from "drizzle-orm";
+import { eq, and, inArray, asc, sql } from "drizzle-orm";
 import OpenAI from "openai";
 import PDFDocument from "pdfkit";
 // @ts-ignore
@@ -4761,6 +4763,526 @@ router.patch("/sessions/:id/wp-library-session/:wpCode", async (req: Request, re
       .where(and(eq(wpLibrarySessionTable.sessionId, sessionId), eq(wpLibrarySessionTable.wpCode, wpCode)));
 
     return res.json({ message: "WP session record updated", wpCode, status });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /seed-trigger-rules  — Seed ISA logic trigger rules table
+// ─────────────────────────────────────────────────────────────────────────────
+const ISA_TRIGGER_RULES = [
+  // ── MANDATORY RULES (always applied) ──────────────────────────────────────
+  { ruleName:"All-engagements baseline", ruleDescription:"Core mandatory WPs for every audit engagement", codeFamily:null, entityType:"All", industry:null, risk:null, fsHead:null, controlMode:null, materialityLevel:"Always", activateWpCodes:"A001,A002,A003,A004,A005,B001,B002,B003,B004,B005,B006,B007,B008,B009,B010,C001,C002,C003,F001,F002,F003,F004,F005,G001,G002,G003,H001,H002,H003,I001,I002", procedureType:null, assertionLink:null, samplingRate:null, priority:1, mandatoryOverride:true, isaJustification:"ISA 200, ISA 210, ISA 220, ISA 230, ISA 300, ISA 315, ISA 320, ISA 330, ISA 700 — mandatory for all audits" },
+  // ── RISK-BASED RULES ──────────────────────────────────────────────────────
+  { ruleName:"Going concern risk", ruleDescription:"Activate going concern WPs when risk flagged", codeFamily:"F", entityType:null, industry:null, risk:"Going concern", fsHead:null, controlMode:null, materialityLevel:"Always", activateWpCodes:"F010,F011,B019,C024,I019", procedureType:"Risk", assertionLink:"Going Concern", samplingRate:null, priority:5, mandatoryOverride:false, isaJustification:"ISA 570 — auditor must evaluate going concern" },
+  { ruleName:"Fraud risk — high", ruleDescription:"Expand procedures when fraud risk identified", codeFamily:null, entityType:null, industry:null, risk:"Fraud", fsHead:null, controlMode:null, materialityLevel:"Always", activateWpCodes:"B037,D025,N007,N008,N009,N010,N011,N014,B031,B038", procedureType:"Risk", assertionLink:"Completeness,Occurrence,Accuracy", samplingRate:"100", priority:3, mandatoryOverride:true, isaJustification:"ISA 240 — mandatory when fraud risk indicators present" },
+  { ruleName:"Related party risk", ruleDescription:"Related party identification and testing", codeFamily:null, entityType:null, industry:null, risk:"Related party", fsHead:null, controlMode:null, materialityLevel:"Always", activateWpCodes:"B022,N012,M009,I028", procedureType:"Risk", assertionLink:"Completeness,Disclosure,Rights & Obligations", samplingRate:null, priority:4, mandatoryOverride:false, isaJustification:"ISA 550 — must identify and test related party transactions" },
+  { ruleName:"Tax risk", ruleDescription:"Tax compliance and exposure procedures", codeFamily:"M", entityType:null, industry:null, risk:"Tax", fsHead:null, controlMode:null, materialityLevel:"Always", activateWpCodes:"M001,M002,M003,M004,M005,M006,M007,M008,M009,I016,I017,I019,I027,I028,B041", procedureType:"ToD", assertionLink:"Completeness,Valuation,Accuracy", samplingRate:null, priority:5, mandatoryOverride:false, isaJustification:"ISA 250 — compliance with tax laws and regulations" },
+  { ruleName:"IT reliance / ERP", ruleDescription:"IT general controls and automated controls testing", codeFamily:"D", entityType:null, industry:null, risk:"IT reliance", fsHead:null, controlMode:"ERP,IT-dependent", materialityLevel:"Always", activateWpCodes:"D011,D012,D013,D021,D022,D023,D024,B031,B044", procedureType:"ToC", assertionLink:"Completeness,Accuracy", samplingRate:null, priority:6, mandatoryOverride:false, isaJustification:"ISA 315 — must evaluate IT general controls when entity relies on IT" },
+  // ── FS HEAD RULES ─────────────────────────────────────────────────────────
+  { ruleName:"Revenue — substantive", ruleDescription:"Revenue testing when FS Head = Revenue", codeFamily:"E", entityType:null, industry:null, risk:null, fsHead:"Revenue", controlMode:null, materialityLevel:"Above Trivial", activateWpCodes:"E101,E102,E103,E104,E105,E106,E107,E108,E109,E110,B040,N007", procedureType:"ToD", assertionLink:"Completeness,Occurrence,Accuracy,Cut-off", samplingRate:"15", priority:10, mandatoryOverride:false, isaJustification:"ISA 330 — revenue is presumed significant risk (ISA 240.26)" },
+  { ruleName:"Receivables — substantive", ruleDescription:"Trade receivables confirmation and aging", codeFamily:"E", entityType:null, industry:null, risk:null, fsHead:"Receivables", controlMode:null, materialityLevel:"Above PM", activateWpCodes:"E121,E122,E123,E124,E125,E126,E127,E128,E129,E130,C022", procedureType:"ToD", assertionLink:"Existence,Completeness,Valuation,Rights & Obligations", samplingRate:"20", priority:11, mandatoryOverride:false, isaJustification:"ISA 330 — confirmation of receivables (ISA 505)" },
+  { ruleName:"Inventory — substantive", ruleDescription:"Inventory count, costing, NRV", codeFamily:"E", entityType:null, industry:null, risk:null, fsHead:"Inventory", controlMode:null, materialityLevel:"Above PM", activateWpCodes:"E141,E142,E143,E144,E145,E146,E147,E148,E149,E150,C023", procedureType:"ToD", assertionLink:"Existence,Completeness,Valuation,Rights & Obligations", samplingRate:"25", priority:12, mandatoryOverride:false, isaJustification:"ISA 501 — inventory attendance mandatory if material" },
+  { ruleName:"PPE — substantive", ruleDescription:"Fixed assets, depreciation, capex-opex split", codeFamily:"E", entityType:null, industry:null, risk:null, fsHead:"PPE", controlMode:null, materialityLevel:"Above PM", activateWpCodes:"E161,E162,E163,E164,E165,E166,E167,E168,E169,E170", procedureType:"ToD", assertionLink:"Existence,Completeness,Valuation,Rights & Obligations", samplingRate:"15", priority:13, mandatoryOverride:false, isaJustification:"ISA 330 — PPE is typically material and requires substantive procedures" },
+  { ruleName:"Cash and bank", ruleDescription:"Bank confirmation, reconciliation, cut-off", codeFamily:"E", entityType:null, industry:null, risk:null, fsHead:"Cash", controlMode:null, materialityLevel:"Always", activateWpCodes:"E181,E182,E183,E184,E185,E186,E187,E188,E189,E190", procedureType:"ToD", assertionLink:"Existence,Completeness,Rights & Obligations,Cut-off", samplingRate:"100", priority:14, mandatoryOverride:true, isaJustification:"ISA 330, ISA 505 — bank confirmations are standard mandatory procedure" },
+  { ruleName:"Payables — substantive", ruleDescription:"Trade creditors, accruals, GIT", codeFamily:"E", entityType:null, industry:null, risk:null, fsHead:"Payables", controlMode:null, materialityLevel:"Above PM", activateWpCodes:"E201,E202,E203,E204,E205,E206,E207,E208,E209,E210", procedureType:"ToD", assertionLink:"Completeness,Existence,Valuation,Rights & Obligations,Cut-off", samplingRate:"20", priority:15, mandatoryOverride:false, isaJustification:"ISA 330 — payables completeness is an area of presumed risk" },
+  { ruleName:"Borrowings — substantive", ruleDescription:"Loans, credit facilities, covenants", codeFamily:"E", entityType:null, industry:null, risk:null, fsHead:"Borrowings", controlMode:null, materialityLevel:"Above PM", activateWpCodes:"E221,E222,E223,E224,E225,E226,E227,E228,E229,E230,C024", procedureType:"ToD", assertionLink:"Existence,Completeness,Valuation,Disclosure,Rights & Obligations", samplingRate:"100", priority:16, mandatoryOverride:false, isaJustification:"ISA 330 — borrowings and covenants require full confirmation" },
+  { ruleName:"Taxation — current and deferred", ruleDescription:"Tax charge, deferred tax, provision", codeFamily:"E", entityType:null, industry:null, risk:null, fsHead:"Taxation", controlMode:null, materialityLevel:"Above PM", activateWpCodes:"E241,E242,E243,E244,E245,E246,E247,E248,M001,M002,M003", procedureType:"ToD", assertionLink:"Completeness,Accuracy,Valuation", samplingRate:"100", priority:17, mandatoryOverride:false, isaJustification:"ISA 330 — tax is complex estimate requiring detailed testing" },
+  { ruleName:"Equity — substantive", ruleDescription:"Share capital, reserves, retained earnings", codeFamily:"E", entityType:null, industry:null, risk:null, fsHead:"Equity", controlMode:null, materialityLevel:"Above PM", activateWpCodes:"E261,E262,E263,E264,E265,E266,E267,E268,E269,E270", procedureType:"ToD", assertionLink:"Completeness,Existence,Rights & Obligations,Presentation", samplingRate:"100", priority:18, mandatoryOverride:false, isaJustification:"ISA 330 — equity movements must be fully vouched" },
+  // ── ENTITY TYPE OVERLAYS ──────────────────────────────────────────────────
+  { ruleName:"Listed entity overlay", ruleDescription:"Additional WPs for listed / PSX entities", codeFamily:null, entityType:"Listed", industry:null, risk:null, fsHead:null, controlMode:null, materialityLevel:"Always", activateWpCodes:"I003,I021,A024,A025,G007,G008,G009,H004,H005,B036,K005,K006,K007,K008,K009,K010", procedureType:null, assertionLink:null, samplingRate:null, priority:20, mandatoryOverride:false, isaJustification:"ISA 220, ISQM 1 — PIE/listed entities require additional quality procedures" },
+  { ruleName:"Group audit overlay", ruleDescription:"ISA 600 Revised group audit requirements", codeFamily:"K", entityType:"Group,Listed", industry:null, risk:null, fsHead:null, controlMode:null, materialityLevel:"Always", activateWpCodes:"K001,K002,K003,K004,K011,K012,K013,K014,K015", procedureType:null, assertionLink:null, samplingRate:null, priority:21, mandatoryOverride:false, isaJustification:"ISA 600 (Revised 2023) — group audit requires component instructions and review" },
+  { ruleName:"NGO / donor-funded overlay", ruleDescription:"NGO-specific WPs including donor compliance", codeFamily:"L", entityType:"NGO,NPO,Section 42,Donor-funded", industry:null, risk:null, fsHead:null, controlMode:null, materialityLevel:"Always", activateWpCodes:"L001,L002,L003,L004,L005,L006,L008,L014,L015,L017,L019,L020", procedureType:null, assertionLink:null, samplingRate:null, priority:22, mandatoryOverride:false, isaJustification:"ISA 250 — NGO must comply with donor agreements, FCRA, Section 42" },
+  { ruleName:"SOE overlay", ruleDescription:"State-owned enterprise additional controls", codeFamily:null, entityType:"SOE", industry:null, risk:null, fsHead:null, controlMode:null, materialityLevel:"Always", activateWpCodes:"A024,I024,G007,H006,H007", procedureType:null, assertionLink:null, samplingRate:null, priority:23, mandatoryOverride:false, isaJustification:"ISA 250 — SOEs subject to additional regulatory requirements" },
+  // ── INDUSTRY RULES ────────────────────────────────────────────────────────
+  { ruleName:"Manufacturing / Textile overlay", ruleDescription:"Manufacturing sector specific WPs", codeFamily:"J", entityType:null, industry:"Manufacturing,Textile", risk:null, fsHead:null, controlMode:null, materialityLevel:"Always", activateWpCodes:"J101,J102,J103,J104,J105,I026,D015,C023", procedureType:null, assertionLink:null, samplingRate:null, priority:30, mandatoryOverride:false, isaJustification:"ISA 315 — industry knowledge required; ISA 501 inventory observation" },
+  { ruleName:"Construction / real estate overlay", ruleDescription:"Long-term contract accounting", codeFamily:"J", entityType:null, industry:"Construction,Real Estate", risk:null, fsHead:null, controlMode:null, materialityLevel:"Always", activateWpCodes:"J301,J302", procedureType:"ToD", assertionLink:"Completeness,Cut-off,Valuation", samplingRate:null, priority:31, mandatoryOverride:false, isaJustification:"ISA 315, IFRS 15 / IAS 11 — POC method judgement is key risk" },
+  { ruleName:"Education sector overlay", ruleDescription:"Fee income, deferred admission, endowment", codeFamily:"J", entityType:null, industry:"Education", risk:null, fsHead:null, controlMode:null, materialityLevel:"Always", activateWpCodes:"J401,J402,J403,L001,L002", procedureType:null, assertionLink:null, samplingRate:null, priority:32, mandatoryOverride:false, isaJustification:"ISA 315, ISA 250 — education entities have specific revenue recognition and regulatory risks" },
+  // ── MATERIALITY → SAMPLING RULES ─────────────────────────────────────────
+  { ruleName:"High materiality sampling rate", ruleDescription:"Increase sampling when items exceed PM", codeFamily:null, entityType:null, industry:null, risk:null, fsHead:null, controlMode:null, materialityLevel:"Above PM", activateWpCodes:"D031,D032", procedureType:"ToD", assertionLink:null, samplingRate:"25", priority:50, mandatoryOverride:false, isaJustification:"ISA 530 — sampling rate must respond to materiality and risk" },
+  { ruleName:"Low-risk sampling rate", ruleDescription:"Reduced sampling when controls effective and risk low", codeFamily:null, entityType:null, industry:null, risk:null, fsHead:null, controlMode:null, materialityLevel:"Above Trivial", activateWpCodes:"D032", procedureType:"ToD", assertionLink:null, samplingRate:"5", priority:60, mandatoryOverride:false, isaJustification:"ISA 330.18 — effective controls justify reduced substantive testing" },
+];
+
+router.post("/seed-trigger-rules", async (req: Request, res: Response) => {
+  try {
+    let inserted = 0; let updated = 0;
+    for (const rule of ISA_TRIGGER_RULES) {
+      const existing = await db.select({ id: wpTriggerRulesTable.id })
+        .from(wpTriggerRulesTable).where(eq(wpTriggerRulesTable.ruleName, rule.ruleName)).limit(1);
+      if (existing.length === 0) {
+        await db.insert(wpTriggerRulesTable).values(rule as any);
+        inserted++;
+      } else {
+        await db.update(wpTriggerRulesTable).set({ ...rule, updatedAt: new Date() } as any)
+          .where(eq(wpTriggerRulesTable.ruleName, rule.ruleName));
+        updated++;
+      }
+    }
+    return res.json({ message: "Trigger rules seeded", inserted, updated, total: ISA_TRIGGER_RULES.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/validate-for-generation  — 6-check validation gate
+// Checks: TB balance | TB↔FS mapping | GL↔TB recon | mandatory vars |
+//         confidence <85% | mandatory WPs incomplete
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/sessions/:id/validate-for-generation", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    const { validatedBy } = req.body;
+
+    // Check session lock
+    const lock = await db.select().from(wpSessionLockTable).where(eq(wpSessionLockTable.sessionId, sessionId)).limit(1);
+    if (lock.length > 0) return res.status(423).json({ error: "Session is locked. No changes allowed (ISA 230)." });
+
+    const blockedReasons: string[] = [];
+    const warnings: string[] = [];
+
+    // ── CHECK 1: TB balance (Dr = Cr) ──────────────────────────────────────
+    const tbRows = await db.execute(sql`
+      SELECT SUM(debit::numeric) as dr, SUM(credit::numeric) as cr
+      FROM wp_trial_balance_lines WHERE session_id = ${sessionId}`);
+    const tbBal = (tbRows.rows?.[0] as any) || {};
+    const dr = parseFloat(tbBal.dr || "0");
+    const cr = parseFloat(tbBal.cr || "0");
+    const tbDiff = Math.abs(dr - cr);
+    const glTbPass = tbDiff < 1.0;
+    if (!glTbPass) blockedReasons.push(`TB is unbalanced: Dr ${dr.toFixed(2)} ≠ Cr ${cr.toFixed(2)} (difference: ${tbDiff.toFixed(2)})`);
+
+    // ── CHECK 2: TB ↔ FS mapping (no unmapped TB lines) ───────────────────
+    const unmappedTB = await db.execute(sql`
+      SELECT COUNT(*) as cnt FROM wp_trial_balance_lines
+      WHERE session_id = ${sessionId} AND (fs_line_mapping IS NULL OR fs_line_mapping = '')
+        AND ABS(balance::numeric) > 0`);
+    const unmappedCount = parseInt((unmappedTB.rows?.[0] as any)?.cnt || "0");
+    const tbFsPass = unmappedCount === 0;
+    const tbFsNote = tbFsPass ? "All TB accounts mapped to FS lines" : `${unmappedCount} TB account(s) not mapped to FS lines`;
+    if (!tbFsPass) warnings.push(tbFsNote);
+
+    // ── CHECK 3: FS ↔ TB difference ──────────────────────────────────────
+    const fsTotal = await db.execute(sql`
+      SELECT SUM(ABS(amount_current::numeric)) as total
+      FROM wp_fs_extraction WHERE session_id = ${sessionId} AND exception_flag = false`);
+    const tbTotal = await db.execute(sql`
+      SELECT SUM(ABS(balance::numeric)) as total FROM wp_trial_balance_lines WHERE session_id = ${sessionId}`);
+    const fsTot = parseFloat((fsTotal.rows?.[0] as any)?.total || "0");
+    const tbTot = parseFloat((tbTotal.rows?.[0] as any)?.total || "0");
+    const tbFsDifference = Math.abs(fsTot - tbTot);
+    const tbFsBalancePass = tbFsDifference < 1.0 || fsTot === 0;
+    if (!tbFsBalancePass && fsTot > 0) warnings.push(`TB total (${tbTot.toFixed(0)}) differs from FS total (${fsTot.toFixed(0)}) by ${tbFsDifference.toFixed(0)} — verify mapping`);
+
+    // ── CHECK 4: Mandatory engagement fields present ───────────────────────
+    const engRows = await db.execute(sql`SELECT client_name, entity_type, financial_year_end, reporting_framework, performance_materiality FROM audit_engine_master WHERE session_id = ${sessionId} LIMIT 1`);
+    const eng = (engRows.rows?.[0] as any) || {};
+    const missingVars: string[] = [];
+    if (!eng.client_name) missingVars.push("clientName");
+    if (!eng.entity_type) missingVars.push("entityType");
+    if (!eng.financial_year_end) missingVars.push("financialYearEnd");
+    if (!eng.reporting_framework) missingVars.push("reportingFramework");
+    if (!eng.performance_materiality || eng.performance_materiality === "0") missingVars.push("performanceMateriality");
+    const mandatoryVarsPass = missingVars.length === 0;
+    if (!mandatoryVarsPass) blockedReasons.push(`Missing mandatory engagement fields: ${missingVars.join(", ")}`);
+
+    // ── CHECK 5: Low confidence items (<85%) ──────────────────────────────
+    const lowConf = await db.execute(sql`
+      SELECT COUNT(*) as cnt FROM wp_trial_balance_lines
+      WHERE session_id = ${sessionId} AND confidence IS NOT NULL AND confidence::numeric < 85`);
+    const lowConfCount = parseInt((lowConf.rows?.[0] as any)?.cnt || "0");
+    const confidencePass = lowConfCount === 0;
+    if (!confidencePass) warnings.push(`${lowConfCount} TB line(s) have confidence score <85% — review before generation`);
+
+    // ── CHECK 6: Mandatory WPs activated and not N/A ───────────────────────
+    const mandatoryWps = await db.execute(sql`
+      SELECT COUNT(*) as cnt FROM wp_library_session
+      WHERE session_id = ${sessionId} AND mandatory_flag = true AND status = 'Pending'`);
+    const mandatoryPending = parseInt((mandatoryWps.rows?.[0] as any)?.cnt || "0");
+    const mandatoryWpsPass = mandatoryPending === 0;
+    if (!mandatoryWpsPass) warnings.push(`${mandatoryPending} mandatory WP(s) still in Pending status — should be In Progress or later`);
+
+    const overallPass = blockedReasons.length === 0;
+    const generationAllowed = blockedReasons.length === 0;
+
+    // Save validation result
+    await db.insert(wpValidationResultTable).values({
+      sessionId,
+      overallPass,
+      tbFsPass: tbFsBalancePass,
+      tbFsDifference: tbFsDifference.toString(),
+      tbFsNote,
+      glTbPass,
+      glTbNote: glTbPass ? "TB is balanced" : `TB unbalanced by ${tbDiff.toFixed(2)}`,
+      mandatoryVarsPass,
+      missingVars: missingVars.join(","),
+      confidencePass,
+      lowConfidenceCount: lowConfCount,
+      mandatoryWpsPass,
+      coaTbPass: tbFsPass,
+      unmappedAccountCount: unmappedCount,
+      blockedReasons: JSON.stringify(blockedReasons),
+      warnings: JSON.stringify(warnings),
+      generationAllowed,
+      validatedBy: validatedBy || "System",
+    } as any);
+
+    return res.json({
+      overallPass, generationAllowed, blockedReasons, warnings,
+      checks: {
+        tbBalance: { pass: glTbPass, detail: glTbPass ? "TB balanced" : `Difference: ${tbDiff.toFixed(2)}` },
+        tbFsMapping: { pass: tbFsPass, unmappedCount, detail: tbFsNote },
+        tbFsDifference: { pass: tbFsBalancePass, difference: tbFsDifference.toFixed(2) },
+        mandatoryVars: { pass: mandatoryVarsPass, missingVars },
+        confidence: { pass: confidencePass, lowConfidenceCount: lowConfCount },
+        mandatoryWps: { pass: mandatoryWpsPass, pendingMandatoryCount: mandatoryPending },
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/auto-flag-exceptions  — ISA exception auto-detection
+// Scans: unmapped FS lines | GL confidence | incomplete mandatory WPs |
+//        TB gaps | COA mismatches | related party anomalies
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/sessions/:id/auto-flag-exceptions", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+
+    // Clear old auto-flagged exceptions for this session
+    await db.delete(wpExceptionsTable).where(
+      and(eq(wpExceptionsTable.sessionId, sessionId), eq(wpExceptionsTable.autoFlagged, true))
+    );
+
+    const exceptions: any[] = [];
+    let exCode = 1;
+    const mkCode = () => `EX${String(exCode++).padStart(4, "0")}`;
+
+    // ── EX TYPE 1: Unmapped FS lines ─────────────────────────────────────
+    const unmappedFS = await db.select().from(wpFsExtractionTable)
+      .where(and(eq(wpFsExtractionTable.sessionId, sessionId), eq(wpFsExtractionTable.exceptionFlag, true)));
+    for (const row of unmappedFS) {
+      exceptions.push({ sessionId, exceptionCode: mkCode(), exceptionType:"Unmapped FS", severity:"High", sourceArea:"FS", referenceCode: row.statementType || "FS", description: `Unmapped FS line: "${row.lineItemText}" in ${row.statementType}`, isaReference:"ISA 330, ISA 315", detail: JSON.stringify({ amount: row.amountCurrent, page: row.pageNo }), autoFlagged: true });
+    }
+
+    // ── EX TYPE 2: Low-confidence journal lines ───────────────────────────
+    const lowConfJournals = await db.select().from(wpJournalImportTable)
+      .where(and(eq(wpJournalImportTable.sessionId, sessionId), eq(wpJournalImportTable.exceptionFlag, true)));
+    for (const row of lowConfJournals) {
+      exceptions.push({ sessionId, exceptionCode: mkCode(), exceptionType:"Low Confidence", severity:"Medium", sourceArea:"Journal", referenceCode: row.journalId || row.entryNo || "", description: `Journal entry confidence <85%: ${row.accountName} (${row.confidenceScore || "?"}%)`, isaReference:"ISA 230", detail: JSON.stringify({ amount: row.debitAmount || row.creditAmount, date: row.entryDate }), autoFlagged: true });
+    }
+
+    // ── EX TYPE 3: Unmapped TB accounts ──────────────────────────────────
+    const unmappedTB = await db.execute(sql`
+      SELECT account_code, account_name, balance FROM wp_trial_balance_lines
+      WHERE session_id = ${sessionId} AND (fs_line_mapping IS NULL OR fs_line_mapping = '')
+        AND ABS(balance::numeric) > 0 LIMIT 50`);
+    for (const row of (unmappedTB.rows || []) as any[]) {
+      exceptions.push({ sessionId, exceptionCode: mkCode(), exceptionType:"COA Gap", severity:"High", sourceArea:"TB", referenceCode: row.account_code, description: `TB account not mapped to FS: ${row.account_code} — ${row.account_name} (Balance: ${parseFloat(row.balance || "0").toFixed(2)})`, isaReference:"ISA 315, ISA 330", detail: JSON.stringify({ balance: row.balance }), autoFlagged: true });
+    }
+
+    // ── EX TYPE 4: Incomplete mandatory WPs ──────────────────────────────
+    const incompleteMandatory = await db.select().from(wpLibrarySessionTable)
+      .where(and(eq(wpLibrarySessionTable.sessionId, sessionId), eq(wpLibrarySessionTable.mandatoryFlag, true)))
+      .then(rows => rows.filter(r => r.status === "Pending" || r.status === "In Progress"));
+    for (const row of incompleteMandatory) {
+      exceptions.push({ sessionId, exceptionCode: mkCode(), exceptionType:"Incomplete WP", severity:"Critical", sourceArea:"WP", referenceCode: row.wpCode, description: `Mandatory WP not completed: ${row.wpCode} — ${row.wpTitle} (Status: ${row.status})`, isaReference:"ISA 230 — audit file completeness", detail: JSON.stringify({ phase: row.wpPhase, category: row.wpCategory }), autoFlagged: true });
+    }
+
+    // ── EX TYPE 5: TB unbalanced ──────────────────────────────────────────
+    const tbBal = await db.execute(sql`
+      SELECT SUM(debit::numeric) as dr, SUM(credit::numeric) as cr
+      FROM wp_trial_balance_lines WHERE session_id = ${sessionId}`);
+    const balRow = (tbBal.rows?.[0] as any) || {};
+    const dr = parseFloat(balRow.dr || "0"); const cr = parseFloat(balRow.cr || "0");
+    const diff = Math.abs(dr - cr);
+    if (diff > 1.0) {
+      exceptions.push({ sessionId, exceptionCode: mkCode(), exceptionType:"Recon Fail", severity:"Critical", sourceArea:"TB", referenceCode:"TB-BALANCE", description: `Trial Balance unbalanced: Dr ${dr.toFixed(2)} ≠ Cr ${cr.toFixed(2)} — difference ${diff.toFixed(2)}`, isaReference:"ISA 330 — TB must balance before WP generation", autoFlagged: true });
+    }
+
+    // ── EX TYPE 6: Missing evidence for prepared WPs ──────────────────────
+    const preparedWPs = await db.select().from(wpLibrarySessionTable)
+      .where(and(eq(wpLibrarySessionTable.sessionId, sessionId)))
+      .then(rows => rows.filter(r => (r.status === "Prepared" || r.status === "Reviewed") && r.evidenceCount === 0 && r.mandatoryFlag));
+    for (const row of preparedWPs) {
+      exceptions.push({ sessionId, exceptionCode: mkCode(), exceptionType:"Missing Evidence", severity:"High", sourceArea:"Evidence", referenceCode: row.wpCode, description: `WP ${row.wpCode} marked ${row.status} but has no linked evidence`, isaReference:"ISA 230 — sufficient appropriate evidence must be documented", autoFlagged: true });
+    }
+
+    // Insert all exceptions
+    if (exceptions.length > 0) {
+      await db.insert(wpExceptionsTable).values(exceptions);
+    }
+
+    // Summary by type and severity
+    const summary: Record<string, number> = {};
+    for (const e of exceptions) {
+      summary[e.exceptionType] = (summary[e.exceptionType] || 0) + 1;
+    }
+
+    return res.json({ message: "Exception scan complete", total: exceptions.length, bySeverity: {
+      critical: exceptions.filter(e => e.severity === "Critical").length,
+      high: exceptions.filter(e => e.severity === "High").length,
+      medium: exceptions.filter(e => e.severity === "Medium").length,
+    }, byType: summary });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /sessions/:id/isa-exceptions  — List ISA library exceptions for a session
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/sessions/:id/isa-exceptions", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    const { severity, type, resolved } = req.query;
+
+    let q = db.select().from(wpExceptionsTable).where(eq(wpExceptionsTable.sessionId, sessionId));
+    const all = await q;
+
+    let filtered = all;
+    if (severity) filtered = filtered.filter(e => e.severity?.toLowerCase() === String(severity).toLowerCase());
+    if (type) filtered = filtered.filter(e => e.exceptionType?.toLowerCase().includes(String(type).toLowerCase()));
+    if (resolved === "false") filtered = filtered.filter(e => !e.resolvedFlag);
+    if (resolved === "true") filtered = filtered.filter(e => e.resolvedFlag);
+
+    const counts = { critical: 0, high: 0, medium: 0, low: 0, resolved: 0 };
+    for (const e of all) {
+      if (e.resolvedFlag) counts.resolved++;
+      else if (e.severity === "Critical") counts.critical++;
+      else if (e.severity === "High") counts.high++;
+      else if (e.severity === "Medium") counts.medium++;
+      else counts.low++;
+    }
+
+    return res.json({ total: all.length, filtered: filtered.length, counts, exceptions: filtered.sort((a, b) => {
+      const order = { Critical: 0, High: 1, Medium: 2, Low: 3, Info: 4 };
+      return (order[a.severity as keyof typeof order] ?? 5) - (order[b.severity as keyof typeof order] ?? 5);
+    })});
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /sessions/:id/isa-exceptions/:exId/resolve  — Resolve an ISA exception
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch("/sessions/:id/isa-exceptions/:exId/resolve", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    const exId = parseInt(req.params.exId, 10);
+    const { resolvedBy, resolutionNote } = req.body;
+    if (!resolvedBy) return res.status(400).json({ error: "resolvedBy is required" });
+
+    await db.update(wpExceptionsTable).set({
+      resolvedFlag: true, resolvedBy, resolvedAt: new Date(), resolutionNote, updatedAt: new Date()
+    } as any).where(and(eq(wpExceptionsTable.id, exId), eq(wpExceptionsTable.sessionId, sessionId)));
+
+    return res.json({ message: "Exception resolved", exId });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/lock  — ISA 230 Partner Approval Lock
+// Locks the session audit file — no further edits allowed without EQCR override
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/sessions/:id/lock", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    const { lockedBy, lockLevel, lockJustification, archiveRef, eqcrCompleted, eqcrBy } = req.body;
+    if (!lockedBy) return res.status(400).json({ error: "lockedBy (partner name) is required" });
+
+    const existingLock = await db.select().from(wpSessionLockTable).where(eq(wpSessionLockTable.sessionId, sessionId)).limit(1);
+    if (existingLock.length > 0) return res.status(409).json({ error: "Session is already locked", lock: existingLock[0] });
+
+    // Pre-lock validation: run quick check
+    const unresolvedCritical = await db.select({ id: wpExceptionsTable.id }).from(wpExceptionsTable)
+      .where(and(eq(wpExceptionsTable.sessionId, sessionId), eq(wpExceptionsTable.resolvedFlag, false), eq(wpExceptionsTable.severity, "Critical")));
+    if (unresolvedCritical.length > 0) {
+      return res.status(422).json({ error: `Cannot lock: ${unresolvedCritical.length} critical unresolved exception(s) must be resolved first` });
+    }
+
+    // Retention date: 7 years from lock (ICAP requirement)
+    const retentionEnd = new Date();
+    retentionEnd.setFullYear(retentionEnd.getFullYear() + 7);
+
+    await db.insert(wpSessionLockTable).values({
+      sessionId,
+      lockedBy,
+      lockLevel: lockLevel || "Partner",
+      lockJustification,
+      preArchiveValidationPassed: true,
+      archiveRef: archiveRef || `ISA230-${sessionId}-${Date.now()}`,
+      retentionEndDate: retentionEnd.toISOString().split("T")[0],
+      eqcrCompleted: eqcrCompleted || false,
+      eqcrBy: eqcrBy || null,
+      unlockAllowed: false,
+    } as any);
+
+    // Update session master status
+    await db.execute(sql`UPDATE audit_engine_master SET current_stage = 'Locked', updated_at = NOW() WHERE session_id = ${sessionId}`);
+
+    return res.json({ message: "Session locked successfully under ISA 230", sessionId, lockedBy, archiveRef: archiveRef || `ISA230-${sessionId}-${Date.now()}`, retentionEndDate: retentionEnd.toISOString().split("T")[0] });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /sessions/:id/lock-status  — Check if session is locked
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/sessions/:id/lock-status", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    const lock = await db.select().from(wpSessionLockTable).where(eq(wpSessionLockTable.sessionId, sessionId)).limit(1);
+    if (lock.length === 0) return res.json({ locked: false });
+    return res.json({ locked: true, lock: lock[0] });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/generate-output  — Generate TB / GL / WP Index exports
+// Produces structured JSON outputs ready for Excel/Word rendering
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/sessions/:id/generate-output", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    const { jobType, triggeredBy } = req.body;
+    // jobType: "tb_excel" | "gl_excel" | "wp_index" | "full_file"
+
+    // Check validation gate
+    const lastValidation = await db.select().from(wpValidationResultTable)
+      .where(eq(wpValidationResultTable.sessionId, sessionId))
+      .orderBy(sql`run_at DESC`).limit(1);
+    if (lastValidation.length > 0 && !lastValidation[0].generationAllowed) {
+      return res.status(422).json({ error: "Generation blocked by validation gate", blockedReasons: JSON.parse(lastValidation[0].blockedReasons || "[]") });
+    }
+
+    const job = await db.insert(wpOutputJobTable).values({
+      sessionId, jobType: jobType || "full_file", status: "running",
+      triggeredBy: triggeredBy || "System", startedAt: new Date(),
+    } as any).returning({ id: wpOutputJobTable.id });
+
+    const jobId = job[0]?.id;
+
+    // ── Build output payload ───────────────────────────────────────────────
+    const tbData = await db.execute(sql`
+      SELECT account_code, account_name, classification as fs_head, fs_line_mapping,
+             '0' as opening_balance, debit, credit, balance as closing_balance,
+             prior_year_balance, source as data_source, confidence
+      FROM wp_trial_balance_lines WHERE session_id = ${sessionId} ORDER BY account_code`);
+
+    const glData = await db.execute(sql`
+      SELECT ge.entry_date, ga.account_code, ga.account_name, ge.narration, ge.debit, ge.credit,
+             ge.voucher_no, ge.running_balance
+      FROM wp_gl_entries ge
+      LEFT JOIN wp_gl_accounts ga ON ge.gl_account_id = ga.id
+      WHERE ge.session_id = ${sessionId} ORDER BY ge.entry_date, ge.voucher_no`);
+
+    const wpIndex = await db.select().from(wpLibrarySessionTable)
+      .where(eq(wpLibrarySessionTable.sessionId, sessionId))
+      .then(rows => rows.sort((a, b) => {
+        const phaseOrder: Record<string, number> = { "Pre-engagement": 1, Planning: 2, Execution: 3, Completion: 4, Reporting: 5, "Quality Control": 6 };
+        return (phaseOrder[a.wpPhase || ""] || 9) - (phaseOrder[b.wpPhase || ""] || 9);
+      }));
+
+    const varRows = await db.execute(sql`SELECT client_name, entity_type, financial_year_end, reporting_framework, performance_materiality FROM audit_engine_master WHERE session_id = ${sessionId} LIMIT 1`);
+    const varsRow = (varRows.rows?.[0] as any) || {};
+    const vars = { entityName: varsRow.client_name, entityType: varsRow.entity_type, financialYearEnd: varsRow.financial_year_end, reportingFramework: varsRow.reporting_framework, currency: "PKR" };
+
+    // Phase summary for WP index
+    const phaseSummary: Record<string, any> = {};
+    for (const wp of wpIndex) {
+      const ph = wp.wpPhase || "Other";
+      if (!phaseSummary[ph]) phaseSummary[ph] = { total: 0, prepared: 0, approved: 0, pending: 0 };
+      phaseSummary[ph].total++;
+      if (wp.status === "Approved") phaseSummary[ph].approved++;
+      else if (wp.status === "Prepared" || wp.status === "Reviewed") phaseSummary[ph].prepared++;
+      else if (wp.status === "Pending" || wp.status === "In Progress") phaseSummary[ph].pending++;
+    }
+
+    const output = {
+      generatedAt: new Date().toISOString(),
+      sessionId,
+      entityName: vars.entityName || "—",
+      financialYearEnd: vars.financialYearEnd || "—",
+      currency: vars.currency || "PKR",
+      tb: { columns: ["Account Code","Account Name","FS Head","FS Line","Assertions","Opening","Dr","Cr","Closing","Prior Year","Variance","Materiality","Risk","WP Code"], rows: tbData.rows || [], totalAccounts: (tbData.rows || []).length },
+      gl: { columns: ["Date","Account Code","Account Name","Narration","Dr","Cr","Journal ID","Voucher Type","Party","Doc No","Source","Confidence"], rows: glData.rows || [], totalTransactions: (glData.rows || []).length },
+      wpIndex: { totalWps: wpIndex.length, phaseSummary, papers: wpIndex.map(wp => ({ code: wp.wpCode, title: wp.wpTitle, phase: wp.wpPhase, category: wp.wpCategory, status: wp.status, mandatory: wp.mandatoryFlag, preparedBy: wp.preparedBy, reviewedBy: wp.reviewedBy, approvedBy: wp.approvedBy, conclusion: wp.conclusion })) },
+    };
+
+    // Complete the job
+    const recordCount = (output.tb.totalAccounts || 0) + (output.gl.totalTransactions || 0) + (output.wpIndex.totalWps || 0);
+    await db.update(wpOutputJobTable).set({ status: "complete", completedAt: new Date(), recordCount, metadata: JSON.stringify({ phases: Object.keys(phaseSummary), tbAccounts: output.tb.totalAccounts, glTxns: output.gl.totalTransactions }) } as any)
+      .where(eq(wpOutputJobTable.id, jobId));
+
+    return res.json({ message: "Output generated", jobId, output });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /sessions/:id/output-jobs  — List all output generation jobs
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/sessions/:id/output-jobs", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    const jobs = await db.select().from(wpOutputJobTable)
+      .where(eq(wpOutputJobTable.sessionId, sessionId))
+      .orderBy(sql`created_at DESC`);
+    return res.json({ total: jobs.length, jobs });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /sessions/:id/wp-audit-trail  — Full ISA 230 audit trail timeline
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/sessions/:id/wp-audit-trail", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    const trail: any[] = [];
+
+    // WP status changes
+    const wps = await db.select().from(wpLibrarySessionTable).where(eq(wpLibrarySessionTable.sessionId, sessionId));
+    for (const wp of wps) {
+      if (wp.preparedBy && wp.preparedDate) trail.push({ timestamp: wp.preparedDate, type: "WP_PREPARED", actor: wp.preparedBy, ref: wp.wpCode, detail: `${wp.wpCode} — ${wp.wpTitle} marked Prepared` });
+      if (wp.reviewedBy && wp.reviewedDate) trail.push({ timestamp: wp.reviewedDate, type: "WP_REVIEWED", actor: wp.reviewedBy, ref: wp.wpCode, detail: `${wp.wpCode} — ${wp.wpTitle} reviewed` });
+      if (wp.approvedBy) trail.push({ timestamp: wp.updatedAt?.toISOString(), type: "WP_APPROVED", actor: wp.approvedBy, ref: wp.wpCode, detail: `${wp.wpCode} — ${wp.wpTitle} approved` });
+    }
+
+    // Validation runs
+    const validations = await db.select().from(wpValidationResultTable).where(eq(wpValidationResultTable.sessionId, sessionId));
+    for (const v of validations) {
+      trail.push({ timestamp: v.runAt?.toISOString(), type: "VALIDATION_RUN", actor: v.validatedBy || "System", ref: "VALIDATION", detail: `Validation ${v.overallPass ? "PASSED" : "FAILED"} — Generation ${v.generationAllowed ? "allowed" : "blocked"}` });
+    }
+
+    // Output jobs
+    const jobs = await db.select().from(wpOutputJobTable).where(eq(wpOutputJobTable.sessionId, sessionId));
+    for (const j of jobs) {
+      trail.push({ timestamp: j.completedAt?.toISOString() || j.createdAt?.toISOString(), type: "OUTPUT_GENERATED", actor: j.triggeredBy || "System", ref: j.jobType, detail: `${j.jobType} generated — ${j.recordCount || 0} records, status: ${j.status}` });
+    }
+
+    // Lock events
+    const locks = await db.select().from(wpSessionLockTable).where(eq(wpSessionLockTable.sessionId, sessionId));
+    for (const l of locks) {
+      trail.push({ timestamp: l.lockedAt?.toISOString(), type: "SESSION_LOCKED", actor: l.lockedBy, ref: "ISA230-LOCK", detail: `Session locked by ${l.lockedBy} (${l.lockLevel}) — Archive ref: ${l.archiveRef}` });
+      if (l.unlockedAt) trail.push({ timestamp: l.unlockedAt?.toISOString(), type: "SESSION_UNLOCKED", actor: l.unlockedBy || "Unknown", ref: "ISA230-UNLOCK", detail: `Session unlocked: ${l.unlockReason}` });
+    }
+
+    trail.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+    return res.json({ sessionId, total: trail.length, trail });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

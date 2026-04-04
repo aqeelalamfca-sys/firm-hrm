@@ -722,3 +722,119 @@ export const wpMasterCoaTable = pgTable("wp_master_coa", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// ── WP Trigger Rules (ISA logic layer: conditions → WP activation rules) ─────────────────
+export const wpTriggerRulesTable = pgTable("wp_trigger_rules", {
+  id: serial("id").primaryKey(),
+  ruleName: text("rule_name").notNull(),
+  ruleDescription: text("rule_description"),
+  codeFamily: varchar("code_family", { length: 4 }),       // A, B, E, etc. or null = any
+  entityType: text("entity_type"),                          // CSV: Pvt Ltd, Listed, NGO…
+  industry: text("industry"),                               // CSV: Manufacturing, Trading…
+  risk: text("risk"),                                       // CSV: High, Fraud, Going concern…
+  fsHead: text("fs_head"),                                  // CSV: Revenue, Inventory, PPE…
+  controlMode: text("control_mode"),                        // Manual | IT-dependent | ERP | Mixed
+  materialityLevel: text("materiality_level"),              // Above PM | Above Trivial | Always
+  activateWpCodes: text("activate_wp_codes").notNull(),     // CSV of WP codes to activate
+  procedureType: text("procedure_type"),                    // Risk | ToC | ToD | Analytics
+  assertionLink: text("assertion_link"),                    // Assertions triggered
+  samplingRate: decimal("sampling_rate", { precision: 5, scale: 2 }), // % sampling for high-risk
+  priority: integer("priority").default(50),                // 1=highest, 100=lowest
+  mandatoryOverride: boolean("mandatory_override").default(false),
+  isaJustification: text("isa_justification"),              // e.g. ISA 315.28 requires…
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ── WP Validation Results (pre-generation validation gate per session) ────────────────────
+export const wpValidationResultTable = pgTable("wp_validation_result", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  runAt: timestamp("run_at").defaultNow(),
+  overallPass: boolean("overall_pass").default(false),
+  // TB ↔ FS check
+  tbFsPass: boolean("tb_fs_pass").default(false),
+  tbFsDifference: decimal("tb_fs_difference", { precision: 15, scale: 2 }),
+  tbFsNote: text("tb_fs_note"),
+  // GL ↔ TB check
+  glTbPass: boolean("gl_tb_pass").default(false),
+  glTbNote: text("gl_tb_note"),
+  // Mandatory variables check
+  mandatoryVarsPass: boolean("mandatory_vars_pass").default(false),
+  missingVars: text("missing_vars"),                        // CSV of missing variable names
+  // Confidence check (<85% items)
+  confidencePass: boolean("confidence_pass").default(false),
+  lowConfidenceCount: integer("low_confidence_count").default(0),
+  lowConfidenceItems: text("low_confidence_items"),         // JSON array
+  // Mandatory WPs check
+  mandatoryWpsPass: boolean("mandatory_wps_pass").default(false),
+  incompleteWpCount: integer("incomplete_wp_count").default(0),
+  // COA ↔ TB mapping check
+  coaTbPass: boolean("coa_tb_pass").default(false),
+  unmappedAccountCount: integer("unmapped_account_count").default(0),
+  // Blockage
+  blockedReasons: text("blocked_reasons"),                  // JSON array of blocking reasons
+  warnings: text("warnings"),                               // JSON array of non-blocking warnings
+  generationAllowed: boolean("generation_allowed").default(false),
+  validatedBy: text("validated_by"),
+  notes: text("notes"),
+});
+
+// ── WP Exceptions (auto-flagged issues per session) ───────────────────────────────────────
+export const wpExceptionsTable = pgTable("wp_exceptions", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  exceptionCode: text("exception_code"),                    // e.g. EX001
+  exceptionType: text("exception_type").notNull(),          // Unmapped FS | Missing Evidence | Incomplete WP | Low Confidence | COA Gap | Recon Fail
+  severity: text("severity").default("Medium"),             // Critical | High | Medium | Low | Info
+  sourceArea: text("source_area"),                          // TB | GL | FS | COA | WP | Evidence | Journal
+  referenceCode: text("reference_code"),                    // WP code, account code, etc.
+  description: text("description").notNull(),
+  detail: text("detail"),                                   // JSON additional detail
+  isaReference: text("isa_reference"),                      // Relevant ISA paragraph
+  resolvedFlag: boolean("resolved_flag").default(false),
+  resolvedBy: text("resolved_by"),
+  resolvedAt: timestamp("resolved_at"),
+  resolutionNote: text("resolution_note"),
+  autoFlagged: boolean("auto_flagged").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ── WP Session Lock (ISA 230 final lock — no overwrites after partner approval) ──────────
+export const wpSessionLockTable = pgTable("wp_session_lock", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull().unique(),
+  lockedAt: timestamp("locked_at").defaultNow(),
+  lockedBy: text("locked_by").notNull(),
+  lockLevel: text("lock_level").default("Partner"),         // Manager | Partner | EQCR
+  lockJustification: text("lock_justification"),
+  preArchiveValidationPassed: boolean("pre_archive_validation_passed").default(false),
+  archiveRef: text("archive_ref"),                          // ISA 230 archive reference
+  retentionEndDate: text("retention_end_date"),             // 7 years per ICAP
+  eqcrCompleted: boolean("eqcr_completed").default(false),
+  eqcrBy: text("eqcr_by"),
+  unlockAllowed: boolean("unlock_allowed").default(false),  // Only EQCR/admin can unlock
+  unlockedAt: timestamp("unlocked_at"),
+  unlockedBy: text("unlocked_by"),
+  unlockReason: text("unlock_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ── WP Output Jobs (output generation tracking — TB/GL/WP document exports) ──────────────
+export const wpOutputJobTable = pgTable("wp_output_job", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  jobType: text("job_type").notNull(),                      // tb_excel | gl_excel | wp_index | wp_document | full_file
+  status: text("status").default("queued"),                 // queued | running | complete | failed
+  triggeredBy: text("triggered_by"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  outputPath: text("output_path"),
+  outputSize: integer("output_size"),                       // bytes
+  recordCount: integer("record_count"),
+  errorMessage: text("error_message"),
+  metadata: text("metadata"),                               // JSON: phase counts, family breakdown etc.
+  createdAt: timestamp("created_at").defaultNow(),
+});

@@ -2424,6 +2424,147 @@ function AuditEngineStage({
 
   // ── End WP Library state ───────────────────────────────────────────────────
 
+  // ── Exceptions state ──────────────────────────────────────────────────────
+  const [exceptions, setExceptions] = useState<any[]>([]);
+  const [excLoading, setExcLoading] = useState(false);
+  const [excScanning, setExcScanning] = useState(false);
+  const [excFilter, setExcFilter] = useState<"all"|"unresolved"|"critical">("unresolved");
+  const [excCounts, setExcCounts] = useState<any>({});
+  const [excScanResult, setExcScanResult] = useState<any>(null);
+  const [resolvingId, setResolvingId] = useState<number | null>(null);
+  const [resolveNote, setResolveNote] = useState("");
+
+  const fetchExceptions = async () => {
+    if (!session?.id) return;
+    setExcLoading(true);
+    try {
+      const params = excFilter === "unresolved" ? "?resolved=false" : excFilter === "critical" ? "?severity=Critical" : "";
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/isa-exceptions${params}`);
+      const d = await r.json();
+      setExceptions(d.exceptions || []);
+      setExcCounts(d.counts || {});
+    } catch { /* ignore */ } finally { setExcLoading(false); }
+  };
+
+  const runExceptionScan = async () => {
+    if (!session?.id) return;
+    setExcScanning(true);
+    try {
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/auto-flag-exceptions`, { method: "POST" });
+      const d = await r.json();
+      setExcScanResult(d);
+      await fetchExceptions();
+    } catch { /* ignore */ } finally { setExcScanning(false); }
+  };
+
+  const resolveException = async (exId: number, note: string) => {
+    if (!session?.id) return;
+    await fetch(`/api/working-papers/sessions/${session.id}/isa-exceptions/${exId}/resolve`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resolvedBy: "Audit Team", resolutionNote: note }),
+    });
+    setResolvingId(null);
+    setResolveNote("");
+    await fetchExceptions();
+  };
+
+  useEffect(() => { if (activeEngineTab === "exceptions") fetchExceptions(); }, [activeEngineTab, excFilter]);
+
+  // ── Generate Output state ─────────────────────────────────────────────────
+  const [validation, setValidation] = useState<any>(null);
+  const [validating, setValidating] = useState(false);
+  const [genLoading, setGenLoading] = useState(false);
+  const [genResult, setGenResult] = useState<any>(null);
+  const [outputJobs, setOutputJobs] = useState<any[]>([]);
+  const [genJobType, setGenJobType] = useState("full_file");
+
+  const runValidation = async () => {
+    if (!session?.id) return;
+    setValidating(true);
+    try {
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/validate-for-generation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ validatedBy: "Audit Team" }),
+      });
+      const d = await r.json();
+      setValidation(d);
+    } catch { /* ignore */ } finally { setValidating(false); }
+  };
+
+  const generateOutput = async () => {
+    if (!session?.id) return;
+    setGenLoading(true);
+    try {
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/generate-output`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobType: genJobType, triggeredBy: "Audit Team" }),
+      });
+      const d = await r.json();
+      setGenResult(d);
+      await fetchOutputJobs();
+    } catch { /* ignore */ } finally { setGenLoading(false); }
+  };
+
+  const fetchOutputJobs = async () => {
+    if (!session?.id) return;
+    try {
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/output-jobs`);
+      const d = await r.json();
+      setOutputJobs(d.jobs || []);
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => { if (activeEngineTab === "generate") { runValidation(); fetchOutputJobs(); } }, [activeEngineTab]);
+
+  // ── Lock & Archive state ──────────────────────────────────────────────────
+  const [lockStatus, setLockStatus] = useState<any>(null);
+  const [lockLoading, setLockLoading] = useState(false);
+  const [locking, setLocking] = useState(false);
+  const [lockForm, setLockForm] = useState({ lockedBy: "", lockLevel: "Partner", lockJustification: "", archiveRef: "", eqcrCompleted: false, eqcrBy: "" });
+  const [lockResult, setLockResult] = useState<any>(null);
+  const [auditTrail, setAuditTrail] = useState<any[]>([]);
+  const [trailLoading, setTrailLoading] = useState(false);
+
+  const fetchLockStatus = async () => {
+    if (!session?.id) return;
+    setLockLoading(true);
+    try {
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/lock-status`);
+      const d = await r.json();
+      setLockStatus(d);
+    } catch { /* ignore */ } finally { setLockLoading(false); }
+  };
+
+  const lockSession = async () => {
+    if (!session?.id || !lockForm.lockedBy) return;
+    setLocking(true);
+    try {
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/lock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(lockForm),
+      });
+      const d = await r.json();
+      setLockResult(d);
+      await fetchLockStatus();
+    } catch { /* ignore */ } finally { setLocking(false); }
+  };
+
+  const fetchAuditTrail = async () => {
+    if (!session?.id) return;
+    setTrailLoading(true);
+    try {
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/wp-audit-trail`);
+      const d = await r.json();
+      setAuditTrail(d.trail || []);
+    } catch { /* ignore */ } finally { setTrailLoading(false); }
+  };
+
+  useEffect(() => { if (activeEngineTab === "lock") { fetchLockStatus(); fetchAuditTrail(); } }, [activeEngineTab]);
+
   useEffect(() => { if (auditMaster && !masterForm) setMasterForm({ ...auditMaster }); }, [auditMaster]);
 
   const saveMaster = async () => { setSaving(true); await onUpdateMaster(masterForm); setSaving(false); };
@@ -2438,6 +2579,9 @@ function AuditEngineStage({
     { key: "evidence", label: "Evidence Vault", icon: FileCheck },
     { key: "recon", label: "Reconciliation", icon: RefreshCw },
     { key: "wp_library", label: "ISA Library", icon: BookOpen },
+    { key: "exceptions", label: "Exceptions", icon: AlertTriangle },
+    { key: "generate", label: "Generate Output", icon: Download },
+    { key: "lock", label: "Lock & Archive", icon: Lock },
   ];
 
   const fmt = (v: any) => { const n = Number(v || 0); return isNaN(n) ? "—" : n.toLocaleString("en-PK"); };
@@ -3062,9 +3206,9 @@ function AuditEngineStage({
                 <div className="py-14 text-center border border-dashed border-slate-200 rounded-2xl">
                   <BookOpen className="w-10 h-10 text-slate-200 mx-auto mb-3" />
                   <p className="text-slate-500 text-sm font-medium">Library not seeded</p>
-                  <p className="text-slate-400 text-xs mt-1 mb-4">Click "Seed Library" to load all 240 ISA/ICAP papers into the database</p>
+                  <p className="text-slate-400 text-xs mt-1 mb-4">Click "Seed Library" to load all 384+ ISA/ICAP papers into the database</p>
                   <button onClick={seedLibrary} disabled={libSeeding} className="px-4 py-2 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-1.5 mx-auto">
-                    {libSeeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookOpen className="w-3.5 h-3.5" />}Seed Library (240 papers)
+                    {libSeeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookOpen className="w-3.5 h-3.5" />}Seed Library (384+ papers)
                   </button>
                 </div>
               ) : (
@@ -3072,6 +3216,330 @@ function AuditEngineStage({
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* ── TAB 9: EXCEPTIONS ─────────────────────────────────────────── */}
+      {activeEngineTab === "exceptions" && (
+        <div className="space-y-4">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-red-900 to-rose-800 rounded-2xl p-5 text-white">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h3 className="text-base font-bold flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-red-300" /> ISA EXCEPTION MANAGEMENT</h3>
+                <p className="text-red-200 text-xs mt-0.5">Auto-flag unmapped FS lines · low-confidence entries · incomplete mandatory WPs · TB gaps</p>
+              </div>
+              <button onClick={runExceptionScan} disabled={excScanning} className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white text-xs rounded-xl font-semibold flex items-center gap-1.5 border border-white/20 transition-colors disabled:opacity-60">
+                {excScanning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+                {excScanning ? "Scanning..." : "Run Exception Scan"}
+              </button>
+            </div>
+            {excScanResult && (
+              <div className="mt-3 bg-white/10 rounded-xl px-4 py-2 text-xs flex flex-wrap gap-4">
+                <span className="font-semibold">{excScanResult.total} exceptions flagged</span>
+                {excScanResult.bySeverity?.critical > 0 && <span className="text-red-300">{excScanResult.bySeverity.critical} Critical</span>}
+                {excScanResult.bySeverity?.high > 0 && <span className="text-orange-300">{excScanResult.bySeverity.high} High</span>}
+                {excScanResult.bySeverity?.medium > 0 && <span className="text-yellow-300">{excScanResult.bySeverity.medium} Medium</span>}
+              </div>
+            )}
+          </div>
+
+          {/* Counts bar */}
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              { label: "Critical", count: excCounts.critical || 0, color: "bg-red-50 border-red-200 text-red-700" },
+              { label: "High", count: excCounts.high || 0, color: "bg-orange-50 border-orange-200 text-orange-700" },
+              { label: "Medium", count: excCounts.medium || 0, color: "bg-amber-50 border-amber-200 text-amber-700" },
+              { label: "Resolved", count: excCounts.resolved || 0, color: "bg-emerald-50 border-emerald-200 text-emerald-700" },
+            ].map(({ label, count, color }) => (
+              <div key={label} className={cn("rounded-xl border p-3 text-center", color)}>
+                <div className="text-2xl font-bold">{count}</div>
+                <div className="text-xs font-medium mt-0.5">{label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Filter tabs */}
+          <div className="flex gap-2">
+            {(["unresolved", "critical", "all"] as const).map((f) => (
+              <button key={f} onClick={() => setExcFilter(f)} className={cn("px-3 py-1.5 text-xs rounded-lg font-medium transition-colors", excFilter === f ? "bg-red-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}>
+                {f === "unresolved" ? "Unresolved" : f === "critical" ? "Critical Only" : "All"}
+              </button>
+            ))}
+          </div>
+
+          {/* Exception list */}
+          {excLoading ? (
+            <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-red-400" /></div>
+          ) : exceptions.length === 0 ? (
+            <div className="py-14 text-center border border-dashed border-slate-200 rounded-2xl">
+              <CheckCircle2 className="w-10 h-10 text-emerald-300 mx-auto mb-3" />
+              <p className="text-slate-500 text-sm font-medium">No {excFilter === "all" ? "" : excFilter + " "}exceptions found</p>
+              <p className="text-slate-400 text-xs mt-1">Run a scan to detect issues across FS, TB, GL, COA, and WPs</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {exceptions.map((ex: any) => {
+                const SEV: Record<string, string> = { Critical: "bg-red-100 text-red-700 border-red-200", High: "bg-orange-100 text-orange-700 border-orange-200", Medium: "bg-amber-100 text-amber-700 border-amber-200", Low: "bg-slate-100 text-slate-600 border-slate-200", Info: "bg-blue-50 text-blue-600 border-blue-100" };
+                return (
+                  <div key={ex.id} className={cn("bg-white border rounded-xl p-4", ex.severity === "Critical" ? "border-red-200" : ex.severity === "High" ? "border-orange-200" : "border-slate-200", ex.resolvedFlag && "opacity-60")}>
+                    <div className="flex items-start gap-3">
+                      <div className="shrink-0 mt-0.5 space-y-1">
+                        <span className={cn("text-[10px] px-2 py-0.5 rounded border font-bold block text-center", SEV[ex.severity] || SEV.Low)}>{ex.severity}</span>
+                        <span className="text-[9px] font-mono text-slate-400 block text-center">{ex.exceptionCode}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-semibold text-slate-800">{ex.description}</span>
+                          {ex.resolvedFlag && <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-semibold">RESOLVED</span>}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 flex-wrap text-[10px] text-slate-400">
+                          <span className="bg-slate-100 px-2 py-0.5 rounded">{ex.exceptionType}</span>
+                          <span>Source: {ex.sourceArea}</span>
+                          {ex.referenceCode && <span className="font-mono text-indigo-500">{ex.referenceCode}</span>}
+                          {ex.isaReference && <span>{ex.isaReference}</span>}
+                        </div>
+                        {ex.resolvedFlag && ex.resolutionNote && (
+                          <p className="text-[10px] text-emerald-600 mt-1 italic">Resolution: {ex.resolutionNote}</p>
+                        )}
+                        {!ex.resolvedFlag && resolvingId === ex.id && (
+                          <div className="mt-2 flex gap-2">
+                            <input value={resolveNote} onChange={e => setResolveNote(e.target.value)} placeholder="Resolution note..." className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1" />
+                            <button onClick={() => resolveException(ex.id, resolveNote)} className="px-3 py-1 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-semibold">Mark Resolved</button>
+                            <button onClick={() => setResolvingId(null)} className="px-3 py-1 bg-slate-100 text-slate-600 text-xs rounded-lg hover:bg-slate-200">Cancel</button>
+                          </div>
+                        )}
+                      </div>
+                      {!ex.resolvedFlag && resolvingId !== ex.id && (
+                        <button onClick={() => setResolvingId(ex.id)} className="shrink-0 px-3 py-1.5 text-xs rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 font-medium">Resolve</button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB 10: GENERATE OUTPUT ───────────────────────────────────────── */}
+      {activeEngineTab === "generate" && (
+        <div className="space-y-4">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-emerald-900 to-teal-800 rounded-2xl p-5 text-white">
+            <h3 className="text-base font-bold flex items-center gap-2"><Download className="w-5 h-5 text-emerald-300" /> OUTPUT GENERATION ENGINE</h3>
+            <p className="text-emerald-200 text-xs mt-0.5">Step 1 — Run Validation Gate · Step 2 — Generate TB / GL / WP Index outputs</p>
+          </div>
+
+          {/* Step 1: Validation Gate */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white", validation?.generationAllowed ? "bg-emerald-500" : validation ? "bg-red-500" : "bg-slate-300")}>
+                  {validation?.generationAllowed ? "✓" : validation ? "✗" : "1"}
+                </div>
+                <span className="text-sm font-semibold text-slate-800">Validation Gate — ISA Pre-Generation Check</span>
+              </div>
+              <button onClick={runValidation} disabled={validating} className="px-3 py-1.5 text-xs rounded-lg bg-slate-700 text-white hover:bg-slate-800 font-medium flex items-center gap-1.5 disabled:opacity-60">
+                {validating ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                {validating ? "Running..." : "Run Validation"}
+              </button>
+            </div>
+            {validation ? (
+              <div className="p-4 space-y-3">
+                <div className={cn("flex items-center gap-3 p-3 rounded-xl border", validation.generationAllowed ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200")}>
+                  {validation.generationAllowed ? <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" /> : <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />}
+                  <div>
+                    <p className={cn("text-sm font-semibold", validation.generationAllowed ? "text-emerald-700" : "text-red-700")}>{validation.generationAllowed ? "All checks passed — generation allowed" : "Generation blocked — resolve issues below"}</p>
+                    {validation.blockedReasons?.length > 0 && <ul className="mt-1 space-y-0.5">{validation.blockedReasons.map((r: string, i: number) => <li key={i} className="text-xs text-red-600">· {r}</li>)}</ul>}
+                  </div>
+                </div>
+                {/* Individual checks */}
+                <div className="grid grid-cols-1 gap-2">
+                  {validation.checks && Object.entries(validation.checks).map(([k, v]: [string, any]) => (
+                    <div key={k} className={cn("flex items-center gap-3 px-3 py-2 rounded-lg border text-xs", v.pass ? "bg-emerald-50/50 border-emerald-100" : "bg-red-50/50 border-red-100")}>
+                      <span className={cn("text-base", v.pass ? "text-emerald-500" : "text-red-500")}>{v.pass ? "✓" : "✗"}</span>
+                      <span className="font-medium text-slate-700 w-36 shrink-0">{k.replace(/([A-Z])/g, " $1").replace(/^./, s => s.toUpperCase())}</span>
+                      <span className={cn(v.pass ? "text-slate-500" : "text-red-600")}>{v.detail || (v.pass ? "Passed" : "Failed")}</span>
+                      {v.missingVars?.length > 0 && <span className="text-red-600 ml-1">Missing: {v.missingVars.join(", ")}</span>}
+                    </div>
+                  ))}
+                </div>
+                {/* Warnings */}
+                {validation.warnings?.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-1">
+                    <p className="text-xs font-semibold text-amber-700 mb-1">Warnings (non-blocking):</p>
+                    {validation.warnings.map((w: string, i: number) => <p key={i} className="text-xs text-amber-600">· {w}</p>)}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-slate-400 text-sm">Click "Run Validation" to check all 6 pre-generation conditions</div>
+            )}
+          </div>
+
+          {/* Step 2: Generate */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center gap-2">
+              <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white", validation?.generationAllowed ? "bg-emerald-500" : "bg-slate-300")}>2</div>
+              <span className="text-sm font-semibold text-slate-800">Generate Audit File Output</span>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  { type: "tb_excel", label: "TB Export", desc: "Trial Balance (Excel)", icon: "📊" },
+                  { type: "gl_excel", label: "GL Export", desc: "General Ledger (Excel)", icon: "📋" },
+                  { type: "wp_index", label: "WP Index", desc: "All WPs phase-wise", icon: "📁" },
+                  { type: "full_file", label: "Full File", desc: "TB + GL + WP Index", icon: "📦" },
+                ].map(({ type, label, desc, icon }) => (
+                  <button key={type} onClick={() => setGenJobType(type)} className={cn("p-3 rounded-xl border text-left transition-all", genJobType === type ? "bg-emerald-50 border-emerald-400 ring-1 ring-emerald-400" : "border-slate-200 hover:border-emerald-200")}>
+                    <span className="text-2xl">{icon}</span>
+                    <p className="text-xs font-semibold text-slate-800 mt-1">{label}</p>
+                    <p className="text-[10px] text-slate-400">{desc}</p>
+                  </button>
+                ))}
+              </div>
+              <button onClick={generateOutput} disabled={genLoading || !validation?.generationAllowed} className={cn("w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all", validation?.generationAllowed ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-slate-100 text-slate-400 cursor-not-allowed")}>
+                {genLoading ? <><Loader2 className="w-4 h-4 animate-spin" />Generating...</> : <><Download className="w-4 h-4" />Generate {genJobType === "tb_excel" ? "Trial Balance" : genJobType === "gl_excel" ? "General Ledger" : genJobType === "wp_index" ? "WP Index" : "Full Audit File"}</>}
+              </button>
+              {!validation?.generationAllowed && <p className="text-center text-xs text-slate-400">Run and pass the validation gate first</p>}
+            </div>
+          </div>
+
+          {/* Generation result */}
+          {genResult && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 space-y-2">
+              <p className="text-sm font-semibold text-emerald-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />Output generated — Job #{genResult.jobId}</p>
+              {genResult.output && (
+                <div className="grid grid-cols-3 gap-3 mt-2">
+                  <div className="bg-white border border-emerald-100 rounded-xl p-3 text-center"><div className="text-xl font-bold text-emerald-700">{genResult.output.tb?.totalAccounts}</div><div className="text-[10px] text-slate-500">TB Accounts</div></div>
+                  <div className="bg-white border border-emerald-100 rounded-xl p-3 text-center"><div className="text-xl font-bold text-teal-700">{genResult.output.gl?.totalTransactions}</div><div className="text-[10px] text-slate-500">GL Transactions</div></div>
+                  <div className="bg-white border border-emerald-100 rounded-xl p-3 text-center"><div className="text-xl font-bold text-indigo-700">{genResult.output.wpIndex?.totalWps}</div><div className="text-[10px] text-slate-500">WPs in Index</div></div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Output job history */}
+          {outputJobs.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="bg-slate-50 border-b border-slate-100 px-4 py-2.5"><span className="text-xs font-semibold text-slate-700">Previous Output Jobs</span></div>
+              <div className="divide-y divide-slate-50">
+                {outputJobs.slice(0, 8).map((job: any) => (
+                  <div key={job.id} className="px-4 py-2.5 flex items-center gap-3 text-xs">
+                    <span className={cn("px-2 py-0.5 rounded font-semibold", job.status === "complete" ? "bg-emerald-100 text-emerald-700" : job.status === "running" ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700")}>{job.status}</span>
+                    <span className="font-mono text-slate-500">{job.jobType}</span>
+                    <span className="text-slate-400">{job.recordCount ? `${job.recordCount} records` : ""}</span>
+                    <span className="text-slate-300 ml-auto">{job.triggeredBy}</span>
+                    <span className="text-slate-300">{job.createdAt ? new Date(job.createdAt).toLocaleString("en-PK", { dateStyle: "short", timeStyle: "short" }) : "—"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB 11: LOCK & ARCHIVE (ISA 230) ─────────────────────────────── */}
+      {activeEngineTab === "lock" && (
+        <div className="space-y-4">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-5 text-white">
+            <h3 className="text-base font-bold flex items-center gap-2"><Lock className="w-5 h-5 text-slate-300" /> SESSION LOCK & ARCHIVE — ISA 230</h3>
+            <p className="text-slate-400 text-xs mt-0.5">Partner approval lock · 7-year ICAP retention · No overwrite after lock · EQCR completion tracking</p>
+          </div>
+
+          {/* Lock status */}
+          {lockLoading ? (
+            <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>
+          ) : lockStatus?.locked ? (
+            <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center shrink-0"><Lock className="w-5 h-5 text-white" /></div>
+                <div>
+                  <p className="text-sm font-bold text-emerald-800">Session Locked — ISA 230 Compliant</p>
+                  <p className="text-xs text-emerald-600">No further edits permitted without EQCR override</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="bg-white border border-emerald-100 rounded-xl p-3"><span className="text-slate-400 block">Locked by</span><span className="font-semibold text-slate-800">{lockStatus.lock.lockedBy}</span></div>
+                <div className="bg-white border border-emerald-100 rounded-xl p-3"><span className="text-slate-400 block">Lock level</span><span className="font-semibold text-slate-800">{lockStatus.lock.lockLevel}</span></div>
+                <div className="bg-white border border-emerald-100 rounded-xl p-3"><span className="text-slate-400 block">Archive ref (ISA 230)</span><span className="font-mono text-indigo-600 text-[11px]">{lockStatus.lock.archiveRef}</span></div>
+                <div className="bg-white border border-emerald-100 rounded-xl p-3"><span className="text-slate-400 block">Retention until</span><span className="font-semibold text-slate-800">{lockStatus.lock.retentionEndDate}</span></div>
+                <div className="bg-white border border-emerald-100 rounded-xl p-3"><span className="text-slate-400 block">EQCR completed</span><span className={cn("font-semibold", lockStatus.lock.eqcrCompleted ? "text-emerald-700" : "text-amber-600")}>{lockStatus.lock.eqcrCompleted ? "Yes" : "Pending"}</span></div>
+                <div className="bg-white border border-emerald-100 rounded-xl p-3"><span className="text-slate-400 block">Locked at</span><span className="font-semibold text-slate-800">{lockStatus.lock.lockedAt ? new Date(lockStatus.lock.lockedAt).toLocaleDateString("en-PK") : "—"}</span></div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="bg-amber-50 border-b border-amber-100 px-4 py-3 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                <span className="text-sm font-semibold text-amber-800">Session not locked — apply partner approval to archive</span>
+              </div>
+              <div className="p-4 space-y-4">
+                <p className="text-xs text-slate-500">Under ISA 230, the audit file must be locked after partner approval. No documentation may be added, deleted or modified after the assembly date.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 block mb-1">Partner name <span className="text-red-500">*</span></label>
+                    <input value={lockForm.lockedBy} onChange={e => setLockForm(f => ({ ...f, lockedBy: e.target.value }))} placeholder="e.g. Muhammad Alam" className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-400" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 block mb-1">Lock level</label>
+                    <select value={lockForm.lockLevel} onChange={e => setLockForm(f => ({ ...f, lockLevel: e.target.value }))} className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2">
+                      {["Partner", "Manager", "EQCR"].map(l => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs font-medium text-slate-600 block mb-1">Lock justification</label>
+                    <input value={lockForm.lockJustification} onChange={e => setLockForm(f => ({ ...f, lockJustification: e.target.value }))} placeholder="e.g. Audit completed and all SQC criteria satisfied" className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 block mb-1">Archive reference (optional)</label>
+                    <input value={lockForm.archiveRef} onChange={e => setLockForm(f => ({ ...f, archiveRef: e.target.value }))} placeholder="e.g. ANA-2025-001" className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 block mb-1">EQCR reviewer (if applicable)</label>
+                    <input value={lockForm.eqcrBy} onChange={e => setLockForm(f => ({ ...f, eqcrBy: e.target.value }))} placeholder="e.g. Aulakh" className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2" />
+                  </div>
+                </div>
+                {lockResult?.error && <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700">{lockResult.error}</div>}
+                <button onClick={lockSession} disabled={locking || !lockForm.lockedBy} className="w-full py-3 bg-slate-900 hover:bg-slate-700 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50">
+                  {locking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                  {locking ? "Locking session..." : "Lock Session — ISA 230 Archive"}
+                </button>
+                <p className="text-center text-[10px] text-slate-400">Requires: all critical exceptions resolved · retention: 7 years (ICAP)</p>
+              </div>
+            </div>
+          )}
+
+          {/* ISA 230 Audit Trail */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="bg-slate-50 border-b border-slate-100 px-4 py-2.5 flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-700 flex items-center gap-1.5"><ClipboardCheck className="w-3.5 h-3.5" />ISA 230 Audit Trail</span>
+              <button onClick={fetchAuditTrail} disabled={trailLoading} className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1">
+                {trailLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}Refresh
+              </button>
+            </div>
+            {trailLoading ? (
+              <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-slate-300" /></div>
+            ) : auditTrail.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs">No audit trail events yet — approve WPs, run validations, or generate outputs to populate</div>
+            ) : (
+              <div className="divide-y divide-slate-50 max-h-96 overflow-y-auto">
+                {auditTrail.map((event: any, i: number) => {
+                  const typeStyle: Record<string, string> = { WP_PREPARED: "bg-amber-100 text-amber-700", WP_REVIEWED: "bg-violet-100 text-violet-700", WP_APPROVED: "bg-emerald-100 text-emerald-700", VALIDATION_RUN: "bg-blue-100 text-blue-700", OUTPUT_GENERATED: "bg-teal-100 text-teal-700", SESSION_LOCKED: "bg-slate-800 text-white", SESSION_UNLOCKED: "bg-orange-100 text-orange-700" };
+                  return (
+                    <div key={i} className="px-4 py-2.5 flex items-start gap-3 text-xs">
+                      <span className="text-slate-300 shrink-0 mt-0.5 tabular-nums">{event.timestamp ? new Date(event.timestamp).toLocaleString("en-PK", { dateStyle: "short", timeStyle: "short" }) : "—"}</span>
+                      <span className={cn("px-2 py-0.5 rounded text-[10px] font-semibold shrink-0", typeStyle[event.type] || "bg-slate-100 text-slate-600")}>{event.type?.replace(/_/g, " ")}</span>
+                      <span className="text-slate-700 flex-1">{event.detail}</span>
+                      <span className="text-slate-400 shrink-0">{event.actor}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
