@@ -24,39 +24,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Start Backend"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Start application"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "Deploy to Production"
-
-[[workflows.workflow]]
-name = "Start Backend"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "PORT=5000 pnpm --filter @workspace/api-server run dev"
-waitForPort = 5000
-
-[[workflows.workflow]]
-name = "Start application"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "webview"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "PORT=3000 pnpm --filter @workspace/hrm-system run dev"
-waitForPort = 3000
 
 [[workflows.workflow]]
 name = "Deploy to Production"
@@ -89,3 +57,4 @@ VPS_HOST = "187.77.130.117"
 VPS_USERNAME = "root"
 VPS_PORT = "22"
 JWT_SECRET = "a7599d60a9677b9d8836e267cc2dc9ab14998d73e433cb44b427ab905aaad2de"
+API_PORT = "8080"
