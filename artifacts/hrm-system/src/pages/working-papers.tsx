@@ -60,7 +60,12 @@ export default function WorkingPapers() {
   const [stage, setStage] = useState<string>("upload");
 
   const [newClientName, setNewClientName] = useState("");
-  const [newYear, setNewYear] = useState("2024");
+  const [newYear, setNewYear] = useState("2025");
+  const [newEntityType, setNewEntityType] = useState("Private Limited");
+  const [newNtn, setNewNtn] = useState("");
+  const [newStrn, setNewStrn] = useState("");
+  const [newFramework, setNewFramework] = useState("IFRS");
+  const [newEngagementType, setNewEngagementType] = useState("statutory_audit");
 
   const [uploadFiles, setUploadFiles] = useState<{ file: File; category: string }[]>([]);
   const [extractionData, setExtractionData] = useState<any>(null);
@@ -113,12 +118,22 @@ export default function WorkingPapers() {
       setLoading(true);
       const res = await fetch(`${API_BASE}/working-papers/sessions`, {
         method: "POST", headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ clientName: newClientName, engagementYear: newYear }),
+        body: JSON.stringify({
+          clientName: newClientName,
+          engagementYear: newYear,
+          entityType: newEntityType,
+          ntn: newNtn || undefined,
+          strn: newStrn || undefined,
+          reportingFramework: newFramework,
+          engagementType: newEngagementType,
+        }),
       });
       if (res.ok) {
         const session = await res.json();
-        toast({ title: "Session created" });
+        toast({ title: "Session created", description: `${newClientName} — ${newEntityType}` });
         setNewClientName("");
+        setNewNtn("");
+        setNewStrn("");
         await fetchSessions();
         await fetchSession(session.id);
       }
@@ -446,14 +461,74 @@ export default function WorkingPapers() {
 
         <div className="bg-card border rounded-xl p-6 space-y-4">
           <h2 className="font-semibold">New Engagement Session</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input placeholder="Client / Entity Name" value={newClientName} onChange={e => setNewClientName(e.target.value)} />
-            <Input placeholder="Engagement Year" value={newYear} onChange={e => setNewYear(e.target.value)} />
-            <Button onClick={createSession} disabled={loading}>
-              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-              Create Session
-            </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Client / Entity Name *</label>
+              <Input placeholder="e.g. ABC Industries (Pvt.) Ltd." value={newClientName} onChange={e => setNewClientName(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Entity Type *</label>
+              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newEntityType} onChange={e => setNewEntityType(e.target.value)}>
+                <option value="Private Limited">Private Limited Company</option>
+                <option value="Public Limited (Listed)">Public Limited (Listed / PIE)</option>
+                <option value="Public Limited (Unlisted)">Public Limited (Unlisted)</option>
+                <option value="Single Member">Single Member Company</option>
+                <option value="LLP">Limited Liability Partnership</option>
+                <option value="AOP">Association of Persons (AOP)</option>
+                <option value="Sole Proprietor">Sole Proprietor</option>
+                <option value="NGO/NPO">NGO / NPO (Section 42)</option>
+                <option value="Trust">Trust</option>
+                <option value="Government Entity">Government Entity</option>
+                <option value="Branch Office">Branch Office (Foreign Company)</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Engagement Year *</label>
+              <Input placeholder="2025" value={newYear} onChange={e => setNewYear(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">NTN (National Tax Number)</label>
+              <Input placeholder="e.g. 1234567-8" value={newNtn} onChange={e => setNewNtn(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">STRN (Sales Tax Registration)</label>
+              <Input placeholder="e.g. 32-00-1234-567-89" value={newStrn} onChange={e => setNewStrn(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Reporting Framework</label>
+              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newFramework} onChange={e => setNewFramework(e.target.value)}>
+                <option value="IFRS">IFRS (Full)</option>
+                <option value="IFRS for SMEs">IFRS for SMEs</option>
+                <option value="AFRS">AFRS (Accounting Framework)</option>
+                <option value="Fourth Schedule">Fourth Schedule (Companies Act 2017)</option>
+                <option value="Fifth Schedule">Fifth Schedule (Banking/Insurance)</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Engagement Type</label>
+              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newEngagementType} onChange={e => setNewEngagementType(e.target.value)}>
+                <option value="statutory_audit">Statutory Audit</option>
+                <option value="limited_review">Limited Review / Review Engagement</option>
+                <option value="agreed_upon_procedures">Agreed-Upon Procedures</option>
+                <option value="compilation">Compilation Engagement</option>
+                <option value="special_purpose">Special Purpose Audit</option>
+                <option value="group_audit">Group / Consolidated Audit</option>
+                <option value="ipo_due_diligence">IPO / Due Diligence</option>
+              </select>
+            </div>
+            <div className="flex items-end">
+              <Button onClick={createSession} disabled={loading} className="w-full">
+                {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                Create Session
+              </Button>
+            </div>
           </div>
+          {(newEntityType === "Public Limited (Listed)" || newEntityType === "Government Entity") && (
+            <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              {newEntityType === "Public Limited (Listed)" ? "Listed entities require EQCR review and enhanced disclosure working papers." : "Government entity engagements follow special reporting requirements."}
+            </div>
+          )}
         </div>
 
         {sessions.length > 0 && (
@@ -461,11 +536,17 @@ export default function WorkingPapers() {
             <div className="p-4 font-semibold">Existing Sessions</div>
             {sessions.map((s: any) => (
               <div key={s.id} className="p-4 flex items-center justify-between hover:bg-muted/30 cursor-pointer" onClick={() => fetchSession(s.id)}>
-                <div>
-                  <p className="font-medium">{s.clientName}</p>
-                  <p className="text-sm text-muted-foreground">Year: {s.engagementYear} — Stage: {s.status}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{s.clientName}</p>
+                    {s.entityType && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-medium">{s.entityType}</span>}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Year: {s.engagementYear} — {s.reportingFramework || "IFRS"} — Stage: {s.status}
+                    {s.ntn && <span className="ml-2">NTN: {s.ntn}</span>}
+                  </p>
                 </div>
-                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
               </div>
             ))}
           </div>
@@ -483,9 +564,16 @@ export default function WorkingPapers() {
         <Button variant="ghost" size="sm" onClick={() => { setActiveSession(null); setStage("upload"); }}>
           <ArrowLeft className="w-4 h-4 mr-1" /> Back
         </Button>
-        <div className="flex-1">
-          <h1 className="text-xl font-bold">{activeSession.clientName}</h1>
-          <p className="text-sm text-muted-foreground">Year: {activeSession.engagementYear} — {activeSession.reportingFramework || "IFRS"}</p>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xl font-bold">{activeSession.clientName}</h1>
+            {activeSession.entityType && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium">{activeSession.entityType}</span>}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Year: {activeSession.engagementYear} — {activeSession.reportingFramework || "IFRS"}
+            {activeSession.ntn && <span className="ml-2">— NTN: {activeSession.ntn}</span>}
+            {activeSession.strn && <span className="ml-1">— STRN: {activeSession.strn}</span>}
+          </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => fetchExceptions()}>
           <AlertTriangle className="w-4 h-4 mr-1" /> Exceptions ({exceptions.length})

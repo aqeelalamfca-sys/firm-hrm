@@ -78,7 +78,7 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("reporting_period_end", "Entity & Constitution", "Reporting Period", "Reporting Period End", { dataType: "date", mandatoryFlag: M, aiExtractableFlag: AI, displayOrder: 22 }),
   v("functional_currency", "Entity & Constitution", "Currency", "Functional Currency", { defaultValue: "PKR", aiExtractableFlag: AI, displayOrder: 23 }),
   v("presentation_currency", "Entity & Constitution", "Currency", "Presentation Currency", { defaultValue: "PKR", displayOrder: 24 }),
-  v("reporting_framework", "Entity & Constitution", "Framework", "Reporting Framework", { inputMode: "dropdown", dropdownOptionsJson: dd(["IFRS","IFRS for SMEs","Non-IFRS"]), mandatoryFlag: M, defaultValue: "IFRS", displayOrder: 25 }),
+  v("reporting_framework", "Entity & Constitution", "Framework", "Reporting Framework", { inputMode: "dropdown", dropdownOptionsJson: dd(["IFRS","IFRS for SMEs","AFRS","Fourth Schedule","Fifth Schedule"]), mandatoryFlag: M, defaultValue: "IFRS", displayOrder: 25 }),
   v("applicable_company_law", "Entity & Constitution", "Framework", "Applicable Company Law", { defaultValue: "Companies Act 2017", pakistanReference: "Companies Act 2017", displayOrder: 26 }),
   v("tax_jurisdiction", "Entity & Constitution", "Tax", "Tax Jurisdiction", { defaultValue: "Pakistan (Federal + Provincial)", displayOrder: 27 }),
   v("group_entity_flag", "Entity & Constitution", "Group", "Group Entity", { dataType: "boolean", inputMode: "toggle", displayOrder: 28 }),
@@ -117,7 +117,7 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   // ═══════════════════════════════════════════════════════════════════════════
   // GROUP 3 — Engagement Acceptance & Continuance
   // ═══════════════════════════════════════════════════════════════════════════
-  v("engagement_type", "Engagement Acceptance", "Engagement Setup", "Engagement Type", { inputMode: "dropdown", dropdownOptionsJson: dd(["Statutory Audit","Special Audit","Review Engagement","Agreed-upon Procedures","Compilation","Tax Audit","Internal Audit","Due Diligence"]), mandatoryFlag: M, displayOrder: 1 }),
+  v("engagement_type", "Engagement Acceptance", "Engagement Setup", "Engagement Type", { inputMode: "dropdown", dropdownOptionsJson: dd(["statutory_audit","limited_review","agreed_upon_procedures","compilation","special_purpose","group_audit","ipo_due_diligence"]), mandatoryFlag: M, displayOrder: 1 }),
   v("assurance_level", "Engagement Acceptance", "Engagement Setup", "Assurance Level", { inputMode: "dropdown", dropdownOptionsJson: dd(["Reasonable","Limited","None"]), defaultValue: "Reasonable", displayOrder: 2 }),
   v("first_year_audit", "Engagement Acceptance", "History", "First Year Audit", { dataType: "boolean", inputMode: "toggle", affectsWorkingPapersJson: ["ob_verification"], displayOrder: 3 }),
   v("recurring_engagement", "Engagement Acceptance", "History", "Recurring Engagement", { dataType: "boolean", inputMode: "toggle", displayOrder: 4 }),

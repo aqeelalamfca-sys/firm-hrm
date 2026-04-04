@@ -187,7 +187,7 @@ router.get("/sessions", async (_req: Request, res: Response) => {
 
 router.post("/sessions", async (req: Request, res: Response) => {
   try {
-    const { clientName, engagementYear, entityType, ntn, strn, reportingFramework } = req.body;
+    const { clientName, engagementYear, entityType, ntn, strn, reportingFramework, engagementType } = req.body;
     if (!clientName || !engagementYear) {
       return res.status(400).json({ error: "Client name and engagement year are required" });
     }
@@ -197,6 +197,7 @@ router.post("/sessions", async (req: Request, res: Response) => {
       ntn: ntn || null,
       strn: strn || null,
       reportingFramework: reportingFramework || "IFRS",
+      engagementType: engagementType || "statutory_audit",
       status: "upload",
     }).returning();
 
@@ -327,6 +328,10 @@ router.post("/sessions/:id/upload", upload.array("files", 20), async (req: Reque
 router.post("/sessions/:id/extract", async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(req.params.id);
+    const sessionRows = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
+    if (!sessionRows[0]) return res.status(404).json({ error: "Session not found" });
+    const sessionMeta = sessionRows[0];
+
     const files = await db.select().from(wpUploadedFilesTable).where(eq(wpUploadedFilesTable.sessionId, sessionId));
     if (files.length === 0) return res.status(400).json({ error: "No files uploaded yet" });
 
@@ -390,6 +395,12 @@ router.post("/sessions/:id/extract", async (req: Request, res: Response) => {
     const docSummary = allTexts.join("\n\n---\n\n");
 
     const extractionPrompt = `You are a senior Pakistan-qualified chartered accountant with forensic document analysis expertise.
+
+CLIENT: ${sessionMeta.clientName}
+ENTITY TYPE: ${sessionMeta.entityType || "Private Limited"}
+YEAR: ${sessionMeta.engagementYear}
+FRAMEWORK: ${sessionMeta.reportingFramework || "IFRS"}
+NTN: ${sessionMeta.ntn || "Not provided"}
 
 DOCUMENTS TO ANALYZE (${files.length} files, ${totalSheets} Excel sheets, ${totalPages} pages):
 ${docSummary}
@@ -713,9 +724,30 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
     const sessionId = parseInt(req.params.id);
     if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
 
+    const sessions = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
+    if (!sessions[0]) return res.status(404).json({ error: "Session not found" });
+    const session = sessions[0];
+
     const fields = await db.select().from(wpExtractedFieldsTable).where(eq(wpExtractedFieldsTable.sessionId, sessionId));
 
     const extractedMap: Record<string, { value: string; confidence: string; sourceFile?: string; sourceSheet?: string; sourcePage?: number }> = {};
+
+    const sessionMetaMap: Record<string, string> = {};
+    if (session.clientName) sessionMetaMap["entity_name"] = session.clientName;
+    if (session.entityType) sessionMetaMap["entity_legal_form"] = session.entityType;
+    if (session.entityType) sessionMetaMap["listed_status"] = (session.entityType === "Public Limited (Listed)") ? "Listed" : "Unlisted";
+    if (session.ntn) sessionMetaMap["ntn"] = session.ntn;
+    if (session.strn) sessionMetaMap["strn"] = session.strn;
+    if (session.reportingFramework) sessionMetaMap["reporting_framework"] = session.reportingFramework;
+    if (session.engagementType) sessionMetaMap["engagement_type"] = session.engagementType;
+    if (session.engagementYear) sessionMetaMap["financial_year_end"] = `June 30, ${session.engagementYear}`;
+    if (session.engagementYear) sessionMetaMap["reporting_period_end"] = `June 30, ${session.engagementYear}`;
+    if (session.strn) sessionMetaMap["sales_tax_applicable"] = "true";
+
+    for (const [code, value] of Object.entries(sessionMetaMap)) {
+      extractedMap[code] = { value, confidence: "100" };
+    }
+
     for (const f of fields) {
       const mappedCode = EXTRACTION_FIELD_TO_VARIABLE_MAP[f.fieldName];
       if (mappedCode) {
@@ -1487,8 +1519,12 @@ router.post("/sessions/:id/heads/:headIndex/generate", async (req: Request, res:
       const paperPrompt = `Generate the audit working paper "${paperCode}" for the "${headDef.name}" section.
 
 CLIENT: ${session?.clientName || "Unknown"}
+ENTITY TYPE: ${session?.entityType || "Private Limited"}
 YEAR: ${session?.engagementYear || "2024"}
 FRAMEWORK: ${session?.reportingFramework || "IFRS"}
+ENGAGEMENT: ${session?.engagementType?.replace(/_/g, " ") || "Statutory Audit"}
+NTN: ${session?.ntn || "N/A"}
+LISTED STATUS: ${session?.entityType === "Public Limited (Listed)" ? "Listed / PIE" : "Unlisted"}
 
 ENGAGEMENT VARIABLES:
 ${varSummary}
@@ -1803,7 +1839,7 @@ router.post("/sessions/:id/export-bundle", async (req: Request, res: Response) =
 
     const wb = XLSX.utils.book_new();
 
-    const indexData = [["Working Papers Bundle"], [`Client: ${session.clientName}`], [`Year: ${session.engagementYear}`], [`Generated: ${new Date().toISOString()}`], [], ["Head", "Status", "Papers", "Exceptions", "Exported"]];
+    const indexData = [["Working Papers Bundle"], [`Client: ${session.clientName}`], [`Entity Type: ${session.entityType || "N/A"}`], [`Year: ${session.engagementYear}`], [`Framework: ${session.reportingFramework || "IFRS"}`], [`NTN: ${session.ntn || "N/A"}`], [`Generated: ${new Date().toISOString()}`], [], ["Head", "Status", "Papers", "Exceptions", "Exported"]];
     for (const head of heads) {
       const headDocs = allDocs.filter(d => d.headId === head.id);
       indexData.push([head.headName, head.status, String(headDocs.length), String(head.exceptionsCount || 0), head.exportedAt ? "Yes" : "No"]);

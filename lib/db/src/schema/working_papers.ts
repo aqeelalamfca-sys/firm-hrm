@@ -72,6 +72,7 @@ export const wpSessionsTable = pgTable("wp_sessions", {
   ntn: text("ntn"),
   strn: text("strn"),
   reportingFramework: text("reporting_framework").default("IFRS"),
+  engagementType: text("engagement_type").default("statutory_audit"),
   status: wpSessionStatus("status").notNull().default("upload"),
   currentHeadIndex: integer("current_head_index").default(0),
   createdBy: integer("created_by"),
