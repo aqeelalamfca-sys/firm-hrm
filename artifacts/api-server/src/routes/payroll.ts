@@ -17,148 +17,163 @@ function calculatePakistanTax(annualIncome: number): number {
 }
 
 router.get("/", async (req, res) => {
-  const { month, year } = req.query;
-  let records = await db.select().from(payrollTable);
-  if (month) records = records.filter((r: any) => r.month === month);
-  if (year) records = records.filter((r: any) => r.year === parseInt(year as string));
+  try {
+    const { month, year } = req.query;
+    let records = await db.select().from(payrollTable);
+    if (month) records = records.filter((r: any) => r.month === month);
+    if (year) records = records.filter((r: any) => r.year === parseInt(year as string));
 
-  const result = await Promise.all(
-    records.map(async (r: any) => {
-      const emps = await db.select().from(employeesTable).where(eq(employeesTable.id, r.employeeId));
-      const emp = emps[0];
-      return {
-        id: r.id,
-        employeeId: r.employeeId,
-        employeeName: emp ? `${emp.firstName} ${emp.lastName}` : "Unknown",
-        employeeCode: emp?.employeeCode || "???",
-        designation: emp?.designation || "",
-        department: emp?.department || "",
-        month: r.month,
-        year: r.year,
-        basicSalary: Number(r.basicSalary),
-        allowances: Number(r.allowances),
-        deductions: Number(r.deductions),
-        taxAmount: Number((r as any).taxAmount || 0),
-        overtimeHours: Number((r as any).overtimeHours || 0),
-        overtimePay: Number((r as any).overtimePay || 0),
-        advances: Number(r.advances),
-        netSalary: Number(r.netSalary),
-        workingDays: r.workingDays,
-        presentDays: r.presentDays,
-        paymentStatus: r.paymentStatus,
-        paidDate: r.paidDate,
-        notes: r.notes,
-      };
-    })
-  );
+    const result = await Promise.all(
+      records.map(async (r: any) => {
+        const emps = await db.select().from(employeesTable).where(eq(employeesTable.id, r.employeeId));
+        const emp = emps[0];
+        return {
+          id: r.id,
+          employeeId: r.employeeId,
+          employeeName: emp ? `${emp.firstName} ${emp.lastName}` : "Unknown",
+          employeeCode: emp?.employeeCode || "???",
+          designation: emp?.designation || "",
+          department: emp?.department || "",
+          month: r.month,
+          year: r.year,
+          basicSalary: Number(r.basicSalary),
+          allowances: Number(r.allowances),
+          deductions: Number(r.deductions),
+          taxAmount: Number(r.taxAmount || 0),
+          overtimeHours: Number(r.overtimeHours || 0),
+          overtimePay: Number(r.overtimePay || 0),
+          advances: Number(r.advances),
+          netSalary: Number(r.netSalary),
+          workingDays: r.workingDays,
+          presentDays: r.presentDays,
+          paymentStatus: r.paymentStatus,
+          paidDate: r.paidDate,
+          notes: r.notes,
+        };
+      })
+    );
 
-  res.json(result);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch payroll records" });
+  }
 });
 
 router.get("/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
-  const records = await db.select().from(payrollTable).where(eq(payrollTable.id, id));
-  const r = records[0];
-  if (!r) return res.status(404).json({ error: "Payroll record not found" });
+  try {
+    const id = parseInt(req.params.id);
+    const records = await db.select().from(payrollTable).where(eq(payrollTable.id, id));
+    const r = records[0];
+    if (!r) return res.status(404).json({ error: "Payroll record not found" });
 
-  const emps = await db.select().from(employeesTable).where(eq(employeesTable.id, r.employeeId));
-  const emp = emps[0];
+    const emps = await db.select().from(employeesTable).where(eq(employeesTable.id, r.employeeId));
+    const emp = emps[0];
 
-  res.json({
-    id: r.id,
-    employeeId: r.employeeId,
-    employeeName: emp ? `${emp.firstName} ${emp.lastName}` : "Unknown",
-    employeeCode: emp?.employeeCode || "???",
-    designation: emp?.designation || "",
-    department: emp?.department || "",
-    month: r.month,
-    year: r.year,
-    basicSalary: Number(r.basicSalary),
-    allowances: Number(r.allowances),
-    deductions: Number(r.deductions),
-    taxAmount: Number((r as any).taxAmount || 0),
-    overtimeHours: Number((r as any).overtimeHours || 0),
-    overtimePay: Number((r as any).overtimePay || 0),
-    advances: Number(r.advances),
-    netSalary: Number(r.netSalary),
-    workingDays: r.workingDays,
-    presentDays: r.presentDays,
-    paymentStatus: r.paymentStatus,
-    paidDate: r.paidDate,
-    notes: r.notes,
-  });
+    res.json({
+      id: r.id,
+      employeeId: r.employeeId,
+      employeeName: emp ? `${emp.firstName} ${emp.lastName}` : "Unknown",
+      employeeCode: emp?.employeeCode || "???",
+      designation: emp?.designation || "",
+      department: emp?.department || "",
+      month: r.month,
+      year: r.year,
+      basicSalary: Number(r.basicSalary),
+      allowances: Number(r.allowances),
+      deductions: Number(r.deductions),
+      taxAmount: Number(r.taxAmount || 0),
+      overtimeHours: Number(r.overtimeHours || 0),
+      overtimePay: Number(r.overtimePay || 0),
+      advances: Number(r.advances),
+      netSalary: Number(r.netSalary),
+      workingDays: r.workingDays,
+      presentDays: r.presentDays,
+      paymentStatus: r.paymentStatus,
+      paidDate: r.paidDate,
+      notes: r.notes,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch payroll record" });
+  }
 });
 
-router.post("/", async (req, res) => {
-  const { month, year } = req.body;
-  if (!month || !year) return res.status(400).json({ error: "Month and year required" });
+router.post("/", async (req: AuthenticatedRequest, res) => {
+  try {
+    const { month, year } = req.body;
+    if (!month || !year) return res.status(400).json({ error: "Month and year required" });
 
-  const employees = await db.select().from(employeesTable).where(eq(employeesTable.status, "active"));
+    const employees = await db.select().from(employeesTable).where(eq(employeesTable.status, "active"));
 
-  const workingDays = 26; // Standard working days per month
+    const workingDays = 26;
 
-  const records = await Promise.all(
-    employees.map(async (emp: any) => {
-      const existingPayroll = await db.select().from(payrollTable)
-        .where(and(eq(payrollTable.employeeId, emp.id), eq(payrollTable.month, month), eq(payrollTable.year, parseInt(year))));
-      
-      if (existingPayroll.length > 0) return null;
+    const records = await Promise.all(
+      employees.map(async (emp: any) => {
+        const existingPayroll = await db.select().from(payrollTable)
+          .where(and(eq(payrollTable.employeeId, emp.id), eq(payrollTable.month, month), eq(payrollTable.year, parseInt(year))));
 
-      const attRecords = await db.select().from(attendanceTable).where(eq(attendanceTable.employeeId, emp.id));
-      const monthAttendance = attRecords.filter((r: any) => {
-        const d = new Date(r.date);
-        const [mn, yr] = month.split("-");
-        return d.getMonth() + 1 === parseInt(mn) && d.getFullYear() === parseInt(yr);
-      });
+        if (existingPayroll.length > 0) return null;
 
-      const presentDays = monthAttendance.filter((r: any) => r.status === "present" || r.status === "late").length;
-      const basicSalary = Number(emp.salary);
-      const perDaySalary = basicSalary / workingDays;
-      const grossSalary = presentDays > 0 ? (perDaySalary * presentDays) : basicSalary;
-      const annualProjection = basicSalary * 12;
-      const annualTax = calculatePakistanTax(annualProjection);
-      const monthlyTax = Math.round(annualTax / 12);
-      const netSalary = grossSalary - monthlyTax;
+        const attRecords = await db.select().from(attendanceTable).where(eq(attendanceTable.employeeId, emp.id));
+        const monthAttendance = attRecords.filter((r: any) => {
+          const d = new Date(r.date);
+          const [mn, yr] = month.split("-");
+          return d.getMonth() + 1 === parseInt(mn) && d.getFullYear() === parseInt(yr);
+        });
 
-      const [record] = await db.insert(payrollTable).values({
-        employeeId: emp.id,
-        month,
-        year: parseInt(year),
-        basicSalary: basicSalary.toString(),
-        allowances: "0",
-        deductions: monthlyTax.toString(),
-        taxAmount: monthlyTax.toString(),
-        overtimeHours: "0",
-        overtimePay: "0",
-        advances: "0",
-        netSalary: netSalary.toFixed(2),
-        workingDays,
-        presentDays: presentDays || workingDays,
-        paymentStatus: "pending",
-      }).returning();
+        const presentDays = monthAttendance.filter((r: any) => r.status === "present" || r.status === "late").length;
+        const basicSalary = Number(emp.salary);
+        const perDaySalary = basicSalary / workingDays;
+        const grossSalary = presentDays > 0 ? (perDaySalary * presentDays) : basicSalary;
+        const annualProjection = basicSalary * 12;
+        const annualTax = calculatePakistanTax(annualProjection);
+        const monthlyTax = Math.round(annualTax / 12);
+        const netSalary = grossSalary - monthlyTax;
 
-      return {
-        id: record.id,
-        employeeId: emp.id,
-        employeeName: `${emp.firstName} ${emp.lastName}`,
-        employeeCode: emp.employeeCode,
-        month: record.month,
-        year: record.year,
-        basicSalary: Number(record.basicSalary),
-        allowances: Number(record.allowances),
-        deductions: Number(record.deductions),
-        advances: Number(record.advances),
-        netSalary: Number(record.netSalary),
-        workingDays: record.workingDays,
-        presentDays: record.presentDays,
-        paymentStatus: record.paymentStatus,
-        paidDate: record.paidDate,
-        notes: record.notes,
-      };
-    })
-  );
+        const [record] = await db.insert(payrollTable).values({
+          employeeId: emp.id,
+          month,
+          year: parseInt(year),
+          basicSalary: basicSalary.toString(),
+          allowances: "0",
+          deductions: monthlyTax.toString(),
+          taxAmount: monthlyTax.toString(),
+          overtimeHours: "0",
+          overtimePay: "0",
+          advances: "0",
+          netSalary: netSalary.toFixed(2),
+          workingDays,
+          presentDays: presentDays || workingDays,
+          paymentStatus: "pending",
+        }).returning();
 
-  res.status(201).json(records.filter(Boolean));
+        return {
+          id: record.id,
+          employeeId: emp.id,
+          employeeName: `${emp.firstName} ${emp.lastName}`,
+          employeeCode: emp.employeeCode,
+          month: record.month,
+          year: record.year,
+          basicSalary: Number(record.basicSalary),
+          allowances: Number(record.allowances),
+          deductions: Number(record.deductions),
+          taxAmount: Number(record.taxAmount || 0),
+          overtimeHours: Number(record.overtimeHours || 0),
+          overtimePay: Number(record.overtimePay || 0),
+          advances: Number(record.advances),
+          netSalary: Number(record.netSalary),
+          workingDays: record.workingDays,
+          presentDays: record.presentDays,
+          paymentStatus: record.paymentStatus,
+          paidDate: record.paidDate,
+          notes: record.notes,
+        };
+      })
+    );
+
+    res.status(201).json(records.filter(Boolean));
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to generate payroll" });
+  }
 });
 
 export default router;

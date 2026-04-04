@@ -122,7 +122,7 @@ export default function Invoices() {
       body.paidDate = new Date().toISOString().split("T")[0];
     }
     const res = await fetch(`/api/invoices/${id}/status`, {
-      method: "PUT", headers,
+      method: "PATCH", headers,
       body: JSON.stringify(body),
     });
     if (res.ok) {

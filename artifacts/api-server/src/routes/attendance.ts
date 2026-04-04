@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { attendanceTable, employeesTable } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { type AuthenticatedRequest } from "../middleware/auth";
 
 const router = Router();
@@ -13,151 +13,167 @@ async function getEmployeeName(employeeId: number) {
 }
 
 router.get("/summary", async (req, res) => {
-  const { month, year } = req.query;
-  const employees = await db.select().from(employeesTable).where(eq(employeesTable.status, "active"));
+  try {
+    const { month, year } = req.query;
+    const employees = await db.select().from(employeesTable).where(eq(employeesTable.status, "active"));
 
-  const summaries = await Promise.all(
-    employees.map(async (emp: any) => {
-      let records = await db.select().from(attendanceTable).where(eq(attendanceTable.employeeId, emp.id));
-      if (month && year) {
-        records = records.filter((r: any) => {
-          const d = new Date(r.date);
-          return d.getMonth() + 1 === parseInt(month as string) && d.getFullYear() === parseInt(year as string);
-        });
-      }
+    const summaries = await Promise.all(
+      employees.map(async (emp: any) => {
+        let records = await db.select().from(attendanceTable).where(eq(attendanceTable.employeeId, emp.id));
+        if (month && year) {
+          records = records.filter((r: any) => {
+            const d = new Date(r.date);
+            return d.getMonth() + 1 === parseInt(month as string) && d.getFullYear() === parseInt(year as string);
+          });
+        }
 
-      const totalDays = records.length;
-      const presentDays = records.filter((r: any) => r.status === "present").length;
-      const absentDays = records.filter((r: any) => r.status === "absent").length;
-      const lateDays = records.filter((r: any) => r.status === "late").length;
-      const halfDays = records.filter((r: any) => r.status === "half_day").length;
-      const leaveDays = records.filter((r: any) => r.status === "leave").length;
-      const attendancePercentage = totalDays > 0 ? Math.round((presentDays + lateDays) / totalDays * 100) : 0;
+        const totalDays = records.length;
+        const presentDays = records.filter((r: any) => r.status === "present").length;
+        const absentDays = records.filter((r: any) => r.status === "absent").length;
+        const lateDays = records.filter((r: any) => r.status === "late").length;
+        const halfDays = records.filter((r: any) => r.status === "half_day").length;
+        const leaveDays = records.filter((r: any) => r.status === "leave").length;
+        const attendancePercentage = totalDays > 0 ? Math.round((presentDays + lateDays) / totalDays * 100) : 0;
 
-      return {
-        employeeId: emp.id,
-        employeeName: `${emp.firstName} ${emp.lastName}`,
-        employeeCode: emp.employeeCode,
-        totalDays,
-        presentDays,
-        absentDays,
-        lateDays,
-        halfDays,
-        leaveDays,
-        attendancePercentage,
-      };
-    })
-  );
+        return {
+          employeeId: emp.id,
+          employeeName: `${emp.firstName} ${emp.lastName}`,
+          employeeCode: emp.employeeCode,
+          totalDays,
+          presentDays,
+          absentDays,
+          lateDays,
+          halfDays,
+          leaveDays,
+          attendancePercentage,
+        };
+      })
+    );
 
-  res.json(summaries);
+    res.json(summaries);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch attendance summary" });
+  }
 });
 
 router.get("/", async (req, res) => {
-  const { employeeId, month, year } = req.query;
+  try {
+    const { employeeId, month, year } = req.query;
 
-  let records = await db.select().from(attendanceTable);
-  if (employeeId) records = records.filter((r: any) => r.employeeId === parseInt(employeeId as string));
-  if (month && year) {
-    records = records.filter((r: any) => {
-      const d = new Date(r.date);
-      return d.getMonth() + 1 === parseInt(month as string) && d.getFullYear() === parseInt(year as string);
-    });
+    let records = await db.select().from(attendanceTable);
+    if (employeeId) records = records.filter((r: any) => r.employeeId === parseInt(employeeId as string));
+    if (month && year) {
+      records = records.filter((r: any) => {
+        const d = new Date(r.date);
+        return d.getMonth() + 1 === parseInt(month as string) && d.getFullYear() === parseInt(year as string);
+      });
+    }
+
+    const result = await Promise.all(
+      records.map(async (r: any) => {
+        const { name, code } = await getEmployeeName(r.employeeId);
+        return {
+          id: r.id,
+          employeeId: r.employeeId,
+          employeeName: name,
+          employeeCode: code,
+          date: r.date,
+          checkIn: r.checkIn,
+          checkOut: r.checkOut,
+          status: r.status,
+          hoursWorked: r.hoursWorked ? Number(r.hoursWorked) : null,
+          ipAddress: (r as any).ipAddress || null,
+          notes: r.notes,
+        };
+      })
+    );
+
+    res.json(result.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch attendance records" });
   }
-
-  const result = await Promise.all(
-    records.map(async (r: any) => {
-      const { name, code } = await getEmployeeName(r.employeeId);
-      return {
-        id: r.id,
-        employeeId: r.employeeId,
-        employeeName: name,
-        employeeCode: code,
-        date: r.date,
-        checkIn: r.checkIn,
-        checkOut: r.checkOut,
-        status: r.status,
-        hoursWorked: r.hoursWorked ? Number(r.hoursWorked) : null,
-        ipAddress: (r as any).ipAddress || null,
-        notes: r.notes,
-      };
-    })
-  );
-
-  res.json(result.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 });
 
 router.post("/", async (req: AuthenticatedRequest, res) => {
-  const { employeeId, date, checkIn, checkOut, status, notes } = req.body;
-  if (!employeeId || !date || !status) {
-    return res.status(400).json({ error: "Missing required fields" });
+  try {
+    const { employeeId, date, checkIn, checkOut, status, notes } = req.body;
+    if (!employeeId || !date || !status) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    let hoursWorked = null;
+    if (checkIn && checkOut) {
+      const [inH, inM] = checkIn.split(":").map(Number);
+      const [outH, outM] = checkOut.split(":").map(Number);
+      hoursWorked = ((outH * 60 + outM) - (inH * 60 + inM)) / 60;
+    }
+
+    const [record] = await db.insert(attendanceTable).values({
+      employeeId: parseInt(employeeId),
+      date,
+      checkIn: checkIn || null,
+      checkOut: checkOut || null,
+      status,
+      hoursWorked: hoursWorked?.toString() || null,
+      notes: notes || null,
+      ipAddress: req.ip || null,
+    }).returning();
+
+    const { name, code } = await getEmployeeName(record.employeeId);
+    res.status(201).json({
+      id: record.id,
+      employeeId: record.employeeId,
+      employeeName: name,
+      employeeCode: code,
+      date: record.date,
+      checkIn: record.checkIn,
+      checkOut: record.checkOut,
+      status: record.status,
+      hoursWorked: record.hoursWorked ? Number(record.hoursWorked) : null,
+      ipAddress: (record as any).ipAddress || null,
+      notes: record.notes,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to create attendance record" });
   }
-
-  let hoursWorked = null;
-  if (checkIn && checkOut) {
-    const [inH, inM] = checkIn.split(":").map(Number);
-    const [outH, outM] = checkOut.split(":").map(Number);
-    hoursWorked = ((outH * 60 + outM) - (inH * 60 + inM)) / 60;
-  }
-
-  const [record] = await db.insert(attendanceTable).values({
-    employeeId: parseInt(employeeId),
-    date,
-    checkIn: checkIn || null,
-    checkOut: checkOut || null,
-    status,
-    hoursWorked: hoursWorked?.toString() || null,
-    notes: notes || null,
-    ipAddress: req.ip || null,
-  }).returning();
-
-  const { name, code } = await getEmployeeName(record.employeeId);
-  res.status(201).json({
-    id: record.id,
-    employeeId: record.employeeId,
-    employeeName: name,
-    employeeCode: code,
-    date: record.date,
-    checkIn: record.checkIn,
-    checkOut: record.checkOut,
-    status: record.status,
-    hoursWorked: record.hoursWorked ? Number(record.hoursWorked) : null,
-    ipAddress: (record as any).ipAddress || null,
-    notes: record.notes,
-  });
 });
 
 router.put("/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
-  const { checkIn, checkOut, status, notes } = req.body;
-  
-  const updates: Record<string, any> = { updatedAt: new Date() };
-  if (checkIn !== undefined) updates.checkIn = checkIn;
-  if (checkOut !== undefined) updates.checkOut = checkOut;
-  if (status !== undefined) updates.status = status;
-  if (notes !== undefined) updates.notes = notes;
+  try {
+    const id = parseInt(req.params.id);
+    const { checkIn, checkOut, status, notes } = req.body;
 
-  if (checkIn && checkOut) {
-    const [inH, inM] = checkIn.split(":").map(Number);
-    const [outH, outM] = checkOut.split(":").map(Number);
-    updates.hoursWorked = (((outH * 60 + outM) - (inH * 60 + inM)) / 60).toString();
+    const updates: Record<string, any> = { updatedAt: new Date() };
+    if (checkIn !== undefined) updates.checkIn = checkIn;
+    if (checkOut !== undefined) updates.checkOut = checkOut;
+    if (status !== undefined) updates.status = status;
+    if (notes !== undefined) updates.notes = notes;
+
+    if (checkIn && checkOut) {
+      const [inH, inM] = checkIn.split(":").map(Number);
+      const [outH, outM] = checkOut.split(":").map(Number);
+      updates.hoursWorked = (((outH * 60 + outM) - (inH * 60 + inM)) / 60).toString();
+    }
+
+    const [record] = await db.update(attendanceTable).set(updates).where(eq(attendanceTable.id, id)).returning();
+    if (!record) return res.status(404).json({ error: "Attendance record not found" });
+
+    const { name, code } = await getEmployeeName(record.employeeId);
+    res.json({
+      id: record.id,
+      employeeId: record.employeeId,
+      employeeName: name,
+      employeeCode: code,
+      date: record.date,
+      checkIn: record.checkIn,
+      checkOut: record.checkOut,
+      status: record.status,
+      hoursWorked: record.hoursWorked ? Number(record.hoursWorked) : null,
+      notes: record.notes,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update attendance record" });
   }
-
-  const [record] = await db.update(attendanceTable).set(updates).where(eq(attendanceTable.id, id)).returning();
-  if (!record) return res.status(404).json({ error: "Attendance record not found" });
-
-  const { name, code } = await getEmployeeName(record.employeeId);
-  res.json({
-    id: record.id,
-    employeeId: record.employeeId,
-    employeeName: name,
-    employeeCode: code,
-    date: record.date,
-    checkIn: record.checkIn,
-    checkOut: record.checkOut,
-    status: record.status,
-    hoursWorked: record.hoursWorked ? Number(record.hoursWorked) : null,
-    notes: record.notes,
-  });
 });
 
 export default router;

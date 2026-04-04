@@ -542,7 +542,7 @@ function UploadStep({ fsFiles, stFiles, onFsAdd, onStAdd, onFsRemove, onStRemove
   }, []);
 
   const DropZone = ({ label, files, inputRef, onAdd, onRemove, icon: Icon, accent }:
-    { label: string; files: File[]; inputRef: React.RefObject<HTMLInputElement>; onAdd: (f: File[]) => void;
+    { label: string; files: File[]; inputRef: React.RefObject<HTMLInputElement | null>; onAdd: (f: File[]) => void;
       onRemove: (i: number) => void; icon: any; accent: string }) => (
     <div className="flex-1">
       <div
