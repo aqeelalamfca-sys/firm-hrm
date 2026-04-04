@@ -1106,15 +1106,15 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
     sessionMetaMap["journal_entry_controls"] = "Adequate";
 
     sessionMetaMap["principal_activity"] = "To be determined";
-    sessionMetaMap["engagement_partner"] = "To be assigned";
+    sessionMetaMap["engagement_partner"] = session.approverName || "To be assigned";
     sessionMetaMap["materiality_basis_amount"] = "0";
     sessionMetaMap["overall_materiality_amount"] = "0";
     sessionMetaMap["performance_materiality_amount"] = "0";
     sessionMetaMap["trivial_threshold_amount"] = "0";
     sessionMetaMap["significant_risk_areas"] = "Revenue recognition (ISA 240 presumed risk), Management override of controls (ISA 240.31)";
     sessionMetaMap["audit_opinion"] = "Unmodified";
-    sessionMetaMap["report_date"] = session.periodEnd || "";
-    sessionMetaMap["signing_partner_name"] = "To be assigned";
+    sessionMetaMap["report_date"] = session.periodEnd || today;
+    sessionMetaMap["signing_partner_name"] = session.approverName || "To be assigned";
 
     sessionMetaMap["manual_or_system"] = "Semi-Automated";
     sessionMetaMap["account_type"] = "4-digit COA";
@@ -1122,6 +1122,44 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
 
     sessionMetaMap["number_of_shareholders"] = "0";
     sessionMetaMap["number_of_directors"] = "0";
+
+    sessionMetaMap["secp_registration_no"] = "";
+    sessionMetaMap["incorporation_date"] = "";
+    sessionMetaMap["commencement_date"] = "";
+    sessionMetaMap["industry_sector"] = "To be determined";
+    sessionMetaMap["registered_address"] = "";
+    sessionMetaMap["business_address"] = "";
+    sessionMetaMap["principal_place_of_business"] = "";
+    sessionMetaMap["parent_entity_name"] = "N/A";
+    sessionMetaMap["classes_of_shares"] = "Ordinary Shares";
+    sessionMetaMap["ceo_name"] = "";
+    sessionMetaMap["cfo_name"] = "";
+    sessionMetaMap["company_secretary"] = "";
+    sessionMetaMap["key_management_personnel"] = "";
+    sessionMetaMap["related_parties_list"] = "";
+    sessionMetaMap["engagement_manager"] = session.reviewerName || "";
+    sessionMetaMap["engagement_team_members"] = "";
+    sessionMetaMap["reviewer"] = session.reviewerName || "";
+    sessionMetaMap["approver"] = session.approverName || "";
+    sessionMetaMap["accounting_software"] = "To be determined";
+    sessionMetaMap["erp_name"] = "";
+    sessionMetaMap["specific_materiality_areas"] = "";
+    sessionMetaMap["revised_materiality_reason"] = "";
+    sessionMetaMap["risk_assessment_summary"] = "";
+    sessionMetaMap["sampling_basis"] = "Value-based";
+    sessionMetaMap["analytics_conclusion"] = "";
+    sessionMetaMap["sector_regulator"] = "SECP";
+    sessionMetaMap["modified_opinion_basis"] = "";
+    sessionMetaMap["archiving_completed_date"] = "";
+    sessionMetaMap["preparer_designation"] = "";
+    sessionMetaMap["reviewer_designation"] = "";
+    sessionMetaMap["review_date"] = "";
+    sessionMetaMap["approver_designation"] = "";
+    sessionMetaMap["approval_date"] = "";
+    sessionMetaMap["lock_reason"] = "";
+    sessionMetaMap["reopen_reason"] = "";
+    sessionMetaMap["current_stage"] = "Variables";
+    sessionMetaMap["current_substage"] = "Auto-Fill";
 
     const cyPyFieldCodes = [
       "total_assets","non_current_assets","current_assets","fixed_assets","right_of_use_assets",
@@ -1174,8 +1212,42 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
     sessionMetaMap["sample_reviewed_by_user"] = "false";
     sessionMetaMap["expected_misstatement"] = "0";
 
+    const sessionDerivedKeys = new Set([
+      "entity_name", "legal_name_as_per_secp", "short_name", "entity_legal_form", "listed_status",
+      "public_interest_entity_flag", "ntn", "strn", "reporting_framework", "reporting_framework_disclosed",
+      "ifrs_applicable", "ifrs_for_smes_applicable", "engagement_type", "assurance_level", "report_type",
+      "group_entity_flag", "component_auditor_required", "reporting_period_start", "financial_year_start",
+      "reporting_period_end", "financial_year_end", "report_date", "expected_signing_date",
+      "reporting_deadline", "archiving_due_date", "engagement_start_date", "preparation_date",
+      "preparer_name", "reviewer_name", "approver_name", "engagement_partner",
+      "functional_currency", "presentation_currency", "applicable_company_law", "tax_jurisdiction",
+      "companies_act_applicable", "first_year_audit", "recurring_engagement",
+      "previous_auditor", "predecessor_communication_done", "continuance_approved",
+      "eqcr_required", "key_audit_matters_flag", "audit_committee_exists", "internal_audit_function_exists",
+      "sales_tax_applicable", "signing_partner_name", "engagement_manager", "reviewer", "approver",
+    ]);
+
+    const defaultSourceMap: Record<string, string> = {};
+
     for (const [code, value] of Object.entries(sessionMetaMap)) {
-      extractedMap[code] = { value, confidence: "100" };
+      const isSessionDerived = sessionDerivedKeys.has(code);
+      const isEmpty = value === "" || value === undefined;
+      const isZeroNumeric = value === "0";
+      let conf: string;
+      if (isSessionDerived && !isEmpty) {
+        conf = "90";
+        defaultSourceMap[code] = "session";
+      } else if (isEmpty) {
+        conf = "30";
+        defaultSourceMap[code] = "default";
+      } else if (isZeroNumeric) {
+        conf = "50";
+        defaultSourceMap[code] = "default";
+      } else {
+        conf = "60";
+        defaultSourceMap[code] = "default";
+      }
+      extractedMap[code] = { value: value || "", confidence: conf };
     }
 
     for (const f of fields) {
@@ -1208,12 +1280,14 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
 
       if (existing) {
         if (extracted && !existing.userEditedValue && !existing.isLocked) {
+          const defaultSrcExisting = defaultSourceMap[def.variableCode];
+          const isRealExt = !defaultSrcExisting && Number(extracted.confidence) >= 70;
           await db.update(wpVariablesTable).set({
             autoFilledValue: extracted.value,
             rawExtractedValue: extracted.value,
             finalValue: extracted.value,
             confidence: extracted.confidence,
-            sourceType: "ai_extraction",
+            sourceType: isRealExt ? "ai_extraction" : (defaultSrcExisting === "session" ? "session" : "default"),
             sourceSheet: extracted.sourceSheet || null,
             sourcePage: extracted.sourcePage || null,
             updatedAt: new Date(),
@@ -1225,22 +1299,40 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
         continue;
       }
 
-      const value = extracted?.value || def.defaultValue || null;
-      const conf = extracted ? extracted.confidence : (def.defaultValue ? "100" : null);
+      const value = extracted?.value || def.defaultValue || "";
+      const conf = extracted ? extracted.confidence : (def.defaultValue ? "60" : "30");
+
+      const defaultSrc = defaultSourceMap[def.variableCode];
+      const isRealExtraction = !!extracted && !defaultSrc && Number(extracted.confidence) >= 70;
+      let srcType: string;
+      if (isRealExtraction) {
+        srcType = "ai_extraction";
+      } else if (defaultSrc === "session") {
+        srcType = "session";
+      } else {
+        srcType = "default";
+      }
+
+      let reviewStatus: string;
+      if (def.reviewRequiredFlag) {
+        reviewStatus = "needs_review";
+      } else {
+        reviewStatus = "auto_filled";
+      }
 
       const [v] = await db.insert(wpVariablesTable).values({
         sessionId,
         variableCode: def.variableCode,
         category: def.variableGroup,
         variableName: def.variableName,
-        autoFilledValue: extracted?.value || null,
+        autoFilledValue: value,
         rawExtractedValue: extracted?.value || null,
         finalValue: value,
         confidence: conf,
-        sourceType: extracted ? "ai_extraction" : (def.defaultValue ? "default" : null),
+        sourceType: srcType,
         sourceSheet: extracted?.sourceSheet || null,
         sourcePage: extracted?.sourcePage || null,
-        reviewStatus: def.reviewRequiredFlag ? "needs_review" : (extracted ? "auto_filled" : "pending"),
+        reviewStatus,
       }).returning();
       results.push(v);
       created++;
@@ -1248,7 +1340,12 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
 
     await db.update(wpSessionsTable).set({ status: "variables" as any, updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
 
-    const missingMandatory = VARIABLE_DEFINITIONS.filter(d => d.mandatoryFlag && !extractedMap[d.variableCode] && !d.defaultValue);
+    const missingMandatory = VARIABLE_DEFINITIONS.filter(d => {
+      if (!d.mandatoryFlag) return false;
+      const ext = extractedMap[d.variableCode];
+      const val = ext?.value || d.defaultValue || "";
+      return !val || val === "" || val === "0" || val === "To be determined" || val === "To be assigned";
+    });
     for (const mm of missingMandatory) {
       const existingException = await db.select().from(wpExceptionLogTable).where(
         and(eq(wpExceptionLogTable.sessionId, sessionId), eq(wpExceptionLogTable.title, `Missing mandatory: ${mm.variableLabel}`))
@@ -1314,7 +1411,8 @@ router.get("/sessions/:id/variables", async (req: Request, res: Response) => {
       });
 
       grouped[grp].stats.total++;
-      if (v.finalValue) grouped[grp].stats.filled++;
+      const hasValue = v.finalValue && v.finalValue.trim() !== "";
+      if (hasValue) grouped[grp].stats.filled++;
       else grouped[grp].stats.missing++;
       if (v.confidence && Number(v.confidence) < 70) grouped[grp].stats.lowConf++;
       if (v.isLocked) grouped[grp].stats.locked++;
@@ -1323,8 +1421,8 @@ router.get("/sessions/:id/variables", async (req: Request, res: Response) => {
 
     const totalStats = {
       total: variables.length,
-      filled: variables.filter(v => v.finalValue).length,
-      missing: variables.filter(v => !v.finalValue).length,
+      filled: variables.filter(v => v.finalValue && v.finalValue.trim() !== "").length,
+      missing: variables.filter(v => !v.finalValue || v.finalValue.trim() === "").length,
       lowConfidence: variables.filter(v => v.confidence && Number(v.confidence) < 70).length,
       needsReview: variables.filter(v => v.reviewStatus === "needs_review").length,
       locked: variables.filter(v => v.isLocked).length,

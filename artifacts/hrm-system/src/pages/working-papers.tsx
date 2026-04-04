@@ -1162,7 +1162,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
     }
     if (filter === "mandatory" && !v.definition?.mandatoryFlag) return false;
     if (filter === "low_confidence" && (!v.confidence || Number(v.confidence) >= 70)) return false;
-    if (filter === "missing" && v.finalValue) return false;
+    if (filter === "missing" && v.finalValue && v.finalValue.trim() !== "") return false;
     if (filter === "reviewed" && v.reviewStatus !== "reviewed" && v.reviewStatus !== "confirmed") return false;
     if (filter === "locked" && !v.isLocked) return false;
     if (filter === "needs_review" && v.reviewStatus !== "needs_review") return false;
