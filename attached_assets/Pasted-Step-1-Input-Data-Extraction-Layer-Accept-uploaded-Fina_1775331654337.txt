@@ -1,0 +1,93 @@
+Step 1 — Input & Data Extraction Layer
+Accept uploaded Financial Statements (Excel/PDF).
+Apply OCR (if PDF) and structured parsing.
+Extract:
+All FS line items (current & prior year)
+Notes (if available)
+Any embedded TB/GL (if exists)
+Normalize into structured dataset: {account_name, amount, year, category}.
+Validate completeness; flag missing critical fields.
+Step 2 — Chart of Accounts Mapping Engine
+Create dynamic CoA mapping aligned with:
+Pakistan regulatory framework (Companies Act, IFRS)
+Industry-specific structure
+Auto-map FS line items → standardized account codes.
+Allow fallback AI mapping where labels are inconsistent.
+Ensure 100% coverage of FS lines (no unmapped accounts).
+Step 3 — Trial Balance Generation (Core Engine)
+Generate AI-built Trial Balance:
+Debit/Credit classification enforced
+Opening balances (if prior year available)
+Closing balances = FS figures
+Enforce:
+Total Debits = Total Credits (auto-balance engine)
+Strict one-to-one linkage with FS
+Add validation layer:
+If imbalance → auto-adjust using intelligent suspense elimination (not blind plug)
+Output: structured TB (exportable Excel)
+Step 4 — Transaction Engine (GL Builder)
+For each TB account:
+Generate transaction-wise ledger
+Include:
+Date (spread logically across period)
+Description (context-based narration)
+Debit/Credit entries
+Running balance
+Apply intelligence:
+Reflect Pakistan environment, sector, entity nature
+Revenue, expenses, receivables, payables behave logically
+Step 5 — Materiality Logic Layer
+Embed rule:
+Significant transactions fall within ~1% to 50% of account balance (where logical)
+High-value accounts:
+Fewer, larger transactions
+Low-value accounts:
+More granular entries
+Avoid unrealistic uniform distributions
+Step 6 — Opening & Closing Balance Integrity
+Opening balance:
+Derived from prior year (if available) OR AI-estimated logically
+Closing balance:
+Must EXACTLY match TB
+
+Enforce:
+
+Opening + Transactions = Closing (per account)
+Step 7 — Reconciliation Engine (Critical Control)
+Perform 3-way reconciliation:
+Financial Statements ↔ Trial Balance
+Trial Balance ↔ General Ledger
+GL totals ↔ FS line items
+Hard validation rules:
+No rounding gaps
+No orphan balances
+No unmapped entries
+If mismatch:
+Auto-diagnose → fix → re-run until ZERO variance
+Step 8 — Error Handling & Self-Healing
+Detect:
+Missing accounts
+Misclassifications
+Imbalances
+Auto-correct using AI reasoning
+Log all corrections (audit trail)
+Step 9 — Output Layer
+Generate:
+Trial Balance (Excel)
+General Ledger (Excel; each account separate sheet + summary)
+Ensure:
+Clean formatting
+Linked structure (TB ↔ GL references)
+Step 10 — UI/UX Integration
+Replace existing TB/GL logic completely
+Add:
+“Generate TB & GL” button (single trigger)
+Progress tracker (Extraction → Mapping → TB → GL → Reconciliation)
+Allow:
+User review/edit before final lock
+Step 11 — Final Enforcement Rule
+System must NOT finalize unless:
+TB is balanced
+GL fully reconciles
+FS linkage is exact
+Zero tolerance for differences
