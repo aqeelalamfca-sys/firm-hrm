@@ -117,7 +117,9 @@ export default function WorkingPapers() {
 
   useEffect(() => {
     if (activeSession) {
-      setStage(activeSession.status || "upload");
+      const validStages = STAGES.map(s => s.key) as string[];
+      const sessionStage = activeSession.status || "upload";
+      setStage(validStages.includes(sessionStage) ? sessionStage : "upload");
       if (activeSession.heads) setHeads(activeSession.heads);
       if (activeSession.exceptions) setExceptions(activeSession.exceptions);
     }
@@ -489,8 +491,11 @@ export default function WorkingPapers() {
         toast({ title: "Head approved, next unlocked" });
         await fetchSession(activeSession.id);
         await fetchExceptions();
+      } else {
+        const err = await res.json();
+        toast({ title: "Approval failed", description: err.error, variant: "destructive" });
       }
-    } catch {}
+    } catch { toast({ title: "Approval failed", variant: "destructive" }); }
   };
 
   const exportHead = async (headIndex: number) => {
@@ -511,8 +516,11 @@ export default function WorkingPapers() {
         URL.revokeObjectURL(url);
         toast({ title: "Export downloaded" });
         await fetchSession(activeSession.id);
+      } else {
+        const err = await res.json().catch(() => ({ error: "Export failed" }));
+        toast({ title: "Export failed", description: err.error, variant: "destructive" });
       }
-    } catch {}
+    } catch { toast({ title: "Export failed", variant: "destructive" }); }
   };
 
   const autoProcessAll = async () => {
@@ -872,7 +880,12 @@ export default function WorkingPapers() {
                         ? "text-emerald-300 hover:bg-white/10"
                         : "text-slate-400 hover:bg-white/10",
                   )}
-                  onClick={() => setStage(s.key)}
+                  onClick={() => {
+                    setStage(s.key);
+                    if (s.key === "variables" && variables.length === 0) fetchVariables();
+                    if (s.key === "arranged_data" && !arrangedData) fetchArrangedData();
+                    if (s.key === "generation" || s.key === "export") { fetchSession(activeSession.id); fetchExceptions(); }
+                  }}
                 >
                   {isPast ? <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                   <span className="hidden sm:inline">{s.label}</span>
@@ -971,6 +984,7 @@ export default function WorkingPapers() {
           exceptions={exceptions}
           onExportHead={exportHead}
           onExportBundle={exportBundle}
+          onRefresh={() => { fetchSession(activeSession.id); fetchExceptions(); }}
           loading={loading}
         />
       )}
@@ -2514,7 +2528,7 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
   );
 }
 
-function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle, loading }: any) {
+function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle, onRefresh, loading }: any) {
   const completedHeads = (heads || []).filter((h: any) => ["approved", "exported", "completed"].includes(h.status));
   const openExceptions = (exceptions || []).filter((e: any) => e.status === "open");
   const totalHeads = (heads || []).length;
@@ -2553,11 +2567,18 @@ function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle,
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-emerald-50 to-green-50/50 px-5 py-4 border-b border-slate-200/60">
-          <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-            <Download className="w-5 h-5 text-emerald-600" /> Export Center
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">Download completed working papers individually or as a full bundle</p>
+        <div className="bg-gradient-to-r from-emerald-50 to-green-50/50 px-5 py-4 border-b border-slate-200/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+              <Download className="w-5 h-5 text-emerald-600" /> Export Center
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">Download completed working papers individually or as a full bundle</p>
+          </div>
+          {onRefresh && (
+            <Button variant="outline" size="sm" onClick={onRefresh} className="self-start h-8">
+              <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
+            </Button>
+          )}
         </div>
 
         <div className="p-5 space-y-5">

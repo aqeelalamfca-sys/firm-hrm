@@ -2456,7 +2456,7 @@ router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Re
     const skipped = results.filter(r => r.action === "skipped").length;
     const failed = results.filter(r => r.action === "failed").length;
 
-    await db.update(wpSessionsTable).set({ currentStage: "generation", updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
+    await db.update(wpSessionsTable).set({ status: "generation", updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
 
     res.json({
       success: true,
