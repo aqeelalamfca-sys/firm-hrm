@@ -27,9 +27,9 @@ import {
 import { eq, and, inArray, asc, sql } from "drizzle-orm";
 import OpenAI from "openai";
 import PDFDocument from "pdfkit";
+import * as XLSX from "xlsx";
 // @ts-ignore
 import pdfParse from "pdf-parse";
-import * as XLSX from "xlsx";
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell,
   WidthType, AlignmentType, BorderStyle, ShadingType, PageBreak,
@@ -5344,6 +5344,261 @@ router.get("/sessions/:id/wp-audit-trail", async (req: Request, res: Response) =
 
     trail.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
     return res.json({ sessionId, total: trail.length, trail });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Download blank Excel upload template ─────────────────────────────────────
+router.get("/download-template", (_req: Request, res: Response) => {
+  try {
+    const wb = XLSX.utils.book_new();
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    const H = (v: string) => ({ v, t: "s" as const });
+    const N = (v: number) => ({ v, t: "n" as const });
+    const mkSheet = (rows: any[][]): XLSX.WorkSheet => {
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      return ws;
+    };
+
+    // ── Sheet 1: INSTRUCTIONS ─────────────────────────────────────────────────
+    const instrRows = [
+      ["ANA WORKING PAPERS — DATA UPLOAD TEMPLATE"],
+      ["Alam & Aulakh Chartered Accountants"],
+      [""],
+      ["HOW TO USE THIS TEMPLATE"],
+      ["1. Fill each sheet with the relevant financial data for your client."],
+      ["2. Keep ALL column headers exactly as shown — do not rename or reorder."],
+      ["3. Use plain numbers only — no PKR, Rs., commas or currency symbols."],
+      ["4. Dates must be in YYYY-MM-DD format (e.g. 2024-06-30)."],
+      ["5. Delete the SAMPLE ROW (row 3 of each data sheet) before uploading."],
+      ["6. Save as .xlsx before uploading."],
+      ["7. Upload each sheet as a SEPARATE file with the matching category."],
+      [""],
+      ["FILE CATEGORY MAP (select when uploading)"],
+      ["Sheet Name",     "Upload Category",      "File Name Hint"],
+      ["Entity Info",    "financial_statements",  "entity_info.xlsx"],
+      ["Trial Balance",  "trial_balance",         "trial_balance.xlsx"],
+      ["General Ledger", "general_ledger",        "general_ledger.xlsx"],
+      ["Balance Sheet",  "financial_statements",  "balance_sheet.xlsx"],
+      ["Profit & Loss",  "financial_statements",  "profit_loss.xlsx"],
+      ["Bank Statement", "bank_statement",        "bank_statement.xlsx"],
+      ["Tax Data",       "financial_statements",  "tax_data.xlsx"],
+      [""],
+      ["CLASSIFICATION VALUES (for Trial Balance sheet)"],
+      ["Use exactly one of:", "Asset", "Liability", "Equity", "Revenue", "Cost of Sales", "Operating Expense", "Finance Cost", "Tax"],
+      [""],
+      ["TIP: You may also upload the real printed financials (PDF/Excel)."],
+      ["The AI will extract data automatically from any uploaded document."],
+      ["This template ensures 100% accurate structured extraction."],
+    ];
+    const wsInstr = mkSheet(instrRows);
+    wsInstr["!cols"] = [{ wch: 55 }, { wch: 25 }, { wch: 30 }];
+    XLSX.utils.book_append_sheet(wb, wsInstr, "INSTRUCTIONS");
+
+    // ── Sheet 2: Entity Info ──────────────────────────────────────────────────
+    const entityRows = [
+      ["ENTITY INFO — Fill all fields. Leave blank if not applicable."],
+      ["Field", "Value", "Notes"],
+      ["Company / Client Name", "ABC Manufacturing (Pvt) Ltd", "Full legal name"],
+      ["NTN", "1234567-8", "National Tax Number"],
+      ["STRN", "12-34-5678-001-87", "Sales Tax Registration Number (if registered)"],
+      ["CNIC (sole proprietor)", "", "Only for individuals / sole traders"],
+      ["Financial Year", "2024", "e.g. 2024"],
+      ["Period Start", "2024-07-01", "YYYY-MM-DD"],
+      ["Period End", "2025-06-30", "YYYY-MM-DD"],
+      ["Address", "Plot 12, Industrial Estate, Lahore", ""],
+      ["City", "Lahore", ""],
+      ["Industry", "Manufacturing", "e.g. Manufacturing, Services, Trading, Real Estate"],
+      ["Entity Type", "Private Limited", "Private Limited / Public Limited / Partnership / Sole Proprietor"],
+      ["Listed Status", "Unlisted", "Listed / Unlisted"],
+      ["Reporting Framework", "IFRS", "IFRS / IFRS for SMEs / Companies Act 2017"],
+      ["Engagement Type", "Statutory Audit", "Statutory Audit / Tax Audit / Review / Agreed Procedures"],
+      ["", "", ""],
+      ["DIRECTORS / PARTNERS (one per row)"],
+      ["Name", "Designation", ""],
+      ["Mr. Ali Alam", "CEO / MD", ""],
+      ["Mr. Bilal Aulakh", "Director Finance", ""],
+      ["", "", ""],
+      ["BANKERS (one per row)"],
+      ["Bank Name", "Account Number", "Branch"],
+      ["Habib Bank Limited", "01234567890123", "Gulberg, Lahore"],
+      ["MCB Bank", "9876543210", "Garden Town, Lahore"],
+    ];
+    const wsEntity = mkSheet(entityRows);
+    wsEntity["!cols"] = [{ wch: 32 }, { wch: 40 }, { wch: 35 }];
+    XLSX.utils.book_append_sheet(wb, wsEntity, "Entity Info");
+
+    // ── Sheet 3: Trial Balance ────────────────────────────────────────────────
+    const tbHeader = ["Account Code", "Account Name", "Classification", "Debit (PKR)", "Credit (PKR)", "Closing Balance (PKR)", "Prior Year Balance (PKR)", "FS Line Mapping"];
+    const tbSample = ["1001", "Cash in Hand", "Asset", 250000, 0, 250000, 200000, "Cash and Bank Balances"];
+    const tbRows = [
+      ["TRIAL BALANCE — One row per account. Delete sample rows before uploading."],
+      tbHeader,
+      tbSample,
+      // Common account stubs
+      ["1002", "Bank - HBL Current", "Asset", 1500000, 0, 1500000, 1200000, "Cash and Bank Balances"],
+      ["1101", "Trade Receivables", "Asset", 3200000, 0, 3200000, 2800000, "Trade Debts"],
+      ["1201", "Stock in Trade", "Asset", 5500000, 0, 5500000, 4900000, "Inventories"],
+      ["1301", "Property Plant & Equipment - Net", "Asset", 12000000, 0, 12000000, 13500000, "Property, Plant & Equipment"],
+      ["2001", "Trade Payables", "Liability", 0, 2400000, 2400000, 2100000, "Trade and Other Payables"],
+      ["2101", "Long Term Financing", "Liability", 0, 5000000, 5000000, 6000000, "Long-Term Borrowings"],
+      ["3001", "Share Capital", "Equity", 0, 10000000, 10000000, 10000000, "Share Capital"],
+      ["3101", "Retained Earnings", "Equity", 0, 4050000, 4050000, 3600000, "Retained Earnings"],
+      ["4001", "Revenue - Sales", "Revenue", 0, 25000000, 25000000, 22000000, "Revenue"],
+      ["5001", "Cost of Goods Sold", "Cost of Sales", 16000000, 0, 16000000, 14000000, "Cost of Sales"],
+      ["6001", "Salaries & Wages", "Operating Expense", 3000000, 0, 3000000, 2700000, "Administrative Expenses"],
+      ["6002", "Rent & Utilities", "Operating Expense", 800000, 0, 800000, 720000, "Administrative Expenses"],
+      ["6003", "Depreciation", "Operating Expense", 1500000, 0, 1500000, 1400000, "Administrative Expenses"],
+      ["7001", "Finance Cost - Interest", "Finance Cost", 450000, 0, 450000, 500000, "Finance Costs"],
+      ["8001", "Income Tax Expense", "Tax", 200000, 0, 200000, 180000, "Income Tax"],
+    ];
+    const wsTB = mkSheet(tbRows);
+    wsTB["!cols"] = [{ wch: 14 }, { wch: 36 }, { wch: 20 }, { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 24 }, { wch: 30 }];
+    XLSX.utils.book_append_sheet(wb, wsTB, "Trial Balance");
+
+    // ── Sheet 4: General Ledger ───────────────────────────────────────────────
+    const glHeader = ["Entry Date", "Account Code", "Account Name", "Voucher No.", "Narration / Description", "Debit (PKR)", "Credit (PKR)", "Running Balance (PKR)", "Reference"];
+    const glRows = [
+      ["GENERAL LEDGER — One row per journal line. Delete sample rows before uploading."],
+      glHeader,
+      ["2024-07-01", "1002", "Bank - HBL Current", "BPV-001", "Opening balance c/f", 0, 0, 1500000, ""],
+      ["2024-07-05", "4001", "Revenue - Sales", "SIV-001", "Sales to Khan Traders - Invoice 1001", 0, 500000, 24500000, "INV-1001"],
+      ["2024-07-05", "1101", "Trade Receivables", "SIV-001", "Sales to Khan Traders - Invoice 1001", 500000, 0, 3700000, "INV-1001"],
+      ["2024-07-10", "5001", "Cost of Goods Sold", "JV-010", "Monthly COGS allocation July 2024", 1200000, 0, 17200000, ""],
+      ["2024-07-10", "1201", "Stock in Trade", "JV-010", "Monthly COGS allocation July 2024", 0, 1200000, 4300000, ""],
+      ["2024-07-15", "6001", "Salaries & Wages", "CPV-015", "Salaries July 2024", 250000, 0, 3250000, ""],
+      ["2024-07-15", "1002", "Bank - HBL Current", "CPV-015", "Salaries July 2024", 0, 250000, 1250000, ""],
+      ["2024-07-31", "2001", "Trade Payables", "BPV-031", "Payment to supplier - XYZ Co.", 200000, 0, 2200000, ""],
+      ["2024-07-31", "1002", "Bank - HBL Current", "BPV-031", "Payment to supplier - XYZ Co.", 0, 200000, 1050000, ""],
+    ];
+    const wsGL = mkSheet(glRows);
+    wsGL["!cols"] = [{ wch: 14 }, { wch: 14 }, { wch: 32 }, { wch: 14 }, { wch: 42 }, { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, wsGL, "General Ledger");
+
+    // ── Sheet 5: Balance Sheet ────────────────────────────────────────────────
+    const bsRows = [
+      ["BALANCE SHEET — Fill all amounts in PKR. Delete sample text rows before uploading."],
+      ["Line Item", "Note Ref", "Current Year (PKR)", "Prior Year (PKR)", "Section"],
+      ["NON-CURRENT ASSETS", "", "", "", ""],
+      ["Property, Plant & Equipment", "4", 12000000, 13500000, "Non-Current Assets"],
+      ["Intangible Assets", "5", 500000, 600000, "Non-Current Assets"],
+      ["Long-Term Investments", "6", 1000000, 1000000, "Non-Current Assets"],
+      ["CURRENT ASSETS", "", "", "", ""],
+      ["Inventories / Stock in Trade", "7", 5500000, 4900000, "Current Assets"],
+      ["Trade Debts / Receivables", "8", 3200000, 2800000, "Current Assets"],
+      ["Advances, Deposits & Prepayments", "9", 300000, 250000, "Current Assets"],
+      ["Sales Tax Refundable", "10", 120000, 80000, "Current Assets"],
+      ["Cash and Bank Balances", "11", 1750000, 1400000, "Current Assets"],
+      ["TOTAL ASSETS", "", 24370000, 24530000, ""],
+      ["", "", "", "", ""],
+      ["EQUITY", "", "", "", ""],
+      ["Share Capital", "12", 10000000, 10000000, "Equity"],
+      ["General Reserve", "13", 2000000, 1500000, "Equity"],
+      ["Unappropriated Profit", "14", 4050000, 3600000, "Equity"],
+      ["TOTAL EQUITY", "", 16050000, 15100000, ""],
+      ["", "", "", "", ""],
+      ["NON-CURRENT LIABILITIES", "", "", "", ""],
+      ["Long-Term Financing", "15", 5000000, 6000000, "Non-Current Liabilities"],
+      ["Deferred Tax Liability", "16", 320000, 430000, "Non-Current Liabilities"],
+      ["CURRENT LIABILITIES", "", "", "", ""],
+      ["Trade and Other Payables", "17", 2400000, 2100000, "Current Liabilities"],
+      ["Short-Term Borrowings", "18", 400000, 600000, "Current Liabilities"],
+      ["Accrued Liabilities", "19", 200000, 300000, "Current Liabilities"],
+      ["TOTAL LIABILITIES", "", 8320000, 9430000, ""],
+      ["TOTAL EQUITY & LIABILITIES", "", 24370000, 24530000, ""],
+    ];
+    const wsBS = mkSheet(bsRows);
+    wsBS["!cols"] = [{ wch: 38 }, { wch: 10 }, { wch: 22 }, { wch: 22 }, { wch: 25 }];
+    XLSX.utils.book_append_sheet(wb, wsBS, "Balance Sheet");
+
+    // ── Sheet 6: Profit & Loss ────────────────────────────────────────────────
+    const plRows = [
+      ["PROFIT & LOSS / INCOME STATEMENT — Fill all amounts in PKR."],
+      ["Line Item", "Note Ref", "Current Year (PKR)", "Prior Year (PKR)"],
+      ["Revenue / Net Sales", "20", 25000000, 22000000],
+      ["Cost of Sales / COGS", "21", 16000000, 14000000],
+      ["GROSS PROFIT", "", 9000000, 8000000],
+      ["", "", "", ""],
+      ["OPERATING EXPENSES", "", "", ""],
+      ["Distribution / Selling Expenses", "22", 800000, 720000],
+      ["Administrative Expenses", "23", 4300000, 3820000],
+      ["Other Operating Expenses", "", 150000, 130000],
+      ["TOTAL OPERATING EXPENSES", "", 5250000, 4670000],
+      ["", "", "", ""],
+      ["OPERATING PROFIT / EBIT", "", 3750000, 3330000],
+      ["Other Income", "24", 200000, 150000],
+      ["Finance Costs / Interest", "25", 450000, 500000],
+      ["PROFIT BEFORE TAX", "", 3500000, 2980000],
+      ["Income Tax Expense - Current", "26", 150000, 130000],
+      ["Income Tax Expense - Deferred", "", 50000, 50000],
+      ["PROFIT AFTER TAX / NET PROFIT", "", 3300000, 2800000],
+      ["", "", "", ""],
+      ["Other Comprehensive Income (if any)", "", 0, 0],
+      ["TOTAL COMPREHENSIVE INCOME", "", 3300000, 2800000],
+      ["", "", "", ""],
+      ["Earnings Per Share (if applicable)", "", 33, 28],
+    ];
+    const wsPL = mkSheet(plRows);
+    wsPL["!cols"] = [{ wch: 40 }, { wch: 10 }, { wch: 22 }, { wch: 22 }];
+    XLSX.utils.book_append_sheet(wb, wsPL, "Profit & Loss");
+
+    // ── Sheet 7: Bank Statement ───────────────────────────────────────────────
+    const bankHeader = ["Date", "Narration / Description", "Reference / Cheque No.", "Debit (PKR)", "Credit (PKR)", "Balance (PKR)", "Bank Name", "Account Number"];
+    const bankRows = [
+      ["BANK STATEMENT — One row per transaction. Delete sample rows before uploading."],
+      bankHeader,
+      ["2024-07-01", "Opening Balance", "", 0, 0, 1200000, "Habib Bank Limited", "01234567890123"],
+      ["2024-07-05", "Received from Khan Traders - Invoice 1001", "CHQ-112233", 0, 500000, 1700000, "Habib Bank Limited", "01234567890123"],
+      ["2024-07-10", "Salary Payment July 2024", "TT-223344", 250000, 0, 1450000, "Habib Bank Limited", "01234567890123"],
+      ["2024-07-15", "Payment to XYZ Suppliers", "CHQ-334455", 200000, 0, 1250000, "Habib Bank Limited", "01234567890123"],
+      ["2024-07-20", "Received from Ali Enterprises", "RTGS-445566", 0, 750000, 2000000, "Habib Bank Limited", "01234567890123"],
+      ["2024-07-25", "Rent - July 2024", "CHQ-556677", 80000, 0, 1920000, "Habib Bank Limited", "01234567890123"],
+      ["2024-07-31", "Bank Charges", "", 2500, 0, 1917500, "Habib Bank Limited", "01234567890123"],
+      ["2024-07-31", "Profit on Deposit", "", 0, 12000, 1929500, "Habib Bank Limited", "01234567890123"],
+    ];
+    const wsBank = mkSheet(bankRows);
+    wsBank["!cols"] = [{ wch: 14 }, { wch: 44 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 24 }, { wch: 20 }];
+    XLSX.utils.book_append_sheet(wb, wsBank, "Bank Statement");
+
+    // ── Sheet 8: Tax Data ─────────────────────────────────────────────────────
+    const taxRows = [
+      ["TAX DATA — Fill all relevant fields. Leave blank if not applicable."],
+      ["Field", "Value", "Notes"],
+      ["Tax Period From", "2024-07-01", "YYYY-MM-DD"],
+      ["Tax Period To", "2025-06-30", "YYYY-MM-DD"],
+      ["Sales Tax (Output Tax) PKR", 2000000, "Total GST/Sales Tax charged on sales"],
+      ["Sales Tax (Input Tax) PKR", 1500000, "Total Input Tax credits claimed"],
+      ["Net Sales Tax Payable PKR", 500000, "Output Tax minus Input Tax"],
+      ["", "", ""],
+      ["INCOME TAX", "", ""],
+      ["Advance Tax Paid (u/s 147) PKR", 100000, ""],
+      ["WHT Deducted by Clients PKR", 75000, "Withholding Tax deducted at source"],
+      ["Income Tax Provision PKR", 200000, "Provision charged in P&L"],
+      ["", "", ""],
+      ["TAX RETURNS FILED", "", ""],
+      ["Monthly ST Return Filing Date 1", "2024-08-15", "YYYY-MM-DD"],
+      ["Monthly ST Return Filing Date 2", "2024-09-15", ""],
+      ["Annual Income Tax Return Filing Date", "2025-01-15", ""],
+      ["", "", ""],
+      ["ADJUSTMENTS / ANNEXURES", "", ""],
+      ["Annexures Summary", "Annex-B: WHT Agents; Annex-C: Import; Annex-G: Exports", "Brief description"],
+      ["Other Adjustments PKR", 0, "Any other tax adjustments"],
+      ["", "", ""],
+      ["ADDITIONAL NOTES", "", ""],
+      ["Tax Notices / Orders Reference", "", "Reference numbers of any notices received"],
+      ["Appeal Status", "", "Pending / Decided / None"],
+    ];
+    const wsTax = mkSheet(taxRows);
+    wsTax["!cols"] = [{ wch: 38 }, { wch: 40 }, { wch: 42 }];
+    XLSX.utils.book_append_sheet(wb, wsTax, "Tax Data");
+
+    // ── Serialize & send ─────────────────────────────────────────────────────
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", 'attachment; filename="ANA_Upload_Template.xlsx"');
+    res.send(buf);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

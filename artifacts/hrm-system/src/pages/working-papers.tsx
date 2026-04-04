@@ -1788,10 +1788,38 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
 
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50/50 px-5 py-4 border-b border-slate-200/60">
-          <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-            <Upload className="w-5 h-5 text-blue-600" /> Upload Documents
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">Financial Statements / TB / GL / Bank Statements require Excel (.xlsx/.xls). Tax Returns / Notices require PDF.</p>
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+                <Upload className="w-5 h-5 text-blue-600" /> Upload Documents
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">Financial Statements / TB / GL / Bank Statements require Excel (.xlsx/.xls). Tax Returns / Notices require PDF.</p>
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  const token = localStorage.getItem("hrm_token");
+                  const r = await fetch("/api/working-papers/download-template", {
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                  });
+                  if (!r.ok) throw new Error("Download failed");
+                  const blob = await r.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "ANA_Upload_Template.xlsx";
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch {
+                  toast({ title: "Download failed", description: "Could not download template.", variant: "destructive" });
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors shrink-0"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Download Excel Template
+            </button>
+          </div>
         </div>
         <div className="p-5 space-y-5">
           <div
