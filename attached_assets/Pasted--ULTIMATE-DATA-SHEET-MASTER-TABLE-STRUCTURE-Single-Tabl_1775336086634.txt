@@ -1,0 +1,144 @@
+🔷 ULTIMATE DATA SHEET (MASTER TABLE STRUCTURE)
+
+Single Table Name: MASTER_COA_ENGINE
+(To be stored in backend DB or Excel master sheet)
+
+🔶 TABLE STRUCTURE (FINAL)
+Field Name	Data Type	Description	Example	Mandatory	Logic / Rule
+Account_Code	Text (10)	Unique hierarchical code	152101	Yes	Must be unique
+Parent_Code	Text (10)	Parent grouping	1520	Yes	Enables roll-up
+Account_Name	Text (100)	Account title	Trade Debtors	Yes	Standardized
+FS_Head	Dropdown	Financial Statement Head	Current Assets	Yes	Maps to FS
+FS_Sub_Head	Dropdown	Sub classification	Receivables	Yes	FS grouping
+Account_Type	Dropdown	Asset/Liability/Equity/Income/Expense	Asset	Yes	Drives TB side
+Normal_Balance	Dropdown	Debit / Credit	Debit	Yes	Validation logic
+Industry_Tag	Multi-select	Sector applicability	Manufacturing, Trading	Yes	Dynamic CoA
+Entity_Type_Tag	Multi-select	Company type	Pvt Ltd, NGO, Listed	Yes	WP triggering
+IFRS_Reference	Text	Relevant IFRS	IFRS 9	Optional	Disclosure linkage
+Tax_Treatment	Dropdown	Tax nature	Normal / Disallowable / Capital	Yes	Tax WP
+Is_Control_Account	Boolean	GL control flag	Yes/No	Yes	Sub-ledger link
+Is_Sub_Ledger	Boolean	Detail ledger	Yes/No	Yes	Enables breakdown
+Opening_Balance	Decimal	Start of year	1,000,000	Yes	TB generation
+Debit_Total	Decimal	Movement	500,000	Yes	GL aggregation
+Credit_Total	Decimal	Movement	200,000	Yes	GL aggregation
+Closing_Balance	Decimal	Auto-calculated	1,300,000	Yes	System computed
+Prior_Year_Balance	Decimal	Comparative	900,000	Optional	FS comparison
+Variance	Decimal	Difference vs PY	400,000	Auto	Analytical WP
+Materiality_Tag	Dropdown	High/Medium/Low	High	Yes	Sampling logic
+Risk_Tag	Dropdown	RMM Level	High	Yes	ISA 315 linkage
+Assertion_Tag	Multi-select	Assertions	Existence, Completeness	Yes	Audit mapping
+Related_Party_Flag	Boolean	RPT identification	Yes/No	Yes	Disclosure WP
+Cash_Flow_Tag	Dropdown	Operating/Investing/Financing	Operating	Yes	Cash flow
+Mapping_GL_Code	Text	GL linkage	GL-152101	Yes	GL creation
+Mapping_FS_Line	Text	FS line item	Trade Receivables	Yes	FS mapping
+Working_Paper_Code	Multi-select	Trigger WP	B1, C3, D5	Yes	Automation
+Reconciliation_Flag	Boolean	Reconciled with FS	Yes/No	Yes	Validation
+Data_Source	Dropdown	OCR / Manual / Imported	OCR	Yes	Audit trail
+Confidence_Score	%	AI confidence	92%	Yes	Exception handling
+Exception_Flag	Boolean	Error detected	Yes/No	Yes	Review trigger
+Notes	Text	Remarks	Missing invoice support	Optional	Reviewer notes
+Prepared_By	Text	User	Associate	Yes	Audit trail
+Reviewed_By	Text	Reviewer	Manager	Optional	Control
+Approved_By	Text	Partner	Partner	Optional	Finalization
+Timestamp	DateTime	System time	2026-04-05	Yes	Immutable log
+🔷 CORE SYSTEM LOGIC (CRITICAL FOR BACKEND)
+1. AUTO-POPULATION ENGINE
+OCR extracts FS → maps line-by-line to:
+Mapping_FS_Line
+Account_Name
+AI assigns:
+Account_Code (from master CoA)
+FS_Head / Sub_Head
+Account_Type
+2. TRIAL BALANCE GENERATION
+
+Rule:
+
+Closing Balance = Opening + Debit – Credit
+Debit accounts → positive
+Credit accounts → negative
+System ensures:
+∑ Debit = ∑ Credit (ZERO DIFFERENCE)
+3. GENERAL LEDGER GENERATION
+
+For each Account_Code:
+
+AI generates:
+Logical transaction volume
+Dates within period
+Narrations based on nature
+Ensures:
+Opening + Transactions = Closing
+4. FINANCIAL STATEMENT RECONCILIATION
+Sum of all mapped accounts must equal FS figures
+If mismatch:
+→ Exception_Flag = TRUE
+5. WORKING PAPER AUTOMATION LINK
+Trigger	Condition
+Analytical Review	Variance > materiality
+Risk Assessment	Risk_Tag = High
+Related Party WP	Related_Party_Flag = Yes
+Tax WP	Tax_Treatment ≠ Normal
+Control Testing	Is_Control_Account = Yes
+6. MATERIALITY & SAMPLING ENGINE
+High → Full testing / 60–100% coverage
+Medium → 20–50%
+Low → Analytical reliance
+7. ERROR / EXCEPTION HANDLING
+
+System flags when:
+
+FS ≠ TB
+TB ≠ GL
+Missing mapping
+Low AI confidence (<85%)
+🔷 DATA FLOW ARCHITECTURE
+UPLOAD FILES (FS / TAX RETURNS)
+        ↓
+OCR EXTRACTION
+        ↓
+MASTER_COA_ENGINE POPULATION
+        ↓
+VALIDATION (BALANCING + MAPPING)
+        ↓
+TRIAL BALANCE (AUTO)
+        ↓
+GENERAL LEDGER (AUTO)
+        ↓
+WORKING PAPERS (AUTO)
+        ↓
+FINAL OUTPUT (Excel / Word / PDF)
+🔷 READY-TO-USE IMPLEMENTATION NOTES
+Backend (Recommended)
+DB: PostgreSQL
+Table: master_coa_engine
+Index on:
+Account_Code
+FS_Head
+Industry_Tag
+API Endpoints
+/extract-data
+/validate-coa
+/generate-tb
+/generate-gl
+/generate-wp
+🔷 MINIMUM REQUIRED DATA FOR FULL AUTOMATION
+
+✔ Financial Statements (Excel preferred)
+✔ Optional: Tax returns (PDF)
+✔ Variables (Entity type, industry, framework)
+
+🔷 OUTPUT GUARANTEE (SYSTEM DESIGN OBJECTIVE)
+100% TB balancing
+100% FS reconciliation
+Logical GL transactions
+Fully ISA-compliant working papers
+Zero missing variables (except non-extractable)
+🔷 NEXT STEP (IF REQUIRED)
+
+I can generate for you:
+
+✔ Excel file (ready to upload into your system)
+✔ JSON schema for backend integration
+✔ Full mapping of working papers (ISA-linked)
+✔ Sample dataset for testing (Manufacturing / NGO / Services)

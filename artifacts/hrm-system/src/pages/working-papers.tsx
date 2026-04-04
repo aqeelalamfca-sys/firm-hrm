@@ -11,7 +11,7 @@ import {
   FileCheck, Layers, ClipboardCheck, Pencil, Save, Mail, Phone,
   Globe, EyeOff, Calendar, Tag, Sparkles, Bot, Zap,
   Info, AlertOctagon, Calculator, CircleDot,
-  ExternalLink, Gauge,
+  ExternalLink, Gauge, Table2, Trash2, Database,
 } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
@@ -19,6 +19,7 @@ const API_BASE = import.meta.env.VITE_API_URL || "/api";
 const STAGES = [
   { key: "upload", label: "Upload", icon: Upload },
   { key: "extraction", label: "AI Extraction", icon: Eye },
+  { key: "data_sheet", label: "Data Sheet", icon: Database },
   { key: "arranged_data", label: "Arranged Data", icon: Layers },
   { key: "variables", label: "Variables", icon: Settings2 },
   { key: "generation", label: "Generation", icon: Play },
@@ -92,6 +93,8 @@ export default function WorkingPapers() {
 
   const [uploadFiles, setUploadFiles] = useState<{ file: File; category: string }[]>([]);
   const [extractionData, setExtractionData] = useState<any>(null);
+  const [coaData, setCoaData] = useState<any[]>([]);
+  const [coaLoading, setCoaLoading] = useState(false);
   const [arrangedData, setArrangedData] = useState<any>(null);
   const [variables, setVariables] = useState<any[]>([]);
   const [variableGroups, setVariableGroups] = useState<any>({});
@@ -298,6 +301,116 @@ export default function WorkingPapers() {
         toast({ title: "Extraction failed", description: err.error, variant: "destructive" });
       }
     } catch { toast({ title: "Extraction failed", variant: "destructive" }); }
+    finally { setLoading(false); }
+  };
+
+  const fetchCoaData = async () => {
+    if (!activeSession) return;
+    try {
+      setCoaLoading(true);
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/coa`, { headers });
+      if (res.ok) setCoaData(await res.json());
+    } catch {} finally { setCoaLoading(false); }
+  };
+
+  const populateCoa = async () => {
+    if (!activeSession) return;
+    try {
+      setCoaLoading(true);
+      toast({ title: "Populating COA from extracted data…", description: "This may take a moment." });
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/coa/populate`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({ title: "COA Populated", description: data.message });
+        await fetchCoaData();
+        await fetchSession(activeSession.id);
+        setStage("data_sheet");
+      } else {
+        toast({ title: "Populate failed", description: data.error, variant: "destructive" });
+      }
+    } catch { toast({ title: "Populate failed", variant: "destructive" }); }
+    finally { setCoaLoading(false); }
+  };
+
+  const updateCoaRow = async (rowId: number, updates: any) => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/coa/${rowId}`, {
+        method: "PATCH", headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setCoaData(prev => prev.map(r => r.id === rowId ? updated : r));
+        toast({ title: "Row updated" });
+      } else {
+        const err = await res.json();
+        toast({ title: "Update failed", description: err.error, variant: "destructive" });
+      }
+    } catch {}
+  };
+
+  const addCoaRow = async (row: any) => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/coa`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(row),
+      });
+      if (res.ok) {
+        const inserted = await res.json();
+        setCoaData(prev => [...prev, inserted]);
+        toast({ title: "Row added" });
+      } else {
+        const err = await res.json();
+        toast({ title: "Add failed", description: err.error, variant: "destructive" });
+      }
+    } catch {}
+  };
+
+  const deleteCoaRow = async (rowId: number) => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/coa/${rowId}`, {
+        method: "DELETE", headers,
+      });
+      if (res.ok) {
+        setCoaData(prev => prev.filter(r => r.id !== rowId));
+        toast({ title: "Row deleted" });
+      }
+    } catch {}
+  };
+
+  const validateCoa = async (): Promise<any> => {
+    if (!activeSession) return { valid: false, issues: [] };
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/coa/validate`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      });
+      if (res.ok) return await res.json();
+    } catch {}
+    return { valid: false, issues: ["Validation request failed"] };
+  };
+
+  const approveCoa = async () => {
+    if (!activeSession) return;
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/coa/approve`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({ title: "Data Sheet Approved", description: data.message });
+        await fetchSession(activeSession.id);
+        fetchArrangedData();
+        setStage("arranged_data");
+      } else {
+        toast({ title: "Approval failed", description: data.error, variant: "destructive" });
+      }
+    } catch { toast({ title: "Approval failed", variant: "destructive" }); }
     finally { setLoading(false); }
   };
 
@@ -998,6 +1111,7 @@ export default function WorkingPapers() {
                     setStage(s.key);
                     if (s.key === "variables" && variables.length === 0) fetchVariables();
                     if (s.key === "arranged_data" && !arrangedData) fetchArrangedData();
+                    if (s.key === "data_sheet" && coaData.length === 0) fetchCoaData();
                     if (s.key === "generation" || s.key === "export") { fetchSession(activeSession.id); fetchExceptions(); }
                   }}
                 >
@@ -1092,10 +1206,25 @@ export default function WorkingPapers() {
         <ExtractionStage
           data={extractionData}
           session={activeSession}
-          onFetchArranged={() => { fetchArrangedData(); setStage("arranged_data"); }}
+          onFetchArranged={() => { fetchCoaData(); setStage("data_sheet"); }}
           onRerun={runExtraction}
           loading={loading}
           confidenceBadge={confidenceBadge}
+        />
+      )}
+
+      {stage === "data_sheet" && (
+        <DataSheetStage
+          coaData={coaData}
+          loading={coaLoading || loading}
+          onPopulate={populateCoa}
+          onUpdate={updateCoaRow}
+          onAdd={addCoaRow}
+          onDelete={deleteCoaRow}
+          onValidate={validateCoa}
+          onApprove={approveCoa}
+          onRefresh={fetchCoaData}
+          session={activeSession}
         />
       )}
 
@@ -1452,10 +1581,294 @@ function ExtractionStage({ data, session, onFetchArranged, onRerun, loading, con
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={onFetchArranged} size="lg" className="px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-200/50">
-          Review Arranged Data <ArrowRight className="w-4 h-4 ml-2" />
+        <Button onClick={onFetchArranged} size="lg" className="px-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-md shadow-indigo-200/50 gap-2">
+          <Database className="w-4 h-4" /> Proceed to Data Sheet <ArrowRight className="w-4 h-4" />
         </Button>
       </div>
+    </div>
+  );
+}
+
+function DataSheetStage({ coaData, loading, onPopulate, onUpdate, onDelete, onAdd, onValidate, onApprove, onRefresh, session }: any) {
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<any>({});
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addForm, setAddForm] = useState<any>({ accountCode: "", accountName: "", accountType: "Asset", normalBalance: "Debit", openingBalance: "0", debitTotal: "0", creditTotal: "0", materialityTag: "Medium", riskTag: "Medium", dataSource: "Manual" });
+  const [validation, setValidation] = useState<any>(null);
+  const [savingId, setSavingId] = useState<number | null>(null);
+
+  const totalDebit = coaData.reduce((s: number, r: any) => s + (Number(r.closingBalance) > 0 ? Number(r.closingBalance) : 0), 0);
+  const totalCredit = coaData.reduce((s: number, r: any) => s + (Number(r.closingBalance) < 0 ? Math.abs(Number(r.closingBalance)) : 0), 0);
+  const difference = Math.abs(totalDebit - totalCredit);
+  const isBalanced = difference < 1;
+
+  const handleValidate = async () => {
+    const result = await onValidate();
+    setValidation(result);
+  };
+
+  const startEdit = (row: any) => {
+    setEditingId(row.id);
+    setEditForm({ ...row });
+    setShowAddForm(false);
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+    setSavingId(editingId);
+    await onUpdate(editingId, editForm);
+    setEditingId(null);
+    setSavingId(null);
+  };
+
+  const handleAddRow = async () => {
+    const ob = Number(addForm.openingBalance || 0);
+    const dr = Number(addForm.debitTotal || 0);
+    const cr = Number(addForm.creditTotal || 0);
+    await onAdd({ ...addForm, openingBalance: ob, debitTotal: dr, creditTotal: cr });
+    setShowAddForm(false);
+    setAddForm({ accountCode: "", accountName: "", accountType: "Asset", normalBalance: "Debit", openingBalance: "0", debitTotal: "0", creditTotal: "0", materialityTag: "Medium", riskTag: "Medium", dataSource: "Manual" });
+  };
+
+  const fmt = (v: any) => {
+    const n = Number(v || 0);
+    if (isNaN(n)) return "0";
+    return n.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  };
+
+  const TYPE_OPTIONS = ["Asset", "Liability", "Equity", "Revenue", "Expense"];
+  const MAT_OPTIONS = ["High", "Medium", "Low"];
+  const RISK_OPTIONS = ["High", "Medium", "Low"];
+  const CF_OPTIONS = ["Operating", "Investing", "Financing"];
+  const TAX_OPTIONS = ["Normal", "Disallowable", "Capital"];
+
+  const typeColor = (t: string) => {
+    if (t === "Asset") return "bg-blue-50 text-blue-700";
+    if (t === "Liability") return "bg-orange-50 text-orange-700";
+    if (t === "Equity") return "bg-purple-50 text-purple-700";
+    if (t === "Revenue") return "bg-emerald-50 text-emerald-700";
+    if (t === "Expense") return "bg-red-50 text-red-700";
+    return "bg-gray-50 text-gray-600";
+  };
+
+  const riskColor = (r: string) => r === "High" ? "text-red-600 font-semibold" : r === "Medium" ? "text-amber-600" : "text-green-600";
+  const matColor = (m: string) => m === "High" ? "bg-red-100 text-red-700" : m === "Medium" ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700";
+
+  return (
+    <div className="space-y-5">
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0"><Database className="w-4.5 h-4.5 text-indigo-600" /></div>
+          <div><p className="text-xl font-bold text-slate-900">{coaData.length}</p><p className="text-[11px] text-slate-500">COA Accounts</p></div>
+        </div>
+        <div className={cn("border rounded-xl p-4 flex items-center gap-3", isBalanced ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200")}>
+          <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", isBalanced ? "bg-emerald-100" : "bg-red-100")}>
+            {isBalanced ? <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600" /> : <AlertTriangle className="w-4.5 h-4.5 text-red-600" />}
+          </div>
+          <div><p className={cn("text-sm font-bold", isBalanced ? "text-emerald-800" : "text-red-800")}>{isBalanced ? "Balanced ✓" : `Diff: ${fmt(difference)}`}</p><p className="text-[11px] text-slate-500">TB Status</p></div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><ArrowRight className="w-4.5 h-4.5 text-blue-600" /></div>
+          <div><p className="text-sm font-bold text-slate-900">{fmt(totalDebit)}</p><p className="text-[11px] text-slate-500">Total Debit (Dr)</p></div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center shrink-0"><ArrowLeft className="w-4.5 h-4.5 text-amber-600" /></div>
+          <div><p className="text-sm font-bold text-slate-900">{fmt(totalCredit)}</p><p className="text-[11px] text-slate-500">Total Credit (Cr)</p></div>
+        </div>
+      </div>
+
+      {/* Validation result */}
+      {validation && (
+        <div className={cn("border rounded-xl p-4", validation.valid ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200")}>
+          <div className="flex items-center gap-2 mb-2">
+            {validation.valid ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertTriangle className="w-4 h-4 text-amber-600" />}
+            <span className={cn("text-sm font-semibold", validation.valid ? "text-emerald-800" : "text-amber-800")}>
+              {validation.valid ? "Validation Passed — TB is balanced and complete" : `${validation.issues?.length} issues found`}
+            </span>
+          </div>
+          {(validation.issues || []).slice(0, 5).map((issue: string, i: number) => (
+            <p key={i} className="text-xs text-amber-700 ml-6">• {issue}</p>
+          ))}
+        </div>
+      )}
+
+      {/* Main table card */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50/40 px-5 py-4 border-b border-slate-200/60 flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="font-semibold text-slate-900 flex items-center gap-2"><Table2 className="w-5 h-5 text-indigo-600" /> MASTER COA ENGINE — Data Sheet</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Edit accounts, balances and audit attributes. This drives the complete TB, GL and Working Papers generation.</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={onRefresh} disabled={loading} className="h-8 text-xs"><RefreshCw className={cn("w-3.5 h-3.5 mr-1", loading && "animate-spin")} />Refresh</Button>
+            <Button variant="outline" size="sm" onClick={handleValidate} disabled={loading} className="h-8 text-xs border-blue-200 text-blue-700 hover:bg-blue-50"><CheckCircle2 className="w-3.5 h-3.5 mr-1" />Validate TB</Button>
+            <Button variant="outline" size="sm" onClick={onPopulate} disabled={loading} className="h-8 text-xs border-indigo-200 text-indigo-700 hover:bg-indigo-50"><Sparkles className="w-3.5 h-3.5 mr-1" />{coaData.length > 0 ? "Re-populate" : "Populate from AI"}</Button>
+            <Button size="sm" onClick={() => { setShowAddForm(true); setEditingId(null); }} disabled={loading} className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700"><Plus className="w-3.5 h-3.5 mr-1" />Add Row</Button>
+          </div>
+        </div>
+
+        {coaData.length === 0 && !loading ? (
+          <div className="py-20 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-indigo-50 mx-auto mb-4 flex items-center justify-center"><Database className="w-8 h-8 text-indigo-400" /></div>
+            <h3 className="text-slate-800 font-semibold text-lg mb-1">No COA Data Yet</h3>
+            <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto">Click "Populate from AI" to auto-extract accounts from your uploaded documents, or add rows manually.</p>
+            <Button onClick={onPopulate} className="bg-indigo-600 hover:bg-indigo-700 gap-2"><Sparkles className="w-4 h-4" />Populate from AI / Extracted Data</Button>
+          </div>
+        ) : loading && coaData.length === 0 ? (
+          <div className="py-16 text-center"><Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" /></div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse min-w-[1200px]">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="text-left px-3 py-2.5 font-semibold text-slate-600 sticky left-0 bg-slate-50 z-10 min-w-[80px]">Code</th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-slate-600 min-w-[200px]">Account Name</th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-slate-600 min-w-[90px]">Type</th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-slate-600 min-w-[60px]">Dr/Cr</th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-slate-600 min-w-[80px]">FS Head</th>
+                  <th className="text-right px-3 py-2.5 font-semibold text-slate-600 min-w-[110px]">Opening Bal</th>
+                  <th className="text-right px-3 py-2.5 font-semibold text-slate-600 min-w-[110px]">Debit (Dr)</th>
+                  <th className="text-right px-3 py-2.5 font-semibold text-slate-600 min-w-[110px]">Credit (Cr)</th>
+                  <th className="text-right px-3 py-2.5 font-semibold text-slate-600 bg-slate-100 min-w-[110px]">Closing Bal</th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-slate-600 min-w-[70px]">Matl.</th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-slate-600 min-w-[60px]">Risk</th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-slate-600 min-w-[80px]">Tax</th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-slate-600 min-w-[60px]">Src</th>
+                  <th className="text-right px-3 py-2.5 font-semibold text-slate-600 min-w-[55px]">Conf%</th>
+                  <th className="text-center px-3 py-2.5 font-semibold text-slate-600 min-w-[80px]">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {/* Add row form */}
+                {showAddForm && (
+                  <tr className="bg-emerald-50 border-b-2 border-emerald-200">
+                    <td className="px-2 py-2 sticky left-0 bg-emerald-50 z-10"><input className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs" placeholder="1000" value={addForm.accountCode} onChange={e => setAddForm((p: any) => ({ ...p, accountCode: e.target.value }))} /></td>
+                    <td className="px-2 py-2"><input className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs" placeholder="Account Name" value={addForm.accountName} onChange={e => setAddForm((p: any) => ({ ...p, accountName: e.target.value }))} /></td>
+                    <td className="px-2 py-2"><select className="w-full border border-slate-300 rounded px-1 py-1 text-xs" value={addForm.accountType} onChange={e => setAddForm((p: any) => ({ ...p, accountType: e.target.value, normalBalance: ["Asset","Expense"].includes(e.target.value) ? "Debit" : "Credit" }))}>{TYPE_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></td>
+                    <td className="px-2 py-2"><select className="w-full border border-slate-300 rounded px-1 py-1 text-xs" value={addForm.normalBalance} onChange={e => setAddForm((p: any) => ({ ...p, normalBalance: e.target.value }))}><option>Debit</option><option>Credit</option></select></td>
+                    <td className="px-2 py-2"><input className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs" placeholder="Assets" value={addForm.fsHead || ""} onChange={e => setAddForm((p: any) => ({ ...p, fsHead: e.target.value }))} /></td>
+                    <td className="px-2 py-2"><input type="number" className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs text-right" value={addForm.openingBalance} onChange={e => setAddForm((p: any) => ({ ...p, openingBalance: e.target.value }))} /></td>
+                    <td className="px-2 py-2"><input type="number" className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs text-right" value={addForm.debitTotal} onChange={e => setAddForm((p: any) => ({ ...p, debitTotal: e.target.value }))} /></td>
+                    <td className="px-2 py-2"><input type="number" className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs text-right" value={addForm.creditTotal} onChange={e => setAddForm((p: any) => ({ ...p, creditTotal: e.target.value }))} /></td>
+                    <td className="px-2 py-2 bg-emerald-100 text-right font-mono text-xs font-semibold">{fmt(Number(addForm.openingBalance||0)+Number(addForm.debitTotal||0)-Number(addForm.creditTotal||0))}</td>
+                    <td className="px-2 py-2"><select className="w-full border border-slate-300 rounded px-1 py-1 text-xs" value={addForm.materialityTag} onChange={e => setAddForm((p: any) => ({ ...p, materialityTag: e.target.value }))}>{MAT_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></td>
+                    <td className="px-2 py-2"><select className="w-full border border-slate-300 rounded px-1 py-1 text-xs" value={addForm.riskTag} onChange={e => setAddForm((p: any) => ({ ...p, riskTag: e.target.value }))}>{RISK_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></td>
+                    <td className="px-2 py-2"><select className="w-full border border-slate-300 rounded px-1 py-1 text-xs" value={addForm.taxTreatment || ""} onChange={e => setAddForm((p: any) => ({ ...p, taxTreatment: e.target.value }))}><option value="">—</option>{TAX_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></td>
+                    <td className="px-2 py-2"><input className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs" value={addForm.dataSource} onChange={e => setAddForm((p: any) => ({ ...p, dataSource: e.target.value }))} /></td>
+                    <td className="px-2 py-2"><input type="number" className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs text-right" value={addForm.confidenceScore || "100"} onChange={e => setAddForm((p: any) => ({ ...p, confidenceScore: e.target.value }))} /></td>
+                    <td className="px-2 py-2 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button onClick={handleAddRow} className="px-2 py-1 rounded bg-emerald-600 text-white text-[10px] font-medium hover:bg-emerald-700"><Check className="w-3 h-3" /></button>
+                        <button onClick={() => setShowAddForm(false)} className="px-2 py-1 rounded bg-slate-200 text-slate-600 text-[10px] font-medium hover:bg-slate-300"><X className="w-3 h-3" /></button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {coaData.map((row: any) => (
+                  editingId === row.id ? (
+                    <tr key={row.id} className="bg-blue-50 border-b-2 border-blue-200">
+                      <td className="px-2 py-2 sticky left-0 bg-blue-50 z-10"><input className="w-full border border-blue-300 rounded px-1.5 py-1 text-xs font-mono" value={editForm.accountCode || ""} onChange={e => setEditForm((p: any) => ({ ...p, accountCode: e.target.value }))} /></td>
+                      <td className="px-2 py-2"><input className="w-full border border-blue-300 rounded px-1.5 py-1 text-xs" value={editForm.accountName || ""} onChange={e => setEditForm((p: any) => ({ ...p, accountName: e.target.value }))} /></td>
+                      <td className="px-2 py-2"><select className="w-full border border-blue-300 rounded px-1 py-1 text-xs" value={editForm.accountType || "Asset"} onChange={e => setEditForm((p: any) => ({ ...p, accountType: e.target.value, normalBalance: ["Asset","Expense"].includes(e.target.value) ? "Debit" : "Credit" }))}>{TYPE_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></td>
+                      <td className="px-2 py-2"><select className="w-full border border-blue-300 rounded px-1 py-1 text-xs" value={editForm.normalBalance || "Debit"} onChange={e => setEditForm((p: any) => ({ ...p, normalBalance: e.target.value }))}><option>Debit</option><option>Credit</option></select></td>
+                      <td className="px-2 py-2"><input className="w-full border border-blue-300 rounded px-1.5 py-1 text-xs" value={editForm.fsHead || ""} onChange={e => setEditForm((p: any) => ({ ...p, fsHead: e.target.value }))} /></td>
+                      <td className="px-2 py-2"><input type="number" className="w-full border border-blue-300 rounded px-1.5 py-1 text-xs text-right" value={editForm.openingBalance || "0"} onChange={e => setEditForm((p: any) => ({ ...p, openingBalance: e.target.value }))} /></td>
+                      <td className="px-2 py-2"><input type="number" className="w-full border border-blue-300 rounded px-1.5 py-1 text-xs text-right" value={editForm.debitTotal || "0"} onChange={e => setEditForm((p: any) => ({ ...p, debitTotal: e.target.value }))} /></td>
+                      <td className="px-2 py-2"><input type="number" className="w-full border border-blue-300 rounded px-1.5 py-1 text-xs text-right" value={editForm.creditTotal || "0"} onChange={e => setEditForm((p: any) => ({ ...p, creditTotal: e.target.value }))} /></td>
+                      <td className="px-2 py-2 bg-blue-100 text-right font-mono text-xs font-semibold">{fmt(Number(editForm.openingBalance||0)+Number(editForm.debitTotal||0)-Number(editForm.creditTotal||0))}</td>
+                      <td className="px-2 py-2"><select className="w-full border border-blue-300 rounded px-1 py-1 text-xs" value={editForm.materialityTag || "Medium"} onChange={e => setEditForm((p: any) => ({ ...p, materialityTag: e.target.value }))}>{MAT_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></td>
+                      <td className="px-2 py-2"><select className="w-full border border-blue-300 rounded px-1 py-1 text-xs" value={editForm.riskTag || "Medium"} onChange={e => setEditForm((p: any) => ({ ...p, riskTag: e.target.value }))}>{RISK_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></td>
+                      <td className="px-2 py-2"><select className="w-full border border-blue-300 rounded px-1 py-1 text-xs" value={editForm.taxTreatment || ""} onChange={e => setEditForm((p: any) => ({ ...p, taxTreatment: e.target.value }))}><option value="">—</option>{TAX_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></td>
+                      <td className="px-2 py-2"><input className="w-full border border-blue-300 rounded px-1.5 py-1 text-xs" value={editForm.dataSource || ""} onChange={e => setEditForm((p: any) => ({ ...p, dataSource: e.target.value }))} /></td>
+                      <td className="px-2 py-2"><input type="number" className="w-full border border-blue-300 rounded px-1.5 py-1 text-xs text-right" value={editForm.confidenceScore || "90"} onChange={e => setEditForm((p: any) => ({ ...p, confidenceScore: e.target.value }))} /></td>
+                      <td className="px-2 py-2 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={saveEdit} disabled={savingId === row.id} className="px-2 py-1 rounded bg-blue-600 text-white text-[10px] font-medium hover:bg-blue-700 disabled:opacity-50"><Save className="w-3 h-3" /></button>
+                          <button onClick={() => setEditingId(null)} className="px-2 py-1 rounded bg-slate-200 text-slate-600 text-[10px] font-medium hover:bg-slate-300"><X className="w-3 h-3" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={row.id} className={cn("hover:bg-slate-50/60 transition-colors", row.exceptionFlag && "bg-red-50/30")}>
+                      <td className="px-3 py-2.5 font-mono text-slate-700 font-medium sticky left-0 bg-white z-10">{row.accountCode}</td>
+                      <td className="px-3 py-2.5 text-slate-800 font-medium max-w-[200px]">
+                        <div className="truncate" title={row.accountName}>{row.accountName}</div>
+                        {row.mappingFsLine && <div className="text-[10px] text-slate-400 truncate">{row.mappingFsLine}</div>}
+                      </td>
+                      <td className="px-3 py-2.5"><span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold", typeColor(row.accountType))}>{row.accountType}</span></td>
+                      <td className="px-3 py-2.5"><span className={cn("text-[10px] font-semibold", row.normalBalance === "Debit" ? "text-blue-600" : "text-amber-600")}>{row.normalBalance === "Debit" ? "Dr" : "Cr"}</span></td>
+                      <td className="px-3 py-2.5 text-slate-500 text-[11px] truncate max-w-[80px]" title={row.fsHead || ""}>{row.fsHead || "—"}</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-slate-600">{fmt(row.openingBalance)}</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-blue-700 font-medium">{fmt(row.debitTotal)}</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-amber-700 font-medium">{fmt(row.creditTotal)}</td>
+                      <td className="px-3 py-2.5 text-right font-mono font-semibold bg-slate-50/80">
+                        <span className={Number(row.closingBalance) >= 0 ? "text-blue-800" : "text-amber-800"}>{fmt(Math.abs(Number(row.closingBalance)))} <span className="text-[10px] font-normal">{Number(row.closingBalance) >= 0 ? "Dr" : "Cr"}</span></span>
+                      </td>
+                      <td className="px-3 py-2.5"><span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", matColor(row.materialityTag))}>{row.materialityTag || "—"}</span></td>
+                      <td className="px-3 py-2.5 text-[11px]"><span className={riskColor(row.riskTag)}>{row.riskTag || "—"}</span></td>
+                      <td className="px-3 py-2.5 text-[10px] text-slate-500">{row.taxTreatment || "—"}</td>
+                      <td className="px-3 py-2.5 text-[10px] text-slate-500">{row.dataSource || "—"}</td>
+                      <td className="px-3 py-2.5 text-right">
+                        {row.confidenceScore ? (
+                          <span className={cn("text-[10px] font-semibold", Number(row.confidenceScore) >= 85 ? "text-emerald-600" : Number(row.confidenceScore) >= 70 ? "text-amber-600" : "text-red-600")}>{Number(row.confidenceScore).toFixed(0)}%</span>
+                        ) : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => startEdit(row)} className="p-1 rounded hover:bg-blue-100 text-blue-600 transition-colors" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => onDelete(row.id)} className="p-1 rounded hover:bg-red-100 text-red-500 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                ))}
+              </tbody>
+              {coaData.length > 0 && (
+                <tfoot>
+                  <tr className="bg-slate-100 border-t-2 border-slate-300 font-semibold text-xs">
+                    <td colSpan={5} className="px-3 py-2.5 text-slate-700 sticky left-0 bg-slate-100 z-10">TOTALS ({coaData.length} accounts)</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-slate-600">{fmt(coaData.reduce((s: number, r: any) => s + Number(r.openingBalance || 0), 0))}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-blue-700">{fmt(coaData.reduce((s: number, r: any) => s + Number(r.debitTotal || 0), 0))}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-amber-700">{fmt(coaData.reduce((s: number, r: any) => s + Number(r.creditTotal || 0), 0))}</td>
+                    <td className="px-3 py-2.5 text-right font-mono bg-slate-200">
+                      <div><span className="text-blue-800">Dr: {fmt(totalDebit)}</span></div>
+                      <div><span className="text-amber-800">Cr: {fmt(totalCredit)}</span></div>
+                      <div className={isBalanced ? "text-emerald-700" : "text-red-700"}>{isBalanced ? "✓ BALANCED" : `Diff: ${fmt(difference)}`}</div>
+                    </td>
+                    <td colSpan={6} />
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        )}
+
+        {/* Notes / Instructions */}
+        {coaData.length > 0 && (
+          <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500">
+            <strong>How it works:</strong> Closing Balance = Opening + Debit − Credit. Positive closing = Dr balance; Negative = Cr balance. TB is balanced when total Dr = total Cr. After approval, this data drives TB generation, GL entries, and all 12 Working Paper heads.
+          </div>
+        )}
+      </div>
+
+      {/* Action footer */}
+      {coaData.length > 0 && (
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm text-slate-500">
+            {isBalanced
+              ? <span className="flex items-center gap-1.5 text-emerald-600"><CheckCircle2 className="w-4 h-4" /> TB is balanced — ready to approve</span>
+              : <span className="flex items-center gap-1.5 text-amber-600"><AlertTriangle className="w-4 h-4" /> TB not balanced — review and fix before approving</span>
+            }
+          </div>
+          <Button onClick={onApprove} disabled={loading} size="lg" className={cn("px-6 gap-2", isBalanced ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700" : "bg-slate-400 cursor-not-allowed")} title={!isBalanced ? "Balance the TB before approving" : ""}>
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            Approve Data Sheet & Continue
+            <ArrowRight className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

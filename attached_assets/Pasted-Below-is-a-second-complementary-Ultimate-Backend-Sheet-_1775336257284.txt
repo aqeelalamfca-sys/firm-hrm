@@ -1,0 +1,150 @@
+Below is a second (complementary) “Ultimate Backend Sheet” — separate from the CoA engine — designed to make your Working Paper Generator fully complete, automated, and inspection-ready.
+
+This sheet acts as the central control layer linking:
+
+Variables
+Audit workflow
+Working papers
+Sampling
+Evidence
+ISA compliance
+
+Aligned with International Financial Reporting Standards, Institute of Chartered Accountants of Pakistan, and ISAs.
+
+🔷 ULTIMATE BACKEND CONTROL SHEET
+Table Name: AUDIT_ENGINE_MASTER
+
+This is the brain of the system (not financial data, but audit logic + workflow control)
+
+🔶 1. MASTER TABLE STRUCTURE
+Field Name	Data Type	Description	Example	Mandatory	Logic
+Record_ID	UUID	Unique ID	UUID	Yes	Primary key
+Engagement_ID	Text	Engagement reference	ENG-001	Yes	Links all tables
+Client_Name	Text	Entity name	ABC Ltd	Yes	Display
+Entity_Type	Dropdown	Pvt, Listed, NGO, Bank	Pvt Ltd	Yes	Drives WPs
+Industry_Type	Dropdown	Manufacturing, Services	Manufacturing	Yes	Sector logic
+Financial_Year	Date Range	Audit period	01-Jul-24 to 30-Jun-25	Yes	Controls dates
+Reporting_Framework	Dropdown	IFRS, IFRS for SMEs	IFRS	Yes	Disclosure
+Audit_Type	Dropdown	Statutory, Internal	Statutory	Yes	Scope
+Engagement_Status	Dropdown	Planning, Execution, Completed	Planning	Yes	Workflow
+Materiality_Amount	Decimal	Overall materiality	2,000,000	Yes	Sampling
+Performance_Materiality	Decimal	PM	1,500,000	Yes	Risk
+Triviality_Threshold	Decimal	Posting threshold	50,000	Yes	JE logic
+Risk_Level_Overall	Dropdown	Low/Medium/High	High	Yes	Drives testing
+Going_Concern_Flag	Boolean	Yes/No	Yes	Yes	ISA 570
+Fraud_Risk_Flag	Boolean	Yes/No	Yes	Yes	ISA 240
+Related_Party_Flag	Boolean	Yes/No	Yes	Yes	ISA 550
+Laws_Regulation_Flag	Boolean	Yes/No	Yes	Yes	ISA 250
+Component_Audit_Flag	Boolean	Yes/No	No	Yes	ISA 600
+Group_Audit_Flag	Boolean	Yes/No	No	Yes	ISA 600
+IT_System_Type	Dropdown	ERP, Manual	ERP	Yes	Control testing
+Internal_Audit_Flag	Boolean	Yes/No	Yes	Yes	ISA 610
+Use_of_Expert_Flag	Boolean	Yes/No	No	Yes	ISA 620
+Sampling_Method	Dropdown	Random, MUS, Judgmental	MUS	Yes	ToD
+Data_Source	Dropdown	OCR / Manual	OCR	Yes	Audit trail
+Confidence_Level	%	AI confidence	93%	Yes	Exception
+Exception_Flag	Boolean	Yes/No	No	Yes	Review
+Prepared_By	Text	Associate	Ali	Yes	Log
+Reviewed_By	Text	Manager	Sara	Optional	Control
+Approved_By	Text	Partner	Aqeel	Optional	Final
+Timestamp	DateTime	System time	2026-04-05	Yes	Immutable
+🔷 2. WORKING PAPER CONTROL MATRIX (EMBEDDED LOGIC)
+Table: WP_TRIGGER_ENGINE
+Field	Description
+WP_Code	A1, B1, C3 etc
+WP_Name	Working Paper Title
+Trigger_Condition	Variable-based condition
+ISA_Reference	Standard
+Output_Format	Word / Excel
+Mandatory_Flag	Yes/No
+Example
+WP_Code	WP_Name	Trigger	ISA
+A1	Engagement Letter	Always	ISA 210
+B1	Understanding Entity	Always	ISA 315
+B3	Risk Assessment	Risk_Level = High	ISA 315
+C2	Analytical Review	Variance > Materiality	ISA 520
+D5	Related Party Testing	Related_Party = Yes	ISA 550
+E1	Going Concern	Going_Concern = Yes	ISA 570
+🔷 3. ASSERTION MAPPING ENGINE
+Table: ASSERTION_LINKAGE
+Account_Type	Assertion	WP_Link
+Receivables	Existence	Debtor Confirmation
+Inventory	Valuation	NRV Testing
+Payables	Completeness	Supplier Reconciliation
+Revenue	Occurrence	Sales Testing
+🔷 4. SAMPLING ENGINE TABLE
+Table: SAMPLING_RULES
+Risk_Level	Materiality	Sample_Size	Coverage
+High	> PM	60–100%	Full
+Medium	≤ PM	30–50%	Moderate
+Low	< Trivial	10–20%	Analytical
+🔷 5. ANALYTICAL PROCEDURE ENGINE
+Table: ANALYTICS_ENGINE
+Ratio	Formula	Threshold	WP_Trigger
+GP %	GP / Sales	±10%	Analytical WP
+Current Ratio	CA / CL	<1	Risk WP
+Debtor Days	Receivable / Sales × 365	>90	Collection risk
+🔷 6. CONTROL TESTING ENGINE
+Table: CONTROL_MATRIX
+Process	Control	Frequency	Test_Type
+Sales	Invoice Approval	Daily	ToC
+Purchases	PO Approval	Per transaction	ToC
+Payroll	Authorization	Monthly	ToC
+🔷 7. EVIDENCE VAULT STRUCTURE
+Table: EVIDENCE_LOG
+Field	Description
+Evidence_ID	Unique
+WP_Code	Linked WP
+Document_Type	Invoice / Contract
+Source	Client / External
+Verified_Flag	Yes/No
+Reviewer_Comment	Notes
+🔷 8. RECONCILIATION ENGINE
+Table: RECON_ENGINE
+Check	Rule
+FS vs TB	Must match
+TB vs GL	Must match
+GL vs Transactions	Must match
+Opening vs PY	Must match
+🔷 9. AUTOMATION FLOW LOGIC
+VARIABLES SELECTED / EXTRACTED
+        ↓
+AUDIT_ENGINE_MASTER POPULATED
+        ↓
+WP_TRIGGER_ENGINE ACTIVATED
+        ↓
+COA_ENGINE LINKED
+        ↓
+TB GENERATED
+        ↓
+GL GENERATED
+        ↓
+SAMPLING + ASSERTIONS APPLIED
+        ↓
+WORKING PAPERS GENERATED
+        ↓
+REVIEW + SIGN-OFF
+        ↓
+FINAL REPORT
+🔷 10. BACKEND PERFECTION RULES (CRITICAL)
+
+✔ No working paper without trigger
+✔ No TB without FS mapping
+✔ No GL without TB reconciliation
+✔ No WP completion without evidence
+✔ No sign-off without conclusion
+✔ No output if Exception_Flag = TRUE
+
+🔷 11. SYSTEM VALIDATION CHECKS
+Missing variables → block generation
+Low confidence (<85%) → review required
+Unbalanced TB → stop process
+Unlinked WP → flag error
+🔷 FINAL POSITIONING
+
+This sheet + your previous CoA sheet together create:
+
+🔥 COMPLETE BACKEND ECOSYSTEM
+CoA Engine → Financial Structure
+Audit Engine → Logic + Compliance
+WP Engine → Deliverables

@@ -12,7 +12,7 @@ import { db } from "@workspace/db";
 import {
   wpSessionsTable, wpExtractedFieldsTable, wpVariablesTable,
   wpTrialBalanceLinesTable, wpGlAccountsTable, wpGlEntriesTable,
-  wpExceptionLogTable, wpHeadsTable,
+  wpExceptionLogTable, wpHeadsTable, wpMasterCoaTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import OpenAI from "openai";
@@ -292,6 +292,33 @@ export async function runTBEngine(sessionId: number, ai: { client: OpenAI; model
 }> {
   const auditLog: string[] = [];
   const exceptions: string[] = [];
+
+  // ── Layer 0: Master COA Engine (highest priority — user-approved data sheet)
+  const coaRows = await db.select().from(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, sessionId));
+  if (coaRows.length > 0) {
+    auditLog.push(`Layer 0: Using MASTER_COA_ENGINE — ${coaRows.length} accounts from user-approved data sheet`);
+    const raw = coaRows.map((r: any) => {
+      const closing = Number(r.closingBalance || 0);
+      const isDebit = closing >= 0;
+      return {
+        accountCode: r.accountCode,
+        accountName: r.accountName,
+        classification: r.accountType || "Asset",
+        debit: isDebit ? Math.abs(closing).toFixed(2) : "0",
+        credit: isDebit ? "0" : Math.abs(closing).toFixed(2),
+        balance: closing.toFixed(2),
+        source: "master_coa_engine",
+        confidence: String(r.confidenceScore || "95"),
+        fsLineMapping: r.mappingFsLine || "",
+      };
+    });
+    const { lines, correction, differenceBeforeAdj } = intelligentBalance(raw);
+    if (correction) {
+      exceptions.push(correction);
+      auditLog.push(`Auto-balance applied: ${correction}`);
+    }
+    return buildTBResult(lines, exceptions, auditLog);
+  }
 
   // ── Layer 1: Try existing extracted TB lines
   const extractedTB = await db.select().from(wpExtractedFieldsTable)

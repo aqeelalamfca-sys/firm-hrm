@@ -9,10 +9,12 @@ import {
   wpVariableChangeLogTable, wpExceptionLogTable, wpTrialBalanceLinesTable,
   wpGlAccountsTable, wpGlEntriesTable, wpHeadsTable, wpHeadDocumentsTable,
   wpExportJobsTable, wpVariableDefinitionsTable, wpVariableDependencyRulesTable,
+  wpMasterCoaTable,
 } from "@workspace/db";
 import { VARIABLE_DEFINITIONS, EXTRACTION_FIELD_TO_VARIABLE_MAP, VARIABLE_GROUPS, DEPENDENCY_RULES } from "../data/variable-definitions";
 import {
   runTBEngine, runGLEngine, runReconciliation, checkFinalEnforcement,
+  PAKISTAN_COA, mapFsToCoa,
 } from "./tb-gl-engine";
 import { eq, and, inArray, asc } from "drizzle-orm";
 import OpenAI from "openai";
@@ -290,13 +292,14 @@ router.patch("/sessions/:id/status", async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid session ID" });
     const { status } = req.body;
-    const validStatuses = ["upload", "extraction", "arranged_data", "variables", "generation", "export", "completed"];
+    const validStatuses = ["upload", "extraction", "data_sheet", "arranged_data", "variables", "generation", "export", "completed"];
     if (!validStatuses.includes(status)) return res.status(400).json({ error: "Invalid status" });
 
     const validTransitions: Record<string, string[]> = {
       upload: ["extraction"],
-      extraction: ["arranged_data", "upload"],
-      arranged_data: ["variables"],
+      extraction: ["data_sheet", "arranged_data", "upload"],
+      data_sheet: ["arranged_data", "variables", "extraction"],
+      arranged_data: ["variables", "data_sheet"],
       variables: ["generation"],
       generation: ["export"],
       export: ["completed", "generation"],
@@ -624,6 +627,374 @@ Return ONLY valid JSON:
   }
 });
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MASTER COA ENGINE (DATA SHEET)
+// ═══════════════════════════════════════════════════════════════════════════
+
+router.get("/sessions/:id/coa", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const rows = await db.select().from(wpMasterCoaTable)
+      .where(eq(wpMasterCoaTable.sessionId, sessionId))
+      .orderBy(asc(wpMasterCoaTable.displayOrder));
+    res.json(rows);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch COA data" });
+  }
+});
+
+router.post("/sessions/:id/coa/populate", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const ai = await getAIClient();
+
+    // Gather extracted FS fields
+    const fsFields = await db.select().from(wpExtractedFieldsTable)
+      .where(and(eq(wpExtractedFieldsTable.sessionId, sessionId), eq(wpExtractedFieldsTable.category, "FS Line Items")));
+    const vars = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+    const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    const fsMap: Record<string, number> = {};
+    for (const f of fsFields) {
+      const val = Number(f.finalValue || f.extractedValue || 0);
+      if (val !== 0) fsMap[f.fieldName] = val;
+    }
+    for (const v of vars) {
+      if (v.finalValue && !fsMap[v.variableName]) {
+        const num = Number(v.finalValue);
+        if (!isNaN(num) && num !== 0) fsMap[v.variableName] = num;
+      }
+    }
+
+    // Build COA rows from PAKISTAN_COA + FS mapping
+    const coaMapped = mapFsToCoa(fsMap);
+    let rows: any[] = [];
+
+    if (coaMapped.length > 0) {
+      rows = coaMapped.map((line: any, idx: number) => {
+        const closing = Number(line.balance || 0);
+        const isDebit = line.classification === "Asset" || line.classification === "Expense";
+        const coaEntry = PAKISTAN_COA.find((e: any) => e.code === line.accountCode);
+        const fsHead = line.classification === "Asset" ? "Assets" :
+          line.classification === "Liability" ? "Liabilities" :
+          line.classification === "Equity" ? "Equity" :
+          line.classification === "Revenue" ? "Income Statement" : "Income Statement";
+        return {
+          sessionId,
+          accountCode: line.accountCode,
+          parentCode: line.accountCode.slice(0, 2) + "00",
+          accountName: line.accountName,
+          fsHead,
+          fsSubHead: line.classification,
+          accountType: line.classification,
+          normalBalance: isDebit ? "Debit" : "Credit",
+          industryTag: session.entityType || "General",
+          entityTypeTag: session.entityType || "Private Limited",
+          ifrsReference: coaEntry ? getIfrsRef(line.classification) : null,
+          taxTreatment: ["Revenue", "Expense"].includes(line.classification) ? "Normal" : null,
+          isControlAccount: false,
+          isSubLedger: false,
+          openingBalance: "0",
+          debitTotal: line.debit || "0",
+          creditTotal: line.credit || "0",
+          closingBalance: String(closing),
+          priorYearBalance: null,
+          variance: null,
+          materialityTag: Math.abs(closing) > 10000000 ? "High" : Math.abs(closing) > 1000000 ? "Medium" : "Low",
+          riskTag: line.classification === "Asset" || line.classification === "Revenue" ? "Medium" : "Low",
+          assertionTag: isDebit ? "Existence,Completeness,Valuation" : "Completeness,Accuracy,Classification",
+          relatedPartyFlag: false,
+          cashFlowTag: line.classification === "Asset" || line.classification === "Liability" ? "Operating" : null,
+          mappingGlCode: `GL-${line.accountCode}`,
+          mappingFsLine: line.fsLineMapping || "",
+          workingPaperCode: getWorkingPaperCode(line.classification),
+          reconciliationFlag: false,
+          dataSource: line.source === "ai_generated" ? "AI" : "Imported",
+          confidenceScore: line.confidence || "90",
+          exceptionFlag: false,
+          notes: null,
+          displayOrder: idx,
+        };
+      });
+    } else if (ai) {
+      // AI fallback: generate from session metadata
+      const prompt = `Generate a MASTER_COA_ENGINE table for a Pakistani ${session.entityType || "Private Limited"} company audit for year ${session.engagementYear}. Return 20-30 accounts covering Assets, Liabilities, Equity, Revenue, Expenses using Pakistan Companies Act 4-digit chart of accounts. For each account provide: account_code (4 digits), account_name, account_type (Asset/Liability/Equity/Revenue/Expense), normal_balance (Debit/Credit), fs_head, opening_balance (number), debit_total (number), credit_total (number), closing_balance (number, = opening + debit - credit). All in PKR. closing_balance must be positive for Debit accounts, negative for Credit accounts. Ensure total of all closing_balances is exactly 0 (TB balance). Return JSON: {"accounts":[...]}`;
+      const resp = await ai.client.chat.completions.create({
+        model: ai.model,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 4000,
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+      });
+      const parsed = JSON.parse(resp.choices[0]?.message?.content || "{}");
+      const accounts = parsed.accounts || [];
+      rows = accounts.map((a: any, idx: number) => ({
+        sessionId,
+        accountCode: a.account_code || String(1000 + idx),
+        parentCode: null,
+        accountName: a.account_name || "Unknown",
+        fsHead: a.fs_head || a.account_type || "",
+        fsSubHead: a.account_type || "",
+        accountType: a.account_type || "Asset",
+        normalBalance: a.normal_balance || "Debit",
+        industryTag: session.entityType || "General",
+        entityTypeTag: session.entityType || "Private Limited",
+        ifrsReference: null,
+        taxTreatment: ["Revenue", "Expense"].includes(a.account_type) ? "Normal" : null,
+        isControlAccount: false,
+        isSubLedger: false,
+        openingBalance: String(Number(a.opening_balance || 0).toFixed(2)),
+        debitTotal: String(Number(a.debit_total || 0).toFixed(2)),
+        creditTotal: String(Number(a.credit_total || 0).toFixed(2)),
+        closingBalance: String(Number(a.closing_balance || 0).toFixed(2)),
+        priorYearBalance: null,
+        variance: null,
+        materialityTag: Math.abs(Number(a.closing_balance || 0)) > 10000000 ? "High" : "Medium",
+        riskTag: "Medium",
+        assertionTag: "Existence,Completeness,Valuation",
+        relatedPartyFlag: false,
+        cashFlowTag: "Operating",
+        mappingGlCode: `GL-${a.account_code}`,
+        mappingFsLine: a.account_name,
+        workingPaperCode: null,
+        reconciliationFlag: false,
+        dataSource: "AI",
+        confidenceScore: "70",
+        exceptionFlag: false,
+        notes: null,
+        displayOrder: idx,
+      }));
+    }
+
+    if (rows.length === 0) return res.status(422).json({ error: "No financial data found. Please upload and extract documents first." });
+
+    // Clear existing COA for this session and insert new
+    await db.delete(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, sessionId));
+    const inserted = await db.insert(wpMasterCoaTable).values(rows).returning();
+
+    // Advance session to data_sheet
+    await db.update(wpSessionsTable).set({ status: "data_sheet" as any, updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
+
+    res.json({ inserted: inserted.length, message: `${inserted.length} COA accounts populated from ${coaMapped.length > 0 ? "extracted FS data" : "AI generation"}` });
+  } catch (err: any) {
+    logger.error({ err }, "COA populate failed");
+    res.status(500).json({ error: err.message || "Failed to populate COA" });
+  }
+});
+
+function getIfrsRef(cls: string): string {
+  if (cls === "Asset") return "IAS 1 / IAS 16 / IFRS 9";
+  if (cls === "Liability") return "IAS 1 / IAS 37";
+  if (cls === "Equity") return "IAS 1 / IAS 32";
+  if (cls === "Revenue") return "IFRS 15";
+  return "IAS 1";
+}
+
+function getWorkingPaperCode(cls: string): string {
+  if (cls === "Asset") return "F1";
+  if (cls === "Liability") return "F2";
+  if (cls === "Revenue") return "F3";
+  if (cls === "Expense") return "F4";
+  return "B1";
+}
+
+router.post("/sessions/:id/coa", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const {
+      accountCode, parentCode, accountName, fsHead, fsSubHead, accountType, normalBalance,
+      industryTag, entityTypeTag, ifrsReference, taxTreatment, isControlAccount, isSubLedger,
+      openingBalance, debitTotal, creditTotal, priorYearBalance,
+      materialityTag, riskTag, assertionTag, relatedPartyFlag, cashFlowTag,
+      mappingGlCode, mappingFsLine, workingPaperCode, reconciliationFlag,
+      dataSource, confidenceScore, exceptionFlag, notes,
+    } = req.body;
+
+    if (!accountCode || !accountName) return res.status(400).json({ error: "accountCode and accountName are required" });
+
+    const ob = Number(openingBalance || 0);
+    const dr = Number(debitTotal || 0);
+    const cr = Number(creditTotal || 0);
+    const closing = ob + dr - cr;
+    const pyBal = priorYearBalance !== undefined && priorYearBalance !== "" ? Number(priorYearBalance) : null;
+
+    const countRows = await db.select().from(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, sessionId));
+    const displayOrder = countRows.length;
+
+    const [inserted] = await db.insert(wpMasterCoaTable).values({
+      sessionId,
+      accountCode,
+      parentCode: parentCode || null,
+      accountName,
+      fsHead: fsHead || null,
+      fsSubHead: fsSubHead || null,
+      accountType: accountType || "Asset",
+      normalBalance: normalBalance || "Debit",
+      industryTag: industryTag || null,
+      entityTypeTag: entityTypeTag || null,
+      ifrsReference: ifrsReference || null,
+      taxTreatment: taxTreatment || null,
+      isControlAccount: isControlAccount || false,
+      isSubLedger: isSubLedger || false,
+      openingBalance: ob.toFixed(2),
+      debitTotal: dr.toFixed(2),
+      creditTotal: cr.toFixed(2),
+      closingBalance: closing.toFixed(2),
+      priorYearBalance: pyBal !== null ? pyBal.toFixed(2) : null,
+      variance: pyBal !== null ? (closing - pyBal).toFixed(2) : null,
+      materialityTag: materialityTag || "Low",
+      riskTag: riskTag || "Low",
+      assertionTag: assertionTag || null,
+      relatedPartyFlag: relatedPartyFlag || false,
+      cashFlowTag: cashFlowTag || null,
+      mappingGlCode: mappingGlCode || `GL-${accountCode}`,
+      mappingFsLine: mappingFsLine || null,
+      workingPaperCode: workingPaperCode || null,
+      reconciliationFlag: reconciliationFlag || false,
+      dataSource: dataSource || "Manual",
+      confidenceScore: confidenceScore ? String(confidenceScore) : "100",
+      exceptionFlag: exceptionFlag || false,
+      notes: notes || null,
+      displayOrder,
+    }).returning();
+
+    res.json(inserted);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to add COA row" });
+  }
+});
+
+router.patch("/sessions/:id/coa/:rowId", async (req: Request, res: Response) => {
+  try {
+    const rowId = parseInt(req.params.rowId);
+    const {
+      accountCode, parentCode, accountName, fsHead, fsSubHead, accountType, normalBalance,
+      industryTag, entityTypeTag, ifrsReference, taxTreatment, isControlAccount, isSubLedger,
+      openingBalance, debitTotal, creditTotal, priorYearBalance,
+      materialityTag, riskTag, assertionTag, relatedPartyFlag, cashFlowTag,
+      mappingGlCode, mappingFsLine, workingPaperCode, reconciliationFlag,
+      dataSource, confidenceScore, exceptionFlag, notes,
+    } = req.body;
+
+    const updates: any = { updatedAt: new Date() };
+    if (accountCode !== undefined) updates.accountCode = accountCode;
+    if (parentCode !== undefined) updates.parentCode = parentCode;
+    if (accountName !== undefined) updates.accountName = accountName;
+    if (fsHead !== undefined) updates.fsHead = fsHead;
+    if (fsSubHead !== undefined) updates.fsSubHead = fsSubHead;
+    if (accountType !== undefined) updates.accountType = accountType;
+    if (normalBalance !== undefined) updates.normalBalance = normalBalance;
+    if (industryTag !== undefined) updates.industryTag = industryTag;
+    if (entityTypeTag !== undefined) updates.entityTypeTag = entityTypeTag;
+    if (ifrsReference !== undefined) updates.ifrsReference = ifrsReference;
+    if (taxTreatment !== undefined) updates.taxTreatment = taxTreatment;
+    if (isControlAccount !== undefined) updates.isControlAccount = isControlAccount;
+    if (isSubLedger !== undefined) updates.isSubLedger = isSubLedger;
+    if (materialityTag !== undefined) updates.materialityTag = materialityTag;
+    if (riskTag !== undefined) updates.riskTag = riskTag;
+    if (assertionTag !== undefined) updates.assertionTag = assertionTag;
+    if (relatedPartyFlag !== undefined) updates.relatedPartyFlag = relatedPartyFlag;
+    if (cashFlowTag !== undefined) updates.cashFlowTag = cashFlowTag;
+    if (mappingGlCode !== undefined) updates.mappingGlCode = mappingGlCode;
+    if (mappingFsLine !== undefined) updates.mappingFsLine = mappingFsLine;
+    if (workingPaperCode !== undefined) updates.workingPaperCode = workingPaperCode;
+    if (reconciliationFlag !== undefined) updates.reconciliationFlag = reconciliationFlag;
+    if (dataSource !== undefined) updates.dataSource = dataSource;
+    if (confidenceScore !== undefined) updates.confidenceScore = String(confidenceScore);
+    if (exceptionFlag !== undefined) updates.exceptionFlag = exceptionFlag;
+    if (notes !== undefined) updates.notes = notes;
+
+    // Recompute closing balance if any balance field changes
+    if (openingBalance !== undefined || debitTotal !== undefined || creditTotal !== undefined || priorYearBalance !== undefined) {
+      const existing = (await db.select().from(wpMasterCoaTable).where(eq(wpMasterCoaTable.id, rowId)))[0];
+      const ob = openingBalance !== undefined ? Number(openingBalance) : Number(existing?.openingBalance || 0);
+      const dr = debitTotal !== undefined ? Number(debitTotal) : Number(existing?.debitTotal || 0);
+      const cr = creditTotal !== undefined ? Number(creditTotal) : Number(existing?.creditTotal || 0);
+      const closing = ob + dr - cr;
+      const pyBal = priorYearBalance !== undefined && priorYearBalance !== "" ? Number(priorYearBalance) : (existing?.priorYearBalance ? Number(existing.priorYearBalance) : null);
+      updates.openingBalance = ob.toFixed(2);
+      updates.debitTotal = dr.toFixed(2);
+      updates.creditTotal = cr.toFixed(2);
+      updates.closingBalance = closing.toFixed(2);
+      if (pyBal !== null) {
+        updates.priorYearBalance = pyBal.toFixed(2);
+        updates.variance = (closing - pyBal).toFixed(2);
+      }
+    }
+
+    const [updated] = await db.update(wpMasterCoaTable).set(updates).where(eq(wpMasterCoaTable.id, rowId)).returning();
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update COA row" });
+  }
+});
+
+router.delete("/sessions/:id/coa/:rowId", async (req: Request, res: Response) => {
+  try {
+    const rowId = parseInt(req.params.rowId);
+    await db.delete(wpMasterCoaTable).where(eq(wpMasterCoaTable.id, rowId));
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to delete COA row" });
+  }
+});
+
+router.post("/sessions/:id/coa/validate", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const rows = await db.select().from(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, sessionId));
+
+    let totalDebit = 0, totalCredit = 0;
+    const issues: string[] = [];
+    const accountCodes = new Set<string>();
+
+    for (const r of rows) {
+      const closing = Number(r.closingBalance || 0);
+      const computed = Number(r.openingBalance || 0) + Number(r.debitTotal || 0) - Number(r.creditTotal || 0);
+      if (Math.abs(closing - computed) > 0.01) {
+        issues.push(`${r.accountCode} ${r.accountName}: closing balance ${closing.toFixed(2)} ≠ computed ${computed.toFixed(2)}`);
+      }
+      if (closing > 0) totalDebit += closing;
+      else totalCredit += Math.abs(closing);
+      if (accountCodes.has(r.accountCode)) issues.push(`Duplicate account code: ${r.accountCode}`);
+      accountCodes.add(r.accountCode);
+      if (!r.accountType) issues.push(`${r.accountCode}: Account Type not set`);
+      if (!r.normalBalance) issues.push(`${r.accountCode}: Normal Balance not set`);
+    }
+
+    const difference = Math.abs(totalDebit - totalCredit);
+    const balanced = difference < 0.01;
+    if (!balanced) issues.push(`TB imbalance: Debit total ${totalDebit.toFixed(2)} ≠ Credit total ${totalCredit.toFixed(2)} — difference ${difference.toFixed(2)}`);
+
+    res.json({
+      balanced,
+      totalDebit,
+      totalCredit,
+      difference,
+      rowCount: rows.length,
+      issues,
+      valid: issues.length === 0,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to validate COA" });
+  }
+});
+
+router.post("/sessions/:id/coa/approve", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const rows = await db.select().from(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, sessionId));
+    if (rows.length === 0) return res.status(422).json({ error: "No COA data to approve. Populate first." });
+
+    // Advance to arranged_data
+    await db.update(wpSessionsTable).set({ status: "arranged_data" as any, updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
+    res.json({ success: true, message: `${rows.length} COA accounts approved. Advanced to Arranged Data.` });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to approve COA" });
+  }
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ARRANGED DATA
