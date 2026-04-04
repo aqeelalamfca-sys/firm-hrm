@@ -1462,6 +1462,7 @@ router.patch("/sessions/:id/variables/:varId", async (req: Request, res: Respons
     const updates: any = {
       userEditedValue: value,
       finalValue: value,
+      sourceType: "user_edit",
       editedBy: editedBy || null,
       editedAt: new Date(),
       reasonForChange: reason || null,
