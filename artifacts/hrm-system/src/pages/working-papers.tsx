@@ -482,6 +482,48 @@ export default function WorkingPapers() {
     finally { setLoading(false); }
   };
 
+  const [tbGlProgress, setTbGlProgress] = useState<{
+    running: boolean;
+    stages: { stage: string; status: "pending" | "ok" | "warn" | "fail"; detail: string }[];
+    result: any | null;
+  }>({ running: false, stages: [], result: null });
+
+  const generateTbGl = async () => {
+    if (!activeSession) return;
+    const stageNames = ["Input Extraction", "Trial Balance", "General Ledger", "Reconciliation", "Enforcement Check"];
+    setTbGlProgress({
+      running: true,
+      stages: stageNames.map(s => ({ stage: s, status: "pending", detail: "Waiting..." })),
+      result: null,
+    });
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/generate-tb-gl`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTbGlProgress({ running: false, stages: data.stages || [], result: data });
+        const status = data.status === "complete" ? "TB & GL generated successfully" : "TB & GL generated with warnings";
+        toast({ title: status, description: data.stages?.filter((s: any) => s.status !== "ok").map((s: any) => s.stage).join(", ") || "All stages passed" });
+        await fetchSession(activeSession.id);
+        await fetchExceptions();
+      } else {
+        setTbGlProgress(prev => ({
+          running: false,
+          stages: (data.stages || stageNames.map(s => ({ stage: s, status: "pending", detail: "" }))).map((s: any, i: number) =>
+            i === (data.stages?.length ?? 0) - 1 ? { ...s, status: "fail" } : s
+          ),
+          result: null,
+        }));
+        toast({ title: "Generation failed", description: data.error, variant: "destructive" });
+      }
+    } catch (e: any) {
+      setTbGlProgress(prev => ({ ...prev, running: false }));
+      toast({ title: "Generation failed", description: e?.message, variant: "destructive" });
+    } finally { setLoading(false); }
+  };
+
   const approveHead = async (headIndex: number) => {
     if (!activeSession) return;
     try {
@@ -1069,6 +1111,8 @@ export default function WorkingPapers() {
           session={activeSession}
           exceptions={exceptions}
           onGenerate={generateHead}
+          onGenerateTbGl={generateTbGl}
+          tbGlProgress={tbGlProgress}
           onApprove={approveHead}
           onExport={exportHead}
           onAutoProcessAll={autoProcessAll}
@@ -2306,7 +2350,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
   );
 }
 
-function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, onExport, onAutoProcessAll, onResolveException, loading, onRefresh }: any) {
+function GenerationStage({ heads, session, exceptions, onGenerate, onGenerateTbGl, tbGlProgress, onApprove, onExport, onAutoProcessAll, onResolveException, loading, onRefresh }: any) {
   const allExceptions: any[] = exceptions || [];
   const allHeads: any[] = heads || [];
   const [approvalInProgress, setApprovalInProgress] = useState(false);
@@ -2367,8 +2411,105 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
     }
   };
 
+  const tbGlStages: { stage: string; status: "pending" | "ok" | "warn" | "fail"; detail: string }[] =
+    tbGlProgress?.stages || [];
+
+  const stageStatusIcon = (s: string) => {
+    if (s === "ok") return <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />;
+    if (s === "warn") return <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />;
+    if (s === "fail") return <X className="w-4 h-4 text-red-500 shrink-0" />;
+    if (tbGlProgress?.running) return <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />;
+    return <div className="w-4 h-4 rounded-full border-2 border-slate-200 shrink-0" />;
+  };
+
   return (
     <div className="space-y-5">
+
+      {/* ── Unified TB & GL Engine Panel ────────────────────────────────── */}
+      <div className={cn(
+        "rounded-xl border overflow-hidden transition-all",
+        tbGlProgress?.result?.status === "complete" ? "border-emerald-200 bg-emerald-50/30" :
+        tbGlProgress?.result?.status === "complete_with_warnings" ? "border-amber-200 bg-amber-50/20" :
+        tbGlProgress?.result?.status === "error" ? "border-red-200 bg-red-50/20" :
+        "border-blue-200 bg-blue-50/20"
+      )}>
+        <div className="px-4 py-3.5 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center shrink-0 shadow-sm">
+              <Play className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-900 text-sm">Generate TB & GL</p>
+              <p className="text-[11px] text-slate-500">Full pipeline: CoA Mapping → Trial Balance → General Ledger → 3-Way Reconciliation</p>
+            </div>
+          </div>
+          <Button
+            onClick={onGenerateTbGl}
+            disabled={loading || tbGlProgress?.running}
+            className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white shadow-sm text-sm font-medium shrink-0"
+          >
+            {tbGlProgress?.running
+              ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Generating...</>
+              : tbGlProgress?.result
+              ? <><RefreshCw className="w-4 h-4 mr-2" /> Re-generate</>
+              : <><Play className="w-4 h-4 mr-2" /> Generate TB & GL</>
+            }
+          </Button>
+        </div>
+
+        {(tbGlProgress?.running || tbGlStages.length > 0) && (
+          <div className="border-t border-slate-100 px-4 py-3 bg-white/60">
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              {(tbGlStages.length > 0
+                ? tbGlStages
+                : ["Input Extraction","Trial Balance","General Ledger","Reconciliation","Enforcement Check"].map(s => ({ stage: s, status: "pending" as const, detail: "Waiting..." }))
+              ).map((s: any, idx: number) => (
+                <div key={idx} className="flex items-center gap-2 flex-1 min-w-0">
+                  {stageStatusIcon(s.status)}
+                  <div className="min-w-0 flex-1">
+                    <p className={cn("text-xs font-medium truncate",
+                      s.status === "ok" ? "text-emerald-700" :
+                      s.status === "fail" ? "text-red-600" :
+                      s.status === "warn" ? "text-amber-700" : "text-slate-500"
+                    )}>
+                      {s.stage}
+                    </p>
+                    {s.detail && s.detail !== "Waiting..." && (
+                      <p className="text-[10px] text-slate-400 truncate leading-tight">{s.detail}</p>
+                    )}
+                  </div>
+                  {idx < 4 && <div className="hidden sm:block w-5 h-px bg-slate-200 shrink-0 mx-1" />}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tbGlProgress?.result && (
+          <div className="border-t border-slate-100 px-4 py-3 bg-white/40 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="text-center">
+              <p className="text-lg font-bold text-slate-900">{tbGlProgress.result.tb?.lineCount ?? "—"}</p>
+              <p className="text-[10px] text-slate-500">TB Accounts</p>
+            </div>
+            <div className="text-center">
+              <p className={cn("text-lg font-bold", tbGlProgress.result.tb?.balanced ? "text-emerald-600" : "text-red-600")}>
+                {tbGlProgress.result.tb?.balanced ? "Balanced ✓" : "Imbalanced ✗"}
+              </p>
+              <p className="text-[10px] text-slate-500">TB Status</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-bold text-slate-900">{tbGlProgress.result.gl?.accounts ?? "—"}</p>
+              <p className="text-[10px] text-slate-500">GL Accounts</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-bold text-slate-900">{tbGlProgress.result.gl?.entries ?? "—"}</p>
+              <p className="text-[10px] text-slate-500">GL Entries</p>
+            </div>
+          </div>
+        )}
+      </div>
+      {/* ── End Unified Panel ───────────────────────────────────────────── */}
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">

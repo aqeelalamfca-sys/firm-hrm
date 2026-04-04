@@ -11,6 +11,9 @@ import {
   wpExportJobsTable, wpVariableDefinitionsTable, wpVariableDependencyRulesTable,
 } from "@workspace/db";
 import { VARIABLE_DEFINITIONS, EXTRACTION_FIELD_TO_VARIABLE_MAP, VARIABLE_GROUPS, DEPENDENCY_RULES } from "../data/variable-definitions";
+import {
+  runTBEngine, runGLEngine, runReconciliation, checkFinalEnforcement,
+} from "./tb-gl-engine";
 import { eq, and, inArray, asc } from "drizzle-orm";
 import OpenAI from "openai";
 import PDFDocument from "pdfkit";
@@ -1805,7 +1808,7 @@ async function checkVariableImpact(sessionId: number, variableCode: string): Pro
 
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TRIAL BALANCE ENGINE — RULE-BASED FIRST, AI-ASSISTED SECOND
+// TRIAL BALANCE ENGINE — Enhanced (Steps 1-3, 7-8, 11)
 // ═══════════════════════════════════════════════════════════════════════════
 
 router.post("/sessions/:id/generate-tb", async (req: Request, res: Response) => {
@@ -1820,108 +1823,12 @@ router.post("/sessions/:id/generate-tb", async (req: Request, res: Response) => 
       if (!deps.satisfied) return res.status(400).json({ error: `Prerequisites not met: ${deps.missing.join(", ")}` });
     }
 
-    const fields = await db.select().from(wpExtractedFieldsTable).where(and(eq(wpExtractedFieldsTable.sessionId, sessionId), eq(wpExtractedFieldsTable.category, "TB Lines")));
-    const fsFields = await db.select().from(wpExtractedFieldsTable).where(and(eq(wpExtractedFieldsTable.sessionId, sessionId), eq(wpExtractedFieldsTable.category, "FS Line Items")));
+    const ai = await getAIClient();
+    const result = await runTBEngine(sessionId, ai);
 
-    let tbLines: any[] = [];
-    const exceptions: string[] = [];
-
-    if (fields.length > 0) {
-      for (const f of fields) {
-        try {
-          const line = JSON.parse(f.extractedValue || "{}");
-          tbLines.push({
-            accountCode: line.account_code || "0000",
-            accountName: line.account_name || "Unknown",
-            classification: line.classification || "Other",
-            debit: String(line.debit || 0),
-            credit: String(line.credit || 0),
-            balance: String((line.debit || 0) - (line.credit || 0)),
-            source: "extraction",
-            confidence: f.confidence || "85",
-          });
-        } catch {}
-      }
-    }
-
-    if (tbLines.length === 0 && fsFields.length > 0) {
-      const fsMap: Record<string, number> = {};
-      for (const f of fsFields) {
-        fsMap[f.fieldName] = Number(f.finalValue || f.extractedValue || 0);
-      }
-      tbLines = buildTBFromFS(fsMap);
-
-      if (tbLines.length > 0) {
-        exceptions.push("TB reconstructed from FS data — not extracted from source TB document");
-      }
-    }
-
-    if (tbLines.length === 0) {
-      const ai = await getAIClient();
-      if (ai) {
-        const vars = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
-        const varSummary = vars.map(v => `${v.variableName}: ${v.finalValue}`).join("\n");
-
-        const resp = await ai.client.chat.completions.create({
-          model: ai.model,
-          messages: [
-            { role: "system", content: "Generate a Trial Balance from the provided financial variables. Return JSON array of {account_code, account_name, debit, credit, classification}. Follow Pakistan 4-digit chart of accounts. MUST balance (total debits = total credits)." },
-            { role: "user", content: `Generate TB from:\n${varSummary}` },
-          ],
-          max_tokens: 4000, temperature: 0.2,
-          response_format: { type: "json_object" },
-        });
-
-        const raw = JSON.parse(resp.choices[0]?.message?.content || "{}");
-        const aiLines = raw.tb_lines || raw.lines || [];
-        tbLines = aiLines.map((l: any) => ({
-          accountCode: l.account_code || "0000",
-          accountName: l.account_name || "Unknown",
-          classification: l.classification || "Other",
-          debit: String(l.debit || 0),
-          credit: String(l.credit || 0),
-          balance: String((l.debit || 0) - (l.credit || 0)),
-          source: "ai_generated",
-          confidence: "70",
-        }));
-        exceptions.push("TB generated via AI — requires manual review");
-      }
-    }
-
-    let totalDebit = tbLines.reduce((s: number, l: any) => s + Number(l.debit || 0), 0);
-    let totalCredit = tbLines.reduce((s: number, l: any) => s + Number(l.credit || 0), 0);
-    let difference = Math.abs(totalDebit - totalCredit);
-
-    if (difference > 0.01) {
-      const adj = totalDebit - totalCredit;
-      if (adj > 0) {
-        tbLines.push({
-          accountCode: "9999", accountName: "Rounding / Balancing Adjustment", classification: "Adjustment",
-          debit: "0", credit: String(Math.abs(adj).toFixed(2)),
-          balance: String(-Math.abs(adj).toFixed(2)), source: "auto_balance", confidence: "100",
-        });
-      } else {
-        tbLines.push({
-          accountCode: "9999", accountName: "Rounding / Balancing Adjustment", classification: "Adjustment",
-          debit: String(Math.abs(adj).toFixed(2)), credit: "0",
-          balance: String(Math.abs(adj).toFixed(2)), source: "auto_balance", confidence: "100",
-        });
-      }
-      exceptions.push(`TB auto-balanced: Original difference of ${difference.toFixed(2)} adjusted via rounding line (Account 9999). Review recommended.`);
-      await db.insert(wpExceptionLogTable).values({
-        sessionId, headIndex: 0, exceptionType: "tb_auto_balanced",
-        severity: "low", title: "Trial Balance Auto-Balanced",
-        description: `Original imbalance of ${difference.toFixed(2)} was auto-corrected with a rounding adjustment line. Debits were ${totalDebit.toFixed(2)}, Credits were ${totalCredit.toFixed(2)}.`,
-        status: "open",
-      });
-
-      totalDebit = tbLines.reduce((s: number, l: any) => s + Number(l.debit || 0), 0);
-      totalCredit = tbLines.reduce((s: number, l: any) => s + Number(l.credit || 0), 0);
-      difference = Math.abs(totalDebit - totalCredit);
-    }
-
+    // Persist TB lines
     await db.delete(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
-    for (const line of tbLines) {
+    for (const line of result.tbLines) {
       await db.insert(wpTrialBalanceLinesTable).values({
         sessionId,
         accountCode: line.accountCode,
@@ -1932,74 +1839,51 @@ router.post("/sessions/:id/generate-tb", async (req: Request, res: Response) => 
         balance: line.balance,
         source: line.source,
         confidence: line.confidence,
-        hasException: difference > 0.01,
+        fsLineMapping: line.fsLineMapping || null,
+        hasException: !result.balanced,
+        exceptionNote: result.balanced ? null : `Difference: ${result.difference.toFixed(4)}`,
       });
     }
 
-    for (const exc of exceptions) {
-      if (!exc.includes("DOES NOT BALANCE")) {
-        await db.insert(wpExceptionLogTable).values({
-          sessionId, headIndex: 0, exceptionType: "tb_note",
-          severity: "medium", title: "TB Generation Note", description: exc, status: "open",
-        });
-      }
+    // Log exceptions
+    for (const exc of result.exceptions) {
+      await db.insert(wpExceptionLogTable).values({
+        sessionId, headIndex: 0,
+        exceptionType: exc.includes("Suspense") ? "tb_suspense" : exc.includes("AI") ? "tb_ai_generated" : "tb_note",
+        severity: exc.includes("Material") || exc.includes("REQUIRES") ? "high" : "medium",
+        title: "TB Generation — " + (exc.length > 60 ? exc.slice(0, 57) + "..." : exc),
+        description: exc + "\n\nAudit Log:\n" + result.auditLog.join("\n"),
+        status: "open",
+      });
     }
 
+    // Update head status
     const head = await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, 0)));
     if (head[0]) {
       await db.update(wpHeadsTable).set({
         status: "validating", generatedAt: new Date(), updatedAt: new Date(),
-        exceptionsCount: exceptions.length,
+        exceptionsCount: result.exceptions.length,
       }).where(eq(wpHeadsTable.id, head[0].id));
     }
 
     res.json({
-      tbLines, totalDebit, totalCredit, difference, balanced: difference < 0.01,
-      exceptions, lineCount: tbLines.length,
+      tbLines: result.tbLines,
+      totalDebit: result.totalDebit,
+      totalCredit: result.totalCredit,
+      difference: result.difference,
+      balanced: result.balanced,
+      exceptions: result.exceptions,
+      auditLog: result.auditLog,
+      lineCount: result.tbLines.length,
     });
   } catch (err: any) {
     logger.error({ err }, "TB generation failed");
-    res.status(500).json({ error: "TB generation failed" });
+    res.status(500).json({ error: err?.message || "TB generation failed" });
   }
 });
 
-function buildTBFromFS(fs: Record<string, number>): any[] {
-  const lines: any[] = [];
-  const addLine = (code: string, name: string, cls: string, amount: number) => {
-    if (!amount) return;
-    lines.push({
-      accountCode: code, accountName: name, classification: cls,
-      debit: amount > 0 ? String(amount) : "0",
-      credit: amount < 0 ? String(Math.abs(amount)) : "0",
-      balance: String(amount), source: "deterministic", confidence: "90",
-    });
-  };
-  addLine("1100", "Fixed Assets", "Asset", fs.fixed_assets || 0);
-  addLine("1200", "Intangible Assets", "Asset", fs.intangible_assets || 0);
-  addLine("1300", "Long Term Investments", "Asset", fs.long_term_investments || 0);
-  addLine("1400", "Inventory", "Asset", fs.inventory || 0);
-  addLine("1500", "Trade Receivables", "Asset", fs.trade_receivables || 0);
-  addLine("1600", "Advances & Deposits", "Asset", fs.advances_deposits || 0);
-  addLine("1700", "Cash & Bank", "Asset", fs.cash_and_bank || 0);
-  addLine("2100", "Long Term Loans", "Liability", -(fs.long_term_loans || 0));
-  addLine("2200", "Trade Payables", "Liability", -(fs.trade_payables || 0));
-  addLine("2300", "Short Term Borrowings", "Liability", -(fs.short_term_borrowings || 0));
-  addLine("2400", "Accrued Liabilities", "Liability", -(fs.accrued_liabilities || 0));
-  addLine("2500", "Tax Payable", "Liability", -(fs.tax_payable || 0));
-  addLine("3100", "Share Capital", "Equity", -(fs.share_capital || 0));
-  addLine("3200", "Retained Earnings", "Equity", -(fs.retained_earnings || 0));
-  addLine("3300", "Reserves", "Equity", -(fs.reserves || 0));
-  addLine("4100", "Revenue", "Revenue", -(fs.revenue || 0));
-  addLine("5100", "Cost of Sales", "Expense", fs.cost_of_sales || 0);
-  addLine("5200", "Operating Expenses", "Expense", fs.operating_expenses || 0);
-  addLine("5300", "Finance Cost", "Expense", fs.finance_cost || 0);
-  addLine("5400", "Tax Expense", "Expense", fs.tax_expense || 0);
-  return lines;
-}
-
-
 // ═══════════════════════════════════════════════════════════════════════════
-// GL ENGINE — WITH AUDIT CONTROLS
+// GENERAL LEDGER ENGINE — Enhanced (Steps 4-6, 7-8)
 // ═══════════════════════════════════════════════════════════════════════════
 
 router.post("/sessions/:id/generate-gl", async (req: Request, res: Response) => {
@@ -2018,133 +1902,17 @@ router.post("/sessions/:id/generate-gl", async (req: Request, res: Response) => 
     if (tbLines.length === 0) return res.status(400).json({ error: "TB must be generated first" });
 
     const ai = await getAIClient();
-    if (!ai) return res.status(503).json({ error: "AI service not configured" });
+    if (!ai) return res.status(503).json({ error: "AI service not configured — add API key in Settings" });
 
     const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
+    const result = await runGLEngine(sessionId, ai, session);
 
-    await db.delete(wpGlEntriesTable).where(eq(wpGlEntriesTable.sessionId, sessionId));
-    await db.delete(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, sessionId));
-
-    const exceptions: string[] = [];
-    const accounts: any[] = [];
-
-    const batchSize = 6;
-    for (let i = 0; i < tbLines.length; i += batchSize) {
-      const batch = tbLines.slice(i, i + batchSize);
-      const batchSummary = batch.map(l =>
-        `${l.accountCode} ${l.accountName}: Dr=${l.debit} Cr=${l.credit} (${l.classification})`
-      ).join("\n");
-
-      const yearEnd = session?.engagementYear || "2024";
-
-      const glPrompt = `Generate realistic General Ledger entries for these Trial Balance accounts for the year ending ${yearEnd}.
-
-ACCOUNTS:
-${batchSummary}
-
-RULES:
-1. Opening balance carried from prior year (use 0 if not available)
-2. Monthly transaction spread based on account nature
-3. Voucher sequence: JV-001, JV-002, etc. (continuous within each account)
-4. Debit/credit logic must match account type
-5. Closing balance MUST match TB balance exactly
-6. Total debits and credits per account must match TB turnover exactly
-7. Spread transactions across 12 months realistically
-8. Each account needs 8-20 realistic journal entries
-
-Return JSON:
-{
-  "accounts": [
-    {
-      "account_code": string,
-      "account_name": string,
-      "account_type": string,
-      "opening_balance": number,
-      "entries": [
-        {"date":"YYYY-MM-DD","voucher":"JV-NNN","narration":string,"debit":number,"credit":number,"month":number}
-      ],
-      "closing_balance": number,
-      "total_debit": number,
-      "total_credit": number,
-      "is_synthetic": boolean,
-      "rationale": string,
-      "transaction_count_note": string
-    }
-  ]
-}`;
-
-      try {
-        const resp = await ai.client.chat.completions.create({
-          model: ai.model,
-          messages: [
-            { role: "system", content: "Generate audit-grade General Ledger entries. Each account closing balance must match TB exactly. Return valid JSON only." },
-            { role: "user", content: glPrompt },
-          ],
-          max_tokens: 6000, temperature: 0.3,
-          response_format: { type: "json_object" },
-        });
-
-        const raw = JSON.parse(resp.choices[0]?.message?.content || "{}");
-        const glAccounts = raw.accounts || [];
-
-        for (const acc of glAccounts) {
-          const tbLine = batch.find(l => l.accountCode === acc.account_code);
-          const tbBalance = tbLine ? Number(tbLine.debit) - Number(tbLine.credit) : 0;
-          const glBalance = acc.closing_balance || 0;
-          const isReconciled = Math.abs(tbBalance - glBalance) < 0.01;
-
-          if (!isReconciled) {
-            exceptions.push(`GL account ${acc.account_code} closing balance (${glBalance}) does not match TB (${tbBalance})`);
-          }
-
-          const [glAccount] = await db.insert(wpGlAccountsTable).values({
-            sessionId,
-            accountCode: acc.account_code,
-            accountName: acc.account_name,
-            accountType: acc.account_type,
-            openingBalance: String(acc.opening_balance || 0),
-            closingBalance: String(acc.closing_balance || 0),
-            totalDebit: String(acc.total_debit || 0),
-            totalCredit: String(acc.total_credit || 0),
-            tbDebit: tbLine ? String(tbLine.debit) : "0",
-            tbCredit: tbLine ? String(tbLine.credit) : "0",
-            isReconciled,
-            isSynthetic: acc.is_synthetic || true,
-            generationRationale: acc.rationale || "",
-            transactionCountNote: acc.transaction_count_note || "",
-          }).returning();
-
-          accounts.push(glAccount);
-
-          if (acc.entries && Array.isArray(acc.entries)) {
-            let runningBal = acc.opening_balance || 0;
-            for (const entry of acc.entries) {
-              runningBal += (entry.debit || 0) - (entry.credit || 0);
-              await db.insert(wpGlEntriesTable).values({
-                sessionId,
-                glAccountId: glAccount.id,
-                entryDate: entry.date,
-                voucherNo: entry.voucher,
-                narration: entry.narration,
-                debit: String(entry.debit || 0),
-                credit: String(entry.credit || 0),
-                runningBalance: String(runningBal),
-                month: entry.month || null,
-                isSynthetic: true,
-              });
-            }
-          }
-        }
-      } catch (batchErr) {
-        logger.error({ err: batchErr }, `GL batch ${i} failed`);
-        exceptions.push(`GL batch ${i}-${i + batchSize} generation failed`);
-      }
-    }
-
-    for (const exc of exceptions) {
+    // Log exceptions
+    for (const exc of result.exceptions) {
       await db.insert(wpExceptionLogTable).values({
-        sessionId, headIndex: 1, exceptionType: "gl_issue",
-        severity: "high", title: "GL Generation Issue", description: exc, status: "open",
+        sessionId, headIndex: 1, exceptionType: "gl_recon",
+        severity: "high", title: "GL Reconciliation Issue",
+        description: exc, status: "open",
       });
     }
 
@@ -2152,14 +1920,189 @@ Return JSON:
     if (head[0]) {
       await db.update(wpHeadsTable).set({
         status: "validating", generatedAt: new Date(), updatedAt: new Date(),
-        exceptionsCount: exceptions.length,
+        exceptionsCount: result.exceptions.length,
       }).where(eq(wpHeadsTable.id, head[0].id));
     }
 
-    res.json({ accounts: accounts.length, exceptions });
+    res.json({
+      accounts: result.accountsProcessed,
+      entries: result.entriesGenerated,
+      reconciledCount: result.reconciledCount,
+      exceptions: result.exceptions,
+      auditLog: result.auditLog,
+    });
   } catch (err: any) {
     logger.error({ err }, "GL generation failed");
-    res.status(500).json({ error: "GL generation failed" });
+    res.status(500).json({ error: err?.message || "GL generation failed" });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UNIFIED TB & GL ENGINE — Single-trigger, full pipeline (All 11 Steps)
+// POST /sessions/:id/generate-tb-gl
+// ═══════════════════════════════════════════════════════════════════════════
+
+router.post("/sessions/:id/generate-tb-gl", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const stages: { stage: string; status: "ok" | "warn" | "fail"; detail: string }[] = [];
+
+    // ── Validate prerequisites
+    const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
+    if (!session) return res.status(404).json({ error: "Session not found" });
+    const ai = await getAIClient();
+
+    // Clean previous exceptions for heads 0 and 1
+    await db.delete(wpExceptionLogTable).where(and(eq(wpExceptionLogTable.sessionId, sessionId), eq(wpExceptionLogTable.headIndex, 0)));
+    await db.delete(wpExceptionLogTable).where(and(eq(wpExceptionLogTable.sessionId, sessionId), eq(wpExceptionLogTable.headIndex, 1)));
+
+    // ── Stage 1: Input Extraction & CoA Mapping
+    stages.push({ stage: "Input Extraction", status: "ok", detail: "Session data loaded" });
+
+    // ── Stage 2: Trial Balance Generation
+    let tbResult: Awaited<ReturnType<typeof runTBEngine>>;
+    try {
+      tbResult = await runTBEngine(sessionId, ai);
+      await db.delete(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+      for (const line of tbResult.tbLines) {
+        await db.insert(wpTrialBalanceLinesTable).values({
+          sessionId,
+          accountCode: line.accountCode,
+          accountName: line.accountName,
+          classification: line.classification,
+          debit: line.debit,
+          credit: line.credit,
+          balance: line.balance,
+          source: line.source,
+          confidence: line.confidence,
+          fsLineMapping: line.fsLineMapping || null,
+          hasException: !tbResult.balanced,
+          exceptionNote: tbResult.balanced ? null : `Difference: ${tbResult.difference.toFixed(4)}`,
+        });
+      }
+      for (const exc of tbResult.exceptions) {
+        await db.insert(wpExceptionLogTable).values({
+          sessionId, headIndex: 0,
+          exceptionType: exc.includes("Suspense") ? "tb_suspense" : "tb_note",
+          severity: exc.includes("Material") ? "high" : "medium",
+          title: "TB — " + exc.slice(0, 80),
+          description: exc, status: "open",
+        });
+      }
+      const tbHead = await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, 0)));
+      if (tbHead[0]) {
+        await db.update(wpHeadsTable).set({
+          status: "validating", generatedAt: new Date(), updatedAt: new Date(),
+          exceptionsCount: tbResult.exceptions.length,
+        }).where(eq(wpHeadsTable.id, tbHead[0].id));
+      }
+      stages.push({
+        stage: "Trial Balance",
+        status: tbResult.balanced ? "ok" : "warn",
+        detail: `${tbResult.tbLines.length} accounts | Dr=${tbResult.totalDebit.toFixed(2)} Cr=${tbResult.totalCredit.toFixed(2)} | ${tbResult.balanced ? "Balanced ✓" : `Diff: ${tbResult.difference.toFixed(2)}`}`,
+      });
+    } catch (tbErr: any) {
+      stages.push({ stage: "Trial Balance", status: "fail", detail: tbErr?.message || "TB failed" });
+      return res.status(500).json({ error: "TB generation failed: " + tbErr?.message, stages });
+    }
+
+    // ── Stage 3: GL Generation (requires AI)
+    if (!ai) {
+      stages.push({ stage: "General Ledger", status: "fail", detail: "AI not configured — add API key in Settings" });
+      return res.status(503).json({ error: "AI service not configured", stages });
+    }
+
+    let glResult: Awaited<ReturnType<typeof runGLEngine>>;
+    try {
+      glResult = await runGLEngine(sessionId, ai, session);
+      for (const exc of glResult.exceptions) {
+        await db.insert(wpExceptionLogTable).values({
+          sessionId, headIndex: 1, exceptionType: "gl_recon",
+          severity: "high", title: "GL — " + exc.slice(0, 80),
+          description: exc, status: "open",
+        });
+      }
+      const glHead = await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, 1)));
+      if (glHead[0]) {
+        await db.update(wpHeadsTable).set({
+          status: "validating", generatedAt: new Date(), updatedAt: new Date(),
+          exceptionsCount: glResult.exceptions.length,
+        }).where(eq(wpHeadsTable.id, glHead[0].id));
+      }
+      stages.push({
+        stage: "General Ledger",
+        status: glResult.exceptions.length === 0 ? "ok" : "warn",
+        detail: `${glResult.accountsProcessed} accounts | ${glResult.entriesGenerated} entries | ${glResult.reconciledCount} reconciled`,
+      });
+    } catch (glErr: any) {
+      stages.push({ stage: "General Ledger", status: "fail", detail: glErr?.message || "GL failed" });
+      return res.status(500).json({ error: "GL generation failed: " + glErr?.message, stages });
+    }
+
+    // ── Stage 4: 3-Way Reconciliation
+    let reconResult: Awaited<ReturnType<typeof runReconciliation>>;
+    try {
+      reconResult = await runReconciliation(sessionId);
+      if (reconResult.status !== "pass") {
+        await db.insert(wpExceptionLogTable).values({
+          sessionId, headIndex: 1, exceptionType: "reconciliation",
+          severity: reconResult.status === "fail" ? "critical" : "medium",
+          title: "3-Way Reconciliation — " + reconResult.status.toUpperCase(),
+          description: reconResult.report.join("\n"),
+          status: reconResult.status === "pass" ? "resolved" : "open",
+        });
+      }
+      stages.push({
+        stage: "Reconciliation",
+        status: reconResult.status,
+        detail: reconResult.report.join(" | "),
+      });
+    } catch (reconErr: any) {
+      stages.push({ stage: "Reconciliation", status: "warn", detail: "Reconciliation check skipped: " + reconErr?.message });
+      reconResult = { fsTbVariance: 0, tbGlVariance: 0, status: "warn", report: [], autoFixed: 0 };
+    }
+
+    // ── Stage 5: Final Enforcement Check (Step 11)
+    const enforcement = await checkFinalEnforcement(sessionId);
+    stages.push({
+      stage: "Enforcement Check",
+      status: enforcement.canFinalize ? "ok" : "warn",
+      detail: enforcement.canFinalize
+        ? "All checks passed — ready for review"
+        : "Blockers: " + enforcement.blockers.join("; "),
+    });
+
+    const overallStatus = stages.every(s => s.status === "ok") ? "complete"
+      : stages.some(s => s.status === "fail") ? "error" : "complete_with_warnings";
+
+    res.json({
+      status: overallStatus,
+      stages,
+      tb: {
+        lineCount: tbResult.tbLines.length,
+        totalDebit: tbResult.totalDebit,
+        totalCredit: tbResult.totalCredit,
+        balanced: tbResult.balanced,
+        exceptions: tbResult.exceptions.length,
+      },
+      gl: {
+        accounts: glResult.accountsProcessed,
+        entries: glResult.entriesGenerated,
+        reconciledCount: glResult.reconciledCount,
+        exceptions: glResult.exceptions.length,
+      },
+      reconciliation: {
+        fsTbVariance: reconResult.fsTbVariance,
+        tbGlVariance: reconResult.tbGlVariance,
+        autoFixed: reconResult.autoFixed,
+        status: reconResult.status,
+        report: reconResult.report,
+      },
+      enforcement,
+    });
+  } catch (err: any) {
+    logger.error({ err }, "Unified TB-GL generation failed");
+    res.status(500).json({ error: err?.message || "Unified TB & GL generation failed" });
   }
 });
 
