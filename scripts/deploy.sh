@@ -30,26 +30,23 @@ setup_ssh() {
   # Always prefer writing fresh from VPS_SSH_KEY secret if it is set
   if [ -n "$VPS_SSH_KEY" ]; then
     log "Writing VPS_SSH_KEY secret to disk..."
-    # Handle keys where newlines are stored as literal \n or spaces
-    printf '%s' "$VPS_SSH_KEY" \
-      | sed 's/\\n/\n/g' \
-      | awk '{
-          if (/BEGIN .* PRIVATE KEY/) { print; next }
-          if (/END .* PRIVATE KEY/)   { print; next }
-          gsub(/ /, "\n"); print
-        }' \
-      | grep -v "^$" \
-      > "$SSH_KEY"
-    # Ensure trailing newline
-    echo "" >> "$SSH_KEY"
+    # Use node to properly reconstruct the PEM key (handles space-separated secrets)
+    export SSH_KEY_PATH="$SSH_KEY"
+    node - << 'JSEOF'
+const raw = process.env.VPS_SSH_KEY;
+const m = raw.match(/(-----BEGIN [^-]+ PRIVATE KEY-----)(.*?)(-----END [^-]+ PRIVATE KEY-----)/s);
+if (!m) { process.stderr.write("Cannot parse SSH key structure\n"); process.exit(1); }
+const body = m[2].replace(/\s+/g, '');
+const lines = [];
+for (let i = 0; i < body.length; i += 64) lines.push(body.slice(i, i + 64));
+const pem = m[1] + '\n' + lines.join('\n') + '\n' + m[3] + '\n';
+require('fs').writeFileSync(process.env.SSH_KEY_PATH, pem, { mode: 0o600 });
+JSEOF
     chmod 600 "$SSH_KEY"
-    # Validate key was written correctly
     if ssh-keygen -y -f "$SSH_KEY" > /dev/null 2>&1; then
       ok "SSH key written and validated from VPS_SSH_KEY secret"
     else
-      warn "SSH key validation failed — attempting raw write..."
-      printf '%s\n' "$VPS_SSH_KEY" | sed 's/\\n/\n/g' > "$SSH_KEY"
-      chmod 600 "$SSH_KEY"
+      err "SSH key validation failed — check that VPS_SSH_KEY contains a valid private key"
     fi
     SSH_CMD="ssh -i $SSH_KEY -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=20 -p $VPS_PORT"
     return
