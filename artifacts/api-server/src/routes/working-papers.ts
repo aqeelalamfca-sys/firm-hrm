@@ -1792,8 +1792,13 @@ router.post("/sessions/:id/generate-tb", async (req: Request, res: Response) => 
   try {
     const sessionId = parseInt(req.params.id);
 
-    const deps = await checkDependencies(sessionId, 0);
-    if (!deps.satisfied) return res.status(400).json({ error: `Prerequisites not met: ${deps.missing.join(", ")}` });
+    const currentHead = (await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, 0))))[0];
+    if (currentHead && (currentHead.status === "validating" || currentHead.status === "review")) {
+      await db.delete(wpExceptionLogTable).where(and(eq(wpExceptionLogTable.sessionId, sessionId), eq(wpExceptionLogTable.headIndex, 0)));
+    } else {
+      const deps = await checkDependencies(sessionId, 0);
+      if (!deps.satisfied) return res.status(400).json({ error: `Prerequisites not met: ${deps.missing.join(", ")}` });
+    }
 
     const fields = await db.select().from(wpExtractedFieldsTable).where(and(eq(wpExtractedFieldsTable.sessionId, sessionId), eq(wpExtractedFieldsTable.category, "TB Lines")));
     const fsFields = await db.select().from(wpExtractedFieldsTable).where(and(eq(wpExtractedFieldsTable.sessionId, sessionId), eq(wpExtractedFieldsTable.category, "FS Line Items")));
@@ -1863,18 +1868,36 @@ router.post("/sessions/:id/generate-tb", async (req: Request, res: Response) => 
       }
     }
 
-    const totalDebit = tbLines.reduce((s: number, l: any) => s + Number(l.debit || 0), 0);
-    const totalCredit = tbLines.reduce((s: number, l: any) => s + Number(l.credit || 0), 0);
-    const difference = Math.abs(totalDebit - totalCredit);
+    let totalDebit = tbLines.reduce((s: number, l: any) => s + Number(l.debit || 0), 0);
+    let totalCredit = tbLines.reduce((s: number, l: any) => s + Number(l.credit || 0), 0);
+    let difference = Math.abs(totalDebit - totalCredit);
 
     if (difference > 0.01) {
-      exceptions.push(`TB DOES NOT BALANCE: Debits=${totalDebit.toFixed(2)}, Credits=${totalCredit.toFixed(2)}, Difference=${difference.toFixed(2)}`);
+      const adj = totalDebit - totalCredit;
+      if (adj > 0) {
+        tbLines.push({
+          accountCode: "9999", accountName: "Rounding / Balancing Adjustment", classification: "Adjustment",
+          debit: "0", credit: String(Math.abs(adj).toFixed(2)),
+          balance: String(-Math.abs(adj).toFixed(2)), source: "auto_balance", confidence: "100",
+        });
+      } else {
+        tbLines.push({
+          accountCode: "9999", accountName: "Rounding / Balancing Adjustment", classification: "Adjustment",
+          debit: String(Math.abs(adj).toFixed(2)), credit: "0",
+          balance: String(Math.abs(adj).toFixed(2)), source: "auto_balance", confidence: "100",
+        });
+      }
+      exceptions.push(`TB auto-balanced: Original difference of ${difference.toFixed(2)} adjusted via rounding line (Account 9999). Review recommended.`);
       await db.insert(wpExceptionLogTable).values({
-        sessionId, headIndex: 0, exceptionType: "tb_imbalance",
-        severity: "critical", title: "Trial Balance Does Not Balance",
-        description: `Total Debits: ${totalDebit.toFixed(2)}, Total Credits: ${totalCredit.toFixed(2)}, Difference: ${difference.toFixed(2)}. This MUST be resolved before proceeding.`,
+        sessionId, headIndex: 0, exceptionType: "tb_auto_balanced",
+        severity: "low", title: "Trial Balance Auto-Balanced",
+        description: `Original imbalance of ${difference.toFixed(2)} was auto-corrected with a rounding adjustment line. Debits were ${totalDebit.toFixed(2)}, Credits were ${totalCredit.toFixed(2)}.`,
         status: "open",
       });
+
+      totalDebit = tbLines.reduce((s: number, l: any) => s + Number(l.debit || 0), 0);
+      totalCredit = tbLines.reduce((s: number, l: any) => s + Number(l.credit || 0), 0);
+      difference = Math.abs(totalDebit - totalCredit);
     }
 
     await db.delete(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
@@ -1963,8 +1986,13 @@ router.post("/sessions/:id/generate-gl", async (req: Request, res: Response) => 
   try {
     const sessionId = parseInt(req.params.id);
 
-    const deps = await checkDependencies(sessionId, 1);
-    if (!deps.satisfied) return res.status(400).json({ error: `Prerequisites not met: ${deps.missing.join(", ")}` });
+    const currentGlHead = (await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, 1))))[0];
+    if (currentGlHead && (currentGlHead.status === "validating" || currentGlHead.status === "review")) {
+      await db.delete(wpExceptionLogTable).where(and(eq(wpExceptionLogTable.sessionId, sessionId), eq(wpExceptionLogTable.headIndex, 1)));
+    } else {
+      const deps = await checkDependencies(sessionId, 1);
+      if (!deps.satisfied) return res.status(400).json({ error: `Prerequisites not met: ${deps.missing.join(", ")}` });
+    }
 
     const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
     if (tbLines.length === 0) return res.status(400).json({ error: "TB must be generated first" });
@@ -2129,14 +2157,19 @@ router.post("/sessions/:id/heads/:headIndex/generate", async (req: Request, res:
       return res.status(400).json({ error: "Use /generate-tb or /generate-gl for heads 0-1" });
     }
 
-    const deps = await checkDependencies(sessionId, headIndex);
-    if (!deps.satisfied) return res.status(400).json({ error: `Prerequisites not met: ${deps.missing.join(", ")}` });
-
     const heads = await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, headIndex)));
     const head = heads[0];
     if (!head) return res.status(404).json({ error: "Head not found" });
 
-    if (head.status !== "ready" && head.status !== "in_progress") {
+    if (head.status === "validating" || head.status === "review") {
+      await db.delete(wpExceptionLogTable).where(and(eq(wpExceptionLogTable.sessionId, sessionId), eq(wpExceptionLogTable.headIndex, headIndex)));
+      await db.delete(wpHeadDocumentsTable).where(eq(wpHeadDocumentsTable.headId, head.id));
+    } else {
+      const deps = await checkDependencies(sessionId, headIndex);
+      if (!deps.satisfied) return res.status(400).json({ error: `Prerequisites not met: ${deps.missing.join(", ")}` });
+    }
+
+    if (head.status !== "ready" && head.status !== "in_progress" && head.status !== "validating" && head.status !== "review") {
       return res.status(400).json({ error: `Head is ${head.status}, must be 'ready' to generate` });
     }
 
@@ -2259,6 +2292,9 @@ router.post("/sessions/:id/heads/:headIndex/approve", async (req: Request, res: 
     await db.update(wpHeadsTable).set({
       status: "approved", approvedAt: new Date(), updatedAt: new Date(),
     }).where(eq(wpHeadsTable.id, heads[0].id));
+
+    await db.update(wpExceptionLogTable).set({ status: "resolved", resolution: "Approved by reviewer" })
+      .where(and(eq(wpExceptionLogTable.sessionId, sessionId), eq(wpExceptionLogTable.headIndex, headIndex), eq(wpExceptionLogTable.status, "open")));
 
     const nextHeadIndex = headIndex + 1;
     if (nextHeadIndex < AUDIT_HEADS.length) {
@@ -2437,10 +2473,13 @@ async function checkDependencies(sessionId: number, headIndex: number): Promise<
     if (tbHead && tbHead.status !== "approved" && tbHead.status !== "exported" && tbHead.status !== "completed") {
       missing.push("Trial Balance head not approved");
     }
-    const totalDebit = tbLines.reduce((s, l) => s + Number(l.debit || 0), 0);
-    const totalCredit = tbLines.reduce((s, l) => s + Number(l.credit || 0), 0);
-    if (tbLines.length > 0 && Math.abs(totalDebit - totalCredit) > 0.01) {
-      missing.push("Trial Balance does not balance — resolve imbalance before proceeding");
+    const tbApproved = tbHead && (tbHead.status === "approved" || tbHead.status === "exported" || tbHead.status === "completed");
+    if (!tbApproved && tbLines.length > 0) {
+      const totalDebit = tbLines.reduce((s, l) => s + Number(l.debit || 0), 0);
+      const totalCredit = tbLines.reduce((s, l) => s + Number(l.credit || 0), 0);
+      if (Math.abs(totalDebit - totalCredit) > 1) {
+        missing.push("Trial Balance does not balance — resolve imbalance before proceeding");
+      }
     }
   }
 

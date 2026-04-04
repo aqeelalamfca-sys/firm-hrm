@@ -1882,7 +1882,8 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
         <div className="space-y-2">
           {(heads || []).map((head: any, i: number) => {
             const statusColor = HEAD_COLORS[head.status] || HEAD_COLORS.locked;
-            const canGenerate = head.status === "ready";
+            const canGenerate = head.status === "ready" || head.status === "in_progress";
+            const canRegenerate = head.status === "validating" || head.status === "review";
             const canApprove = head.status === "validating" || head.status === "review";
             const canExport = head.status === "approved" || head.status === "exported" || head.status === "completed";
             const isLocked = head.status === "locked";
@@ -1937,6 +1938,11 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
                   {canGenerate && (
                     <Button size="sm" onClick={() => onGenerate(head.headIndex)} disabled={loading} className="h-8">
                       {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 mr-1" />} Generate
+                    </Button>
+                  )}
+                  {canRegenerate && (
+                    <Button size="sm" variant="outline" onClick={() => onGenerate(head.headIndex)} disabled={loading} className="h-8 border-amber-300 text-amber-700">
+                      {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />} Re-generate
                     </Button>
                   )}
                   {canApprove && (
