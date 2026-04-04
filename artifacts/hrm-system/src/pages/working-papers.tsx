@@ -387,6 +387,20 @@ export default function WorkingPapers() {
     } catch {}
   };
 
+  const markVariableReviewed = async (varId: number) => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/variables/${varId}/review`, {
+        method: "PATCH", headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ reviewStatus: "reviewed" }),
+      });
+      if (res.ok) {
+        toast({ title: "Marked as reviewed" });
+        await fetchVariables();
+      }
+    } catch {}
+  };
+
   const validateVariables = async () => {
     if (!activeSession) return;
     try {
@@ -740,6 +754,7 @@ export default function WorkingPapers() {
           setEditValue={setEditValue}
           setEditReason={setEditReason}
           onSave={saveVariableEdit}
+          onReview={markVariableReviewed}
           onFetch={fetchVariables}
           onLockAll={lockAllVariables}
           onLockSection={lockSection}
@@ -1058,7 +1073,7 @@ function ArrangedDataStage({ data, activeTab, setActiveTab, onFetch, onApproveAl
   );
 }
 
-function VariablesStage({ variables, grouped, stats, changeLog, editingVar, editValue, editReason, setEditingVar, setEditValue, setEditReason, onSave, onFetch, onLockAll, onLockSection, onValidate, loading, confidenceBadge }: any) {
+function VariablesStage({ variables, grouped, stats, changeLog, editingVar, editValue, editReason, setEditingVar, setEditValue, setEditReason, onSave, onReview, onFetch, onLockAll, onLockSection, onValidate, loading, confidenceBadge }: any) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("all");
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
@@ -1245,6 +1260,11 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
 
                                 <div className="flex items-center gap-2 shrink-0">
                                   {confidenceBadge(v.confidence ? Number(v.confidence) : null)}
+                                  {v.reviewStatus === "needs_review" && !v.isLocked && (
+                                    <button onClick={() => onReview(v.id)} className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors" title="Mark as reviewed">
+                                      ✓ Review
+                                    </button>
+                                  )}
                                   {v.isLocked ? (
                                     <Lock className="w-4 h-4 text-green-600" />
                                   ) : (
