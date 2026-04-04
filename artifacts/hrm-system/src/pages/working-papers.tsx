@@ -106,6 +106,9 @@ export default function WorkingPapers() {
   const [showExceptionsPanel, setShowExceptionsPanel] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [autoChainRunning, setAutoChainRunning] = useState(false);
+  const [autoChainCurrentHead, setAutoChainCurrentHead] = useState<number | null>(null);
+  const chainStopRef = useRef(false);
 
   useEffect(() => { fetchSessions(); fetchTeamMembers(); }, []);
 
@@ -457,29 +460,53 @@ export default function WorkingPapers() {
     return { issues: [], totalIssues: 0 };
   };
 
-  const generateHead = async (headIndex: number) => {
-    if (!activeSession) return;
-    try {
-      setLoading(true);
-      toast({ title: "Generating...", description: `Processing head ${headIndex}` });
-      let url = "";
-      if (headIndex === 0) url = `${API_BASE}/working-papers/sessions/${activeSession.id}/generate-tb`;
-      else if (headIndex === 1) url = `${API_BASE}/working-papers/sessions/${activeSession.id}/generate-gl`;
-      else url = `${API_BASE}/working-papers/sessions/${activeSession.id}/heads/${headIndex}/generate`;
+  const stopChain = () => { chainStopRef.current = true; };
 
-      const res = await fetch(url, {
-        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
-      });
-      if (res.ok) {
-        toast({ title: "Generation complete" });
+  const generateHead = async (startHeadIndex: number) => {
+    if (!activeSession) return;
+    chainStopRef.current = false;
+    setAutoChainRunning(true);
+    setLoading(true);
+    let hi = startHeadIndex;
+    try {
+      while (hi <= 11 && !chainStopRef.current) {
+        setAutoChainCurrentHead(hi);
+        let url = "";
+        if (hi === 0) url = `${API_BASE}/working-papers/sessions/${activeSession.id}/generate-tb`;
+        else if (hi === 1) url = `${API_BASE}/working-papers/sessions/${activeSession.id}/generate-gl`;
+        else url = `${API_BASE}/working-papers/sessions/${activeSession.id}/heads/${hi}/generate`;
+
+        const genRes = await fetch(url, { method: "POST", headers: { ...headers, "Content-Type": "application/json" } });
+        if (!genRes.ok) {
+          const err = await genRes.json().catch(() => ({ error: "Failed" }));
+          toast({ title: `Head ${hi + 1} generation failed`, description: err.error, variant: "destructive" });
+          break;
+        }
+        const appRes = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/heads/${hi}/approve`, {
+          method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+        });
+        if (!appRes.ok) {
+          toast({ title: `Head ${hi + 1} generated — approval failed`, variant: "destructive" });
+          await fetchSession(activeSession.id);
+          break;
+        }
+        toast({ title: `Head ${hi + 1} approved`, description: hi < 11 ? `Starting head ${hi + 2}…` : "All heads complete!" });
         await fetchSession(activeSession.id);
         await fetchExceptions();
-      } else {
-        const err = await res.json();
-        toast({ title: "Generation failed", description: err.error, variant: "destructive" });
+        hi++;
       }
-    } catch { toast({ title: "Generation failed", variant: "destructive" }); }
-    finally { setLoading(false); }
+      if (hi > 11 && !chainStopRef.current) {
+        toast({ title: "All 12 heads generated & approved", description: "Download your working papers from the panel." });
+      }
+    } catch (e: any) {
+      toast({ title: "Chain interrupted", description: e?.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+      setAutoChainRunning(false);
+      setAutoChainCurrentHead(null);
+      await fetchSession(activeSession.id);
+      await fetchExceptions();
+    }
   };
 
   const [tbGlProgress, setTbGlProgress] = useState<{
@@ -504,10 +531,14 @@ export default function WorkingPapers() {
       const data = await res.json();
       if (res.ok) {
         setTbGlProgress({ running: false, stages: data.stages || [], result: data });
-        const status = data.status === "complete" ? "TB & GL generated successfully" : "TB & GL generated with warnings";
-        toast({ title: status, description: data.stages?.filter((s: any) => s.status !== "ok").map((s: any) => s.stage).join(", ") || "All stages passed" });
+        toast({ title: "TB & GL generated — auto-approving", description: "Approving heads 1 & 2, then continuing chain…" });
+        await Promise.all([
+          fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/heads/0/approve`, { method: "POST", headers: { ...headers, "Content-Type": "application/json" } }),
+          fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/heads/1/approve`, { method: "POST", headers: { ...headers, "Content-Type": "application/json" } }),
+        ]);
         await fetchSession(activeSession.id);
         await fetchExceptions();
+        generateHead(2);
       } else {
         setTbGlProgress(prev => ({
           running: false,
@@ -1119,6 +1150,9 @@ export default function WorkingPapers() {
           onResolveException={resolveException}
           loading={loading}
           onRefresh={() => { fetchSession(activeSession.id); fetchExceptions(); }}
+          autoChainRunning={autoChainRunning}
+          autoChainCurrentHead={autoChainCurrentHead}
+          onStopChain={stopChain}
         />
       )}
 
@@ -2350,7 +2384,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
   );
 }
 
-function GenerationStage({ heads, session, exceptions, onGenerate, onGenerateTbGl, tbGlProgress, onApprove, onExport, onAutoProcessAll, onResolveException, loading, onRefresh }: any) {
+function GenerationStage({ heads, session, exceptions, onGenerate, onGenerateTbGl, tbGlProgress, onApprove, onExport, onAutoProcessAll, onResolveException, loading, onRefresh, autoChainRunning, autoChainCurrentHead, onStopChain }: any) {
   const allExceptions: any[] = exceptions || [];
   const allHeads: any[] = heads || [];
   const [approvalInProgress, setApprovalInProgress] = useState(false);
@@ -2509,6 +2543,65 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onGenerateTbG
         )}
       </div>
       {/* ── End Unified Panel ───────────────────────────────────────────── */}
+
+      {/* ── Auto-chain progress banner ──────────────────────────────────── */}
+      {autoChainRunning && (
+        <div className="flex items-center gap-3 bg-blue-600 text-white rounded-xl px-4 py-3 shadow-md">
+          <Loader2 className="w-5 h-5 animate-spin shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold leading-tight">Auto-chain running</p>
+            <p className="text-xs text-blue-200 truncate">
+              {autoChainCurrentHead !== null ? `Generating & approving Head ${autoChainCurrentHead + 1} of 12` : "Starting…"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="w-24 bg-blue-500/50 rounded-full h-1.5">
+              <div className="h-1.5 bg-white rounded-full transition-all duration-500" style={{ width: `${autoChainCurrentHead !== null ? ((autoChainCurrentHead + 1) / 12) * 100 : 0}%` }} />
+            </div>
+            <button onClick={onStopChain} className="text-xs px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg font-medium transition-colors border border-white/20">
+              Stop
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Two-column layout: sidebar + main ────────────────────────────── */}
+      <div className="flex gap-4 items-start">
+
+        {/* ─ Left sidebar: quick download links ─ */}
+        <div className="hidden lg:flex flex-col gap-3 w-48 shrink-0 sticky top-4">
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+            <div className="bg-gradient-to-r from-slate-50 to-slate-100/50 border-b border-slate-100 px-3 py-2.5 flex items-center gap-2">
+              <Download className="w-3.5 h-3.5 text-slate-500" />
+              <span className="text-xs font-semibold text-slate-700">Downloads</span>
+              {exportableHeads.length > 0 && (
+                <span className="ml-auto text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">{exportableHeads.length}</span>
+              )}
+            </div>
+            <div className="divide-y divide-slate-50 max-h-96 overflow-y-auto">
+              {exportableHeads.length === 0 ? (
+                <div className="px-3 py-4 text-center">
+                  <Lock className="w-5 h-5 text-slate-200 mx-auto mb-1.5" />
+                  <p className="text-[11px] text-slate-400 leading-tight">No heads approved yet</p>
+                </div>
+              ) : exportableHeads.map((h: any) => (
+                <button key={h.id} onClick={() => onExport(h.headIndex)} className="w-full text-left px-3 py-2.5 flex items-center gap-2 hover:bg-emerald-50 transition-colors group">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                  <span className="text-[11px] text-slate-700 group-hover:text-emerald-700 truncate leading-tight flex-1">{h.headName || `Head ${h.headIndex + 1}`}</span>
+                  <Download className="w-3 h-3 text-slate-300 group-hover:text-emerald-500 shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
+          {exportableHeads.length > 0 && (
+            <button onClick={exportAll} className="w-full text-[11px] px-3 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors flex items-center justify-center gap-1.5 font-medium shadow-sm">
+              <Download className="w-3 h-3" /> Export All ({exportableHeads.length})
+            </button>
+          )}
+        </div>
+
+        {/* ─ Main content ─ */}
+        <div className="flex-1 min-w-0 space-y-5">
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
@@ -2770,6 +2863,9 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onGenerateTbG
           })}
         </div>
       </div>
+
+        </div>{/* end main content */}
+      </div>{/* end two-column flex */}
     </div>
   );
 }
