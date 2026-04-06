@@ -15,27 +15,6 @@ args = ["pnpm", "store", "prune"]
 env = { "CI" = "true" }
 
 [workflows]
-runButton = "Project"
-
-[[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Deploy to Production"
-
-[[workflows.workflow]]
-name = "Deploy to Production"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/deploy.sh"
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [agent]
 stack = "PNPM_WORKSPACE"
@@ -52,9 +31,6 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
-GITHUB_REPO = "aqeelalamfca-sys/firm-hrm"
-VPS_HOST = "187.77.130.117"
-VPS_USERNAME = "root"
-VPS_PORT = "22"
 JWT_SECRET = "a7599d60a9677b9d8836e267cc2dc9ab14998d73e433cb44b427ab905aaad2de"
 API_PORT = "8080"
+NODE_ENV = "development"
