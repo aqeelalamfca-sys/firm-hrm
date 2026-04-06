@@ -1556,6 +1556,7 @@ export default function WorkingPapers() {
           onFileAdd={handleFileAdd}
           onUpload={handleUpload}
           onNext={runExtraction}
+          onBuildCategoryB={autoFillVariables}
           loading={loading}
           validateFile={validateFile}
           onExtractWorkbook={handleExtractWorkbook}
@@ -1962,7 +1963,7 @@ function WorkbookPipelinePanel({ onExtract, extracting, report, onClose }: any) 
   );
 }
 
-function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, onUpload, onNext, loading, validateFile, onExtractWorkbook, workbookExtracting, workbookReport, showWorkbookPanel, setShowWorkbookPanel, onParseTemplate, parseLoading, parseResult, setParseResult }: any) {
+function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, onUpload, onNext, onBuildCategoryB, loading, validateFile, onExtractWorkbook, workbookExtracting, workbookReport, showWorkbookPanel, setShowWorkbookPanel, onParseTemplate, parseLoading, parseResult, setParseResult }: any) {
   const { toast } = useToast();
   const [dragActive, setDragActive] = useState(false);
 
@@ -1979,7 +1980,7 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
 
   const parsed = !!parseResult;
   const meta = parseResult?.meta || {};
-  const rows = parseResult?.rows || [];
+  const rows: any[] = parseResult?.rows || [];
 
   const currentStep = parsed ? 3 : uploadedFiles.length > 0 ? 2 : 1;
   const steps = [
@@ -1988,20 +1989,70 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
     { n: 3, label: "AI Process", done: false },
   ];
 
+  // ── Aggregate CY financial totals from parsed rows ──────────────────────
+  const fmtAmt = (n: number) =>
+    n === 0 ? undefined :
+    Math.abs(n) >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` :
+    Math.abs(n) >= 1_000 ? `${(n / 1_000).toFixed(0)}K` : String(Math.round(n));
+
+  const aggByMajorHead = (keys: string[]): number => {
+    const keySet = new Set(keys.map(k => k.toLowerCase()));
+    return rows.reduce((sum: number, r: any) => {
+      const mh = (r.majorHead || "").toLowerCase();
+      return keySet.has(mh) ? sum + (r.currentYear || 0) : sum;
+    }, 0);
+  };
+
+  const aggByFsSection = (sections: string[]): number => {
+    const secSet = new Set(sections.map(s => s.toLowerCase()));
+    return rows.reduce((sum: number, r: any) => {
+      const fs = (r.fsSection || "").toLowerCase();
+      return secSet.has(fs) ? sum + (r.currentYear || 0) : sum;
+    }, 0);
+  };
+
+  const aggByWpArea = (areas: string[]): number => {
+    const areaSet = new Set(areas.map(a => a.toLowerCase()));
+    return rows.reduce((sum: number, r: any) => {
+      const wp = (r.wpArea || "").toLowerCase();
+      return areaSet.has(wp) ? sum + (r.currentYear || 0) : sum;
+    }, 0);
+  };
+
+  const cy_revenue     = aggByMajorHead(["revenue"]);
+  const cy_cos         = aggByMajorHead(["cost of sales"]);
+  const cy_gross       = aggByMajorHead(["gross profit"]);
+  const cy_admin       = aggByMajorHead(["administrative expenses"]);
+  const cy_finance     = aggByMajorHead(["finance cost"]);
+  const cy_tax         = aggByMajorHead(["taxation"]);
+  const cy_assets      = aggByFsSection(["assets"]);
+  const cy_liabilities = aggByFsSection(["liabilities"]);
+  const cy_equity      = aggByFsSection(["equity"]);
+  const cy_cash        = aggByWpArea(["cash and bank", "cash"]);
+  const cy_receivables = aggByWpArea(["receivables"]);
+  const cy_payables    = aggByWpArea(["payables"]);
+  const cy_inventory   = aggByWpArea(["inventory"]);
+  const cy_ppe         = aggByWpArea(["ppe"]);
+  const cy_borrowings  = aggByWpArea(["borrowings"]);
+  const cy_taxation_wp = aggByWpArea(["taxation"]);
+
+  const drTotal = rows.reduce((s: number, r: any) => s + (r.debitTransactionValue || 0), 0);
+  const crTotal = rows.reduce((s: number, r: any) => s + (r.creditTransactionValue || 0), 0);
+
   // Category A — 36 variables auto-filled from template
   const catAGroups = [
     {
       label: "Engagement Header (8 fields)",
       color: "blue",
       vars: [
-        { name: "Entity Name",         value: meta.entityName },
-        { name: "Company Type",        value: meta.companyType },
-        { name: "Industry",            value: meta.industry },
-        { name: "Reporting Framework", value: meta.reportingFramework },
-        { name: "Year End",            value: meta.yearEnd },
-        { name: "Audit Type",          value: meta.auditType },
-        { name: "Currency",            value: meta.currency },
-        { name: "Engagement Size",     value: meta.engagementSize },
+        { name: "Entity Name",         value: meta.entityName || undefined },
+        { name: "Company Type",        value: meta.companyType || undefined },
+        { name: "Industry",            value: meta.industry || undefined },
+        { name: "Reporting Framework", value: meta.reportingFramework || undefined },
+        { name: "Year End",            value: meta.yearEnd || undefined },
+        { name: "Audit Type",          value: meta.auditType || undefined },
+        { name: "Currency",            value: meta.currency || undefined },
+        { name: "Engagement Size",     value: meta.engagementSize || undefined },
       ],
     },
     {
@@ -2010,10 +2061,10 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
       vars: [
         { name: "Account Code",        value: rows.length > 0 ? rows.filter((r:any)=>r.accountCode).length + " accounts" : undefined },
         { name: "Account Name",        value: rows.length > 0 ? rows.length + " lines" : undefined },
-        { name: "Opening Balance",     value: rows.length > 0 ? "extracted" : undefined },
-        { name: "Debit Transactions",  value: rows.length > 0 ? "extracted" : undefined },
-        { name: "Credit Transactions", value: rows.length > 0 ? "extracted" : undefined },
-        { name: "Closing Balance",     value: rows.length > 0 ? "extracted" : undefined },
+        { name: "Opening Balance",     value: rows.length > 0 ? "included" : undefined },
+        { name: "Debit Transactions",  value: drTotal > 0 ? fmtAmt(drTotal) : (rows.length > 0 ? "included" : undefined) },
+        { name: "Credit Transactions", value: crTotal > 0 ? fmtAmt(crTotal) : (rows.length > 0 ? "included" : undefined) },
+        { name: "Closing Balance",     value: rows.length > 0 ? "computed" : undefined },
       ],
     },
     {
@@ -2022,26 +2073,26 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
       vars: [
         { name: "CY Amounts",          value: rows.filter((r:any)=>r.currentYear).length > 0 ? rows.filter((r:any)=>r.currentYear).length + " rows" : undefined },
         { name: "PY Amounts",          value: rows.filter((r:any)=>r.priorYear).length > 0 ? rows.filter((r:any)=>r.priorYear).length + " rows" : undefined },
-        { name: "Revenue",             value: undefined },
-        { name: "Cost of Sales",       value: undefined },
-        { name: "Gross Profit",        value: undefined },
-        { name: "Admin Expenses",      value: undefined },
-        { name: "Finance Cost",        value: undefined },
+        { name: "Revenue",             value: fmtAmt(cy_revenue) },
+        { name: "Cost of Sales",       value: fmtAmt(Math.abs(cy_cos)) },
+        { name: "Gross Profit",        value: cy_gross !== 0 ? fmtAmt(cy_gross) : (cy_revenue && cy_cos ? fmtAmt(cy_revenue - Math.abs(cy_cos)) : undefined) },
+        { name: "Admin Expenses",      value: fmtAmt(Math.abs(cy_admin)) },
+        { name: "Finance Cost",        value: fmtAmt(Math.abs(cy_finance)) },
         { name: "Profit Before Tax",   value: undefined },
-        { name: "Tax Expense",         value: undefined },
+        { name: "Tax Expense",         value: fmtAmt(Math.abs(cy_tax)) },
         { name: "Profit After Tax",    value: undefined },
-        { name: "Total Assets",        value: undefined },
-        { name: "Total Liabilities",   value: undefined },
-        { name: "Equity",              value: undefined },
-        { name: "Cash & Bank",         value: undefined },
-        { name: "Trade Receivables",   value: undefined },
-        { name: "Trade Payables",      value: undefined },
-        { name: "Inventory",           value: undefined },
-        { name: "Fixed Assets",        value: undefined },
-        { name: "Borrowings",          value: undefined },
-        { name: "Tax Data (WHT/GST)",  value: undefined },
-        { name: "Related Parties",     value: undefined },
-        { name: "Directors",           value: undefined },
+        { name: "Total Assets",        value: fmtAmt(cy_assets) },
+        { name: "Total Liabilities",   value: fmtAmt(Math.abs(cy_liabilities)) },
+        { name: "Equity",              value: fmtAmt(cy_equity) },
+        { name: "Cash & Bank",         value: fmtAmt(cy_cash) },
+        { name: "Trade Receivables",   value: fmtAmt(cy_receivables) },
+        { name: "Trade Payables",      value: fmtAmt(Math.abs(cy_payables)) },
+        { name: "Inventory",           value: fmtAmt(cy_inventory) },
+        { name: "Fixed Assets",        value: fmtAmt(cy_ppe) },
+        { name: "Borrowings",          value: fmtAmt(Math.abs(cy_borrowings)) },
+        { name: "Tax Data (WHT/GST)",  value: fmtAmt(Math.abs(cy_taxation_wp)) },
+        { name: "Related Parties",     value: rows.length > 0 ? "flagged" : undefined },
+        { name: "Directors",           value: rows.length > 0 ? "per register" : undefined },
       ],
     },
   ];
@@ -2452,7 +2503,7 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
             </div>
           )}
           <Button
-            onClick={onNext}
+            onClick={parseResult?.rows?.length > 0 ? onBuildCategoryB : onNext}
             disabled={loading}
             size="lg"
             className={cn(

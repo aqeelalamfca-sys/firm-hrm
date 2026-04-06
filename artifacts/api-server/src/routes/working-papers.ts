@@ -1661,6 +1661,87 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
       }
     }
 
+    // ── Aggregate CY/PY financial totals from stored TB lines ────────────────
+    // These populate cy_revenue, cy_total_assets, etc. for materiality & formula
+    // calculations even when no AI extraction has been run.
+    const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+    if (tbLines.length > 0) {
+      const TB_CONF = "88"; // high confidence — sourced directly from the template
+      const tbAgg: Record<string, number> = {};
+      const pyAgg: Record<string, number> = {};
+      for (const tb of tbLines) {
+        const bal = parseFloat(String(tb.balance || "0")) || 0;
+        const pyBal = parseFloat(String(tb.priorYearBalance || "0")) || 0;
+        const cls = (tb.classification || "other").toLowerCase();
+        tbAgg[cls] = (tbAgg[cls] || 0) + bal;
+        pyAgg[cls] = (pyAgg[cls] || 0) + pyBal;
+      }
+
+      const sumCls = (...keys: string[]) => keys.reduce((s, k) => s + Math.abs(tbAgg[k.toLowerCase()] || 0), 0);
+      const sumClsPy = (...keys: string[]) => keys.reduce((s, k) => s + Math.abs(pyAgg[k.toLowerCase()] || 0), 0);
+
+      const cyRev    = sumCls("revenue");
+      const cyCoS    = sumCls("cost of sales");
+      const cyOpEx   = sumCls("operating expense");
+      const cyFinCst = sumCls("finance cost");
+      const cyTax    = sumCls("tax");
+      const cyCA     = sumCls("current asset");
+      const cyNCA    = sumCls("non-current asset");
+      const cyCL     = sumCls("current liability");
+      const cyNCL    = sumCls("non-current liability");
+      const cyEq     = sumCls("equity");
+      const cyTotAssets = cyCA + cyNCA;
+      const cyTotLiab   = cyCL + cyNCL;
+      const cyGrossP = cyRev - cyCoS;
+      const cyPBT    = cyGrossP - cyOpEx - cyFinCst;
+
+      const pyRev    = sumClsPy("revenue");
+      const pyTotAssets = sumClsPy("current asset") + sumClsPy("non-current asset");
+
+      const setIfMissing = (code: string, val: number, conf: string = TB_CONF) => {
+        if (val !== 0 && (!extractedMap[code] || Number(extractedMap[code].confidence) < Number(conf))) {
+          extractedMap[code] = { value: String(Math.round(val)), confidence: conf };
+        }
+      };
+
+      setIfMissing("cy_revenue",           cyRev);
+      setIfMissing("cy_cost_of_sales",     cyCoS);
+      setIfMissing("cy_gross_profit",      cyGrossP);
+      setIfMissing("cy_operating_expenses",cyOpEx);
+      setIfMissing("cy_finance_cost",      cyFinCst);
+      setIfMissing("cy_tax_expense",       cyTax);
+      setIfMissing("cy_profit_before_tax", cyPBT);
+      setIfMissing("cy_profit_after_tax",  cyPBT - cyTax);
+      setIfMissing("cy_total_assets",      cyTotAssets);
+      setIfMissing("cy_total_liabilities", cyTotLiab);
+      setIfMissing("cy_total_equity",      cyEq);
+      setIfMissing("cy_current_assets",    cyCA);
+      setIfMissing("cy_non_current_assets",cyNCA);
+      setIfMissing("cy_current_liabilities",cyCL);
+      setIfMissing("cy_non_current_liabilities",cyNCL);
+      setIfMissing("py_revenue",           pyRev);
+      setIfMissing("py_total_assets",      pyTotAssets);
+
+      // FS narrative summary for working papers
+      if (cyRev > 0 || cyTotAssets > 0) {
+        const currency = session.currency || "PKR";
+        const fmtM = (n: number) => n >= 1_000_000
+          ? `${currency} ${(n / 1_000_000).toFixed(2)}M`
+          : `${currency} ${n.toLocaleString()}`;
+        const fsSummary = [
+          cyRev > 0       ? `Revenue: ${fmtM(cyRev)}`              : "",
+          cyGrossP !== 0  ? `Gross Profit: ${fmtM(cyGrossP)}`      : "",
+          cyPBT !== 0     ? `PBT: ${fmtM(cyPBT)}`                  : "",
+          cyTotAssets > 0 ? `Total Assets: ${fmtM(cyTotAssets)}`   : "",
+          cyEq > 0        ? `Equity: ${fmtM(cyEq)}`                : "",
+        ].filter(Boolean).join(" | ");
+
+        if (fsSummary && !extractedMap["fs_summary_cy"]) {
+          extractedMap["fs_summary_cy"] = { value: fsSummary, confidence: TB_CONF };
+        }
+      }
+    }
+
     const safeNum = (code: string): number => {
       const v = extractedMap[code]?.value;
       if (!v) return 0;
