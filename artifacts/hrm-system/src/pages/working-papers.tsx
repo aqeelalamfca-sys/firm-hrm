@@ -1839,7 +1839,9 @@ function WorkbookPipelinePanel({ onExtract, extracting, report, onClose }: any) 
 }
 
 function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, onUpload, onNext, loading, validateFile, onExtractWorkbook, workbookExtracting, workbookReport, showWorkbookPanel, setShowWorkbookPanel, onParseTemplate, parseLoading, parseResult, setParseResult }: any) {
+  const { toast } = useToast();
   const [dragActive, setDragActive] = useState(false);
+
   const hasExcel = uploadedFiles.some((f: any) => {
     const ext = (f.originalName || "").split(".").pop()?.toLowerCase();
     return ext === "xlsx" || ext === "xls" || ext === "xlsm";
@@ -1851,130 +1853,355 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
     (f.originalName || "").toLowerCase().includes("financial data")
   );
 
+  const parsed = !!parseResult;
+  const meta = parseResult?.meta || {};
+  const rows = parseResult?.rows || [];
+
+  const currentStep = parsed ? 3 : uploadedFiles.length > 0 ? 2 : 1;
+  const steps = [
+    { n: 1, label: "Upload Template", done: uploadedFiles.length > 0 },
+    { n: 2, label: "Parse & Extract", done: parsed },
+    { n: 3, label: "AI Process", done: false },
+  ];
+
+  // Category A — 36 variables auto-filled from template
+  const catAGroups = [
+    {
+      label: "Engagement Header (8 fields)",
+      color: "blue",
+      vars: [
+        { name: "Entity Name",         value: meta.entityName },
+        { name: "Company Type",        value: meta.companyType },
+        { name: "Industry",            value: meta.industry },
+        { name: "Reporting Framework", value: meta.reportingFramework },
+        { name: "Year End",            value: meta.yearEnd },
+        { name: "Audit Type",          value: meta.auditType },
+        { name: "Currency",            value: meta.currency },
+        { name: "Engagement Size",     value: meta.engagementSize },
+      ],
+    },
+    {
+      label: "Trial Balance Data (6 fields)",
+      color: "indigo",
+      vars: [
+        { name: "Account Code",        value: rows.length > 0 ? rows.filter((r:any)=>r.accountCode).length + " accounts" : undefined },
+        { name: "Account Name",        value: rows.length > 0 ? rows.length + " lines" : undefined },
+        { name: "Opening Balance",     value: rows.length > 0 ? "extracted" : undefined },
+        { name: "Debit Transactions",  value: rows.length > 0 ? "extracted" : undefined },
+        { name: "Credit Transactions", value: rows.length > 0 ? "extracted" : undefined },
+        { name: "Closing Balance",     value: rows.length > 0 ? "extracted" : undefined },
+      ],
+    },
+    {
+      label: "Financial Statement Data (22 fields)",
+      color: "violet",
+      vars: [
+        { name: "CY Amounts",          value: rows.filter((r:any)=>r.currentYear).length > 0 ? rows.filter((r:any)=>r.currentYear).length + " rows" : undefined },
+        { name: "PY Amounts",          value: rows.filter((r:any)=>r.priorYear).length > 0 ? rows.filter((r:any)=>r.priorYear).length + " rows" : undefined },
+        { name: "Revenue",             value: undefined },
+        { name: "Cost of Sales",       value: undefined },
+        { name: "Gross Profit",        value: undefined },
+        { name: "Admin Expenses",      value: undefined },
+        { name: "Finance Cost",        value: undefined },
+        { name: "Profit Before Tax",   value: undefined },
+        { name: "Tax Expense",         value: undefined },
+        { name: "Profit After Tax",    value: undefined },
+        { name: "Total Assets",        value: undefined },
+        { name: "Total Liabilities",   value: undefined },
+        { name: "Equity",              value: undefined },
+        { name: "Cash & Bank",         value: undefined },
+        { name: "Trade Receivables",   value: undefined },
+        { name: "Trade Payables",      value: undefined },
+        { name: "Inventory",           value: undefined },
+        { name: "Fixed Assets",        value: undefined },
+        { name: "Borrowings",          value: undefined },
+        { name: "Tax Data (WHT/GST)",  value: undefined },
+        { name: "Related Parties",     value: undefined },
+        { name: "Directors",           value: undefined },
+      ],
+    },
+  ];
+
+  // Category B — 10 AI-derived groups
+  const catBGroups = [
+    { code: "B1",  label: "Core Audit Calculations",      items: ["TB Balanced Status","FS–TB Reconciliation","Variance Analysis","Ratio Analysis","Trend Analysis"] },
+    { code: "B2",  label: "Materiality (ISA 320)",         items: ["Materiality Basis","Overall Materiality","Performance Materiality","Trivial Threshold"] },
+    { code: "B3",  label: "Risk Assessment (ISA 315/240)", items: ["Inherent Risk","Control Risk","RMM","Fraud Risk","Significant Risks","Going Concern Risk"] },
+    { code: "B4",  label: "Analytical Flags",              items: ["Unusual Fluctuations","Negative Trends","Liquidity Issues","Profitability Issues"] },
+    { code: "B5",  label: "Sampling (ISA 530)",            items: ["Population Size & Value","Sample Method","Sample Size","Sample Selection"] },
+    { code: "B6",  label: "Assertions & Procedures",       items: ["Assertions Mapping","Substantive Procedures","Test of Controls","Audit Program"] },
+    { code: "B7",  label: "Audit Evidence",                items: ["Confirmation Requirements","Evidence Sufficiency","Evidence Appropriateness"] },
+    { code: "B8",  label: "Misstatements",                 items: ["Expected Misstatement","Proposed Adjustments","Uncorrected Misstatements"] },
+    { code: "B9",  label: "Reporting (ISA 700 Series)",    items: ["Audit Opinion","Emphasis of Matter","KAM","Report Draft"] },
+    { code: "B10", label: "Advanced AI Analytics",         items: ["GL Generation","Transaction Simulation","Anomaly Detection","Duplicate Detection","Audit Health Score"] },
+  ];
+
   return (
     <div className="space-y-5">
 
-      {/* ── Quick-start banner: download the template ───────────────────── */}
+      {/* Step Progress */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+        <div className="flex items-center">
+          {steps.map((step, i) => (
+            <div key={step.n} className="flex items-center flex-1">
+              <div className="flex flex-col items-center gap-1.5 flex-1">
+                <div className={cn(
+                  "w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm transition-all shadow-sm",
+                  step.done
+                    ? "bg-emerald-500 text-white shadow-emerald-200"
+                    : currentStep === step.n
+                      ? "bg-blue-600 text-white shadow-blue-200 ring-4 ring-blue-100"
+                      : "bg-slate-100 text-slate-400"
+                )}>
+                  {step.done ? <Check className="w-4 h-4" /> : step.n}
+                </div>
+                <p className={cn(
+                  "text-xs font-semibold text-center whitespace-nowrap",
+                  step.done ? "text-emerald-700" : currentStep === step.n ? "text-blue-700" : "text-slate-400"
+                )}>{step.label}</p>
+              </div>
+              {i < steps.length - 1 && (
+                <div className={cn("h-0.5 flex-1 -mt-5 mx-1 rounded-full transition-colors", step.done ? "bg-emerald-300" : "bg-slate-200")} />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Template Download Banner */}
       <div className="bg-gradient-to-r from-blue-700 to-indigo-800 rounded-2xl p-5 text-white shadow-md flex flex-col sm:flex-row sm:items-center gap-4">
-        <div className="flex-1">
-          <p className="font-semibold text-base mb-1 flex items-center gap-2">
+        <div className="flex items-start gap-3.5 flex-1">
+          <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
             <FileText className="w-5 h-5 text-blue-200" />
-            One-Sheet Audit Template — Primary Input Format
-          </p>
-          <p className="text-sm text-blue-100">
-            Download the <span className="font-semibold text-white">Financial_Data_Upload</span> Excel template, fill in engagement profile + financial rows, then upload and parse below.
-            All TB, GL, variables and audit engine data will auto-populate from the template.
-          </p>
-          <p className="text-xs text-blue-200 mt-2">
-            Columns: Entity profile · Statement type · FS section · Major head · Account code · CY/PY amounts · Debit/Credit values · WP area · Risk level · Procedure scale · AI GL flag
-          </p>
+          </div>
+          <div className="flex-1">
+            <p className="font-bold text-base mb-0.5">Fixed Audit Upload Template</p>
+            <p className="text-sm text-blue-100">
+              One single Excel file — fill the <span className="font-semibold text-white">Engagement Header</span> and{" "}
+              <span className="font-semibold text-white">Financial Data</span> sheets. All 36 Category A variables
+              populate automatically on parse. Category B is fully AI-derived.
+            </p>
+            <div className="flex flex-wrap gap-1.5 mt-2.5">
+              {["Engagement Header","TB Section","FS Data","Risk Flags","GL Markers"].map(t => (
+                <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/10 border border-white/20 rounded-full text-[11px] text-blue-100">
+                  <span className="w-1 h-1 rounded-full bg-blue-300 inline-block" />{t}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
         <button
           onClick={async () => {
             try {
               const token = localStorage.getItem("hrm_token");
               const r = await fetch("/api/working-papers/download-template", {
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                headers: token ? { Authorization: "Bearer " + token } : {},
               });
-              if (!r.ok) throw new Error("Download failed");
+              if (!r.ok) throw new Error("fail");
               const blob = await r.blob();
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a");
-              a.href = url;
-              a.download = "Financial_Data_Upload_Template.xlsx";
-              a.click();
+              a.href = url; a.download = "Financial_Data_Upload_Template.xlsx"; a.click();
               URL.revokeObjectURL(url);
             } catch {
               toast({ title: "Download failed", description: "Could not download template.", variant: "destructive" });
             }
           }}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-blue-800 text-sm font-bold rounded-xl shadow hover:bg-blue-50 transition-colors shrink-0"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-blue-800 text-sm font-bold rounded-xl shadow hover:bg-blue-50 transition-colors shrink-0"
         >
-          <Download className="w-4 h-4" />
-          Download Template
+          <Download className="w-4 h-4" /> Download Template
         </button>
       </div>
 
-      {/* ── Stats row ───────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[
-          { label: "Queued", value: files.length, icon: Upload, color: "blue" },
-          { label: "Uploaded", value: uploadedFiles.length, icon: CheckCircle2, color: "emerald" },
-          { label: "Excel Files", value: uploadedFiles.filter((f: any) => ["xlsx","xls","xlsm"].includes((f.originalName||"").split(".").pop()?.toLowerCase()||"")).length, icon: FileText, color: "purple" },
-        ].map(s => (
-          <div key={s.label} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${s.color==="blue"?"bg-blue-50":s.color==="emerald"?"bg-emerald-50":"bg-purple-50"}`}>
-              <s.icon className={`w-5 h-5 ${s.color==="blue"?"text-blue-600":s.color==="emerald"?"text-emerald-600":"text-purple-600"}`} />
+      {/* Category A / Category B */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+        {/* ── Category A ── */}
+        <div className="bg-white border border-blue-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3.5 flex items-center gap-3 shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
+              <FileText className="w-4 h-4 text-white" />
             </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900">{s.value}</p>
-              <p className="text-xs text-slate-500">{s.label}</p>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-white text-sm leading-tight">Category A — Template Direct</p>
+              <p className="text-[11px] text-blue-100 mt-0.5">36 variables · Auto-filled on parse · No AI needed</p>
             </div>
+            {parsed ? (
+              <div className="flex items-center gap-1.5 bg-white/20 rounded-full px-2.5 py-1 shrink-0">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200" />
+                <span className="text-[11px] text-white font-semibold">Populated</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 bg-white/10 rounded-full px-2.5 py-1 shrink-0">
+                <Clock className="w-3 h-3 text-blue-200" />
+                <span className="text-[11px] text-blue-100">Awaiting parse</span>
+              </div>
+            )}
           </div>
-        ))}
+          <div className="p-4 space-y-4 flex-1">
+            {catAGroups.map((group: any) => (
+              <div key={group.label}>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <span className={cn("w-1.5 h-1.5 rounded-full inline-block",
+                    group.color === "blue" ? "bg-blue-400" : group.color === "indigo" ? "bg-indigo-400" : "bg-violet-400"
+                  )} />
+                  {group.label}
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {group.vars.map((v: any) => (
+                    <div key={v.name} className={cn(
+                      "flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs transition-all",
+                      parsed && v.value
+                        ? "bg-emerald-50 border-emerald-200"
+                        : parsed
+                          ? "bg-slate-50 border-slate-200"
+                          : "bg-slate-50/50 border-slate-100"
+                    )}>
+                      {parsed ? (
+                        v.value
+                          ? <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                          : <CircleDot className="w-3 h-3 text-slate-300 shrink-0" />
+                      ) : (
+                        <div className="w-3 h-3 rounded-full border-2 border-slate-200 shrink-0" />
+                      )}
+                      <span className={cn(
+                        "flex-1 truncate font-medium leading-tight",
+                        parsed && v.value ? "text-slate-800" : "text-slate-400"
+                      )}>{v.name}</span>
+                      {parsed && v.value && (
+                        <span className="text-[10px] text-emerald-600 font-semibold truncate max-w-[60px] shrink-0">{String(v.value)}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Category B ── */}
+        <div className="bg-white border border-emerald-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-3.5 flex items-center gap-3 shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
+              <Bot className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-white text-sm leading-tight">Category B — AI Engine</p>
+              <p className="text-[11px] text-emerald-100 mt-0.5">10 groups · Derived after AI Process</p>
+            </div>
+            {!parsed ? (
+              <div className="flex items-center gap-1.5 bg-black/20 rounded-full px-2.5 py-1 shrink-0">
+                <Lock className="w-3 h-3 text-white/60" />
+                <span className="text-[11px] text-white/70">Parse first</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 bg-white/20 rounded-full px-2.5 py-1 shrink-0">
+                <Zap className="w-3.5 h-3.5 text-yellow-200" />
+                <span className="text-[11px] text-white font-semibold">Ready</span>
+              </div>
+            )}
+          </div>
+          <div className="p-4 space-y-2 flex-1">
+            <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+              Derived by AI from Category A data. No variable is left empty —
+              fallback: <span className="italic text-slate-600">"AI unable to determine — requires input"</span>.
+            </p>
+            {catBGroups.map((group: any) => (
+              <div key={group.code} className={cn(
+                "rounded-xl border p-3 transition-all",
+                parsed
+                  ? "bg-slate-50 border-slate-200 hover:border-emerald-200 hover:bg-emerald-50/20"
+                  : "bg-slate-50/30 border-slate-100 opacity-50"
+              )}>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className={cn(
+                    "inline-flex items-center justify-center w-6 h-5 rounded text-[10px] font-bold shrink-0",
+                    parsed ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-400"
+                  )}>{group.code}</span>
+                  <p className={cn("text-xs font-semibold leading-tight", parsed ? "text-slate-800" : "text-slate-400")}>{group.label}</p>
+                </div>
+                <div className="flex flex-wrap gap-1 pl-8">
+                  {group.items.map((item: string) => (
+                    <span key={item} className={cn(
+                      "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium",
+                      parsed ? "bg-white border border-slate-200 text-slate-600" : "bg-slate-100 text-slate-400"
+                    )}>{item}</span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* ── Upload panel ─────────────────────────────────────────────────── */}
+      {/* Upload Zone */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50/50 px-5 py-4 border-b border-slate-200/60">
-          <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-            <Upload className="w-5 h-5 text-blue-600" /> Upload Documents
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">Upload the one-sheet Excel template (required) plus any supporting PDFs or images (optional).</p>
+        <div className="bg-gradient-to-r from-slate-50 to-blue-50/30 px-5 py-3.5 border-b border-slate-200/60 flex items-center gap-2">
+          <Upload className="w-4 h-4 text-blue-600" />
+          <h2 className="font-semibold text-slate-900 text-sm">Upload Completed Template</h2>
+          <span className="ml-auto text-[11px] text-slate-400 hidden sm:block">Excel template required · Supporting PDFs optional</span>
         </div>
-        <div className="p-5 space-y-5">
+        <div className="p-5 space-y-4">
           <div
             className={cn(
-              "border-2 border-dashed rounded-xl p-8 sm:p-12 text-center cursor-pointer transition-all duration-200",
+              "border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200",
               dragActive ? "border-blue-400 bg-blue-50/50 scale-[1.01]" : "border-slate-200 hover:border-blue-300 hover:bg-blue-50/20"
             )}
             onClick={() => fileInputRef.current?.click()}
             onDragOver={e => { e.preventDefault(); setDragActive(true); }}
             onDragLeave={() => setDragActive(false)}
-            onDrop={e => { e.preventDefault(); setDragActive(false); const dt = e.dataTransfer.files; if (dt.length) { const arr = Array.from(dt).map(f => ({ file: f, category: "other" })); setFiles((p: any) => [...p, ...arr]); } }}
+            onDrop={e => {
+              e.preventDefault(); setDragActive(false);
+              const dt = e.dataTransfer.files;
+              if (dt.length) setFiles((p: any) => [...p, ...Array.from(dt).map((f: any) => ({ file: f, category: "other" }))]);
+            }}
           >
-            <div className={cn("w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center transition-colors", dragActive ? "bg-blue-100" : "bg-slate-100")}>
-              <Upload className={cn("w-7 h-7 transition-colors", dragActive ? "text-blue-600" : "text-slate-400")} />
+            <div className={cn("w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center transition-colors", dragActive ? "bg-blue-100" : "bg-slate-100")}>
+              <Upload className={cn("w-6 h-6 transition-colors", dragActive ? "text-blue-600" : "text-slate-400")} />
             </div>
-            <p className="font-medium text-slate-700">Drop files here or <span className="text-blue-600 underline underline-offset-2">browse</span></p>
-            <p className="text-xs text-slate-400 mt-1.5">Accepted: .xlsx, .xls, .pdf, .jpg, .png, .webp</p>
+            <p className="font-medium text-slate-700 text-sm">Drop your completed template here or <span className="text-blue-600 underline underline-offset-2">browse</span></p>
+            <p className="text-xs text-slate-400 mt-1.5">Excel (.xlsx) for main template · PDF / images for supporting documents</p>
             <input ref={fileInputRef} type="file" multiple accept=".xlsx,.xls,.pdf,.jpg,.jpeg,.png,.webp" onChange={onFileAdd} className="hidden" />
           </div>
 
           {files.length > 0 && (
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-900">Files to Upload ({files.length})</h3>
-                <Button onClick={onUpload} disabled={loading} size="sm" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-sm">
-                  {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Upload className="w-3.5 h-3.5 mr-1.5" />}
-                  Upload {files.length} File{files.length > 1 ? "s" : ""}
+                <h3 className="text-xs font-semibold text-slate-600">{files.length} file{files.length > 1 ? "s" : ""} ready to upload</h3>
+                <Button onClick={onUpload} disabled={loading} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white h-7 text-xs px-3">
+                  {loading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Upload className="w-3 h-3 mr-1" />}
+                  Upload
                 </Button>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {files.map((uf: any, i: number) => {
                   const err = validateFile(uf.file, uf.category);
                   const ext = uf.file.name.split(".").pop()?.toLowerCase();
                   return (
-                    <div key={i} className={cn("flex items-center gap-3 p-3 rounded-xl border transition-colors", err ? "bg-red-50 border-red-200" : "bg-slate-50/50 border-slate-200 hover:bg-slate-50")}>
-                      <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-bold uppercase",
+                    <div key={i} className={cn(
+                      "flex items-center gap-2.5 p-2.5 rounded-xl border text-xs",
+                      err ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200"
+                    )}>
+                      <div className={cn(
+                        "w-7 h-7 rounded-md flex items-center justify-center shrink-0 font-bold text-[9px] uppercase",
                         ext === "pdf" ? "bg-red-100 text-red-700" : ext === "xlsx" || ext === "xls" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"
                       )}>{ext}</div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">{uf.file.name}</p>
-                        <p className="text-xs text-slate-400">{(uf.file.size / 1024).toFixed(0)} KB</p>
-                        {err && <p className="text-xs text-red-600 mt-0.5 font-medium">{err}</p>}
+                        <p className="font-medium text-slate-800 truncate">{uf.file.name}</p>
+                        <p className="text-[10px] text-slate-400">{(uf.file.size / 1024).toFixed(0)} KB</p>
+                        {err && <p className="text-red-600 font-medium mt-0.5">{err}</p>}
                       </div>
                       <select
-                        className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:ring-2 focus:ring-blue-200 focus:border-blue-400 max-w-[160px] sm:max-w-none"
+                        className="text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-700 focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
                         value={uf.category}
-                        onChange={e => { const updated = [...files]; updated[i].category = e.target.value; setFiles(updated); }}
+                        onChange={e => { const u = [...files]; u[i].category = e.target.value; setFiles(u); }}
                       >
-                        {FILE_CATEGORIES.map(c => (
-                          <option key={c.value} value={c.value}>{c.label} ({c.format})</option>
+                        {FILE_CATEGORIES.map((c: any) => (
+                          <option key={c.value} value={c.value}>{c.label}</option>
                         ))}
                       </select>
-                      <button onClick={() => setFiles((p: any) => p.filter((_: any, j: number) => j !== i))} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors shrink-0">
-                        <X className="w-4 h-4 text-slate-400 hover:text-red-500" />
+                      <button onClick={() => setFiles((p: any) => p.filter((_: any, j: number) => j !== i))} className="p-1 hover:bg-red-50 rounded-lg transition-colors">
+                        <X className="w-3.5 h-3.5 text-slate-400 hover:text-red-500" />
                       </button>
                     </div>
                   );
@@ -1984,26 +2211,29 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
           )}
 
           {uploadedFiles.length > 0 && (
-            <div className="border-t border-slate-200 pt-5">
-              <h3 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Uploaded Files ({uploadedFiles.length})
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className={cn("pt-4", files.length > 0 ? "border-t border-slate-100" : "")}>
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <h3 className="text-xs font-semibold text-slate-600">{uploadedFiles.length} uploaded file{uploadedFiles.length > 1 ? "s" : ""}</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                 {uploadedFiles.map((f: any) => {
                   const ext = (f.originalName || "").split(".").pop()?.toLowerCase();
                   const isXl = ext === "xlsx" || ext === "xls" || ext === "xlsm";
                   return (
-                    <div key={f.id} className={cn("flex items-center gap-2.5 p-2.5 rounded-xl border text-sm",
-                      isXl ? "bg-blue-50/40 border-blue-100" : "bg-emerald-50/50 border-emerald-100"
+                    <div key={f.id} className={cn(
+                      "flex items-center gap-2.5 p-2.5 rounded-xl border text-xs",
+                      isXl ? "bg-blue-50/50 border-blue-100" : "bg-slate-50 border-slate-100"
                     )}>
-                      <div className={cn("w-8 h-8 rounded-md flex items-center justify-center shrink-0 text-[9px] font-bold uppercase",
+                      <div className={cn(
+                        "w-7 h-7 rounded-md flex items-center justify-center shrink-0 font-bold text-[9px] uppercase",
                         ext === "pdf" ? "bg-red-100 text-red-700" : isXl ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"
                       )}>{ext}</div>
                       <div className="flex-1 min-w-0">
-                        <span className="truncate block text-sm font-medium text-slate-800">{f.originalName}</span>
-                        <span className="text-[11px] text-slate-500 capitalize">{f.category?.replace(/_/g, " ")}</span>
+                        <p className="font-medium text-slate-800 truncate">{f.originalName}</p>
+                        {isXl && <p className="text-[10px] text-blue-600 font-medium mt-0.5">Primary template</p>}
                       </div>
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                     </div>
                   );
                 })}
@@ -2013,7 +2243,7 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
         </div>
       </div>
 
-      {/* ── Parse Template CTA ─────────────────────────────────────────────── */}
+      {/* Parse CTA */}
       {hasExcel && !parseResult && (
         <div className={cn(
           "rounded-2xl p-5 border flex flex-col sm:flex-row sm:items-center gap-4",
@@ -2022,7 +2252,7 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
             : "bg-gradient-to-r from-violet-50 to-indigo-50 border-violet-200"
         )}>
           <div className="flex items-start gap-3 flex-1">
-            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5",
+            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
               isTemplate ? "bg-emerald-100" : "bg-violet-100"
             )}>
               {isTemplate
@@ -2031,46 +2261,32 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
             </div>
             <div>
               <p className={cn("text-sm font-semibold", isTemplate ? "text-emerald-900" : "text-slate-900")}>
-                {isTemplate ? "Financial_Data_Upload template detected!" : "Excel workbook uploaded"}
+                {isTemplate ? "Template detected — ready to parse" : "Excel workbook uploaded"}
               </p>
               <p className="text-xs text-slate-600 mt-0.5">
-                {isTemplate
-                  ? "Click Parse Template to extract all engagement fields, financial rows, validate data, auto-populate TB/GL/variables and advance the session."
-                  : "If this is the Financial_Data_Upload template, click Parse Template. Otherwise use Smart Import for multi-sheet workbooks."}
+                Parse the template to auto-populate all 36 Category A variables. Category B AI processing will be available immediately after.
               </p>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
-            <Button
-              onClick={onParseTemplate}
-              disabled={parseLoading}
-              className={cn("shadow-sm font-semibold", isTemplate
-                ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
-                : "bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white"
-              )}
-              size="sm"
-            >
-              {parseLoading
-                ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> Parsing…</>
-                : <><Sparkles className="w-3.5 h-3.5 mr-1.5" /> Parse Template</>
-              }
-            </Button>
-            {!isTemplate && (
-              <Button
-                onClick={() => { setShowWorkbookPanel(true); onExtractWorkbook(); }}
-                variant="outline"
-                size="sm"
-                className="border-violet-300 text-violet-700 hover:bg-violet-50"
-              >
-                <Zap className="w-3.5 h-3.5 mr-1.5" /> Smart Import
-              </Button>
+          <Button
+            onClick={onParseTemplate}
+            disabled={parseLoading}
+            className={cn("shadow-sm font-semibold shrink-0", isTemplate
+              ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
+              : "bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white"
             )}
-          </div>
+            size="sm"
+          >
+            {parseLoading
+              ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> Parsing…</>
+              : <><Sparkles className="w-3.5 h-3.5 mr-1.5" /> Parse Template</>
+            }
+          </Button>
         </div>
       )}
 
-      {/* ── Old Smart Import panel (multi-sheet) ─────────────────────────── */}
-      {(showWorkbookPanel) && (
+      {/* Legacy Smart Import */}
+      {showWorkbookPanel && (
         <WorkbookPipelinePanel
           onExtract={onExtractWorkbook}
           extracting={workbookExtracting}
@@ -2079,25 +2295,55 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
         />
       )}
 
-      {/* ── Parse Result Panel ────────────────────────────────────────────── */}
+      {/* Parse Result */}
       {parseResult && (
         <TemplateParsedPanel result={parseResult} onClear={() => setParseResult(null)} />
       )}
 
-      {/* ── Next action ──────────────────────────────────────────────────── */}
+      {/* Action Row */}
       {uploadedFiles.length > 0 && (
-        <div className="flex items-center justify-between gap-4 pt-1">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-center gap-4">
           {parseResult?.rows?.length > 0 ? (
-            <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Template parsed — TB, GL, and variables auto-populated. You may proceed.
-            </p>
+            <div className="flex items-start gap-3 flex-1">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+                <Bot className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-900">Category A complete — {parseResult.rows.length} financial rows extracted</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Click <span className="font-semibold text-emerald-700">AI Process</span> to derive all Category B variables:
+                  materiality, risk, sampling, procedures, opinions and GL data.
+                </p>
+              </div>
+            </div>
           ) : (
-            <span />
+            <div className="flex items-start gap-3 flex-1">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
+                <Info className="w-5 h-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-900">Parse the template first</p>
+                <p className="text-xs text-slate-500 mt-0.5">Category A must be populated before the AI engine can derive Category B.</p>
+              </div>
+            </div>
           )}
-          <Button onClick={onNext} disabled={loading} size="lg" className="px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-200/50">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
-            {parseResult?.rows?.length > 0 ? "Continue to Extraction" : "Run AI Extraction"}
+          <Button
+            onClick={onNext}
+            disabled={loading}
+            size="lg"
+            className={cn(
+              "px-7 shadow-md shrink-0 font-bold transition-all",
+              parseResult?.rows?.length > 0
+                ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-200/50"
+                : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-blue-200/50"
+            )}
+          >
+            {loading
+              ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              : parseResult?.rows?.length > 0
+                ? <><Bot className="w-4 h-4 mr-2" /> AI Process — Build Category B</>
+                : <><Sparkles className="w-4 h-4 mr-2" /> Run AI Extraction</>
+            }
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </div>
@@ -2105,7 +2351,6 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
     </div>
   );
 }
-
 // ── Template Parse Results Panel ─────────────────────────────────────────────
 function TemplateParsedPanel({ result, onClear }: { result: any; onClear: () => void }) {
   const [showAllRows, setShowAllRows] = useState(false);

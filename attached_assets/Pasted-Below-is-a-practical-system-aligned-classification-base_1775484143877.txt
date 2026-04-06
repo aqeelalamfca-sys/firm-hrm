@@ -1,0 +1,145 @@
+Below is a practical, system-aligned classification based on your uploaded template structure (Financial Data + Entity Sheet).
+
+It clearly defines:
+
+Category A → Auto-filled from Template (Excel upload)
+Category B → AI Button (Derived from Category A)
+
+This is structured exactly for implementation in your Working Paper Generator (AuditWise).
+
+✅ FINAL TABLE — TEMPLATE vs AI VARIABLES
+🔵 CATEGORY A — Auto-Filled from Template (Upload Stage)
+
+(Direct extraction — no AI judgment required)
+
+Sr.	Variable Name	Source Sheet	Field Type	Notes
+1	Entity Name	Header	Text	Direct
+2	Company Type	Header	Dropdown	From template
+3	Industry	Header	Dropdown	From template
+4	Reporting Framework	Header	Dropdown	From template
+5	Year End	Header	Date	Critical
+6	Audit Type	Header	Dropdown	
+7	Currency	Header	Dropdown	
+8	Engagement Size	Header	Dropdown	
+Financial Data (Core Engine Input)
+Sr.	Variable Name	Source	Type
+9	Account Code	TB Section	Text
+10	Account Name	TB Section	Text
+11	Opening Balance	TB	Numeric
+12	Debit Transactions	TB	Numeric
+13	Credit Transactions	TB	Numeric
+14	Closing Balance	TB	Numeric
+15	Current Year Amount	FS	Numeric
+16	Prior Year Amount	FS	Numeric
+17	Revenue	FS	Numeric
+18	Cost of Sales	FS	Numeric
+19	Gross Profit	FS	Numeric
+20	Admin Expenses	FS	Numeric
+21	Finance Cost	FS	Numeric
+22	Profit Before Tax	FS	Numeric
+23	Tax Expense	FS	Numeric
+24	Profit After Tax	FS	Numeric
+25	Total Assets	FS	Numeric
+26	Total Liabilities	FS	Numeric
+27	Equity	FS	Numeric
+28	Cash & Bank	FS	Numeric
+29	Trade Receivables	FS	Numeric
+30	Trade Payables	FS	Numeric
+31	Inventory	FS	Numeric
+Other Template Inputs
+Sr.	Variable	Type
+32	Fixed Assets	Numeric
+33	Borrowings	Numeric
+34	Tax Data (WHT, GST etc.)	Numeric
+35	Related Parties (if entered)	Text
+36	Directors (if entered)	Text
+🟢 CATEGORY B — AI BUTTON VARIABLES (Derived / Generated)
+
+(Generated after clicking “AI Process” using Category A data)
+
+B1 — Core Audit Calculations
+Sr.	Variable	Derived From
+1	Trial Balance Balanced Status	TB data
+2	FS–TB Reconciliation	FS + TB
+3	Variance Analysis	CY vs PY
+4	Ratio Analysis	FS
+5	Trend Analysis	FS
+B2 — Materiality (ISA 320)
+Variable	Logic
+Materiality Basis	Revenue / PBT / Assets
+Overall Materiality	% of base
+Performance Materiality	50–75%
+Trivial Threshold	Small %
+B3 — Risk Assessment (ISA 315 / 240)
+Variable	Logic
+Inherent Risk	Size + fluctuations
+Control Risk	Based on system assumption
+RMM	Combined
+Fraud Risk	Revenue + JE
+Significant Risks	AI detection
+Going Concern Risk	FS trends
+B4 — Analytical Flags
+Variable	Logic
+Unusual Fluctuations	Variance thresholds
+Negative Trends	FS
+Liquidity Issues	Ratios
+Profitability Issues	Ratios
+B5 — Sampling (ISA 530)
+Variable	Logic
+Population Size	TB
+Population Value	TB
+Sample Method	Risk-based
+Sample Size	Materiality
+Sample Selection	AI generated
+B6 — Assertions & Procedures
+Variable	Logic
+Assertions Mapping	Account type
+Substantive Procedures	Generated
+Test of Controls	Risk-based
+Audit Program	Generated
+B7 — Audit Evidence
+Variable	Logic
+Confirmation Requirement	Balance type
+Evidence Sufficiency	Risk + testing
+Evidence Appropriateness	Nature
+B8 — Misstatements
+Variable	Logic
+Expected Misstatement	Sampling
+Proposed Adjustments	Differences
+Uncorrected Misstatements	Aggregation
+B9 — Reporting (ISA 700 Series)
+Variable	Logic
+Audit Opinion	Final evaluation
+Emphasis of Matter	Conditions
+KAM	Significant risks
+Report Draft	Generated
+B10 — Advanced AI (Critical for Your System)
+Variable	Logic
+GL Generation	From TB
+Transaction Simulation	Materiality logic
+Anomaly Detection	Pattern analysis
+Duplicate Transactions	AI
+Suspicious Entries	AI
+Audit Health Score	Overall
+🔴 FINAL SYSTEM LOGIC (IMPORTANT FOR IMPLEMENTATION)
+Step Flow
+User uploads template → Category A filled (100%)
+System validates completeness
+User clicks “AI Process”
+AI:
+Generates Category B
+Builds TB + GL
+Performs risk + materiality
+Creates working papers
+⭐ KEY RULE (MANDATORY FOR YOUR SOFTWARE)
+
+No Category B variable should remain empty unless logically impossible
+(fallback: “AI unable to determine — requires user input”)
+
+💡 Design Insight
+Category A = Structured Data Layer
+Category B = Audit Intelligence Layer
+Link both via:
+Variable IDs
+Mapping engine
+Working paper triggers
