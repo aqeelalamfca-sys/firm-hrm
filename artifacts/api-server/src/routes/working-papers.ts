@@ -33,7 +33,7 @@ import ExcelJS from "exceljs";
 import pdfParse from "pdf-parse";
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell,
-  WidthType, AlignmentType, BorderStyle, ShadingType, PageBreak,
+  WidthType, AlignmentType, BorderStyle, ShadingType, PageBreak, Footer,
   type IShadingAttributesProperties,
 } from "docx";
 
@@ -2822,6 +2822,247 @@ router.post("/sessions/:id/heads/:headIndex/approve", async (req: Request, res: 
   }
 });
 
+// ── Brand palette (ARGB) ─────────────────────────────────────────────────────
+const BP = {
+  navy:      "FF0F3460",  // deep navy — firm header bg
+  blue:      "FF1E3A8A",  // brand blue — column headers
+  blueMid:   "FF2563EB",  // mid blue — sub-headers
+  blueLight: "FFDBEAFE",  // pale blue — alternating rows / info boxes
+  slate:     "FF475569",  // slate — label text
+  slateLight:"FFF1F5F9",  // very light slate — section dividers
+  white:     "FFFFFFFF",
+  green:     "FF16A34A",  // positive balance / credit
+  amber:     "FFF59E0B",  // warnings / highlights
+  amberLight:"FFFEF9C3",
+  red:       "FFB91C1C",  // negative / debit
+  redLight:  "FFFEE2E2",
+  totalBg:   "FF1E40AF",  // totals row bg
+  totalFg:   "FFFFFFFF",
+  black:     "FF111827",
+};
+
+// ── ExcelJS cell helpers ──────────────────────────────────────────────────────
+function xHdr(cell: ExcelJS.Cell, v: any, center = false) {
+  cell.value = v;
+  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BP.blue } };
+  cell.font = { bold: true, color: { argb: BP.white }, size: 10, name: "Calibri" };
+  cell.border = { bottom: { style: "medium", color: { argb: BP.navy } } };
+  cell.alignment = { vertical: "middle", horizontal: center ? "center" : "left", wrapText: false };
+}
+function xFirmHdr(cell: ExcelJS.Cell, v: any) {
+  cell.value = v;
+  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BP.navy } };
+  cell.font = { bold: true, color: { argb: BP.white }, size: 13, name: "Calibri" };
+  cell.alignment = { vertical: "middle", horizontal: "center" };
+}
+function xSubHdr(cell: ExcelJS.Cell, v: any) {
+  cell.value = v;
+  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BP.blueLight } };
+  cell.font = { bold: true, color: { argb: BP.blue }, size: 10, name: "Calibri" };
+  cell.alignment = { vertical: "middle", horizontal: "center" };
+}
+function xData(cell: ExcelJS.Cell, v: any, rowIdx: number, right = false) {
+  cell.value = v;
+  if (rowIdx % 2 === 0) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFF" } };
+  cell.font = { size: 9, name: "Calibri", color: { argb: BP.black } };
+  cell.border = { bottom: { style: "hair", color: { argb: "FFE2E8F0" } } };
+  cell.alignment = { vertical: "middle", horizontal: right ? "right" : "left" };
+}
+function xNum(cell: ExcelJS.Cell, v: number | null | undefined, rowIdx: number) {
+  xData(cell, typeof v === "number" ? v : null, rowIdx, true);
+  if (typeof v === "number") cell.numFmt = "#,##0.00";
+}
+function xTotal(cell: ExcelJS.Cell, v: any, right = false) {
+  cell.value = v;
+  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BP.totalBg } };
+  cell.font = { bold: true, color: { argb: BP.totalFg }, size: 10, name: "Calibri" };
+  cell.alignment = { vertical: "middle", horizontal: right ? "right" : "left" };
+  if (typeof v === "number") cell.numFmt = "#,##0.00";
+}
+function xLabel(cell: ExcelJS.Cell, v: any) {
+  cell.value = v;
+  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BP.slateLight } };
+  cell.font = { bold: true, color: { argb: BP.slate }, size: 9, name: "Calibri" };
+  cell.alignment = { vertical: "middle", horizontal: "left" };
+}
+function xValue(cell: ExcelJS.Cell, v: any) {
+  cell.value = v;
+  cell.font = { size: 9, name: "Calibri", color: { argb: BP.black } };
+  cell.alignment = { vertical: "middle", horizontal: "left" };
+}
+async function xProtect(ws: ExcelJS.Worksheet) {
+  await ws.protect("", { sheet: true, selectLockedCells: true, selectUnlockedCells: true });
+}
+
+// ── Build a standard ANA firm header block on an ExcelJS sheet ───────────────
+function buildXlsxFirmHeader(ws: ExcelJS.Worksheet, colCount: number, clientName: string, docTitle: string, period: string, ntn: string) {
+  const mc = (r: number, c: number) => ws.getRow(r).getCell(c);
+  // Row 1: Firm name
+  mc(1, 1).value = "ALAM & AULAKH CHARTERED ACCOUNTANTS";
+  mc(1, 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: BP.navy } };
+  mc(1, 1).font = { bold: true, color: { argb: BP.white }, size: 14, name: "Calibri" };
+  mc(1, 1).alignment = { vertical: "middle", horizontal: "center" };
+  ws.mergeCells(1, 1, 1, colCount);
+  ws.getRow(1).height = 30;
+
+  // Row 2: Doc title
+  mc(2, 1).value = docTitle.toUpperCase();
+  mc(2, 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: BP.blue } };
+  mc(2, 1).font = { bold: true, color: { argb: BP.white }, size: 11, name: "Calibri" };
+  mc(2, 1).alignment = { vertical: "middle", horizontal: "center" };
+  ws.mergeCells(2, 1, 2, colCount);
+  ws.getRow(2).height = 22;
+
+  // Row 3: Client + Period + NTN — three cells
+  const third = Math.ceil(colCount / 3);
+  mc(3, 1).value = `Client: ${clientName}`;
+  mc(3, 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: BP.blueLight } };
+  mc(3, 1).font = { bold: true, color: { argb: BP.navy }, size: 9, name: "Calibri" };
+  mc(3, 1).alignment = { vertical: "middle", horizontal: "left" };
+  ws.mergeCells(3, 1, 3, third);
+
+  mc(3, third + 1).value = `Period: ${period}`;
+  mc(3, third + 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: BP.blueLight } };
+  mc(3, third + 1).font = { bold: true, color: { argb: BP.navy }, size: 9, name: "Calibri" };
+  mc(3, third + 1).alignment = { vertical: "middle", horizontal: "center" };
+  ws.mergeCells(3, third + 1, 3, third * 2);
+
+  mc(3, third * 2 + 1).value = `NTN: ${ntn || "N/A"}  |  Prepared: ${new Date().toLocaleDateString("en-GB")}`;
+  mc(3, third * 2 + 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: BP.blueLight } };
+  mc(3, third * 2 + 1).font = { bold: false, color: { argb: BP.slate }, size: 9, name: "Calibri" };
+  mc(3, third * 2 + 1).alignment = { vertical: "middle", horizontal: "right" };
+  ws.mergeCells(3, third * 2 + 1, 3, colCount);
+  ws.getRow(3).height = 18;
+}
+
+// ── docx helpers ─────────────────────────────────────────────────────────────
+const DOCX_NAVY  = "0F3460";
+const DOCX_BLUE  = "1E3A8A";
+const DOCX_SLATE = "475569";
+const DOCX_LIGHTBG = "EFF6FF";
+
+function dxFirmHeader(firmName: string, clientName: string, docTitle: string, period: string, ntn: string, isaRef: string): Paragraph[] {
+  return [
+    new Paragraph({
+      children: [new TextRun({ text: firmName, bold: true, size: 32, color: DOCX_NAVY, font: "Calibri" })],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 60 },
+    }),
+    new Paragraph({
+      children: [new TextRun({ text: "Chartered Accountants — Registered with ICAP | QCR-Rated | ICAEW Authorized Employer", size: 18, color: DOCX_SLATE, font: "Calibri", italics: true })],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 160 },
+    }),
+    // separator line as a table
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [new TableRow({ children: [new TableCell({
+        shading: { fill: DOCX_NAVY, type: ShadingType.SOLID },
+        children: [new Paragraph({ text: "" })],
+        borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+      })] })],
+    }),
+    new Paragraph({ text: "", spacing: { after: 120 } }),
+    new Paragraph({
+      children: [new TextRun({ text: docTitle.toUpperCase(), bold: true, size: 28, color: DOCX_BLUE, font: "Calibri" })],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 120 },
+    }),
+    // Metadata table
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({ children: [
+          new TableCell({ width: { size: 25, type: WidthType.PERCENTAGE }, shading: { fill: "1E3A8A", type: ShadingType.SOLID }, children: [new Paragraph({ children: [new TextRun({ text: "Client:", bold: true, color: "FFFFFF", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
+          new TableCell({ width: { size: 75, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: clientName, size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, color: "E2E8F0" }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
+        ]}),
+        new TableRow({ children: [
+          new TableCell({ shading: { fill: "1E3A8A", type: ShadingType.SOLID }, children: [new Paragraph({ children: [new TextRun({ text: "Period:", bold: true, color: "FFFFFF", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: period, size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, color: "E2E8F0" }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
+        ]}),
+        new TableRow({ children: [
+          new TableCell({ shading: { fill: "1E3A8A", type: ShadingType.SOLID }, children: [new Paragraph({ children: [new TextRun({ text: "NTN:", bold: true, color: "FFFFFF", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: ntn || "N/A", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, color: "E2E8F0" }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
+        ]}),
+        new TableRow({ children: [
+          new TableCell({ shading: { fill: "1E3A8A", type: ShadingType.SOLID }, children: [new Paragraph({ children: [new TextRun({ text: "ISA Ref:", bold: true, color: "FFFFFF", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: isaRef || "—", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, color: "E2E8F0" }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
+        ]}),
+        new TableRow({ children: [
+          new TableCell({ shading: { fill: "1E3A8A", type: ShadingType.SOLID }, children: [new Paragraph({ children: [new TextRun({ text: "Prepared:", bold: true, color: "FFFFFF", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: new Date().toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" }), size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
+        ]}),
+      ],
+    }),
+    new Paragraph({ text: "", spacing: { after: 240 } }),
+  ];
+}
+
+function dxSection(title: string): Paragraph {
+  return new Paragraph({
+    children: [new TextRun({ text: title, bold: true, size: 22, color: DOCX_BLUE, font: "Calibri" })],
+    heading: HeadingLevel.HEADING_2,
+    spacing: { before: 300, after: 120 },
+    border: { bottom: { style: BorderStyle.SINGLE, color: DOCX_BLUE, size: 6 } },
+  });
+}
+
+function dxBody(text: string): Paragraph {
+  return new Paragraph({
+    children: [new TextRun({ text, size: 20, font: "Calibri", color: "1E293B" })],
+    spacing: { after: 120, line: 276 },
+  });
+}
+
+function dxBullet(text: string): Paragraph {
+  return new Paragraph({
+    children: [new TextRun({ text, size: 20, font: "Calibri", color: "334155" })],
+    bullet: { level: 0 },
+    spacing: { after: 80 },
+  });
+}
+
+function dxFooter(firmName: string): Paragraph {
+  return new Paragraph({
+    children: [
+      new TextRun({ text: `${firmName}  |  Confidential — For Audit Use Only  |  `, size: 16, color: "94A3B8", font: "Calibri" }),
+      new TextRun({ text: new Date().getFullYear().toString(), size: 16, color: "94A3B8", font: "Calibri" }),
+    ],
+    alignment: AlignmentType.CENTER,
+    border: { top: { style: BorderStyle.SINGLE, color: "CBD5E1", size: 4 } },
+    spacing: { before: 400 },
+  });
+}
+
+function parseDocxContent(content: string, clientName: string): Paragraph[] {
+  const paras: Paragraph[] = [];
+  const lines = (content || "").split("\n");
+  let inSignOff = false;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) { paras.push(new Paragraph({ text: "", spacing: { after: 80 } })); continue; }
+
+    // Section headings: lines starting with ##, all-caps lines, or numbered like "1." "A."
+    if (line.startsWith("##") || line.startsWith("**") && line.endsWith("**") || /^[A-Z ]{10,}$/.test(line) || /^\d+\.\s+[A-Z]/.test(line) || /^[A-Z]\.\s+[A-Z]/.test(line)) {
+      const clean = line.replace(/^#+\s*/, "").replace(/\*\*/g, "");
+      paras.push(dxSection(clean));
+      continue;
+    }
+    // Bullet points
+    if (line.startsWith("- ") || line.startsWith("• ") || line.startsWith("* ")) {
+      paras.push(dxBullet(line.replace(/^[-•*]\s+/, "")));
+      continue;
+    }
+    // Sign-off / Prepared by rows
+    if (/^(prepared|reviewed|approved|signature)/i.test(line)) {
+      inSignOff = true;
+    }
+    paras.push(dxBody(line));
+  }
+  return paras;
+}
+
 router.post("/sessions/:id/heads/:headIndex/export", async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(req.params.id);
@@ -2833,42 +3074,175 @@ router.post("/sessions/:id/heads/:headIndex/export", async (req: Request, res: R
     const documents = await db.select().from(wpHeadDocumentsTable).where(eq(wpHeadDocumentsTable.headId, heads[0].id));
     const headDef = AUDIT_HEADS[headIndex];
 
+    // Fetch session metadata for headers
+    const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
+    const clientName = session?.clientName || "Client";
+    const ntn = session?.ntn || "N/A";
+    const period = session?.periodStart && session?.periodEnd
+      ? `${session.periodStart} to ${session.periodEnd}`
+      : session?.engagementYear ? `FY ${session.engagementYear}` : "—";
+    const firmName = "Alam & Aulakh Chartered Accountants";
+
+    // ── HEAD 0: TRIAL BALANCE — ExcelJS ───────────────────────────────────────
     if (headIndex === 0) {
       const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
-      const wb = XLSX.utils.book_new();
-      const wsData = [["Account Code", "Account Name", "Classification", "Debit", "Credit", "Balance", "Source", "Confidence"]];
+      const wb = new ExcelJS.Workbook();
+      wb.creator = firmName;
+      wb.created = new Date();
+      const ws = wb.addWorksheet("Trial Balance", { properties: { tabColor: { argb: BP.blue } } });
+      ws.views = [{ state: "frozen", ySplit: 5 }];
+
+      const cols = [
+        { header: "Account Code", key: "code", width: 16 },
+        { header: "Account Name", key: "name", width: 42 },
+        { header: "Classification", key: "cls", width: 22 },
+        { header: "Debit (PKR)", key: "dr", width: 18 },
+        { header: "Credit (PKR)", key: "cr", width: 18 },
+        { header: "Balance (PKR)", key: "bal", width: 18 },
+        { header: "Prior Year (PKR)", key: "py", width: 18 },
+        { header: "Source", key: "src", width: 14 },
+        { header: "Confidence", key: "conf", width: 12 },
+      ];
+      ws.columns = cols.map(c => ({ width: c.width }));
+
+      buildXlsxFirmHeader(ws, 9, clientName, "Trial Balance", period, ntn);
+
+      // Row 4: blank spacer
+      ws.getRow(4).height = 4;
+
+      // Row 5: column headers
+      cols.forEach((c, i) => { xHdr(ws.getRow(5).getCell(i + 1), c.header, i >= 3 && i <= 6); });
+      ws.getRow(5).height = 22;
+
+      // Group by classification
+      const groups: Record<string, typeof tbLines> = {};
       for (const l of tbLines) {
-        wsData.push([l.accountCode, l.accountName, l.classification || "", String(l.debit), String(l.credit), String(l.balance), l.source || "", String(l.confidence || "")]);
+        const g = l.classification || "Other";
+        if (!groups[g]) groups[g] = [];
+        groups[g].push(l);
       }
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-      XLSX.utils.book_append_sheet(wb, ws, "Trial Balance");
-      const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 
+      let rowIdx = 6;
+      let totalDr = 0, totalCr = 0, totalBal = 0;
+
+      for (const [groupName, lines] of Object.entries(groups)) {
+        // Section header
+        const gr = ws.getRow(rowIdx);
+        gr.height = 18;
+        const gc = gr.getCell(1);
+        gc.value = groupName.toUpperCase();
+        gc.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E7FF" } };
+        gc.font = { bold: true, color: { argb: BP.blue }, size: 9, name: "Calibri" };
+        ws.mergeCells(rowIdx, 1, rowIdx, 9);
+        rowIdx++;
+
+        for (const l of lines) {
+          const r = ws.getRow(rowIdx);
+          r.height = 17;
+          const dr = parseFloat(String(l.debit)) || 0;
+          const cr = parseFloat(String(l.credit)) || 0;
+          const bal = parseFloat(String(l.balance)) || 0;
+          xData(r.getCell(1), l.accountCode, rowIdx);
+          xData(r.getCell(2), l.accountName, rowIdx);
+          xData(r.getCell(3), l.classification, rowIdx);
+          xNum(r.getCell(4), dr || null, rowIdx);
+          xNum(r.getCell(5), cr || null, rowIdx);
+          // Balance — color: green if positive, red if negative
+          xNum(r.getCell(6), bal, rowIdx);
+          if (bal < 0) r.getCell(6).font = { ...r.getCell(6).font as any, color: { argb: BP.red } };
+          else if (bal > 0) r.getCell(6).font = { ...r.getCell(6).font as any, color: { argb: "FF15803D" } };
+          xNum(r.getCell(7), parseFloat(String(l.priorYearBalance)) || null, rowIdx);
+          xData(r.getCell(8), l.source || "", rowIdx);
+          // Confidence badge
+          const conf = parseFloat(String(l.confidence)) || 0;
+          const confCell = r.getCell(9);
+          xData(confCell, conf ? `${Math.round(conf * 100)}%` : "", rowIdx, true);
+          if (conf >= 0.9) confCell.font = { ...confCell.font as any, color: { argb: "FF16A34A" } };
+          else if (conf >= 0.7) confCell.font = { ...confCell.font as any, color: { argb: "FFF59E0B" } };
+          else if (conf > 0) confCell.font = { ...confCell.font as any, color: { argb: BP.red } };
+          totalDr += dr; totalCr += cr; totalBal += bal;
+          rowIdx++;
+        }
+      }
+
+      // Blank row before totals
+      ws.getRow(rowIdx++).height = 6;
+      // Totals row
+      const tr = ws.getRow(rowIdx);
+      tr.height = 22;
+      xTotal(tr.getCell(1), "TOTALS"); ws.mergeCells(rowIdx, 1, rowIdx, 3);
+      xTotal(tr.getCell(4), totalDr, true);
+      xTotal(tr.getCell(5), totalCr, true);
+      xTotal(tr.getCell(6), totalBal, true);
+      ws.mergeCells(rowIdx, 7, rowIdx, 9);
+
+      // Difference check
+      const diff = Math.abs(totalDr - totalCr);
+      rowIdx += 2;
+      const diffRow = ws.getRow(rowIdx);
+      diffRow.height = 18;
+      const diffCell = diffRow.getCell(1);
+      diffCell.value = diff < 0.01
+        ? "✓ Trial Balance agrees — Debits equal Credits"
+        : `⚠ Difference: PKR ${diff.toLocaleString("en-PK", { minimumFractionDigits: 2 })}`;
+      diffCell.font = { bold: true, color: { argb: diff < 0.01 ? "FF16A34A" : BP.red }, size: 10, name: "Calibri" };
+      diffCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: diff < 0.01 ? "FFF0FDF4" : BP.redLight } };
+      ws.mergeCells(rowIdx, 1, rowIdx, 9);
+
+      await xProtect(ws);
       await db.update(wpHeadsTable).set({ status: "exported", exportedAt: new Date(), updatedAt: new Date() }).where(eq(wpHeadsTable.id, heads[0].id));
-
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="TB_${sessionId}.xlsx"`);
-      return res.send(buffer);
+      res.setHeader("Content-Disposition", `attachment; filename="TB_${clientName.replace(/\s/g, "_")}_${session?.engagementYear || sessionId}.xlsx"`);
+      await wb.xlsx.write(res); return res.end();
     }
 
+    // ── HEAD 1: GENERAL LEDGER — ExcelJS ──────────────────────────────────────
     if (headIndex === 1) {
       const glAccounts = await db.select().from(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, sessionId));
-      const wb = XLSX.utils.book_new();
+      const wb = new ExcelJS.Workbook();
+      wb.creator = firmName;
+      wb.created = new Date();
       const usedSheetNames = new Set<string>();
 
-      for (const acc of glAccounts.slice(0, 50)) {
+      // Cover / Summary sheet
+      const coverWs = wb.addWorksheet("GL Summary", { properties: { tabColor: { argb: BP.navy } } });
+      coverWs.columns = [{ width: 16 }, { width: 42 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 18 }];
+      buildXlsxFirmHeader(coverWs, 6, clientName, "General Ledger — Summary", period, ntn);
+      coverWs.getRow(4).height = 6;
+      ["Code", "Account Name", "Opening (PKR)", "Total Debits", "Total Credits", "Closing (PKR)"].forEach((h, i) => {
+        xHdr(coverWs.getRow(5).getCell(i + 1), h, i >= 2);
+      });
+      coverWs.getRow(5).height = 22;
+      coverWs.views = [{ state: "frozen", ySplit: 5 }];
+
+      let coverRow = 6;
+      let grandOpen = 0, grandDr = 0, grandCr = 0, grandClose = 0;
+      for (const acc of glAccounts) {
+        const r = coverWs.getRow(coverRow);
+        r.height = 17;
+        const ob = parseFloat(String(acc.openingBalance)) || 0;
+        const cb = parseFloat(String(acc.closingBalance)) || 0;
+        xData(r.getCell(1), acc.accountCode, coverRow);
+        xData(r.getCell(2), acc.accountName, coverRow);
+        xNum(r.getCell(3), ob, coverRow);
+        xNum(r.getCell(4), parseFloat(String(acc.totalDebits)) || null, coverRow);
+        xNum(r.getCell(5), parseFloat(String(acc.totalCredits)) || null, coverRow);
+        xNum(r.getCell(6), cb, coverRow);
+        if (cb < 0) r.getCell(6).font = { ...r.getCell(6).font as any, color: { argb: BP.red } };
+        grandOpen += ob; grandDr += parseFloat(String(acc.totalDebits)) || 0;
+        grandCr += parseFloat(String(acc.totalCredits)) || 0; grandClose += cb;
+        coverRow++;
+      }
+      coverRow++;
+      const gtr = coverWs.getRow(coverRow); gtr.height = 22;
+      xTotal(gtr.getCell(1), "TOTALS"); coverWs.mergeCells(coverRow, 1, coverRow, 2);
+      xTotal(gtr.getCell(3), grandOpen, true); xTotal(gtr.getCell(4), grandDr, true);
+      xTotal(gtr.getCell(5), grandCr, true); xTotal(gtr.getCell(6), grandClose, true);
+
+      // Per-account sheets
+      for (const acc of glAccounts.slice(0, 40)) {
         const entries = await db.select().from(wpGlEntriesTable).where(eq(wpGlEntriesTable.glAccountId, acc.id));
-        const wsData = [
-          [`General Ledger: ${acc.accountCode} - ${acc.accountName}`],
-          [`Opening Balance: ${acc.openingBalance}`, "", `Closing Balance: ${acc.closingBalance}`],
-          [],
-          ["Date", "Voucher", "Narration", "Debit", "Credit", "Running Balance"],
-        ];
-        for (const e of entries) {
-          wsData.push([e.entryDate, e.voucherNo || "", e.narration || "", String(e.debit), String(e.credit), String(e.runningBalance || "")]);
-        }
-        // Build unique sheet name (max 31 chars, no duplicates)
-        const base = `${acc.accountCode} ${acc.accountName}`.replace(/[\\/?*\[\]:]/g, "").trim().slice(0, 28) || `Acct_${acc.id}`;
+        const base = `${acc.accountCode} ${acc.accountName}`.replace(/[\\/?*\[\]:]/g, "").trim().slice(0, 24) || `Acct_${acc.id}`;
         let sheetName = base;
         let counter = 2;
         while (usedSheetNames.has(sheetName)) {
@@ -2876,60 +3250,199 @@ router.post("/sessions/:id/heads/:headIndex/export", async (req: Request, res: R
           sheetName = base.slice(0, 31 - suffix.length) + suffix;
         }
         usedSheetNames.add(sheetName);
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+        const ws = wb.addWorksheet(sheetName, { properties: { tabColor: { argb: BP.blueMid } } });
+        ws.columns = [{ width: 14 }, { width: 18 }, { width: 46 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 14 }];
+        ws.views = [{ state: "frozen", ySplit: 6 }];
+
+        buildXlsxFirmHeader(ws, 7, clientName, `GL: ${acc.accountCode} — ${acc.accountName}`, period, ntn);
+        // Account info row
+        ws.getRow(4).height = 18;
+        xSubHdr(ws.getRow(4).getCell(1), `Opening Balance: PKR ${(parseFloat(String(acc.openingBalance)) || 0).toLocaleString("en-PK", { minimumFractionDigits: 2 })}`);
+        ws.mergeCells(4, 1, 4, 3);
+        xSubHdr(ws.getRow(4).getCell(4), `Closing Balance: PKR ${(parseFloat(String(acc.closingBalance)) || 0).toLocaleString("en-PK", { minimumFractionDigits: 2 })}`);
+        ws.mergeCells(4, 4, 4, 7);
+
+        ["Date", "Voucher No.", "Narration / Description", "Debit (PKR)", "Credit (PKR)", "Balance (PKR)", "Ref"].forEach((h, i) => {
+          xHdr(ws.getRow(5).getCell(i + 1), h, i >= 3 && i <= 5);
+        });
+        ws.getRow(5).height = 22;
+
+        let rIdx = 6;
+        for (const e of entries) {
+          const r = ws.getRow(rIdx); r.height = 17;
+          xData(r.getCell(1), e.entryDate, rIdx);
+          xData(r.getCell(2), e.voucherNo || "", rIdx);
+          xData(r.getCell(3), e.narration || "", rIdx);
+          const dr = parseFloat(String(e.debit)) || 0;
+          const cr = parseFloat(String(e.credit)) || 0;
+          const bal = parseFloat(String(e.runningBalance)) || 0;
+          // Dr cell: red if non-zero
+          const drCell = r.getCell(4); xNum(drCell, dr || null, rIdx);
+          if (dr > 0) drCell.font = { ...drCell.font as any, color: { argb: BP.red } };
+          // Cr cell: green if non-zero
+          const crCell = r.getCell(5); xNum(crCell, cr || null, rIdx);
+          if (cr > 0) crCell.font = { ...crCell.font as any, color: { argb: "FF15803D" } };
+          xNum(r.getCell(6), bal, rIdx);
+          if (bal < 0) r.getCell(6).font = { ...r.getCell(6).font as any, color: { argb: BP.red } };
+          xData(r.getCell(7), e.referenceNo || "", rIdx);
+          rIdx++;
+        }
+
+        // Totals
+        rIdx++;
+        const tr2 = ws.getRow(rIdx); tr2.height = 20;
+        xTotal(tr2.getCell(1), "CLOSING BALANCE"); ws.mergeCells(rIdx, 1, rIdx, 3);
+        xTotal(tr2.getCell(6), parseFloat(String(acc.closingBalance)) || 0, true);
+        ws.mergeCells(rIdx, 4, rIdx, 5); ws.mergeCells(rIdx, 7, rIdx, 7);
       }
 
-      const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
       await db.update(wpHeadsTable).set({ status: "exported", exportedAt: new Date(), updatedAt: new Date() }).where(eq(wpHeadsTable.id, heads[0].id));
-
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="GL_${sessionId}.xlsx"`);
-      return res.send(buffer);
+      res.setHeader("Content-Disposition", `attachment; filename="GL_${clientName.replace(/\s/g, "_")}_${session?.engagementYear || sessionId}.xlsx"`);
+      await wb.xlsx.write(res); return res.end();
     }
 
-    const docContent = documents.map(d => `\n\n${"=".repeat(60)}\n${d.paperCode}: ${d.paperName}\n${"=".repeat(60)}\n\n${d.content}`).join("\n");
+    // ── HEADS 2-11: EXCEL output ───────────────────────────────────────────────
+    if (headDef.outputType.includes("excel") && !headDef.outputType.includes("word")) {
+      const wb = new ExcelJS.Workbook();
+      wb.creator = firmName;
+      wb.created = new Date();
+      const usedNames = new Set<string>();
 
-    if (headDef.outputType.includes("excel")) {
-      const wb = XLSX.utils.book_new();
       for (const doc of documents) {
-        const wsData = [[doc.paperName], [""], [doc.content || ""]];
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        XLSX.utils.book_append_sheet(wb, ws, (doc.paperCode || "WP").slice(0, 31));
+        let sheetBase = `${doc.paperCode || "WP"}`.replace(/[\\/?*\[\]:]/g, "").trim().slice(0, 26);
+        let sn = sheetBase;
+        let c2 = 2;
+        while (usedNames.has(sn)) { const sfx = `_${c2++}`; sn = sheetBase.slice(0, 31 - sfx.length) + sfx; }
+        usedNames.add(sn);
+
+        const ws = wb.addWorksheet(sn, { properties: { tabColor: { argb: BP.blue } } });
+        ws.columns = [{ width: 6 }, { width: 28 }, { width: 55 }, { width: 16 }];
+        buildXlsxFirmHeader(ws, 4, clientName, `${doc.paperCode}: ${doc.paperName}`, period, ntn);
+        ws.getRow(4).height = 6;
+
+        // Parse content into table rows
+        const lines = (doc.content || "").split("\n");
+        let rIdx = 5;
+        for (const rawLine of lines) {
+          const line = rawLine.trim();
+          if (!line) { ws.getRow(rIdx++).height = 8; continue; }
+          const r = ws.getRow(rIdx); r.height = 17;
+          if (/^##|^[A-Z ]{8,}$/.test(line) || /^(SECTION|PART|PROCEDURE|TEST|STEP|ASSERTION|CONCLUSION)/i.test(line)) {
+            xHdr(r.getCell(2), line.replace(/^#+\s*/, ""), false); ws.mergeCells(rIdx, 2, rIdx, 4);
+          } else if (line.startsWith("- ") || line.startsWith("• ")) {
+            xData(r.getCell(2), "•", rIdx);
+            xData(r.getCell(3), line.replace(/^[-•]\s+/, ""), rIdx); ws.mergeCells(rIdx, 3, rIdx, 4);
+          } else if (/^[\w\s]+:/.test(line) && line.indexOf(":") < 30) {
+            const colon = line.indexOf(":");
+            xLabel(r.getCell(2), line.slice(0, colon + 1));
+            xValue(r.getCell(3), line.slice(colon + 1).trim()); ws.mergeCells(rIdx, 3, rIdx, 4);
+          } else {
+            xData(r.getCell(2), line, rIdx); ws.mergeCells(rIdx, 2, rIdx, 4);
+          }
+          rIdx++;
+        }
+
+        // Sign-off footer
+        rIdx += 2;
+        const signRow = ws.getRow(rIdx); signRow.height = 40;
+        const signCell = signRow.getCell(2);
+        signCell.value = `Prepared by: ___________________    Date: ___________\n\nReviewed by: ___________________    Date: ___________`;
+        signCell.font = { size: 9, name: "Calibri", color: { argb: BP.slate } };
+        signCell.alignment = { wrapText: true };
+        ws.mergeCells(rIdx, 2, rIdx, 4);
       }
-      const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 
       await db.update(wpHeadsTable).set({ status: "exported", exportedAt: new Date(), updatedAt: new Date() }).where(eq(wpHeadsTable.id, heads[0].id));
-
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="${headDef.name.replace(/\s/g, "_")}_${sessionId}.xlsx"`);
-      return res.send(buffer);
+      res.setHeader("Content-Disposition", `attachment; filename="${headDef.name.replace(/\s/g, "_")}_${clientName.replace(/\s/g, "_")}_${session?.engagementYear || sessionId}.xlsx"`);
+      await wb.xlsx.write(res); return res.end();
     }
 
-    const docxSections: any[] = [];
+    // ── HEADS 2-11: WORD / WORD+EXCEL / WORD+PDF output ──────────────────────
+    const isaRefs: Record<number, string> = {
+      2: "ISA 200, 210, 220", 3: "ISA 200–240", 4: "ISA 500, 505, 580",
+      5: "ISA 510", 6: "ISA 300, 315, 320", 7: "ISA 330, 500–580",
+      8: "ISA 560, 570, 580", 9: "ISA 700–720", 10: "ISA 220", 11: "ISQM 1",
+    };
+
+    const docSections: any[] = [
+      ...dxFirmHeader(firmName, clientName, headDef.name, period, ntn, isaRefs[headIndex] || ""),
+    ];
+
     for (const doc of documents) {
-      docxSections.push(
-        new Paragraph({ text: `${doc.paperCode}: ${doc.paperName}`, heading: HeadingLevel.HEADING_1, pageBreakBefore: docxSections.length > 0 }),
-      );
-      const contentLines = (doc.content || "").split("\n");
-      for (const line of contentLines) {
-        docxSections.push(new Paragraph({ text: line }));
+      if (docSections.length > dxFirmHeader(firmName, clientName, headDef.name, period, ntn, isaRefs[headIndex] || "").length) {
+        docSections.push(new Paragraph({ children: [new PageBreak()] }));
       }
+      // Working paper title
+      docSections.push(new Paragraph({
+        children: [
+          new TextRun({ text: `${doc.paperCode}:  `, bold: true, size: 24, color: DOCX_SLATE, font: "Calibri" }),
+          new TextRun({ text: doc.paperName || "", bold: true, size: 24, color: DOCX_NAVY, font: "Calibri" }),
+        ],
+        heading: HeadingLevel.HEADING_1,
+        spacing: { after: 200 },
+        border: { bottom: { style: BorderStyle.SINGLE, color: DOCX_BLUE, size: 8 } },
+      }));
+      // Content
+      docSections.push(...parseDocxContent(doc.content || "", clientName));
+      // Sign-off table
+      docSections.push(new Paragraph({ text: "", spacing: { before: 400 } }));
+      docSections.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+          new TableRow({ children: [
+            new TableCell({ width: { size: 33, type: WidthType.PERCENTAGE }, shading: { fill: "F1F5F9", type: ShadingType.SOLID }, children: [new Paragraph({ children: [new TextRun({ text: "Prepared By", bold: true, size: 18, color: DOCX_BLUE, font: "Calibri" })] })], borders: { top: { style: BorderStyle.SINGLE, color: "E2E8F0" }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
+            new TableCell({ width: { size: 34, type: WidthType.PERCENTAGE }, shading: { fill: "F1F5F9", type: ShadingType.SOLID }, children: [new Paragraph({ children: [new TextRun({ text: "Reviewed By", bold: true, size: 18, color: DOCX_BLUE, font: "Calibri" })] })], borders: { top: { style: BorderStyle.SINGLE, color: "E2E8F0" }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
+            new TableCell({ width: { size: 33, type: WidthType.PERCENTAGE }, shading: { fill: "F1F5F9", type: ShadingType.SOLID }, children: [new Paragraph({ children: [new TextRun({ text: "Approved By", bold: true, size: 18, color: DOCX_BLUE, font: "Calibri" })] })], borders: { top: { style: BorderStyle.SINGLE, color: "E2E8F0" }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
+          ]}),
+          new TableRow({ children: [
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Name: ___________________", size: 18, font: "Calibri" })], spacing: { after: 80 } }), new Paragraph({ children: [new TextRun({ text: "Signature: _______________", size: 18, font: "Calibri" })], spacing: { after: 80 } }), new Paragraph({ children: [new TextRun({ text: "Date: ___________________", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Name: ___________________", size: 18, font: "Calibri" })], spacing: { after: 80 } }), new Paragraph({ children: [new TextRun({ text: "Signature: _______________", size: 18, font: "Calibri" })], spacing: { after: 80 } }), new Paragraph({ children: [new TextRun({ text: "Date: ___________________", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Name: ___________________", size: 18, font: "Calibri" })], spacing: { after: 80 } }), new Paragraph({ children: [new TextRun({ text: "Signature: _______________", size: 18, font: "Calibri" })], spacing: { after: 80 } }), new Paragraph({ children: [new TextRun({ text: "Date: ___________________", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
+          ]}),
+        ],
+      }));
     }
+
+    docSections.push(dxFooter(firmName));
 
     const docxDoc = new Document({
-      sections: [{ children: docxSections }],
+      styles: {
+        default: {
+          document: { run: { font: "Calibri", size: 20 } },
+        },
+      },
+      sections: [{
+        properties: {
+          page: {
+            margin: { top: 720, right: 720, bottom: 720, left: 900 },
+          },
+        },
+        footers: {
+          default: new Footer({
+            children: [new Paragraph({
+              children: [
+                new TextRun({ text: `${firmName}  |  Confidential — For Audit Use Only  |  ${clientName}  |  ${period}`, size: 16, color: "94A3B8", font: "Calibri" }),
+              ],
+              alignment: AlignmentType.CENTER,
+              border: { top: { style: BorderStyle.SINGLE, color: "CBD5E1", size: 4 } },
+            })],
+          }),
+        },
+        children: docSections,
+      }],
     });
     const buffer = await Packer.toBuffer(docxDoc);
 
     await db.update(wpHeadsTable).set({ status: "exported", exportedAt: new Date(), updatedAt: new Date() }).where(eq(wpHeadsTable.id, heads[0].id));
-
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-    res.setHeader("Content-Disposition", `attachment; filename="${headDef.name.replace(/\s/g, "_")}_${sessionId}.docx"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${headDef.name.replace(/\s/g, "_")}_${clientName.replace(/\s/g, "_")}_${session?.engagementYear || sessionId}.docx"`);
     return res.send(buffer);
   } catch (err: any) {
     logger.error({ err }, "Export failed");
-    res.status(500).json({ error: "Export failed" });
+    res.status(500).json({ error: err.message || "Export failed" });
   }
 });
 
@@ -3034,46 +3547,172 @@ router.post("/sessions/:id/export-bundle", async (req: Request, res: Response) =
     const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
     if (!session) return res.status(404).json({ error: "Session not found" });
 
-    const heads = await db.select().from(wpHeadsTable).where(eq(wpHeadsTable.sessionId, sessionId)).orderBy(asc(wpHeadsTable.headIndex));
-    const allDocs = await db.select().from(wpHeadDocumentsTable).where(eq(wpHeadDocumentsTable.sessionId, sessionId));
+    const heads     = await db.select().from(wpHeadsTable).where(eq(wpHeadsTable.sessionId, sessionId)).orderBy(asc(wpHeadsTable.headIndex));
+    const allDocs   = await db.select().from(wpHeadDocumentsTable).where(eq(wpHeadDocumentsTable.sessionId, sessionId));
     const exceptions = await db.select().from(wpExceptionLogTable).where(eq(wpExceptionLogTable.sessionId, sessionId));
     const changeLog = await db.select().from(wpVariableChangeLogTable).where(eq(wpVariableChangeLogTable.sessionId, sessionId));
-    const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+    const tbLines   = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
 
-    const wb = XLSX.utils.book_new();
+    const clientName = session.clientName || "Client";
+    const ntn = session.ntn || "N/A";
+    const period = session.periodStart && session.periodEnd
+      ? `${session.periodStart} to ${session.periodEnd}`
+      : `FY ${session.engagementYear}`;
+    const firmName = "Alam & Aulakh Chartered Accountants";
 
-    const indexData = [["Working Papers Bundle"], [`Client: ${session.clientName}`], [`Entity Type: ${session.entityType || "N/A"}`], [`Year: ${session.engagementYear}`], [`Framework: ${session.reportingFramework || "IFRS"}`], [`NTN: ${session.ntn || "N/A"}`], [`Generated: ${new Date().toISOString()}`], [], ["Head", "Status", "Papers", "Exceptions", "Exported"]];
+    const wb = new ExcelJS.Workbook();
+    wb.creator = firmName;
+    wb.created = new Date();
+
+    // ── SHEET 1: Cover / Index ─────────────────────────────────────────────
+    const indexWs = wb.addWorksheet("Index", { properties: { tabColor: { argb: BP.navy } } });
+    indexWs.columns = [{ width: 6 }, { width: 34 }, { width: 16 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 14 }];
+    buildXlsxFirmHeader(indexWs, 7, clientName, "Audit Working Papers Bundle", period, ntn);
+    indexWs.getRow(4).height = 6;
+
+    // Meta block
+    const metaFields = [
+      ["Entity Type", session.entityType || "N/A"],
+      ["Framework", session.reportingFramework || "IFRS"],
+      ["Engagement Year", String(session.engagementYear)],
+      ["Generated On", new Date().toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" })],
+      ["Total Heads", String(heads.length)],
+      ["Total Documents", String(allDocs.length)],
+    ];
+    let metaRow = 5;
+    for (const [label, val] of metaFields) {
+      indexWs.getRow(metaRow).height = 17;
+      xLabel(indexWs.getRow(metaRow).getCell(2), label);
+      indexWs.mergeCells(metaRow, 2, metaRow, 3);
+      xValue(indexWs.getRow(metaRow).getCell(4), val);
+      indexWs.mergeCells(metaRow, 4, metaRow, 7);
+      metaRow++;
+    }
+    metaRow++;
+
+    // Index table header
+    indexWs.getRow(metaRow).height = 22;
+    ["#", "Audit Head", "Output Type", "Status", "Documents", "Exceptions", "Exported"].forEach((h, i) => {
+      xHdr(indexWs.getRow(metaRow).getCell(i + 1), h, i >= 2);
+    });
+    metaRow++;
+
+    const statusColor: Record<string, string> = {
+      approved: "FF16A34A", exported: "FF0891B2", completed: "FF0F766E",
+      in_progress: "FFF59E0B", locked: "FF94A3B8", ready: "FF3B82F6",
+    };
     for (const head of heads) {
       const headDocs = allDocs.filter(d => d.headId === head.id);
-      indexData.push([head.headName, head.status, String(headDocs.length), String(head.exceptionsCount || 0), head.exportedAt ? "Yes" : "No"]);
+      const r = indexWs.getRow(metaRow); r.height = 18;
+      xData(r.getCell(1), head.headIndex + 1, metaRow, true);
+      xData(r.getCell(2), head.headName, metaRow);
+      xData(r.getCell(3), (AUDIT_HEADS[head.headIndex]?.outputType || "").toUpperCase(), metaRow);
+      const sc = r.getCell(4);
+      xData(sc, head.status?.replace(/_/g, " "), metaRow);
+      sc.font = { ...sc.font as any, bold: true, color: { argb: statusColor[head.status || ""] || BP.slate } };
+      xData(r.getCell(5), headDocs.length, metaRow, true);
+      xData(r.getCell(6), head.exceptionsCount || 0, metaRow, true);
+      const expCell = r.getCell(7);
+      xData(expCell, head.exportedAt ? "✓ Yes" : "—", metaRow, true);
+      if (head.exportedAt) expCell.font = { ...expCell.font as any, color: { argb: "FF16A34A" }, bold: true };
+      metaRow++;
     }
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(indexData), "Index");
 
-    const tbData = [["Account Code", "Account Name", "Classification", "Debit", "Credit", "Balance"]];
+    // ── SHEET 2: Trial Balance ─────────────────────────────────────────────
+    const tbWs = wb.addWorksheet("Trial Balance", { properties: { tabColor: { argb: BP.blue } } });
+    tbWs.columns = [{ width: 16 }, { width: 42 }, { width: 22 }, { width: 18 }, { width: 18 }, { width: 18 }];
+    tbWs.views = [{ state: "frozen", ySplit: 5 }];
+    buildXlsxFirmHeader(tbWs, 6, clientName, "Trial Balance", period, ntn);
+    tbWs.getRow(4).height = 4;
+    ["Account Code", "Account Name", "Classification", "Debit (PKR)", "Credit (PKR)", "Balance (PKR)"].forEach((h, i) => {
+      xHdr(tbWs.getRow(5).getCell(i + 1), h, i >= 3);
+    });
+    tbWs.getRow(5).height = 22;
+    let tbRow = 6; let tDr = 0, tCr = 0, tBal = 0;
     for (const l of tbLines) {
-      tbData.push([l.accountCode, l.accountName, l.classification || "", String(l.debit), String(l.credit), String(l.balance)]);
+      const r = tbWs.getRow(tbRow); r.height = 17;
+      const dr = parseFloat(String(l.debit)) || 0;
+      const cr = parseFloat(String(l.credit)) || 0;
+      const bal = parseFloat(String(l.balance)) || 0;
+      xData(r.getCell(1), l.accountCode, tbRow);
+      xData(r.getCell(2), l.accountName, tbRow);
+      xData(r.getCell(3), l.classification, tbRow);
+      xNum(r.getCell(4), dr || null, tbRow);
+      xNum(r.getCell(5), cr || null, tbRow);
+      xNum(r.getCell(6), bal, tbRow);
+      if (bal < 0) r.getCell(6).font = { ...r.getCell(6).font as any, color: { argb: BP.red } };
+      tDr += dr; tCr += cr; tBal += bal;
+      tbRow++;
     }
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tbData), "Trial Balance");
+    tbRow++;
+    [xTotal(tbWs.getRow(tbRow).getCell(1), "TOTALS"), tbWs.mergeCells(tbRow, 1, tbRow, 3)];
+    xTotal(tbWs.getRow(tbRow).getCell(4), tDr, true);
+    xTotal(tbWs.getRow(tbRow).getCell(5), tCr, true);
+    xTotal(tbWs.getRow(tbRow).getCell(6), tBal, true);
+    tbWs.getRow(tbRow).height = 22;
 
-    const excData = [["Type", "Severity", "Title", "Description", "Status", "Resolution"]];
+    // ── SHEET 3: Exceptions ────────────────────────────────────────────────
+    const excWs = wb.addWorksheet("Exceptions", { properties: { tabColor: { argb: "FFDC2626" } } });
+    excWs.columns = [{ width: 18 }, { width: 12 }, { width: 38 }, { width: 50 }, { width: 16 }, { width: 30 }];
+    excWs.views = [{ state: "frozen", ySplit: 5 }];
+    buildXlsxFirmHeader(excWs, 6, clientName, "Exceptions Register", period, ntn);
+    excWs.getRow(4).height = 4;
+    ["Exception Type", "Severity", "Title", "Description", "Status", "Resolution"].forEach((h, i) => {
+      xHdr(excWs.getRow(5).getCell(i + 1), h);
+    });
+    excWs.getRow(5).height = 22;
+    const sevColor: Record<string, string> = { critical: "FFDC2626", high: "FFEA580C", medium: "FFF59E0B", low: "FF16A34A" };
+    let eRow = 6;
     for (const e of exceptions) {
-      excData.push([e.exceptionType, e.severity, e.title, e.description || "", e.status, e.resolution || ""]);
+      const r = excWs.getRow(eRow); r.height = 18;
+      xData(r.getCell(1), e.exceptionType, eRow);
+      const sc2 = r.getCell(2); xData(sc2, e.severity, eRow);
+      sc2.font = { ...sc2.font as any, bold: true, color: { argb: sevColor[e.severity || ""] || BP.slate } };
+      xData(r.getCell(3), e.title, eRow);
+      xData(r.getCell(4), e.description || "", eRow);
+      xData(r.getCell(5), e.status, eRow);
+      xData(r.getCell(6), e.resolution || "", eRow);
+      eRow++;
     }
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(excData), "Exceptions");
+    if (exceptions.length === 0) {
+      const noExc = excWs.getRow(6); noExc.height = 20;
+      const nc = noExc.getCell(1); nc.value = "✓ No exceptions recorded";
+      nc.font = { bold: true, color: { argb: "FF16A34A" }, size: 10, name: "Calibri" };
+      excWs.mergeCells(6, 1, 6, 6);
+    }
 
-    const auditData = [["Field", "Old Value", "New Value", "Reason", "Date"]];
+    // ── SHEET 4: Audit Trail ───────────────────────────────────────────────
+    const trailWs = wb.addWorksheet("Audit Trail", { properties: { tabColor: { argb: BP.slate } } });
+    trailWs.columns = [{ width: 28 }, { width: 30 }, { width: 30 }, { width: 38 }, { width: 22 }];
+    trailWs.views = [{ state: "frozen", ySplit: 5 }];
+    buildXlsxFirmHeader(trailWs, 5, clientName, "Audit Trail — Variable Change Log", period, ntn);
+    trailWs.getRow(4).height = 4;
+    ["Field", "Old Value", "New Value", "Reason", "Changed On"].forEach((h, i) => {
+      xHdr(trailWs.getRow(5).getCell(i + 1), h);
+    });
+    trailWs.getRow(5).height = 22;
+    let tRow = 6;
     for (const c of changeLog) {
-      auditData.push([c.fieldName, c.oldValue || "", c.newValue || "", c.reason || "", c.createdAt?.toISOString() || ""]);
+      const r = trailWs.getRow(tRow); r.height = 17;
+      xData(r.getCell(1), c.fieldName, tRow);
+      xData(r.getCell(2), c.oldValue || "", tRow);
+      xData(r.getCell(3), c.newValue || "", tRow);
+      xData(r.getCell(4), c.reason || "", tRow);
+      xData(r.getCell(5), c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-GB") : "", tRow);
+      tRow++;
     }
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(auditData), "Audit Trail");
-
-    const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    if (changeLog.length === 0) {
+      const nc2 = trailWs.getRow(6).getCell(1); nc2.value = "No changes recorded";
+      nc2.font = { color: { argb: BP.slate }, size: 9, name: "Calibri" };
+      trailWs.mergeCells(6, 1, 6, 5);
+    }
 
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename="${session.clientName}_${session.engagementYear}_Bundle.xlsx"`);
-    return res.send(buffer);
+    res.setHeader("Content-Disposition", `attachment; filename="${clientName.replace(/\s/g, "_")}_${session.engagementYear}_Bundle.xlsx"`);
+    await wb.xlsx.write(res);
+    return res.end();
   } catch (err: any) {
-    res.status(500).json({ error: "Bundle export failed" });
+    res.status(500).json({ error: "Bundle export failed: " + err.message });
   }
 });
 
