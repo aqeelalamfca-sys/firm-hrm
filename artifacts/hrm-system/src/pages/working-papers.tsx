@@ -4640,16 +4640,30 @@ function statusColor(val: string): string {
 function sourceIcon(sourceType: string | null | undefined): { label: string; cls: string; isTemplate?: boolean } {
   if (!sourceType) return { label: "", cls: "" };
   switch (sourceType) {
-    case "template": return { label: "Extracted from Upload", cls: "text-emerald-700 bg-emerald-50 border-emerald-200", isTemplate: true };
-    case "ai_extraction": return { label: "AI Processed", cls: "text-blue-600 bg-blue-50 border-blue-200" };
-    case "session": return { label: "Session", cls: "text-emerald-600 bg-emerald-50 border-emerald-200" };
-    case "default": return { label: "Default", cls: "text-slate-500 bg-slate-50 border-slate-200" };
-    case "user_edit": return { label: "Manual", cls: "text-purple-600 bg-purple-50 border-purple-200" };
-    case "formula": return { label: "Calculated", cls: "text-indigo-600 bg-indigo-50 border-indigo-200" };
-    case "assumption": return { label: "Assumed", cls: "text-amber-600 bg-amber-50 border-amber-200" };
-    case "autofill": return { label: "AI Processed", cls: "text-blue-600 bg-blue-50 border-blue-200" };
+    case "primary_session":   return { label: "Session Data",       cls: "text-emerald-700 bg-emerald-50 border-emerald-200", isTemplate: false };
+    case "primary_template":  return { label: "Template Upload",    cls: "text-emerald-700 bg-emerald-50 border-emerald-200", isTemplate: true };
+    case "system_calculated": return { label: "System Formula",     cls: "text-indigo-700 bg-indigo-50 border-indigo-200" };
+    case "template":          return { label: "Template Upload",    cls: "text-emerald-700 bg-emerald-50 border-emerald-200", isTemplate: true };
+    case "ai_extraction":     return { label: "AI Extracted",       cls: "text-blue-600 bg-blue-50 border-blue-200" };
+    case "session":           return { label: "Session",            cls: "text-emerald-600 bg-emerald-50 border-emerald-200" };
+    case "user_edit":         return { label: "Manual",             cls: "text-purple-600 bg-purple-50 border-purple-200" };
+    case "formula":           return { label: "Calculated",         cls: "text-indigo-600 bg-indigo-50 border-indigo-200" };
+    case "autofill":          return { label: "AI Processed",       cls: "text-blue-600 bg-blue-50 border-blue-200" };
+    case "default":           return { label: "Default",            cls: "text-slate-500 bg-slate-50 border-slate-200" };
+    case "assumption":        return { label: "Assumed",            cls: "text-amber-600 bg-amber-50 border-amber-200" };
     default: return { label: sourceType.replace(/_/g, " "), cls: "text-slate-500 bg-slate-50 border-slate-200" };
   }
+}
+
+function categoryBadge(sourceType: string | null | undefined, reviewStatus: string | null | undefined): { label: string; cls: string } | null {
+  if (!sourceType && !reviewStatus) return null;
+  if (sourceType === "primary_session" || sourceType === "primary_template" || sourceType === "template" || sourceType === "session")
+    return { label: "Primary", cls: "bg-emerald-100 text-emerald-700 border-emerald-200" };
+  if (sourceType === "system_calculated" || sourceType === "formula" || reviewStatus === "calculated")
+    return { label: "Secondary", cls: "bg-indigo-100 text-indigo-700 border-indigo-200" };
+  if (sourceType === "ai_extraction" || sourceType === "autofill" || reviewStatus === "ai_filled" || reviewStatus === "auto_filled")
+    return { label: "AI", cls: "bg-blue-100 text-blue-700 border-blue-200" };
+  return null;
 }
 const inputCls = "h-8 text-sm border rounded-md px-2 focus:ring-2 focus:ring-primary/20 focus:border-primary";
 const noSpin = "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
@@ -5092,9 +5106,14 @@ function VariableRow({ v, onSaveDirect, confidenceBadge }: any) {
 
   // Derive status flags
   const isLocked       = !!v.isLocked;
-  const isTemplateFilled = v.reviewStatus === "template_filled" || v.sourceType === "template";
+  const isPrimaryFilled = v.sourceType === "primary_session" || v.sourceType === "primary_template"
+                          || v.sourceType === "template" || v.sourceType === "session"
+                          || v.reviewStatus === "template_filled" || v.reviewStatus === "filled";
+  const isSecondaryCalc = v.sourceType === "system_calculated" || v.sourceType === "formula"
+                          || v.reviewStatus === "calculated";
+  const isTemplateFilled = isPrimaryFilled; // kept for compat
   const isAiFilled     = ["ai_filled", "auto_filled", "ai_extraction", "autofill"].includes(v.reviewStatus)
-                          || v.sourceType === "ai_fill";
+                          || v.sourceType === "ai_extraction" || v.sourceType === "ai_fill";
   const isUserEdited   = !!(v.userEditedValue || v.reviewStatus === "user_edited");
   const isEmpty        = !v.finalValue || v.finalValue.trim() === "" || v.finalValue === "N/A";
   const isLowConf      = !!(v.confidence && Number(v.confidence) < 60);
@@ -5125,26 +5144,29 @@ function VariableRow({ v, onSaveDirect, confidenceBadge }: any) {
   };
 
   // Determine status tag
-  type StatusKey = "locked" | "from_upload" | "user_edited" | "ai_filled" | "missing" | "low_conf" | null;
+  type StatusKey = "locked" | "primary" | "secondary" | "user_edited" | "ai_filled" | "missing" | "low_conf" | null;
   const statusKey: StatusKey =
-    isLocked         ? "locked"      :
-    isTemplateFilled ? "from_upload" :
-    isUserEdited     ? "user_edited" :
-    isAiFilled       ? "ai_filled"   :
-    isEmpty          ? "missing"     :
-    isLowConf        ? "low_conf"    : null;
+    isLocked         ? "locked"     :
+    isUserEdited     ? "user_edited":
+    isPrimaryFilled  ? "primary"    :
+    isSecondaryCalc  ? "secondary"  :
+    isAiFilled       ? "ai_filled"  :
+    isEmpty          ? "missing"    :
+    isLowConf        ? "low_conf"   : null;
 
   const STATUS_LABELS: Record<NonNullable<StatusKey>, string> = {
     locked:      "Locked",
-    from_upload: "From Upload",
-    user_edited: "User Edited",
+    primary:     "Primary",
+    secondary:   "Calculated",
+    user_edited: "Edited",
     ai_filled:   "AI Filled",
     missing:     "Missing",
     low_conf:    "Low Conf.",
   };
   const STATUS_STYLES: Record<NonNullable<StatusKey>, string> = {
     locked:      "bg-slate-100 text-slate-500 border-slate-200",
-    from_upload: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    primary:     "bg-emerald-100 text-emerald-700 border-emerald-200",
+    secondary:   "bg-indigo-100 text-indigo-700 border-indigo-200",
     user_edited: "bg-violet-100 text-violet-700 border-violet-200",
     ai_filled:   "bg-blue-50 text-blue-600 border-blue-100",
     missing:     "bg-red-100 text-red-700 border-red-200",
@@ -5155,12 +5177,14 @@ function VariableRow({ v, onSaveDirect, confidenceBadge }: any) {
   const rowBg = isLocked          ? "bg-slate-50/50"
     : isEmpty && isMandatory       ? "bg-red-50/30"
     : isLowConf                    ? "bg-amber-50/20"
-    : isTemplateFilled             ? "bg-emerald-50/10"
+    : isPrimaryFilled              ? "bg-emerald-50/10"
+    : isSecondaryCalc              ? "bg-indigo-50/10"
     : "bg-white";
 
   const leftAccent = isLocked          ? "border-l-2 border-l-slate-300"
     : isEmpty && isMandatory           ? "border-l-2 border-l-red-400"
-    : isTemplateFilled                 ? "border-l-2 border-l-emerald-400"
+    : isPrimaryFilled                  ? "border-l-2 border-l-emerald-400"
+    : isSecondaryCalc                  ? "border-l-2 border-l-indigo-400"
     : isAiFilled                       ? "border-l-2 border-l-blue-300"
     : "border-l-2 border-l-transparent";
 
@@ -5186,7 +5210,8 @@ function VariableRow({ v, onSaveDirect, confidenceBadge }: any) {
               "inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide border whitespace-nowrap shrink-0",
               STATUS_STYLES[statusKey]
             )}>
-              {statusKey === "from_upload" && <Upload className="w-2.5 h-2.5" />}
+              {statusKey === "primary"     && <Upload className="w-2.5 h-2.5" />}
+              {statusKey === "secondary"   && <span className="font-bold text-[8px]">ƒ</span>}
               {statusKey === "ai_filled"   && <Sparkles className="w-2.5 h-2.5" />}
               {statusKey === "user_edited" && <Pencil className="w-2.5 h-2.5" />}
               {statusKey === "locked"      && <Lock className="w-2.5 h-2.5" />}
@@ -5229,18 +5254,21 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
   useEffect(() => { if (variables.length === 0) onFetch(); }, []);
 
   // Computed counts (client-side, always fresh)
-  const templateFilledCount = variables.filter((v: any) =>
-    v.reviewStatus === "template_filled" || v.sourceType === "template").length;
-  const aiFilledCount = variables.filter((v: any) =>
-    ["ai_filled", "auto_filled", "ai_extraction", "autofill"].includes(v.reviewStatus) || v.sourceType === "ai_fill").length;
-  const missingCount = variables.filter((v: any) =>
+  const isPrimaryFilled = (v: any) => v.sourceType === "primary_session" || v.sourceType === "primary_template"
+    || v.sourceType === "template" || v.sourceType === "session"
+    || v.reviewStatus === "template_filled" || v.reviewStatus === "filled";
+  const isSecondaryCalc = (v: any) => v.sourceType === "system_calculated" || v.sourceType === "formula"
+    || v.reviewStatus === "calculated";
+  const isAiFilled = (v: any) => ["ai_filled", "auto_filled", "ai_extraction", "autofill"].includes(v.reviewStatus)
+    || v.sourceType === "ai_extraction" || v.sourceType === "ai_fill";
+
+  const primaryFilledCount  = variables.filter(isPrimaryFilled).length;
+  const secondaryCalcCount  = variables.filter(isSecondaryCalc).length;
+  const aiFilledCount       = variables.filter(isAiFilled).length;
+  const missingCount        = variables.filter((v: any) =>
     !v.finalValue || v.finalValue.trim() === "" || v.finalValue === "N/A").length;
-  const highConfCount = variables.filter((v: any) =>
-    v.confidence && Number(v.confidence) >= 85).length;
-  const medConfCount = variables.filter((v: any) =>
-    v.confidence && Number(v.confidence) >= 60 && Number(v.confidence) < 85).length;
-  const lowConfCount = variables.filter((v: any) =>
-    v.confidence && Number(v.confidence) < 60).length;
+  const highConfCount = variables.filter((v: any) => v.confidence && Number(v.confidence) >= 85).length;
+  const lowConfCount  = variables.filter((v: any) => v.confidence && Number(v.confidence) < 60).length;
 
   // Lock All is only enabled when zero variables are missing
   const canLockAll = missingCount === 0 && variables.length > 0 && !loading;
@@ -5252,12 +5280,12 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
       const code  = (v.variableCode || "").toLowerCase();
       if (!label.includes(s) && !code.includes(s)) return false;
     }
-    if (filter === "from_upload")  return v.reviewStatus === "template_filled" || v.sourceType === "template";
-    if (filter === "ai_filled")    return ["ai_filled", "auto_filled", "ai_extraction", "autofill"].includes(v.reviewStatus) || v.sourceType === "ai_fill";
-    if (filter === "missing")      return !v.finalValue || v.finalValue.trim() === "" || v.finalValue === "N/A";
-    if (filter === "high_conf")    return !!(v.confidence && Number(v.confidence) >= 85);
-    if (filter === "medium_conf")  return !!(v.confidence && Number(v.confidence) >= 60 && Number(v.confidence) < 85);
-    if (filter === "low_conf")     return !!(v.confidence && Number(v.confidence) < 60);
+    if (filter === "primary")     return isPrimaryFilled(v);
+    if (filter === "secondary")   return isSecondaryCalc(v);
+    if (filter === "ai_filled")   return isAiFilled(v);
+    if (filter === "missing")     return !v.finalValue || v.finalValue.trim() === "" || v.finalValue === "N/A";
+    if (filter === "high_conf")   return !!(v.confidence && Number(v.confidence) >= 85);
+    if (filter === "low_conf")    return !!(v.confidence && Number(v.confidence) < 60);
     return true;
   };
 
@@ -5270,23 +5298,23 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
   };
 
   const statTiles = [
-    { label: "Total",       value: variables.length,    icon: Settings2,     bg: "bg-slate-50",   iconColor: "text-slate-500",   key: "all" },
-    { label: "From Upload", value: templateFilledCount, icon: Upload,        bg: "bg-emerald-50", iconColor: "text-emerald-600", key: "from_upload" },
-    { label: "AI Filled",   value: aiFilledCount,       icon: Sparkles,      bg: "bg-blue-50",    iconColor: "text-blue-600",    key: "ai_filled" },
-    { label: "Missing",     value: missingCount,        icon: AlertCircle,   bg: "bg-red-50",     iconColor: "text-red-600",     key: "missing" },
-    { label: "High Conf.",  value: highConfCount,       icon: CheckCircle2,  bg: "bg-green-50",   iconColor: "text-green-600",   key: "high_conf" },
-    { label: "Med. Conf.",  value: medConfCount,        icon: AlertTriangle, bg: "bg-amber-50",   iconColor: "text-amber-500",   key: "medium_conf" },
-    { label: "Low Conf.",   value: lowConfCount,        icon: XCircle,       bg: "bg-red-50",     iconColor: "text-red-500",     key: "low_conf" },
+    { label: "Total",        value: variables.length,     icon: Settings2,     bg: "bg-slate-50",   iconColor: "text-slate-500",    key: "all" },
+    { label: "Primary",      value: primaryFilledCount,   icon: Upload,        bg: "bg-emerald-50", iconColor: "text-emerald-600",  key: "primary" },
+    { label: "Calculated",   value: secondaryCalcCount,   icon: CheckCircle2,  bg: "bg-indigo-50",  iconColor: "text-indigo-600",   key: "secondary" },
+    { label: "AI Filled",    value: aiFilledCount,        icon: Sparkles,      bg: "bg-blue-50",    iconColor: "text-blue-600",     key: "ai_filled" },
+    { label: "Missing",      value: missingCount,         icon: AlertCircle,   bg: "bg-red-50",     iconColor: "text-red-600",      key: "missing" },
+    { label: "High Conf.",   value: highConfCount,        icon: CheckCircle2,  bg: "bg-green-50",   iconColor: "text-green-600",    key: "high_conf" },
+    { label: "Low Conf.",    value: lowConfCount,         icon: XCircle,       bg: "bg-red-50",     iconColor: "text-red-500",      key: "low_conf" },
   ];
 
   const filterChips = [
-    { key: "all",          label: "All" },
-    { key: "from_upload",  label: "From Upload" },
-    { key: "ai_filled",    label: "AI Filled" },
-    { key: "missing",      label: "Missing" },
-    { key: "high_conf",    label: "High Conf." },
-    { key: "medium_conf",  label: "Med. Conf." },
-    { key: "low_conf",     label: "Low Conf." },
+    { key: "all",        label: "All" },
+    { key: "primary",    label: "Primary" },
+    { key: "secondary",  label: "Calculated" },
+    { key: "ai_filled",  label: "AI Filled" },
+    { key: "missing",    label: "Missing" },
+    { key: "high_conf",  label: "High Conf." },
+    { key: "low_conf",   label: "Low Conf." },
   ];
 
   return (
@@ -5317,13 +5345,25 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
             <div className="flex-1 min-w-0">
               <h2 className="font-semibold text-slate-900 flex items-center gap-2 text-sm">
                 <ClipboardList className="w-4 h-4 text-blue-600 shrink-0" />
-                Audit Variables — Working Paper Data Sheet
-                {stats && <span className="text-xs font-normal text-slate-400 ml-1">({stats.filled}/{stats.total} filled)</span>}
+                Audit Variable Register — 417 Variables
+                {stats && <span className="text-xs font-normal text-slate-400 ml-1">({stats.filled}/{stats.total} populated)</span>}
               </h2>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                All variables editable inline — changes autosave on blur.
-                {!canLockAll && missingCount > 0 && <span className="text-red-500 ml-1">Fill {missingCount} missing variable{missingCount !== 1 ? "s" : ""} to enable Lock All.</span>}
-              </p>
+              <div className="flex items-center gap-3 mt-1 flex-wrap">
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">
+                  <Upload className="w-2.5 h-2.5" /> Phase 1 — Primary: {primaryFilledCount} from session/template
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5">
+                  <span className="font-bold text-[9px]">ƒ</span> Phase 2 — Secondary: {secondaryCalcCount} system-calculated
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-1.5 py-0.5">
+                  <Sparkles className="w-2.5 h-2.5" /> Phase 3 — AI: {aiFilledCount} AI-extracted
+                </span>
+                {missingCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-600">
+                    <AlertCircle className="w-2.5 h-2.5" /> {missingCount} still missing
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Action buttons */}
@@ -5336,12 +5376,12 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
               </Button>
               {onAiFill && (
                 <Button size="sm" onClick={handleAiFillClick} disabled={aiFilling || loading}
-                  className="h-7 text-xs bg-violet-600 hover:bg-violet-700 shadow-none"
-                  title="Fill all Missing and Low Confidence variables using AI — respects Template > User Edit > AI priority">
+                  className="h-7 text-xs bg-blue-600 hover:bg-blue-700 shadow-none"
+                  title="Phase 3: AI extracts and fills only AI/judgment variables from uploaded documents. Never overwrites Primary or Secondary variables.">
                   {aiFilling
                     ? <Loader2 className="w-3 h-3 animate-spin mr-1" />
                     : <Sparkles className="w-3 h-3 mr-1" />}
-                  AI Fill
+                  AI Fill Variables
                 </Button>
               )}
               <Button
@@ -5349,7 +5389,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
                 onClick={onLockAll}
                 disabled={!canLockAll}
                 title={canLockAll
-                  ? "Lock all variables — downstream modules will use this locked dataset"
+                  ? "Finalize — lock all variables once you have reviewed and confirmed all values"
                   : `${missingCount} variable${missingCount !== 1 ? "s" : ""} still missing — fill all before locking`}
                 className={cn(
                   "h-7 text-xs shadow-none",
@@ -5357,7 +5397,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
                 )}
               >
                 <Lock className="w-3 h-3 mr-1" />
-                Lock All
+                Lock All / Finalize
                 {!canLockAll && missingCount > 0 && (
                   <span className="ml-1 text-[10px] font-normal">({missingCount})</span>
                 )}

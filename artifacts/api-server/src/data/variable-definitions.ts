@@ -1,3 +1,69 @@
+export type VariableCategory = "primary" | "secondary" | "ai";
+
+// ── 116 PRIMARY variables — filled directly from template upload or session form ──
+export const PRIMARY_VARIABLE_CODES = new Set<string>([
+  // Entity & Constitution (15)
+  "entity_name", "legal_name_as_per_secp", "short_name", "ntn", "strn",
+  "entity_legal_form", "industry_sector", "financial_year_start", "financial_year_end",
+  "reporting_period_start", "reporting_period_end", "functional_currency",
+  "presentation_currency", "reporting_framework", "applicable_company_law",
+  // Engagement Acceptance (10)
+  "engagement_type", "assurance_level", "engagement_size", "first_year_audit",
+  "recurring_engagement", "engagement_partner", "engagement_manager",
+  "engagement_start_date", "reporting_deadline", "expected_signing_date",
+  // Trial Balance & COA Aggregates (6)
+  "tb_line_count", "tb_total_period_debit", "tb_total_period_credit",
+  "tb_opening_balance_aggregate", "tb_closing_balance_aggregate", "audit_procedure_depth",
+  // Materiality Input (1)
+  "materiality_basis",
+  // Financial Statements — Current Year (47)
+  "cy_total_assets", "cy_non_current_assets", "cy_current_assets", "cy_fixed_assets",
+  "cy_right_of_use_assets", "cy_capital_work_in_progress", "cy_intangible_assets",
+  "cy_investments", "cy_long_term_loans", "cy_deposits_prepayments", "cy_inventory",
+  "cy_trade_receivables", "cy_advances", "cy_other_receivables", "cy_short_term_investments",
+  "cy_tax_refunds_due", "cy_cash_and_bank", "cy_total_equity", "cy_share_capital_fs",
+  "cy_reserves", "cy_retained_earnings", "cy_revaluation_surplus", "cy_total_liabilities",
+  "cy_non_current_liabilities", "cy_current_liabilities", "cy_long_term_borrowings",
+  "cy_lease_liabilities", "cy_trade_payables", "cy_accruals", "cy_taxation_payable",
+  "cy_short_term_borrowings", "cy_current_portion_long_term_debt", "cy_revenue",
+  "cy_cost_of_sales", "cy_gross_profit", "cy_admin_expenses", "cy_selling_distribution_expenses",
+  "cy_finance_cost", "cy_other_income", "cy_other_expenses", "cy_profit_before_tax",
+  "cy_tax_expense", "cy_profit_after_tax", "cy_other_comprehensive_income",
+  "cy_total_comprehensive_income", "cy_operating_cash_flow", "cy_investing_cash_flow",
+  "cy_financing_cash_flow",
+  // Financial Statements — Prior Year (36)
+  "py_total_assets", "py_non_current_assets", "py_current_assets", "py_fixed_assets",
+  "py_right_of_use_assets", "py_capital_work_in_progress", "py_intangible_assets",
+  "py_investments", "py_inventory", "py_trade_receivables", "py_cash_and_bank",
+  "py_total_equity", "py_share_capital_fs", "py_retained_earnings", "py_total_liabilities",
+  "py_non_current_liabilities", "py_current_liabilities", "py_long_term_borrowings",
+  "py_trade_payables", "py_taxation_payable", "py_revenue", "py_cost_of_sales",
+  "py_gross_profit", "py_admin_expenses", "py_selling_distribution_expenses",
+  "py_finance_cost", "py_other_income", "py_other_expenses", "py_profit_before_tax",
+  "py_tax_expense", "py_profit_after_tax", "py_other_comprehensive_income",
+  "py_total_comprehensive_income", "py_operating_cash_flow", "py_investing_cash_flow",
+  "py_financing_cash_flow",
+]);
+
+// ── 44 SECONDARY variables — auto-calculated by system formulas from Primary data ──
+export const SECONDARY_VARIABLE_CODES = new Set<string>([
+  "principal_activity", "books_maintained_properly", "gl_available", "tb_available",
+  "fs_uploaded", "prior_year_fs_available", "inventory_records_available",
+  "bank_statements_available", "coa_available", "account_code_present",
+  "account_name_present", "account_type", "account_classification",
+  "opening_balance_present", "movement_debit_present", "movement_credit_present",
+  "closing_balance_present", "tb_balanced_flag", "unmapped_accounts_count",
+  "fs_mapping_completed", "control_accounts_identified", "manual_tb_adjustments_flag",
+  "variance_analysis_done", "materiality_basis_amount", "overall_materiality_percent",
+  "overall_materiality_amount", "performance_materiality_percent",
+  "performance_materiality_amount", "trivial_threshold_percent", "trivial_threshold_amount",
+  "inherent_risk_overall", "control_risk_overall", "risk_of_material_misstatement_overall",
+  "fraud_risk_flag", "revenue_fraud_risk_flag", "management_override_risk_flag",
+  "significant_risk_areas", "account_level_risk_mapping_done", "sampling_required",
+  "population_value", "sampling_basis", "gc_losses_flag", "gc_negative_equity_flag",
+  "gc_negative_operating_cashflows_flag",
+]);
+
 export interface VariableDefinition {
   variableCode: string;
   variableGroup: string;
@@ -18,6 +84,7 @@ export interface VariableDefinition {
   affectsModulesJson?: any;
   affectsWorkingPapersJson?: any;
   displayOrder: number;
+  variableCategory: VariableCategory;
 }
 
 function v(code: string, group: string, subgroup: string | undefined, label: string, opts: Partial<VariableDefinition> = {}): VariableDefinition {
@@ -41,6 +108,9 @@ function v(code: string, group: string, subgroup: string | undefined, label: str
     affectsWorkingPapersJson: opts.affectsWorkingPapersJson,
     displayOrder: opts.displayOrder || 0,
     description: opts.description,
+    variableCategory: PRIMARY_VARIABLE_CODES.has(code) ? "primary"
+                    : SECONDARY_VARIABLE_CODES.has(code) ? "secondary"
+                    : "ai",
   };
 }
 

@@ -19,7 +19,7 @@ import {
   wpSessionLockTable, wpOutputJobTable,
 } from "@workspace/db";
 import { WP_LIBRARY, type WpLibraryEntry } from "../data/wp-library-seed";
-import { VARIABLE_DEFINITIONS, EXTRACTION_FIELD_TO_VARIABLE_MAP, VARIABLE_GROUPS, DEPENDENCY_RULES } from "../data/variable-definitions";
+import { VARIABLE_DEFINITIONS, EXTRACTION_FIELD_TO_VARIABLE_MAP, VARIABLE_GROUPS, DEPENDENCY_RULES, PRIMARY_VARIABLE_CODES, SECONDARY_VARIABLE_CODES } from "../data/variable-definitions";
 import {
   runTBEngine, runGLEngine, runReconciliation, checkFinalEnforcement,
   PAKISTAN_COA, mapFsToCoa,
@@ -1837,66 +1837,114 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
     const results: any[] = [];
     let created = 0, updated = 0, skipped = 0;
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // STRICT 3-PHASE AUTO-FILL
+    // Phase 1: Primary vars   — session form + template upload only
+    // Phase 2: Secondary vars — system formulas only (no AI)
+    // Phase 3: AI vars        — skipped here; filled by /ai-fill endpoint
+    // ─────────────────────────────────────────────────────────────────────────
     for (const def of VARIABLE_DEFINITIONS) {
+      const cat = def.variableCategory;
+
+      // ── PHASE 3 (AI): Skip entirely — will be filled by the AI Fill button ──
+      if (cat === "ai") {
+        skipped++;
+        continue;
+      }
+
       const extracted = extractedMap[def.variableCode];
       const existing = existingByCode[def.variableCode];
 
+      // Determine phase-appropriate sourceType
+      const defaultSrc = defaultSourceMap[def.variableCode];
+      let srcType: string;
+      if (cat === "primary") {
+        // Primary variables come from session or template — never AI/assumption
+        if (defaultSrc === "session") srcType = "primary_session";
+        else if (extracted && Number(extracted.confidence) >= 80) srcType = "primary_template";
+        else srcType = "primary_session";
+      } else {
+        // Secondary variables are always system-calculated
+        srcType = defaultSrc === "formula" ? "system_calculated" : "system_calculated";
+      }
+
       if (existing) {
-        // Never overwrite template-filled or user-edited values with session meta defaults
-        const isTemplateFilled = existing.reviewStatus === "template_filled" || existing.sourceType === "template";
-        if (extracted && !existing.userEditedValue && !existing.isLocked && !isTemplateFilled) {
-          const defaultSrcExisting = defaultSourceMap[def.variableCode];
-          const isRealExt = !defaultSrcExisting && Number(extracted.confidence) >= 70;
-          const isFormulaExt = defaultSrcExisting === "formula";
-          let existingSrcType: string;
-          if (isRealExt) existingSrcType = "ai_extraction";
-          else if (isFormulaExt) existingSrcType = "formula";
-          else if (defaultSrcExisting === "session") existingSrcType = "session";
-          else if (defaultSrcExisting === "assumption") existingSrcType = "assumption";
-          else existingSrcType = "default";
-          const val = extracted.value || existing.finalValue || def.defaultValue || "N/A";
-          await db.update(wpVariablesTable).set({
-            autoFilledValue: val,
-            rawExtractedValue: extracted.value || null,
-            finalValue: val,
-            confidence: extracted.confidence,
-            sourceType: existingSrcType,
-            sourceSheet: extracted.sourceSheet || null,
-            sourcePage: extracted.sourcePage || null,
-            updatedAt: new Date(),
-          }).where(eq(wpVariablesTable.id, existing.id));
-          updated++;
+        // Never overwrite user-edited, locked, or primary-source values
+        const isAlreadyPrimary = existing.sourceType === "primary_session" || existing.sourceType === "primary_template" || existing.sourceType === "template";
+        const isUserEdited = !!existing.userEditedValue;
+        const isLocked = !!existing.isLocked;
+
+        if (extracted && !isUserEdited && !isLocked && !isAlreadyPrimary) {
+          const val = extracted.value || existing.finalValue || def.defaultValue || "";
+          if (val) {
+            await db.update(wpVariablesTable).set({
+              autoFilledValue: val,
+              rawExtractedValue: extracted.value || null,
+              finalValue: val,
+              confidence: extracted.confidence,
+              sourceType: srcType,
+              sourceSheet: extracted.sourceSheet || null,
+              sourcePage: extracted.sourcePage || null,
+              reviewStatus: cat === "secondary" ? "calculated" : "filled",
+              updatedAt: new Date(),
+            }).where(eq(wpVariablesTable.id, existing.id));
+            updated++;
+          } else {
+            skipped++;
+          }
+        } else if (extracted && isAlreadyPrimary && !isLocked && !isUserEdited && cat === "secondary") {
+          // Allow secondary recalculation even if previously primary-tagged
+          const val = extracted.value || existing.finalValue || def.defaultValue || "";
+          if (val) {
+            await db.update(wpVariablesTable).set({
+              autoFilledValue: val,
+              rawExtractedValue: extracted.value || null,
+              finalValue: val,
+              confidence: extracted.confidence,
+              sourceType: "system_calculated",
+              sourceSheet: extracted.sourceSheet || null,
+              sourcePage: extracted.sourcePage || null,
+              reviewStatus: "calculated",
+              updatedAt: new Date(),
+            }).where(eq(wpVariablesTable.id, existing.id));
+            updated++;
+          } else {
+            skipped++;
+          }
         } else {
           skipped++;
         }
         continue;
       }
 
-      const value = extracted?.value || def.defaultValue || "N/A";
-      const conf = extracted ? extracted.confidence : (def.defaultValue ? "60" : "45");
-
-      const defaultSrc = defaultSourceMap[def.variableCode];
-      const isRealExtraction = !!extracted && !defaultSrc && Number(extracted.confidence) >= 70;
-      const isFormula = defaultSrc === "formula";
-      let srcType: string;
-      if (isRealExtraction) {
-        srcType = "ai_extraction";
-      } else if (isFormula) {
-        srcType = "formula";
-      } else if (defaultSrc === "session") {
-        srcType = "session";
-      } else if (defaultSrc === "assumption") {
-        srcType = "assumption";
-      } else {
-        srcType = "default";
+      // Create new row — only for Primary and Secondary variables
+      const value = extracted?.value || def.defaultValue || "";
+      if (!value && cat === "primary") {
+        // Primary var with no value — still create the row so UI shows it as missing
+        const [v] = await db.insert(wpVariablesTable).values({
+          sessionId,
+          variableCode: def.variableCode,
+          category: def.variableGroup,
+          variableName: def.variableName,
+          autoFilledValue: null,
+          rawExtractedValue: null,
+          finalValue: null,
+          confidence: "0",
+          sourceType: "primary_session",
+          reviewStatus: "missing",
+        }).returning();
+        results.push(v);
+        created++;
+        continue;
       }
 
-      let reviewStatus: string;
-      if (def.reviewRequiredFlag) {
-        reviewStatus = "needs_review";
-      } else {
-        reviewStatus = "auto_filled";
+      if (!value) {
+        skipped++;
+        continue;
       }
+
+      const conf = extracted ? extracted.confidence : (def.defaultValue ? "75" : "60");
+      const reviewStatus = cat === "secondary" ? "calculated" : "filled";
 
       const [v] = await db.insert(wpVariablesTable).values({
         sessionId,
@@ -1918,57 +1966,44 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
 
     await db.update(wpSessionsTable).set({ status: "variables" as any, updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
 
-    const assumptionMandatory = VARIABLE_DEFINITIONS.filter(d => {
+    // Flag missing mandatory PRIMARY variables as exceptions
+    const missingMandatoryPrimary = VARIABLE_DEFINITIONS.filter(d => {
       if (!d.mandatoryFlag) return false;
+      if (d.variableCategory !== "primary") return false;
       const ext = extractedMap[d.variableCode];
       const val = ext?.value || d.defaultValue || "";
-      const src = defaultSourceMap[d.variableCode];
-      return src === "assumption" || val === "N/A" || val === "0" || isAssumptionValue(val);
+      return !val || val === "N/A" || val === "0";
     });
-    for (const mm of assumptionMandatory) {
-      const titleKey = `Needs confirmation: ${mm.variableLabel}`;
+    for (const mm of missingMandatoryPrimary) {
+      const titleKey = `Missing primary variable: ${mm.variableLabel}`;
       const existingException = await db.select().from(wpExceptionLogTable).where(
         and(eq(wpExceptionLogTable.sessionId, sessionId), eq(wpExceptionLogTable.title, titleKey))
       );
       if (existingException.length === 0) {
-        const ext = extractedMap[mm.variableCode];
-        const isZero = ext?.value === "0" || ext?.value === "N/A";
         await db.insert(wpExceptionLogTable).values({
-          sessionId, exceptionType: "needs_confirmation", severity: isZero ? "high" : "medium",
+          sessionId, exceptionType: "needs_confirmation", severity: "high",
           title: titleKey,
-          description: `Mandatory variable ${mm.variableCode} (${mm.variableGroup}) has an assumed/placeholder value "${(ext?.value || "").substring(0, 80)}". Please confirm or update with actual data.`,
+          description: `Mandatory primary variable ${mm.variableCode} (${mm.variableGroup}) is missing. Please upload the financial data template or enter the value in the session form.`,
           status: "open",
         });
       }
     }
 
-    const lowConfVars = Object.entries(extractedMap).filter(([_, v]) => Number(v.confidence) < 50);
-    for (const [code, val] of lowConfVars) {
-      const def = VARIABLE_DEFINITIONS.find(d => d.variableCode === code);
-      if (def) {
-        const existingLowConf = await db.select().from(wpExceptionLogTable).where(
-          and(eq(wpExceptionLogTable.sessionId, sessionId), eq(wpExceptionLogTable.title, `Low confidence: ${def.variableLabel}`))
-        );
-        if (existingLowConf.length === 0) {
-          await db.insert(wpExceptionLogTable).values({
-            sessionId, exceptionType: "low_confidence", severity: "medium",
-            title: `Low confidence: ${def.variableLabel}`,
-            description: `Variable ${code} has confidence ${val.confidence}%. Auto-populated with assumed value. Review recommended.`,
-            status: "open",
-          });
-        }
-      }
-    }
-
-    const assumptionCount = Object.values(defaultSourceMap).filter(s => s === "assumption").length;
-    const formulaCount = Object.values(defaultSourceMap).filter(s => s === "formula").length;
+    const primaryCount  = VARIABLE_DEFINITIONS.filter(d => d.variableCategory === "primary").length;
+    const secondaryCount = VARIABLE_DEFINITIONS.filter(d => d.variableCategory === "secondary").length;
+    const aiCount       = VARIABLE_DEFINITIONS.filter(d => d.variableCategory === "ai").length;
+    const formulaCount  = Object.values(defaultSourceMap).filter(s => s === "formula").length;
 
     res.json({
       created, updated, skipped, total: VARIABLE_DEFINITIONS.length,
-      assumptionCount, formulaCount,
-      needsConfirmation: assumptionMandatory.length,
-      populationRate: "100%",
-      message: `All ${VARIABLE_DEFINITIONS.length} variables populated. ${formulaCount} calculated from financial data. ${assumptionCount} use assumed defaults (flagged for review).`
+      primaryFilled: created + updated - (missingMandatoryPrimary.length),
+      secondaryCalculated: formulaCount,
+      aiPending: aiCount,
+      needsConfirmation: missingMandatoryPrimary.length,
+      phase1Complete: true,
+      phase2Complete: true,
+      phase3Pending: true,
+      message: `Phase 1 & 2 complete: ${primaryCount} primary variables filled from session/template, ${secondaryCount} secondary variables calculated by system formulas. ${aiCount} AI variables ready for AI Fill.`
     });
   } catch (err: any) {
     logger.error({ err }, "Failed to auto-fill variables");
@@ -2025,15 +2060,21 @@ router.post("/sessions/:id/variables/ai-fill", async (req: Request, res: Respons
       .map(v => `${v.variableCode}: ${v.finalValue} [source:${v.sourceType || "unknown"}]`)
       .join("\n");
 
-    // AI only targets variables NOT already filled by template, user-edit, or lock
-    // Source hierarchy: Template > User Edit > AI — AI never overrides the first two
+    // AI only targets AI-category variables — never Primary or Secondary
+    // Source hierarchy: Primary > Secondary > User Edit > AI
     const missingDefs = VARIABLE_DEFINITIONS.filter(def => {
+      // PHASE 3: AI is strictly forbidden from touching Primary or Secondary variables
+      if (def.variableCategory !== "ai") return false;
       const ev = existingByCode[def.variableCode];
       if (!ev) return true;                  // not yet in DB — AI should fill
       if (isLocked(ev)) return false;        // locked — AI never touches
       if (isUserEdited(ev)) return false;    // user confirmed — AI never touches
-      if (isTemplateFilled(ev)) return false;// template filled — AI never touches
-      return !isFilled(ev);                  // empty or AI-fillable
+      if (isTemplateFilled(ev)) return false;// template/primary filled — AI never touches
+      // Also skip if already filled by system calculation
+      if (ev.sourceType === "system_calculated" && isFilled(ev)) return false;
+      // Skip if already filled by primary sources
+      if ((ev.sourceType === "primary_session" || ev.sourceType === "primary_template") && isFilled(ev)) return false;
+      return !isFilled(ev);                  // empty — AI should fill
     });
 
     if (missingDefs.length === 0) {
