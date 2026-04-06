@@ -330,6 +330,12 @@ export default function WorkingPapers() {
     } finally { setParseLoading(false); }
   };
 
+  const handleExtractData = async () => {
+    if (!activeSession) return;
+    await handleParseTemplate();
+    await autoFillVariables();
+  };
+
   const runExtraction = async () => {
     if (!activeSession) return;
     try {
@@ -1555,19 +1561,9 @@ export default function WorkingPapers() {
           fileInputRef={fileInputRef}
           onFileAdd={handleFileAdd}
           onUpload={handleUpload}
-          onNext={runExtraction}
-          onBuildCategoryB={autoFillVariables}
-          loading={loading}
+          onExtractData={handleExtractData}
+          loading={parseLoading || loading}
           validateFile={validateFile}
-          onExtractWorkbook={handleExtractWorkbook}
-          workbookExtracting={workbookExtracting}
-          workbookReport={workbookReport}
-          showWorkbookPanel={showWorkbookPanel}
-          setShowWorkbookPanel={setShowWorkbookPanel}
-          onParseTemplate={handleParseTemplate}
-          parseLoading={parseLoading}
-          parseResult={parseResult}
-          setParseResult={setParseResult}
         />
       )}
 
@@ -1963,206 +1959,27 @@ function WorkbookPipelinePanel({ onExtract, extracting, report, onClose }: any) 
   );
 }
 
-function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, onUpload, onNext, onBuildCategoryB, loading, validateFile, onExtractWorkbook, workbookExtracting, workbookReport, showWorkbookPanel, setShowWorkbookPanel, onParseTemplate, parseLoading, parseResult, setParseResult }: any) {
+function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, onUpload, onExtractData, loading, validateFile }: any) {
   const { toast } = useToast();
   const [dragActive, setDragActive] = useState(false);
 
-  const hasExcel = uploadedFiles.some((f: any) => {
-    const ext = (f.originalName || "").split(".").pop()?.toLowerCase();
-    return ext === "xlsx" || ext === "xls" || ext === "xlsm";
-  });
-  const isTemplate = uploadedFiles.some((f: any) =>
-    (f.originalName || "").toLowerCase().includes("financial_data") ||
-    (f.originalName || "").toLowerCase().includes("audit_template") ||
-    (f.originalName || "").toLowerCase().includes("upload_template") ||
-    (f.originalName || "").toLowerCase().includes("financial data")
-  );
+  const hasUploaded = uploadedFiles.length > 0;
 
-  const parsed = !!parseResult;
-  const meta = parseResult?.meta || {};
-  const rows: any[] = parseResult?.rows || [];
-
-  const currentStep = parsed ? 3 : uploadedFiles.length > 0 ? 2 : 1;
-  const steps = [
-    { n: 1, label: "Upload Template", done: uploadedFiles.length > 0 },
-    { n: 2, label: "Parse & Extract", done: parsed },
-    { n: 3, label: "AI Process", done: false },
-  ];
-
-  // ── Aggregate CY financial totals from parsed rows ──────────────────────
-  const fmtAmt = (n: number) =>
-    n === 0 ? undefined :
-    Math.abs(n) >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` :
-    Math.abs(n) >= 1_000 ? `${(n / 1_000).toFixed(0)}K` : String(Math.round(n));
-
-  const aggByMajorHead = (keys: string[]): number => {
-    const keySet = new Set(keys.map(k => k.toLowerCase()));
-    return rows.reduce((sum: number, r: any) => {
-      const mh = (r.majorHead || "").toLowerCase();
-      return keySet.has(mh) ? sum + (r.currentYear || 0) : sum;
-    }, 0);
-  };
-
-  const aggByFsSection = (sections: string[]): number => {
-    const secSet = new Set(sections.map(s => s.toLowerCase()));
-    return rows.reduce((sum: number, r: any) => {
-      const fs = (r.fsSection || "").toLowerCase();
-      return secSet.has(fs) ? sum + (r.currentYear || 0) : sum;
-    }, 0);
-  };
-
-  const aggByWpArea = (areas: string[]): number => {
-    const areaSet = new Set(areas.map(a => a.toLowerCase()));
-    return rows.reduce((sum: number, r: any) => {
-      const wp = (r.wpArea || "").toLowerCase();
-      return areaSet.has(wp) ? sum + (r.currentYear || 0) : sum;
-    }, 0);
-  };
-
-  const cy_revenue     = aggByMajorHead(["revenue"]);
-  const cy_cos         = aggByMajorHead(["cost of sales"]);
-  const cy_gross       = aggByMajorHead(["gross profit"]);
-  const cy_admin       = aggByMajorHead(["administrative expenses"]);
-  const cy_finance     = aggByMajorHead(["finance cost"]);
-  const cy_tax         = aggByMajorHead(["taxation"]);
-  const cy_assets      = aggByFsSection(["assets"]);
-  const cy_liabilities = aggByFsSection(["liabilities"]);
-  const cy_equity      = aggByFsSection(["equity"]);
-  const cy_cash        = aggByWpArea(["cash and bank", "cash"]);
-  const cy_receivables = aggByWpArea(["receivables"]);
-  const cy_payables    = aggByWpArea(["payables"]);
-  const cy_inventory   = aggByWpArea(["inventory"]);
-  const cy_ppe         = aggByWpArea(["ppe"]);
-  const cy_borrowings  = aggByWpArea(["borrowings"]);
-  const cy_taxation_wp = aggByWpArea(["taxation"]);
-
-  const drTotal = rows.reduce((s: number, r: any) => s + (r.debitTransactionValue || 0), 0);
-  const crTotal = rows.reduce((s: number, r: any) => s + (r.creditTransactionValue || 0), 0);
-
-  // Category A — 36 variables auto-filled from template
-  const catAGroups = [
-    {
-      label: "Engagement Header (8 fields)",
-      color: "blue",
-      vars: [
-        { name: "Entity Name",         value: meta.entityName || undefined },
-        { name: "Company Type",        value: meta.companyType || undefined },
-        { name: "Industry",            value: meta.industry || undefined },
-        { name: "Reporting Framework", value: meta.reportingFramework || undefined },
-        { name: "Year End",            value: meta.yearEnd || undefined },
-        { name: "Audit Type",          value: meta.auditType || undefined },
-        { name: "Currency",            value: meta.currency || undefined },
-        { name: "Engagement Size",     value: meta.engagementSize || undefined },
-      ],
-    },
-    {
-      label: "Trial Balance Data (6 fields)",
-      color: "indigo",
-      vars: [
-        { name: "Account Code",        value: rows.length > 0 ? rows.filter((r:any)=>r.accountCode).length + " accounts" : undefined },
-        { name: "Account Name",        value: rows.length > 0 ? rows.length + " lines" : undefined },
-        { name: "Opening Balance",     value: rows.length > 0 ? "included" : undefined },
-        { name: "Debit Transactions",  value: drTotal > 0 ? fmtAmt(drTotal) : (rows.length > 0 ? "included" : undefined) },
-        { name: "Credit Transactions", value: crTotal > 0 ? fmtAmt(crTotal) : (rows.length > 0 ? "included" : undefined) },
-        { name: "Closing Balance",     value: rows.length > 0 ? "computed" : undefined },
-      ],
-    },
-    {
-      label: "Financial Statement Data (22 fields)",
-      color: "violet",
-      vars: [
-        { name: "CY Amounts",          value: rows.filter((r:any)=>r.currentYear).length > 0 ? rows.filter((r:any)=>r.currentYear).length + " rows" : undefined },
-        { name: "PY Amounts",          value: rows.filter((r:any)=>r.priorYear).length > 0 ? rows.filter((r:any)=>r.priorYear).length + " rows" : undefined },
-        { name: "Revenue",             value: fmtAmt(cy_revenue) },
-        { name: "Cost of Sales",       value: fmtAmt(Math.abs(cy_cos)) },
-        { name: "Gross Profit",        value: cy_gross !== 0 ? fmtAmt(cy_gross) : (cy_revenue && cy_cos ? fmtAmt(cy_revenue - Math.abs(cy_cos)) : undefined) },
-        { name: "Admin Expenses",      value: fmtAmt(Math.abs(cy_admin)) },
-        { name: "Finance Cost",        value: fmtAmt(Math.abs(cy_finance)) },
-        { name: "Profit Before Tax",   value: undefined },
-        { name: "Tax Expense",         value: fmtAmt(Math.abs(cy_tax)) },
-        { name: "Profit After Tax",    value: undefined },
-        { name: "Total Assets",        value: fmtAmt(cy_assets) },
-        { name: "Total Liabilities",   value: fmtAmt(Math.abs(cy_liabilities)) },
-        { name: "Equity",              value: fmtAmt(cy_equity) },
-        { name: "Cash & Bank",         value: fmtAmt(cy_cash) },
-        { name: "Trade Receivables",   value: fmtAmt(cy_receivables) },
-        { name: "Trade Payables",      value: fmtAmt(Math.abs(cy_payables)) },
-        { name: "Inventory",           value: fmtAmt(cy_inventory) },
-        { name: "Fixed Assets",        value: fmtAmt(cy_ppe) },
-        { name: "Borrowings",          value: fmtAmt(Math.abs(cy_borrowings)) },
-        { name: "Tax Data (WHT/GST)",  value: fmtAmt(Math.abs(cy_taxation_wp)) },
-        { name: "Related Parties",     value: rows.length > 0 ? "flagged" : undefined },
-        { name: "Directors",           value: rows.length > 0 ? "per register" : undefined },
-      ],
-    },
-  ];
-
-  // Category B — 10 AI-derived groups
-  const catBGroups = [
-    { code: "B1",  label: "Core Audit Calculations",      items: ["TB Balanced Status","FS–TB Reconciliation","Variance Analysis","Ratio Analysis","Trend Analysis"] },
-    { code: "B2",  label: "Materiality (ISA 320)",         items: ["Materiality Basis","Overall Materiality","Performance Materiality","Trivial Threshold"] },
-    { code: "B3",  label: "Risk Assessment (ISA 315/240)", items: ["Inherent Risk","Control Risk","RMM","Fraud Risk","Significant Risks","Going Concern Risk"] },
-    { code: "B4",  label: "Analytical Flags",              items: ["Unusual Fluctuations","Negative Trends","Liquidity Issues","Profitability Issues"] },
-    { code: "B5",  label: "Sampling (ISA 530)",            items: ["Population Size & Value","Sample Method","Sample Size","Sample Selection"] },
-    { code: "B6",  label: "Assertions & Procedures",       items: ["Assertions Mapping","Substantive Procedures","Test of Controls","Audit Program"] },
-    { code: "B7",  label: "Audit Evidence",                items: ["Confirmation Requirements","Evidence Sufficiency","Evidence Appropriateness"] },
-    { code: "B8",  label: "Misstatements",                 items: ["Expected Misstatement","Proposed Adjustments","Uncorrected Misstatements"] },
-    { code: "B9",  label: "Reporting (ISA 700 Series)",    items: ["Audit Opinion","Emphasis of Matter","KAM","Report Draft"] },
-    { code: "B10", label: "Advanced AI Analytics",         items: ["GL Generation","Transaction Simulation","Anomaly Detection","Duplicate Detection","Audit Health Score"] },
-  ];
 
   return (
     <div className="space-y-5">
 
-      {/* Step Progress */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-        <div className="flex items-center">
-          {steps.map((step, i) => (
-            <div key={step.n} className="flex items-center flex-1">
-              <div className="flex flex-col items-center gap-1.5 flex-1">
-                <div className={cn(
-                  "w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm transition-all shadow-sm",
-                  step.done
-                    ? "bg-emerald-500 text-white shadow-emerald-200"
-                    : currentStep === step.n
-                      ? "bg-blue-600 text-white shadow-blue-200 ring-4 ring-blue-100"
-                      : "bg-slate-100 text-slate-400"
-                )}>
-                  {step.done ? <Check className="w-4 h-4" /> : step.n}
-                </div>
-                <p className={cn(
-                  "text-xs font-semibold text-center whitespace-nowrap",
-                  step.done ? "text-emerald-700" : currentStep === step.n ? "text-blue-700" : "text-slate-400"
-                )}>{step.label}</p>
-              </div>
-              {i < steps.length - 1 && (
-                <div className={cn("h-0.5 flex-1 -mt-5 mx-1 rounded-full transition-colors", step.done ? "bg-emerald-300" : "bg-slate-200")} />
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Template Download Banner */}
+      {/* ── 1. Download Template ── */}
       <div className="bg-gradient-to-r from-blue-700 to-indigo-800 rounded-2xl p-5 text-white shadow-md flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex items-start gap-3.5 flex-1">
           <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
             <FileText className="w-5 h-5 text-blue-200" />
           </div>
           <div className="flex-1">
-            <p className="font-bold text-base mb-0.5">Fixed Audit Upload Template</p>
+            <p className="font-bold text-base mb-0.5">Audit Upload Template</p>
             <p className="text-sm text-blue-100">
-              One single Excel file — fill the <span className="font-semibold text-white">Engagement Header</span> and{" "}
-              <span className="font-semibold text-white">Financial Data</span> sheets. All 36 Category A variables
-              populate automatically on parse. Category B is fully AI-derived.
+              Fill in the Engagement Header and Financial Data rows, then upload below to extract all audit variables automatically.
             </p>
-            <div className="flex flex-wrap gap-1.5 mt-2.5">
-              {["Engagement Header","TB Section","FS Data","Risk Flags","GL Markers"].map(t => (
-                <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/10 border border-white/20 rounded-full text-[11px] text-blue-100">
-                  <span className="w-1 h-1 rounded-full bg-blue-300 inline-block" />{t}
-                </span>
-              ))}
-            </div>
           </div>
         </div>
         <button
@@ -2188,133 +2005,12 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
         </button>
       </div>
 
-      {/* Category A / Category B */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-        {/* ── Category A ── */}
-        <div className="bg-white border border-blue-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3.5 flex items-center gap-3 shrink-0">
-            <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
-              <FileText className="w-4 h-4 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-white text-sm leading-tight">Category A — Template Direct</p>
-              <p className="text-[11px] text-blue-100 mt-0.5">36 variables · Auto-filled on parse · No AI needed</p>
-            </div>
-            {parsed ? (
-              <div className="flex items-center gap-1.5 bg-white/20 rounded-full px-2.5 py-1 shrink-0">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200" />
-                <span className="text-[11px] text-white font-semibold">Populated</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 bg-white/10 rounded-full px-2.5 py-1 shrink-0">
-                <Clock className="w-3 h-3 text-blue-200" />
-                <span className="text-[11px] text-blue-100">Awaiting parse</span>
-              </div>
-            )}
-          </div>
-          <div className="p-4 space-y-4 flex-1">
-            {catAGroups.map((group: any) => (
-              <div key={group.label}>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <span className={cn("w-1.5 h-1.5 rounded-full inline-block",
-                    group.color === "blue" ? "bg-blue-400" : group.color === "indigo" ? "bg-indigo-400" : "bg-violet-400"
-                  )} />
-                  {group.label}
-                </p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {group.vars.map((v: any) => (
-                    <div key={v.name} className={cn(
-                      "flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs transition-all",
-                      parsed && v.value
-                        ? "bg-emerald-50 border-emerald-200"
-                        : parsed
-                          ? "bg-slate-50 border-slate-200"
-                          : "bg-slate-50/50 border-slate-100"
-                    )}>
-                      {parsed ? (
-                        v.value
-                          ? <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
-                          : <CircleDot className="w-3 h-3 text-slate-300 shrink-0" />
-                      ) : (
-                        <div className="w-3 h-3 rounded-full border-2 border-slate-200 shrink-0" />
-                      )}
-                      <span className={cn(
-                        "flex-1 truncate font-medium leading-tight",
-                        parsed && v.value ? "text-slate-800" : "text-slate-400"
-                      )}>{v.name}</span>
-                      {parsed && v.value && (
-                        <span className="text-[10px] text-emerald-600 font-semibold truncate max-w-[60px] shrink-0">{String(v.value)}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── Category B ── */}
-        <div className="bg-white border border-emerald-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-          <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-3.5 flex items-center gap-3 shrink-0">
-            <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
-              <Bot className="w-4 h-4 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-white text-sm leading-tight">Category B — AI Engine</p>
-              <p className="text-[11px] text-emerald-100 mt-0.5">10 groups · Derived after AI Process</p>
-            </div>
-            {!parsed ? (
-              <div className="flex items-center gap-1.5 bg-black/20 rounded-full px-2.5 py-1 shrink-0">
-                <Lock className="w-3 h-3 text-white/60" />
-                <span className="text-[11px] text-white/70">Parse first</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 bg-white/20 rounded-full px-2.5 py-1 shrink-0">
-                <Zap className="w-3.5 h-3.5 text-yellow-200" />
-                <span className="text-[11px] text-white font-semibold">Ready</span>
-              </div>
-            )}
-          </div>
-          <div className="p-4 space-y-2 flex-1">
-            <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
-              Derived by AI from Category A data. No variable is left empty —
-              fallback: <span className="italic text-slate-600">"AI unable to determine — requires input"</span>.
-            </p>
-            {catBGroups.map((group: any) => (
-              <div key={group.code} className={cn(
-                "rounded-xl border p-3 transition-all",
-                parsed
-                  ? "bg-slate-50 border-slate-200 hover:border-emerald-200 hover:bg-emerald-50/20"
-                  : "bg-slate-50/30 border-slate-100 opacity-50"
-              )}>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className={cn(
-                    "inline-flex items-center justify-center w-6 h-5 rounded text-[10px] font-bold shrink-0",
-                    parsed ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-400"
-                  )}>{group.code}</span>
-                  <p className={cn("text-xs font-semibold leading-tight", parsed ? "text-slate-800" : "text-slate-400")}>{group.label}</p>
-                </div>
-                <div className="flex flex-wrap gap-1 pl-8">
-                  {group.items.map((item: string) => (
-                    <span key={item} className={cn(
-                      "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium",
-                      parsed ? "bg-white border border-slate-200 text-slate-600" : "bg-slate-100 text-slate-400"
-                    )}>{item}</span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Upload Zone */}
+      {/* ── 2. Upload Zone ── */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="bg-gradient-to-r from-slate-50 to-blue-50/30 px-5 py-3.5 border-b border-slate-200/60 flex items-center gap-2">
           <Upload className="w-4 h-4 text-blue-600" />
           <h2 className="font-semibold text-slate-900 text-sm">Upload Completed Template</h2>
-          <span className="ml-auto text-[11px] text-slate-400 hidden sm:block">Excel template required · Supporting PDFs optional</span>
+          <span className="ml-auto text-[11px] text-slate-400 hidden sm:block">Excel (.xlsx) required</span>
         </div>
         <div className="p-5 space-y-4">
           <div
@@ -2335,7 +2031,7 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
               <Upload className={cn("w-6 h-6 transition-colors", dragActive ? "text-blue-600" : "text-slate-400")} />
             </div>
             <p className="font-medium text-slate-700 text-sm">Drop your completed template here or <span className="text-blue-600 underline underline-offset-2">browse</span></p>
-            <p className="text-xs text-slate-400 mt-1.5">Excel (.xlsx) for main template · PDF / images for supporting documents</p>
+            <p className="text-xs text-slate-400 mt-1.5">Excel (.xlsx) · PDF · Images</p>
             <input ref={fileInputRef} type="file" multiple accept=".xlsx,.xls,.pdf,.jpg,.jpeg,.png,.webp" onChange={onFileAdd} className="hidden" />
           </div>
 
@@ -2366,15 +2062,6 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
                         <p className="text-[10px] text-slate-400">{(uf.file.size / 1024).toFixed(0)} KB</p>
                         {err && <p className="text-red-600 font-medium mt-0.5">{err}</p>}
                       </div>
-                      <select
-                        className="text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-700 focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
-                        value={uf.category}
-                        onChange={e => { const u = [...files]; u[i].category = e.target.value; setFiles(u); }}
-                      >
-                        {FILE_CATEGORIES.map((c: any) => (
-                          <option key={c.value} value={c.value}>{c.label}</option>
-                        ))}
-                      </select>
                       <button onClick={() => setFiles((p: any) => p.filter((_: any, j: number) => j !== i))} className="p-1 hover:bg-red-50 rounded-lg transition-colors">
                         <X className="w-3.5 h-3.5 text-slate-400 hover:text-red-500" />
                       </button>
@@ -2418,108 +2105,30 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
         </div>
       </div>
 
-      {/* Parse CTA */}
-      {hasExcel && !parseResult && (
-        <div className={cn(
-          "rounded-2xl p-5 border flex flex-col sm:flex-row sm:items-center gap-4",
-          isTemplate
-            ? "bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200"
-            : "bg-gradient-to-r from-violet-50 to-indigo-50 border-violet-200"
-        )}>
+      {/* ── 3. Extract Data button (shown after upload) ── */}
+      {hasUploaded && (
+        <div className="bg-white border border-emerald-200 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-center gap-4">
           <div className="flex items-start gap-3 flex-1">
-            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-              isTemplate ? "bg-emerald-100" : "bg-violet-100"
-            )}>
-              {isTemplate
-                ? <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                : <Zap className="w-5 h-5 text-violet-600" />}
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5 text-emerald-600" />
             </div>
             <div>
-              <p className={cn("text-sm font-semibold", isTemplate ? "text-emerald-900" : "text-slate-900")}>
-                {isTemplate ? "Template detected — ready to parse" : "Excel workbook uploaded"}
-              </p>
-              <p className="text-xs text-slate-600 mt-0.5">
-                Parse the template to auto-populate all 36 Category A variables. Category B AI processing will be available immediately after.
+              <p className="text-sm font-bold text-slate-900">Template uploaded — ready to extract</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Parses the template and auto-populates all audit variables — materiality, risk, sampling, and more.
               </p>
             </div>
           </div>
           <Button
-            onClick={onParseTemplate}
-            disabled={parseLoading}
-            className={cn("shadow-sm font-semibold shrink-0", isTemplate
-              ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
-              : "bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white"
-            )}
-            size="sm"
-          >
-            {parseLoading
-              ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> Parsing…</>
-              : <><Sparkles className="w-3.5 h-3.5 mr-1.5" /> Parse Template</>
-            }
-          </Button>
-        </div>
-      )}
-
-      {/* Legacy Smart Import */}
-      {showWorkbookPanel && (
-        <WorkbookPipelinePanel
-          onExtract={onExtractWorkbook}
-          extracting={workbookExtracting}
-          report={workbookReport}
-          onClose={workbookReport || workbookExtracting ? undefined : () => setShowWorkbookPanel(false)}
-        />
-      )}
-
-      {/* Parse Result */}
-      {parseResult && (
-        <TemplateParsedPanel result={parseResult} onClear={() => setParseResult(null)} />
-      )}
-
-      {/* Action Row */}
-      {uploadedFiles.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-center gap-4">
-          {parseResult?.rows?.length > 0 ? (
-            <div className="flex items-start gap-3 flex-1">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
-                <Bot className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-slate-900">Category A complete — {parseResult.rows.length} financial rows extracted</p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Click <span className="font-semibold text-emerald-700">AI Process</span> to derive all Category B variables:
-                  materiality, risk, sampling, procedures, opinions and GL data.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-start gap-3 flex-1">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-                <Info className="w-5 h-5 text-blue-500" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-slate-900">Parse the template first</p>
-                <p className="text-xs text-slate-500 mt-0.5">Category A must be populated before the AI engine can derive Category B.</p>
-              </div>
-            </div>
-          )}
-          <Button
-            onClick={parseResult?.rows?.length > 0 ? onBuildCategoryB : onNext}
+            onClick={onExtractData}
             disabled={loading}
             size="lg"
-            className={cn(
-              "px-7 shadow-md shrink-0 font-bold transition-all",
-              parseResult?.rows?.length > 0
-                ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-200/50"
-                : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-blue-200/50"
-            )}
+            className="px-7 shadow-md shrink-0 font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-200/50"
           >
             {loading
-              ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              : parseResult?.rows?.length > 0
-                ? <><Bot className="w-4 h-4 mr-2" /> AI Process — Build Category B</>
-                : <><Sparkles className="w-4 h-4 mr-2" /> Run AI Extraction</>
+              ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Extracting…</>
+              : <><Sparkles className="w-4 h-4 mr-2" /> Extract Data <ArrowRight className="w-4 h-4 ml-2" /></>
             }
-            <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </div>
       )}
@@ -2527,6 +2136,7 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
   );
 }
 // ── Template Parse Results Panel ─────────────────────────────────────────────
+
 function TemplateParsedPanel({ result, onClear }: { result: any; onClear: () => void }) {
   const [showAllRows, setShowAllRows] = useState(false);
   const { meta = {}, rows = [], errors = [], warnings = [] } = result;
