@@ -6744,10 +6744,12 @@ router.get("/download-template", async (_req: Request, res: Response) => {
       tc.alignment = { vertical: "middle", horizontal: "right" };
     }
 
+    // Write to buffer first — stream writing skips dataValidation XML sections
+    const buf = await wb.xlsx.writeBuffer();
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", 'attachment; filename="Financial_Data_Upload_Template.xlsx"');
-    await wb.xlsx.write(res);
-    return res.end();
+    res.setHeader("Content-Length", buf.byteLength);
+    return res.end(Buffer.from(buf));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
