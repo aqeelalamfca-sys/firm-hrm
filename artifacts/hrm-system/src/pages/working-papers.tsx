@@ -13,6 +13,7 @@ import {
   Info, AlertOctagon, Calculator, CircleDot,
   ExternalLink, Gauge, Table2, Trash2, Database,
   GitMerge, BarChart2, Cpu, CheckCheck, ListChecks, Network, BookOpen,
+  Search, ClipboardList,
 } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
@@ -4571,17 +4572,18 @@ function statusColor(val: string): string {
   if (["reopened","exception","overdue","export"].includes(v)) return "bg-amber-100 text-amber-800 border-amber-300";
   return "bg-slate-100 text-slate-700 border-slate-200";
 }
-function sourceIcon(sourceType: string | null | undefined): { label: string; cls: string } {
+function sourceIcon(sourceType: string | null | undefined): { label: string; cls: string; isTemplate?: boolean } {
   if (!sourceType) return { label: "", cls: "" };
   switch (sourceType) {
-    case "ai_extraction": return { label: "AI", cls: "text-blue-600 bg-blue-50" };
-    case "session": return { label: "Session", cls: "text-emerald-600 bg-emerald-50" };
-    case "default": return { label: "Default", cls: "text-slate-500 bg-slate-50" };
-    case "user_edit": return { label: "Manual", cls: "text-purple-600 bg-purple-50" };
-    case "formula": return { label: "Calculated", cls: "text-indigo-600 bg-indigo-50" };
-    case "assumption": return { label: "Assumed", cls: "text-amber-600 bg-amber-50" };
-    case "autofill": return { label: "Auto", cls: "text-cyan-600 bg-cyan-50" };
-    default: return { label: sourceType.replace(/_/g, " "), cls: "text-slate-500 bg-slate-50" };
+    case "template": return { label: "Extracted from Upload", cls: "text-emerald-700 bg-emerald-50 border-emerald-200", isTemplate: true };
+    case "ai_extraction": return { label: "AI Processed", cls: "text-blue-600 bg-blue-50 border-blue-200" };
+    case "session": return { label: "Session", cls: "text-emerald-600 bg-emerald-50 border-emerald-200" };
+    case "default": return { label: "Default", cls: "text-slate-500 bg-slate-50 border-slate-200" };
+    case "user_edit": return { label: "Manual", cls: "text-purple-600 bg-purple-50 border-purple-200" };
+    case "formula": return { label: "Calculated", cls: "text-indigo-600 bg-indigo-50 border-indigo-200" };
+    case "assumption": return { label: "Assumed", cls: "text-amber-600 bg-amber-50 border-amber-200" };
+    case "autofill": return { label: "AI Processed", cls: "text-blue-600 bg-blue-50 border-blue-200" };
+    default: return { label: sourceType.replace(/_/g, " "), cls: "text-slate-500 bg-slate-50 border-slate-200" };
   }
 }
 const inputCls = "h-8 text-sm border rounded-md px-2 focus:ring-2 focus:ring-primary/20 focus:border-primary";
@@ -5014,13 +5016,10 @@ function RenderDisplayValue({ def, value, sourceType }: { def: any; value: strin
 function VariablesStage({ variables, grouped, stats, changeLog, editingVar, editValue, editReason, setEditingVar, setEditValue, setEditReason, onSave, onReview, onReviewAll, onFetch, onLockAll, onLockSection, onValidate, loading, confidenceBadge }: any) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("all");
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [validationIssues, setValidationIssues] = useState<any[]>([]);
   const [showAuditTrail, setShowAuditTrail] = useState(false);
 
   useEffect(() => { if (variables.length === 0) onFetch(); }, []);
-
-  const toggleGroup = (g: string) => setExpandedGroups(prev => ({ ...prev, [g]: !prev[g] }));
 
   const runValidation = async () => {
     const result = await onValidate();
@@ -5040,6 +5039,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
     if (filter === "reviewed" && v.reviewStatus !== "reviewed" && v.reviewStatus !== "confirmed") return false;
     if (filter === "locked" && !v.isLocked) return false;
     if (filter === "needs_review" && v.reviewStatus !== "needs_review") return false;
+    if (filter === "extracted" && v.sourceType !== "template") return false;
     return true;
   };
 
@@ -5049,253 +5049,318 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
     return allVars.some(filterVar);
   });
 
+  const extractedCount = variables.filter((v: any) => v.sourceType === "template").length;
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+      {/* ── Stats bar ── */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
           {[
-            { label: "Total", value: stats.total, icon: Settings2, bg: "bg-slate-50", iconColor: "text-slate-600", filterKey: "all" },
-            { label: "Filled", value: stats.filled, icon: CheckCircle2, bg: "bg-emerald-50", iconColor: "text-emerald-600", filterKey: "reviewed" },
+            { label: "Total", value: stats.total, icon: Settings2, bg: "bg-slate-50", iconColor: "text-slate-500", filterKey: "all" },
+            { label: "From Upload", value: extractedCount, icon: Upload, bg: "bg-emerald-50", iconColor: "text-emerald-600", filterKey: "extracted" },
+            { label: "Filled", value: stats.filled, icon: CheckCircle2, bg: "bg-blue-50", iconColor: "text-blue-600", filterKey: "reviewed" },
             { label: "Missing", value: stats.missing, icon: AlertCircle, bg: "bg-red-50", iconColor: "text-red-600", filterKey: "missing" },
             { label: "Low Conf.", value: stats.lowConfidence, icon: AlertTriangle, bg: "bg-amber-50", iconColor: "text-amber-600", filterKey: "low_confidence" },
             { label: "Review", value: stats.needsReview, icon: Eye, bg: "bg-purple-50", iconColor: "text-purple-600", filterKey: "needs_review" },
-            { label: "Locked", value: stats.locked, icon: Lock, bg: "bg-blue-50", iconColor: "text-blue-600", filterKey: "locked" },
+            { label: "Locked", value: stats.locked, icon: Lock, bg: "bg-slate-100", iconColor: "text-slate-600", filterKey: "locked" },
           ].map(s => (
             <button key={s.label} onClick={() => setFilter(s.filterKey)} className={cn(
-              "bg-white border rounded-xl p-3 text-center transition-all hover:shadow-md cursor-pointer",
+              "bg-white border rounded-xl p-3 text-center transition-all hover:shadow-sm cursor-pointer",
               filter === s.filterKey ? "ring-2 ring-blue-500 ring-offset-1 border-blue-200 shadow-sm" : "border-slate-200"
             )}>
-              <div className={cn("w-8 h-8 rounded-lg mx-auto mb-1.5 flex items-center justify-center", s.bg)}>
-                <s.icon className={cn("w-4 h-4", s.iconColor)} />
+              <div className={cn("w-7 h-7 rounded-lg mx-auto mb-1 flex items-center justify-center", s.bg)}>
+                <s.icon className={cn("w-3.5 h-3.5", s.iconColor)} />
               </div>
-              <p className="text-xl font-bold text-slate-900">{s.value}</p>
-              <p className="text-[10px] text-slate-500 font-medium mt-0.5">{s.label}</p>
+              <p className="text-lg font-bold text-slate-900 tabular-nums">{s.value}</p>
+              <p className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">{s.label}</p>
             </button>
           ))}
         </div>
       )}
 
+      {/* ── Main card ── */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-emerald-50 to-blue-50/50 px-5 py-4 border-b border-slate-200/60">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-                <Settings2 className="w-5 h-5 text-emerald-600" /> Audit Variable Register
-                {stats && <span className="text-xs font-normal text-slate-500 ml-1">({stats.filled}/{stats.total} filled)</span>}
+
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <h2 className="font-semibold text-slate-900 flex items-center gap-2 text-sm">
+                <ClipboardList className="w-4 h-4 text-blue-600 shrink-0" />
+                Audit Variables — Working Paper Data Sheet
+                {stats && <span className="text-xs font-normal text-slate-400 ml-1">({stats.filled}/{stats.total} filled)</span>}
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">Review, edit and lock audit variables before generation</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">All variables pre-filled from template &amp; AI. Edit any field, then lock &amp; proceed to generation.</p>
             </div>
-            <div className="flex gap-2 flex-wrap self-start">
-              <Button variant="outline" size="sm" onClick={onFetch} className="h-8">
-                <RefreshCw className="w-3.5 h-3.5 mr-1" /> Refresh
+            <div className="flex gap-1.5 flex-wrap shrink-0">
+              <Button variant="outline" size="sm" onClick={onFetch} className="h-7 text-xs">
+                <RefreshCw className="w-3 h-3 mr-1" /> Refresh
               </Button>
-              <Button variant="outline" size="sm" onClick={runValidation} className="h-8">
-                <Shield className="w-3.5 h-3.5 mr-1" /> Validate
+              <Button variant="outline" size="sm" onClick={runValidation} className="h-7 text-xs">
+                <Shield className="w-3 h-3 mr-1" /> Validate
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowAuditTrail(!showAuditTrail)} className="h-8">
-                <ClipboardCheck className="w-3.5 h-3.5 mr-1" /> Trail ({changeLog.length})
+              <Button variant="outline" size="sm" onClick={() => setShowAuditTrail(!showAuditTrail)} className="h-7 text-xs">
+                <ClipboardCheck className="w-3 h-3 mr-1" /> Trail ({changeLog.length})
               </Button>
-              <Button size="sm" onClick={onReviewAll} disabled={loading} className="h-8 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 shadow-sm">
-                <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Review All
+              <Button size="sm" onClick={onReviewAll} disabled={loading} className="h-7 text-xs bg-purple-600 hover:bg-purple-700 shadow-none">
+                <CheckCircle2 className="w-3 h-3 mr-1" /> Review All
               </Button>
-              <Button size="sm" onClick={onLockAll} disabled={loading} className="h-8 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-sm">
-                <Lock className="w-3.5 h-3.5 mr-1" /> Lock All
+              <Button size="sm" onClick={onLockAll} disabled={loading} className="h-7 text-xs bg-amber-500 hover:bg-amber-600 shadow-none">
+                <Lock className="w-3 h-3 mr-1" /> Lock All
               </Button>
             </div>
           </div>
-        </div>
 
-        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/30">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="relative flex-1 sm:max-w-xs">
-              <Input className="h-8 text-sm pl-8" placeholder="Search variables..." value={search} onChange={e => setSearch(e.target.value)} />
-              <Settings2 className="w-3.5 h-3.5 absolute left-2.5 top-2 text-slate-400" />
+          {/* Search + filter row */}
+          <div className="flex flex-col sm:flex-row gap-2 mt-3">
+            <div className="relative flex-1 sm:max-w-sm">
+              <Input className="h-8 text-xs pl-8 bg-white" placeholder="Search variables by name or code…" value={search} onChange={e => setSearch(e.target.value)} />
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {["all", "mandatory", "missing", "low_confidence", "needs_review", "reviewed", "locked"].map(f => (
-                <button key={f} onClick={() => setFilter(f)} className={cn(
+            <div className="flex flex-wrap gap-1">
+              {[
+                { key: "all", label: "All" },
+                { key: "extracted", label: "From Upload" },
+                { key: "mandatory", label: "Required" },
+                { key: "missing", label: "Missing" },
+                { key: "low_confidence", label: "Low Conf." },
+                { key: "needs_review", label: "Needs Review" },
+                { key: "locked", label: "Locked" },
+              ].map(f => (
+                <button key={f.key} onClick={() => setFilter(f.key)} className={cn(
                   "px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all",
-                  filter === f
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
+                  filter === f.key ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
                 )}>
-                  {f.replace(/_/g, " ").replace(/^\w/, c => c.toUpperCase())}
+                  {f.label}
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        <div className="p-4 sm:p-5 space-y-3">
-          {validationIssues.length > 0 && (
-            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl">
-              <h3 className="text-xs font-semibold text-amber-900 mb-2.5 flex items-center gap-1.5">
-                <AlertTriangle className="w-3.5 h-3.5" /> Validation Issues ({validationIssues.length})
-              </h3>
-              <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                {validationIssues.map((issue: any, i: number) => (
-                  <div key={i} className="text-xs flex items-center gap-2 p-2 bg-white/60 rounded-lg border border-amber-100">
-                    <span className={cn("w-2 h-2 rounded-full shrink-0", issue.severity === "high" ? "bg-red-500" : issue.severity === "medium" ? "bg-amber-500" : "bg-blue-500")} />
-                    <span className="font-medium text-slate-800">{issue.label}</span>
-                    <span className="text-slate-500">{issue.issue}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+        {/* Legend */}
+        <div className="px-5 py-2 border-b border-slate-100 bg-slate-50/60 flex flex-wrap items-center gap-3 text-[10px] text-slate-500">
+          <span className="font-semibold text-slate-600 uppercase tracking-wide">Key:</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-emerald-400" /> Extracted from Upload</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-blue-400" /> AI Processed</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-400" /> Missing / Empty</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-amber-400" /> Low Confidence</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-slate-300" /> Locked</span>
+        </div>
 
-          {groupEntries.map(([groupName, groupData]: any) => {
-            const isExpanded = expandedGroups[groupName] !== false;
+        {/* Validation issues */}
+        {validationIssues.length > 0 && (
+          <div className="mx-5 mt-4 p-3.5 bg-amber-50 border border-amber-200 rounded-xl">
+            <h3 className="text-xs font-semibold text-amber-900 mb-2 flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5" /> Validation Issues ({validationIssues.length})
+            </h3>
+            <div className="space-y-1 max-h-28 overflow-y-auto">
+              {validationIssues.map((issue: any, i: number) => (
+                <div key={i} className="text-xs flex items-center gap-2 p-1.5 bg-white/60 rounded-lg border border-amber-100">
+                  <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", issue.severity === "high" ? "bg-red-500" : issue.severity === "medium" ? "bg-amber-500" : "bg-blue-500")} />
+                  <span className="font-medium text-slate-800">{issue.label}</span>
+                  <span className="text-slate-500">{issue.issue}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Variable sections — always expanded, no accordion */}
+        <div className="divide-y divide-slate-100">
+          {variables.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="w-14 h-14 rounded-2xl bg-slate-100 mx-auto mb-4 flex items-center justify-center">
+                <ClipboardList className="w-7 h-7 text-slate-300" />
+              </div>
+              <p className="text-slate-500 font-medium text-sm">No variables yet</p>
+              <p className="text-xs text-slate-400 mt-1">Go back to Upload and run AI Extraction first</p>
+            </div>
+          ) : groupEntries.length === 0 ? (
+            <div className="text-center py-10">
+              <p className="text-sm text-slate-400">No variables match the current filter.</p>
+              <button onClick={() => { setFilter("all"); setSearch(""); }} className="text-xs text-blue-600 underline mt-1">Clear filter</button>
+            </div>
+          ) : groupEntries.map(([groupName, groupData]: any) => {
             const gs = groupData.stats || { total: 0, filled: 0, missing: 0, locked: 0 };
             const pct = gs.total > 0 ? Math.round((gs.filled / gs.total) * 100) : 0;
             const allLocked = gs.locked === gs.total && gs.total > 0;
 
             return (
-              <div key={groupName} className={cn("border rounded-xl overflow-hidden transition-all", allLocked ? "border-emerald-200" : "border-slate-200")}>
-                <button onClick={() => toggleGroup(groupName)} className={cn(
-                  "w-full flex items-center justify-between p-3.5 sm:p-4 transition-colors",
-                  allLocked ? "bg-emerald-50/50 hover:bg-emerald-50" : "bg-slate-50/50 hover:bg-slate-50"
-                )}>
+              <div key={groupName}>
+                {/* Group header */}
+                <div className={cn("px-5 py-3 flex items-center justify-between", allLocked ? "bg-emerald-50/60" : "bg-slate-50/70")}>
                   <div className="flex items-center gap-2.5">
-                    <div className={cn("w-6 h-6 rounded-md flex items-center justify-center transition-transform", isExpanded && "rotate-0")}>
-                      {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-600" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
-                    </div>
-                    <span className="font-semibold text-sm text-slate-900">{groupName}</span>
-                    {allLocked && <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium flex items-center gap-1"><Lock className="w-3 h-3" /> Locked</span>}
+                    <div className={cn("w-1.5 h-6 rounded-full", allLocked ? "bg-emerald-400" : "bg-blue-400")} />
+                    <span className="font-bold text-sm text-slate-900">{groupName}</span>
+                    {allLocked && <span className="text-[9px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-bold flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" /> ALL LOCKED</span>}
                   </div>
-                  <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="flex items-center gap-2.5">
                     <div className="hidden sm:flex items-center gap-1.5">
-                      <div className="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
-                        <div className={cn("h-full rounded-full transition-all", pct === 100 ? "bg-emerald-500" : pct > 50 ? "bg-blue-500" : "bg-amber-500")} style={{ width: `${pct}%` }} />
+                      <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                        <div className={cn("h-full rounded-full", pct === 100 ? "bg-emerald-500" : pct > 50 ? "bg-blue-500" : "bg-amber-400")} style={{ width: `${pct}%` }} />
                       </div>
-                      <span className="text-xs text-slate-500 w-8 text-right tabular-nums">{pct}%</span>
+                      <span className="text-[11px] text-slate-500 tabular-nums w-7 text-right">{pct}%</span>
                     </div>
-                    <span className="text-xs text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-100">{gs.filled}/{gs.total}</span>
-                    {gs.missing > 0 && <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">{gs.missing} missing</span>}
+                    <span className="text-[11px] text-slate-400">{gs.filled}/{gs.total}</span>
+                    {gs.missing > 0 && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-semibold">{gs.missing} missing</span>}
                     {!allLocked && (
-                      <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5 hover:bg-amber-50 hover:text-amber-700" onClick={(e) => { e.stopPropagation(); onLockSection(groupName); }}>
-                        <Lock className="w-3 h-3 mr-1" /> Lock
+                      <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300"
+                        onClick={() => onLockSection(groupName)}>
+                        <Lock className="w-2.5 h-2.5 mr-1" /> Lock section
                       </Button>
                     )}
                   </div>
-                </button>
+                </div>
 
-                {isExpanded && (
-                  <div className="border-t border-slate-100">
-                    {Object.entries(groupData.subgroups || {}).map(([subName, subVars]: any) => {
-                      const filtered = subVars.filter(filterVar);
-                      if (filtered.length === 0) return null;
-                      return (
-                        <div key={subName} className="border-b border-slate-100 last:border-b-0">
-                          <div className="px-4 py-2 bg-slate-50/80">
-                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{subName}</span>
-                          </div>
-                          <div className="divide-y divide-slate-100">
-                            {filtered.map((v: any) => {
-                              const def = v.definition;
-                              const isMandatory = def?.mandatoryFlag;
-                              const isEditing = editingVar === v.id;
-                              const isEmpty = !v.finalValue || v.finalValue.trim() === "";
-                              const isLowConf = v.confidence && Number(v.confidence) < 70;
+                {/* Subgroups + variable rows */}
+                {Object.entries(groupData.subgroups || {}).map(([subName, subVars]: any) => {
+                  const filtered = subVars.filter(filterVar);
+                  if (filtered.length === 0) return null;
+                  return (
+                    <div key={subName}>
+                      {/* Subgroup label */}
+                      <div className="px-5 py-1.5 bg-white border-t border-b border-slate-100">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{subName}</span>
+                      </div>
 
-                              return (
-                                <div key={v.id} className={cn(
-                                  "flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3 px-4 py-3 transition-colors",
-                                  v.isLocked ? "bg-emerald-50/30 border-l-3 border-l-emerald-400" :
-                                  isEmpty ? "bg-red-50/20 border-l-3 border-l-red-300" :
-                                  isLowConf ? "bg-amber-50/20 border-l-3 border-l-amber-300" :
-                                  v.reviewStatus === "needs_review" ? "bg-purple-50/20 border-l-3 border-l-purple-300" :
-                                  "hover:bg-slate-50/50 border-l-3 border-l-transparent"
-                                )}>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      <p className="text-sm font-medium leading-tight text-slate-900">{def?.variableLabel || (v.variableName || "").replace(/_/g, " ")}</p>
-                                      {isMandatory && <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-px rounded-full font-bold tracking-wide">REQ</span>}
-                                      {v.reviewStatus === "needs_review" && <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-px rounded-full font-semibold">REVIEW</span>}
-                                      {def?.aiExtractableFlag && <span className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-px rounded-full border border-blue-100">AI</span>}
-                                      {def?.standardReference && <span className="text-[9px] text-slate-400 bg-slate-50 px-1.5 py-px rounded-full border border-slate-100 hidden sm:inline">{def.standardReference}</span>}
-                                      {def?.pakistanReference && <span className="text-[9px] text-slate-400 bg-slate-50 px-1.5 py-px rounded-full border border-slate-100 hidden sm:inline">{def.pakistanReference}</span>}
-                                    </div>
+                      {/* Variable rows — 2-col form layout */}
+                      <div className="divide-y divide-slate-50">
+                        {filtered.map((v: any) => {
+                          const def = v.definition;
+                          const isMandatory = def?.mandatoryFlag;
+                          const isEditing = editingVar === v.id;
+                          const isEmpty = !v.finalValue || v.finalValue.trim() === "";
+                          const isLowConf = v.confidence && Number(v.confidence) < 70;
+                          const isFromTemplate = v.sourceType === "template";
+                          const isAiProcessed = v.sourceType === "ai_extraction" || v.sourceType === "autofill";
+                          const src = sourceIcon(v.sourceType);
 
-                                    {isEditing ? (
-                                      <div className="mt-2.5 space-y-2.5">
-                                        <RenderEditInput def={def} value={editValue} onChange={setEditValue} />
-                                        <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center pt-1">
-                                          <Input className="h-8 text-xs w-full sm:w-48 placeholder:text-slate-400" value={editReason} onChange={e => setEditReason(e.target.value)} placeholder="Reason for change..." />
-                                          <div className="flex gap-1.5">
-                                            <Button size="sm" variant="default" className="h-8 text-xs px-3 bg-blue-600 hover:bg-blue-700" onClick={() => onSave(v.id)}><Save className="w-3 h-3 mr-1" /> Save</Button>
-                                            <Button size="sm" variant="ghost" className="h-8 text-xs px-2.5" onClick={() => setEditingVar(null)}>Cancel</Button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div className="mt-1">
-                                        <RenderDisplayValue def={def} value={v.finalValue || v.autoFilledValue || ""} sourceType={v.sourceType} />
-                                      </div>
-                                    )}
-                                  </div>
+                          const rowBg = v.isLocked
+                            ? "bg-slate-50/40"
+                            : isEmpty && isMandatory
+                            ? "bg-red-50/30"
+                            : isLowConf
+                            ? "bg-amber-50/20"
+                            : isFromTemplate
+                            ? "bg-emerald-50/10"
+                            : "bg-white";
 
-                                  <div className="flex items-center gap-1.5 shrink-0 sm:pt-0.5 self-end sm:self-start">
-                                    {confidenceBadge(v.confidence ? Number(v.confidence) : null)}
-                                    {v.reviewStatus === "needs_review" && !v.isLocked && (
-                                      <button onClick={() => onReview(v.id)} className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors border border-purple-200" title="Mark as reviewed">
-                                        <Check className="w-3 h-3 inline mr-0.5" /> Review
-                                      </button>
-                                    )}
-                                    {v.isLocked ? (
-                                      <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center">
-                                        <Lock className="w-3.5 h-3.5 text-emerald-600" />
-                                      </div>
-                                    ) : (
-                                      <button onClick={() => { setEditingVar(v.id); setEditValue(v.finalValue || ""); setEditReason(""); }} className="p-1.5 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-200">
-                                        <Pencil className="w-3.5 h-3.5 text-slate-400 hover:text-blue-600" />
-                                      </button>
-                                    )}
-                                  </div>
+                          const leftAccent = v.isLocked
+                            ? "border-l-2 border-l-slate-300"
+                            : isEmpty && isMandatory
+                            ? "border-l-2 border-l-red-400"
+                            : isFromTemplate
+                            ? "border-l-2 border-l-emerald-400"
+                            : isAiProcessed
+                            ? "border-l-2 border-l-blue-300"
+                            : "border-l-2 border-l-transparent";
+
+                          return (
+                            <div key={v.id} className={cn("grid grid-cols-1 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-0 sm:gap-0", rowBg, leftAccent, "px-5 py-3 hover:bg-slate-50/60 transition-colors")}>
+
+                              {/* LEFT: label + badges */}
+                              <div className="flex flex-col justify-center min-w-0 pr-4 sm:border-r sm:border-slate-100">
+                                <div className="flex items-start gap-1.5 flex-wrap">
+                                  <p className="text-[12.5px] font-medium text-slate-800 leading-tight">
+                                    {def?.variableLabel || (v.variableName || "").replace(/_/g, " ")}
+                                    {isMandatory && <span className="ml-1 text-red-500" title="Required">*</span>}
+                                  </p>
                                 </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {isFromTemplate && (
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 uppercase tracking-wide">
+                                      <Upload className="w-2.5 h-2.5" /> Extracted from Upload
+                                    </span>
+                                  )}
+                                  {isAiProcessed && !isFromTemplate && (
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">
+                                      <Sparkles className="w-2.5 h-2.5" /> AI Processed
+                                    </span>
+                                  )}
+                                  {v.reviewStatus === "needs_review" && (
+                                    <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-semibold border border-purple-200">REVIEW</span>
+                                  )}
+                                  {def?.pakistanReference && (
+                                    <span className="text-[9px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded-full border border-slate-100 hidden sm:inline">{def.pakistanReference}</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* RIGHT: value + actions */}
+                              <div className="flex items-center gap-2 mt-2 sm:mt-0 sm:pl-4">
+                                <div className="flex-1 min-w-0">
+                                  {isEditing ? (
+                                    <div className="space-y-2">
+                                      <RenderEditInput def={def} value={editValue} onChange={setEditValue} />
+                                      <div className="flex flex-wrap gap-2 items-center">
+                                        <Input className="h-7 text-xs w-40 placeholder:text-slate-400" value={editReason} onChange={e => setEditReason(e.target.value)} placeholder="Reason for change…" />
+                                        <Button size="sm" className="h-7 text-xs px-3 bg-blue-600 hover:bg-blue-700" onClick={() => onSave(v.id)}><Save className="w-3 h-3 mr-1" /> Save</Button>
+                                        <Button size="sm" variant="ghost" className="h-7 text-xs px-2.5" onClick={() => setEditingVar(null)}>Cancel</Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <RenderDisplayValue def={def} value={v.finalValue || v.autoFilledValue || ""} sourceType={v.sourceType} />
+                                  )}
+                                </div>
+
+                                {/* Action buttons */}
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {confidenceBadge(v.confidence ? Number(v.confidence) : null)}
+                                  {v.reviewStatus === "needs_review" && !v.isLocked && (
+                                    <button onClick={() => onReview(v.id)} className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 hover:bg-purple-200 border border-purple-200 whitespace-nowrap">
+                                      <Check className="w-2.5 h-2.5 inline mr-0.5" /> Review
+                                    </button>
+                                  )}
+                                  {v.isLocked ? (
+                                    <div className="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center" title="Locked">
+                                      <Lock className="w-3 h-3 text-slate-400" />
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => { setEditingVar(v.id); setEditValue(v.finalValue || ""); setEditReason(""); }}
+                                      className="w-6 h-6 rounded-md hover:bg-blue-50 flex items-center justify-center border border-transparent hover:border-blue-200 transition-colors"
+                                      title="Edit"
+                                    >
+                                      <Pencil className="w-3 h-3 text-slate-400 hover:text-blue-600" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
-
-          {variables.length === 0 && (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 rounded-2xl bg-slate-100 mx-auto mb-4 flex items-center justify-center">
-                <Settings2 className="w-8 h-8 text-slate-300" />
-              </div>
-              <p className="text-slate-500 font-medium">No variables yet</p>
-              <p className="text-xs text-slate-400 mt-1">Go back to run extraction and auto-fill</p>
-            </div>
-          )}
-
-          {showAuditTrail && changeLog.length > 0 && (
-            <div className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4">
-              <h3 className="text-xs font-semibold text-slate-700 mb-3 flex items-center gap-2 uppercase tracking-wider">
-                <ClipboardCheck className="w-4 h-4 text-slate-500" /> Audit Trail ({changeLog.length} changes)
-              </h3>
-              <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                {changeLog.map((c: any) => (
-                  <div key={c.id} className="text-xs flex flex-wrap gap-2 sm:gap-3 p-2.5 rounded-lg bg-white border border-slate-100 items-center">
-                    <span className="font-mono text-slate-400 text-[10px]">{c.variableCode || c.fieldName}</span>
-                    <span className="font-medium text-slate-700">{(c.fieldName || "").replace(/_/g, " ")}</span>
-                    <span className="text-red-500 line-through bg-red-50 px-1.5 py-0.5 rounded">{c.oldValue || "—"}</span>
-                    <ArrowRight className="w-3 h-3 text-slate-300" />
-                    <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{c.newValue}</span>
-                    {c.reason && <span className="text-slate-400 italic">({c.reason})</span>}
-                    {c.sourceOfChange && <span className="text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded text-[10px]">[{c.sourceOfChange}]</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
+
+        {/* Audit trail */}
+        {showAuditTrail && changeLog.length > 0 && (
+          <div className="m-5 mt-0 bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <h3 className="text-xs font-semibold text-slate-700 mb-3 flex items-center gap-2 uppercase tracking-wider">
+              <ClipboardCheck className="w-4 h-4 text-slate-500" /> Audit Trail ({changeLog.length} changes)
+            </h3>
+            <div className="space-y-1.5 max-h-48 overflow-y-auto">
+              {changeLog.map((c: any) => (
+                <div key={c.id} className="text-xs flex flex-wrap gap-2 sm:gap-3 p-2.5 rounded-lg bg-white border border-slate-100 items-center">
+                  <span className="font-mono text-slate-400 text-[10px]">{c.variableCode || c.fieldName}</span>
+                  <span className="font-medium text-slate-700">{(c.fieldName || "").replace(/_/g, " ")}</span>
+                  <span className="text-red-500 line-through bg-red-50 px-1.5 py-0.5 rounded">{c.oldValue || "—"}</span>
+                  <ArrowRight className="w-3 h-3 text-slate-300" />
+                  <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{c.newValue}</span>
+                  {c.reason && <span className="text-slate-400 italic">({c.reason})</span>}
+                  {c.sourceOfChange && <span className="text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded text-[10px]">[{c.sourceOfChange}]</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
