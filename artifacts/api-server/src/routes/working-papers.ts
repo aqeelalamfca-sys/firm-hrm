@@ -7432,6 +7432,27 @@ async function autoFillVariablesFromTemplate(
 
       // ── PRINCIPAL ACTIVITY (derived from industry in top section) ──────────
       "principal_activity":                meta.industry ? `${meta.industry} operations` : "",
+
+      // ── PROCEDURE_SCALE (Col Q) — dominant audit depth across all template rows ──
+      // Derived from Procedure_Scale column: Expanded > Standard > Basic by count
+      "audit_procedure_depth":             (() => {
+        const counts: Record<string, number> = { Expanded: 0, Standard: 0, Basic: 0 };
+        rows.forEach(r => {
+          const ps = String(r.procedureScale || "").trim();
+          if (ps === "Expanded") counts.Expanded++;
+          else if (ps === "Standard") counts.Standard++;
+          else if (ps === "Basic") counts.Basic++;
+        });
+        if (counts.Expanded >= counts.Standard && counts.Expanded >= counts.Basic) return "Expanded";
+        if (counts.Standard >= counts.Basic) return "Standard";
+        return "Basic";
+      })(),
+
+      // ── GL_GENERATION_PRIORITY (Col S) — count of High-priority accounts ──
+      // Derived from GL_Generation_Priority column: count rows where priority = "High"
+      "high_priority_gl_count":            String(
+        rows.filter(r => nrm(r.glGenerationPriority) === "high").length
+      ),
     };
 
     // ── 3. MANDATORY FIELD VALIDATION ─────────────────────────────────────

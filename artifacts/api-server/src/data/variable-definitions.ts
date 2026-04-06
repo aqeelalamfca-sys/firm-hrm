@@ -193,6 +193,8 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("tb_total_period_credit", "Trial Balance & COA", "Balances", "Total Period Credit", { dataType: "number", inputMode: "currency", displayOrder: 19 }),
   v("tb_opening_balance_aggregate", "Trial Balance & COA", "Balances", "Total Opening Balance", { dataType: "number", inputMode: "currency", displayOrder: 20 }),
   v("tb_closing_balance_aggregate", "Trial Balance & COA", "Balances", "Total Closing Balance", { dataType: "number", inputMode: "currency", displayOrder: 21 }),
+  v("audit_procedure_depth", "Trial Balance & COA", "Audit Depth", "Dominant Procedure Depth", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Expanded","Standard","Basic"]), displayOrder: 22 }),
+  v("high_priority_gl_count", "Trial Balance & COA", "GL Generation", "High-Priority GL Accounts", { dataType: "number", inputMode: "number", displayOrder: 23 }),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GROUP 6 — Financial Statement Figures (CY + PY)
