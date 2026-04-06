@@ -2,12 +2,14 @@
 # =============================================================================
 # Replit → GitHub → VPS Deploy Script
 # Usage: bash scripts/deploy.sh ["optional commit message"]
-# Supports: SSH key (VPS_SSH_KEY) OR password (VPS_SSH_PASSWORD)
+# Requires secrets: GITHUB_TOKEN, VPS_SSH_KEY
+# Requires env vars: VPS_HOST, VPS_USERNAME, VPS_PORT, DB_PASSWORD,
+#                    JWT_SECRET, ENCRYPTION_KEY, GITHUB_REPO
 # =============================================================================
 set -e
 
 COMMIT_MSG="${1:-Deploy from Replit $(date '+%Y-%m-%d %H:%M UTC')}"
-REPO="aqeelalamfca-sys/firm-hrm"
+REPO="${GITHUB_REPO:-aqeelalamfca-sys/firm-hrm}"
 VPS_USER="${VPS_USERNAME:-root}"
 VPS_IP="${VPS_HOST:-187.77.130.117}"
 VPS_PORT="${VPS_PORT:-22}"
@@ -19,200 +21,241 @@ ok()   { echo -e "${GREEN}✓${NC} $1"; }
 warn() { echo -e "${YELLOW}⚠${NC} $1"; }
 err()  { echo -e "${RED}✗${NC} $1"; exit 1; }
 
-# ── 1. Set up SSH auth (key preferred, password fallback) ─────────────────────
-SSH_CMD=""
-SCP_CMD=""
-
-setup_ssh() {
-  mkdir -p ~/.ssh
-  ssh-keyscan -p "$VPS_PORT" -T 10 "$VPS_IP" >> ~/.ssh/known_hosts 2>/dev/null || true
-
-  # Always prefer writing fresh from VPS_SSH_KEY secret if it is set
-  if [ -n "$VPS_SSH_KEY" ]; then
-    log "Writing VPS_SSH_KEY secret to disk..."
-    # Use node to properly reconstruct the PEM key (handles space-separated secrets)
-    export SSH_KEY_PATH="$SSH_KEY"
-    node - << 'JSEOF'
-const raw = process.env.VPS_SSH_KEY;
-const m = raw.match(/(-----BEGIN [^-]+ PRIVATE KEY-----)(.*?)(-----END [^-]+ PRIVATE KEY-----)/s);
-if (!m) { process.stderr.write("Cannot parse SSH key structure\n"); process.exit(1); }
-const body = m[2].replace(/\s+/g, '');
-const lines = [];
-for (let i = 0; i < body.length; i += 64) lines.push(body.slice(i, i + 64));
-const pem = m[1] + '\n' + lines.join('\n') + '\n' + m[3] + '\n';
-require('fs').writeFileSync(process.env.SSH_KEY_PATH, pem, { mode: 0o600 });
-JSEOF
-    chmod 600 "$SSH_KEY"
-    if ssh-keygen -y -f "$SSH_KEY" > /dev/null 2>&1; then
-      ok "SSH key written and validated from VPS_SSH_KEY secret"
-    else
-      err "SSH key validation failed — check that VPS_SSH_KEY contains a valid private key"
-    fi
-    SSH_CMD="ssh -i $SSH_KEY -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=20 -p $VPS_PORT"
-    return
-  fi
-
-  if [ -n "$VPS_SSH_PASSWORD" ]; then
-    log "No SSH key found — using password auth (sshpass)"
-    # Install sshpass if needed
-    if ! command -v sshpass &>/dev/null; then
-      log "Installing sshpass..."
-      apt-get install -y -q sshpass 2>/dev/null || \
-      yum install -y -q sshpass 2>/dev/null || \
-      nix-env -iA nixpkgs.sshpass 2>/dev/null || \
-      { warn "Could not auto-install sshpass; trying ssh-copy approach"; }
-    fi
-    if command -v sshpass &>/dev/null; then
-      SSH_CMD="sshpass -e ssh -o StrictHostKeyChecking=no -o PubkeyAuthentication=no -o ConnectTimeout=20 -p $VPS_PORT"
-      SSHPASS=$(printf '%s' "$VPS_SSH_PASSWORD")
-      export SSHPASS
-      ok "Password auth ready via sshpass"
-    else
-      err "sshpass not available and no SSH key set. Please add VPS_SSH_KEY to Replit Secrets."
-    fi
-    return
-  fi
-
-  err "No SSH credentials found. Set VPS_SSH_KEY or VPS_SSH_PASSWORD in Replit Secrets."
-}
-
-# ── 2. Push to GitHub ─────────────────────────────────────────────────────────
-push_to_github() {
-  [ -z "$GITHUB_TOKEN" ] && err "GITHUB_TOKEN secret is not set."
-
-  git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
-  git config --global user.name  "Replit Agent"
-  git config --global user.email "deploy@ana-ca.com"
-
-  # If the index is locked (e.g. by auto-checkpoint), wait briefly then force-remove
-  LOCK_FILE="$(git rev-parse --git-dir)/index.lock"
-  if [ -f "$LOCK_FILE" ]; then
-    warn "Git index.lock detected — waiting up to 10s for it to clear..."
-    for i in $(seq 1 4); do
-      sleep 2
-      [ ! -f "$LOCK_FILE" ] && break
-    done
-    if [ -f "$LOCK_FILE" ]; then
-      warn "Force-removing stale index.lock"
-      rm -f "$LOCK_FILE"
-    fi
-  fi
-
-  log "Staging all changes..."
-  git add -A
-  if git diff --cached --quiet; then
-    warn "No new changes to commit — pushing current HEAD anyway."
-  else
-    git commit -m "$COMMIT_MSG"
-    ok "Committed: $COMMIT_MSG"
-  fi
-
-  log "Pushing to GitHub..."
-  git push origin main
-  ok "Pushed → https://github.com/$REPO"
-}
-
-# ── 3. Deploy on VPS ──────────────────────────────────────────────────────────
-deploy_on_vps() {
-  log "Connecting to VPS ($VPS_IP) — Step 1: pull latest code..."
-
-  # Step 1: Pull code and kick off background build (exits SSH immediately)
-  $SSH_CMD "${VPS_USER}@${VPS_IP}" << 'REMOTE'
-APP_DIR=~/firm-hrm
-DEPLOY_DIR="$APP_DIR/deploy"
-LOG=/tmp/vps_deploy.log
-
-if [ ! -d "$APP_DIR/.git" ]; then
-  echo "[VPS] First deploy — cloning repository..."
-  git clone https://github.com/aqeelalamfca-sys/firm-hrm.git "$APP_DIR"
-else
-  echo "[VPS] Pulling latest code from origin/main..."
-  cd "$APP_DIR"
-  git fetch origin main
-  git checkout main 2>/dev/null || true
-  git merge --ff-only origin/main 2>/dev/null || git pull origin main
-fi
-
-cd "$APP_DIR"
-echo "[VPS] Code is at: $(git log --oneline -1)"
-
-[ ! -f "$DEPLOY_DIR/.env" ] && [ -f "$DEPLOY_DIR/.env.example" ] && \
-  cp "$DEPLOY_DIR/.env.example" "$DEPLOY_DIR/.env" && echo "[VPS] .env created"
-
-docker network create auditwise_auditwise 2>/dev/null || true
-
-# Launch build in background — writes to log, exits SSH session quickly
-echo "[VPS] Launching background build → $LOG"
-echo "" > "$LOG"
-nohup bash -c '
-  LOG=/tmp/vps_deploy.log
-  DEPLOY_DIR=~/firm-hrm/deploy
-  cd "$DEPLOY_DIR"
-  echo "[$(date -u)] Stopping old containers..." | tee -a "$LOG"
-  docker compose --env-file .env down --remove-orphans >> "$LOG" 2>&1 || true
-  docker stop ana-backend ana-frontend >> "$LOG" 2>&1 || true
-  docker rm -f ana-backend ana-frontend >> "$LOG" 2>&1 || true
-  sleep 2
-  echo "[$(date -u)] Building ana-backend..." | tee -a "$LOG"
-  docker compose --env-file .env build ana-backend >> "$LOG" 2>&1
-  echo "[$(date -u)] Starting ana-backend..." | tee -a "$LOG"
-  docker compose --env-file .env up -d --force-recreate --no-deps ana-backend >> "$LOG" 2>&1
-  echo "[$(date -u)] Building ana-frontend..." | tee -a "$LOG"
-  docker compose --env-file .env build ana-frontend >> "$LOG" 2>&1
-  echo "[$(date -u)] Starting ana-frontend..." | tee -a "$LOG"
-  docker compose --env-file .env up -d --force-recreate --no-deps ana-frontend >> "$LOG" 2>&1
-  echo "[$(date -u)] Seeding admin..." | tee -a "$LOG"
-  docker exec ana-db psql -U ana_user -d ana_hrm -c "INSERT INTO users (email,password_hash,name,role,user_status,created_at,updated_at) VALUES ('"'"'admin@calfirm.com'"'"','"'"'961c2b43f4d675b76fad6a74cb9797ca0c8e697254304c57b47e3b3adc13e66c'"'"','"'"'Admin'"'"','"'"'super_admin'"'"','"'"'active'"'"',NOW(),NOW()) ON CONFLICT (email) DO UPDATE SET password_hash=EXCLUDED.password_hash,role=EXCLUDED.role,updated_at=NOW();" >> "$LOG" 2>&1 || true
-  echo "[$(date -u)] DEPLOY COMPLETE!" | tee -a "$LOG"
-' >> "$LOG" 2>&1 &
-echo "[VPS] Background build started (PID $!). Monitor: tail -f /tmp/vps_deploy.log"
-REMOTE
-
-  log "Background build running on VPS. Waiting 3 min for build to complete..."
-
-  # Step 2: Wait then check
-  for WAIT in 60 60 60 30; do
-    sleep "$WAIT"
-    log "Checking build status..."
-    DONE=$($SSH_CMD "${VPS_USER}@${VPS_IP}" "tail -5 /tmp/vps_deploy.log 2>/dev/null" 2>/dev/null || echo "ssh_error")
-    echo "$DONE"
-    if echo "$DONE" | grep -q "DEPLOY COMPLETE"; then
-      break
-    fi
-  done
-
-  # Step 3: Show final container status
-  log "Final container status:"
-  $SSH_CMD "${VPS_USER}@${VPS_IP}" \
-    "docker ps --filter 'name=ana-' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null; \
-     echo; echo 'Last 10 lines of build log:'; tail -10 /tmp/vps_deploy.log 2>/dev/null" 2>/dev/null || true
-
-  ok "VPS deployment complete"
-}
-
-# ── 4. Verify live ────────────────────────────────────────────────────────────
-verify_live() {
-  log "Checking live site..."
-  sleep 5
-  STATUS=$(curl -o /dev/null -s -w "%{http_code}" --max-time 15 https://ana-ca.com/api/health 2>/dev/null || echo "000")
-  if [ "$STATUS" = "200" ]; then
-    ok "Live at https://ana-ca.com ✓ (HTTP $STATUS)"
-  else
-    warn "Live check returned HTTP $STATUS (DNS/SSL may still be propagating — this is normal on first deploy)"
-  fi
-}
-
-# ── Main ──────────────────────────────────────────────────────────────────────
 echo ""
 echo "╔══════════════════════════════════════════════════╗"
 echo "║     Replit → GitHub → VPS → ana-ca.com          ║"
 echo "╚══════════════════════════════════════════════════╝"
 echo ""
 
+# ── 1. Validate required secrets ──────────────────────────────────────────────
+validate_env() {
+  local missing=0
+  for var in GITHUB_TOKEN VPS_SSH_KEY DB_PASSWORD JWT_SECRET ENCRYPTION_KEY; do
+    if [ -z "${!var}" ]; then
+      warn "Missing required: $var"
+      missing=1
+    fi
+  done
+  [ "$missing" -eq 1 ] && err "Set missing secrets in Replit Secrets panel, then retry."
+  ok "All required secrets present"
+}
+
+# ── 2. Set up SSH ─────────────────────────────────────────────────────────────
+setup_ssh() {
+  mkdir -p ~/.ssh && chmod 700 ~/.ssh
+
+  log "Writing VPS SSH key from secret..."
+  export SSH_KEY_PATH="$SSH_KEY"
+  node - << 'JSEOF'
+const raw = process.env.VPS_SSH_KEY;
+if (!raw) { process.stderr.write("VPS_SSH_KEY is empty\n"); process.exit(1); }
+const m = raw.match(/(-----BEGIN [^\n-]+ (?:PRIVATE )?KEY-----)([\s\S]*?)(-----END [^\n-]+ (?:PRIVATE )?KEY-----)/);
+if (!m) { process.stderr.write("Cannot parse SSH key — paste the full key including BEGIN/END lines\n"); process.exit(1); }
+const body = m[2].replace(/\s+/g, '');
+const lines = [];
+for (let i = 0; i < body.length; i += 64) lines.push(body.slice(i, i + 64));
+const pem = m[1] + '\n' + lines.join('\n') + '\n' + m[3] + '\n';
+require('fs').writeFileSync(process.env.SSH_KEY_PATH, pem, { mode: 0o600 });
+JSEOF
+
+  chmod 600 "$SSH_KEY"
+  if ! ssh-keygen -y -f "$SSH_KEY" > /dev/null 2>&1; then
+    err "SSH key validation failed — verify VPS_SSH_KEY secret contains a valid private key"
+  fi
+  ok "SSH key validated"
+
+  log "Scanning VPS host fingerprint..."
+  ssh-keyscan -p "$VPS_PORT" -T 15 "$VPS_IP" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+  SSH_CMD="ssh -i $SSH_KEY -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=20 -p $VPS_PORT"
+
+  log "Testing SSH connection to $VPS_IP..."
+  if ! $SSH_CMD "${VPS_USER}@${VPS_IP}" "echo 'SSH OK'" 2>/dev/null | grep -q "SSH OK"; then
+    err "SSH failed. Make sure the public key for VPS_SSH_KEY is in /root/.ssh/authorized_keys on the VPS."
+  fi
+  ok "SSH connection verified"
+}
+
+# ── 3. Push to GitHub ─────────────────────────────────────────────────────────
+push_to_github() {
+  log "Configuring git with GitHub token..."
+  git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+  git config --global user.name  "Replit Deploy"
+  git config --global user.email "deploy@ana-ca.com"
+
+  LOCK_FILE="$(git rev-parse --git-dir)/index.lock"
+  if [ -f "$LOCK_FILE" ]; then
+    warn "Removing stale git index.lock"
+    rm -f "$LOCK_FILE"
+  fi
+
+  log "Staging all changes..."
+  git add -A
+
+  if git diff --cached --quiet; then
+    warn "No new changes to commit — pushing current HEAD."
+  else
+    git commit -m "$COMMIT_MSG"
+    ok "Committed: $COMMIT_MSG"
+  fi
+
+  log "Pushing to GitHub (origin/main)..."
+  git push origin main
+  ok "Pushed → https://github.com/$REPO"
+}
+
+# ── 4. Upload .env securely to VPS ────────────────────────────────────────────
+upload_env() {
+  log "Uploading production .env to VPS (secrets never stored in git)..."
+  printf 'DB_PASSWORD=%s\nJWT_SECRET=%s\nENCRYPTION_KEY=%s\n' \
+    "$DB_PASSWORD" "$JWT_SECRET" "$ENCRYPTION_KEY" > /tmp/_vps_env
+
+  scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -P "$VPS_PORT" \
+    /tmp/_vps_env "${VPS_USER}@${VPS_IP}:/root/firm-hrm/deploy/.env.upload" 2>/dev/null || true
+  rm -f /tmp/_vps_env
+
+  # Merge upload into .env on VPS (only update keys that are set)
+  $SSH_CMD "${VPS_USER}@${VPS_IP}" << 'REMOTE'
+UPLOAD=/root/firm-hrm/deploy/.env.upload
+TARGET=/root/firm-hrm/deploy/.env
+if [ -f "$UPLOAD" ]; then
+  cp "$UPLOAD" "$TARGET"
+  rm -f "$UPLOAD"
+  echo "[VPS] .env updated from Replit secrets"
+fi
+REMOTE
+  ok ".env uploaded to VPS"
+}
+
+# ── 5. Deploy on VPS ──────────────────────────────────────────────────────────
+deploy_on_vps() {
+  log "Connecting to VPS — pulling latest code and starting build..."
+
+  $SSH_CMD "${VPS_USER}@${VPS_IP}" << 'REMOTE'
+APP_DIR=~/firm-hrm
+DEPLOY_DIR="$APP_DIR/deploy"
+LOG=/tmp/vps_deploy.log
+
+echo "[VPS] Starting deployment at $(date -u)"
+
+if [ ! -d "$APP_DIR/.git" ]; then
+  echo "[VPS] First deploy — cloning repo..."
+  git clone https://github.com/aqeelalamfca-sys/firm-hrm.git "$APP_DIR"
+else
+  echo "[VPS] Pulling latest from origin/main..."
+  cd "$APP_DIR"
+  git fetch origin main
+  git reset --hard origin/main
+fi
+cd "$APP_DIR"
+echo "[VPS] HEAD: $(git log --oneline -1)"
+
+echo "" > "$LOG"
+nohup bash -c '
+  LOG=/tmp/vps_deploy.log
+  DEPLOY_DIR=~/firm-hrm/deploy
+  cd "$DEPLOY_DIR"
+
+  echo "[$(date -u)] === DEPLOY START ===" | tee -a "$LOG"
+
+  echo "[$(date -u)] Stopping backend gracefully..." | tee -a "$LOG"
+  docker compose --env-file .env stop ana-backend >> "$LOG" 2>&1 || true
+  docker compose --env-file .env rm -f ana-backend >> "$LOG" 2>&1 || true
+
+  echo "[$(date -u)] Building new image..." | tee -a "$LOG"
+  if docker compose --env-file .env build --no-cache ana-backend >> "$LOG" 2>&1; then
+    echo "[$(date -u)] Build succeeded" | tee -a "$LOG"
+  else
+    echo "[$(date -u)] BUILD FAILED" | tee -a "$LOG"
+    exit 1
+  fi
+
+  echo "[$(date -u)] Starting database..." | tee -a "$LOG"
+  docker compose --env-file .env up -d ana-db >> "$LOG" 2>&1
+
+  echo "[$(date -u)] Waiting for database..." | tee -a "$LOG"
+  for i in $(seq 1 30); do
+    docker exec ana-db pg_isready -U ana_user -d ana_hrm > /dev/null 2>&1 && break || sleep 2
+  done
+  echo "[$(date -u)] Database ready" | tee -a "$LOG"
+
+  echo "[$(date -u)] Starting backend..." | tee -a "$LOG"
+  docker compose --env-file .env up -d --force-recreate --no-deps ana-backend >> "$LOG" 2>&1
+
+  echo "[$(date -u)] Waiting for backend health..." | tee -a "$LOG"
+  for i in $(seq 1 24); do
+    docker exec ana-backend node -e "fetch('"'"'http://localhost:5000/api/health'"'"').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))" > /dev/null 2>&1 && break || sleep 5
+  done
+
+  echo "[$(date -u)] Seeding default admin (idempotent)..." | tee -a "$LOG"
+  docker exec ana-db psql -U ana_user -d ana_hrm -c "
+    INSERT INTO users (email,password_hash,name,role,user_status,created_at,updated_at)
+    VALUES (
+      '"'"'admin@calfirm.com'"'"',
+      '"'"'961c2b43f4d675b76fad6a74cb9797ca0c8e697254304c57b47e3b3adc13e66c'"'"',
+      '"'"'Admin'"'"','"'"'super_admin'"'"','"'"'active'"'"',NOW(),NOW()
+    ) ON CONFLICT (email) DO NOTHING;
+  " >> "$LOG" 2>&1 || true
+
+  echo "[$(date -u)] Container status:" | tee -a "$LOG"
+  docker ps --filter "name=ana-" --format "  {{.Names}}: {{.Status}}" | tee -a "$LOG"
+
+  echo "[$(date -u)] === DEPLOY COMPLETE ===" | tee -a "$LOG"
+' >> "$LOG" 2>&1 &
+echo "[VPS] Background build started. Monitor: tail -f /tmp/vps_deploy.log"
+REMOTE
+
+  ok "VPS build kicked off in background"
+  log "Polling for completion (up to 6 min)..."
+
+  local elapsed=0
+  while [ $elapsed -lt 360 ]; do
+    sleep 30
+    elapsed=$((elapsed + 30))
+    log "Status check at ${elapsed}s..."
+    local status
+    status=$($SSH_CMD "${VPS_USER}@${VPS_IP}" "tail -4 /tmp/vps_deploy.log 2>/dev/null" 2>/dev/null || echo "")
+    echo "$status"
+    if echo "$status" | grep -q "DEPLOY COMPLETE"; then
+      ok "Deployment completed successfully!"
+      break
+    fi
+    if echo "$status" | grep -q "BUILD FAILED"; then
+      err "Build failed on VPS. Run: bash scripts/vps-logs.sh to see details."
+    fi
+  done
+
+  log "Final container status:"
+  $SSH_CMD "${VPS_USER}@${VPS_IP}" \
+    "docker ps --filter 'name=ana-' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'; echo; echo 'Last build log lines:'; tail -8 /tmp/vps_deploy.log" \
+    2>/dev/null || true
+}
+
+# ── 6. Verify live site ───────────────────────────────────────────────────────
+verify_live() {
+  log "Verifying https://ana-ca.com is live..."
+  sleep 5
+  local status
+  status=$(curl -sLo /dev/null -w "%{http_code}" --max-time 20 https://ana-ca.com/api/health 2>/dev/null || echo "000")
+  if [ "$status" = "200" ]; then
+    ok "LIVE ✓ https://ana-ca.com (HTTP $status)"
+  else
+    warn "Health check returned HTTP $status — DNS may be propagating or SSL may need setup"
+    warn "To set up SSL on VPS: certbot --nginx -d ana-ca.com -d www.ana-ca.com --non-interactive --agree-tos -m admin@ana-ca.com"
+  fi
+}
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+validate_env
 setup_ssh
 push_to_github
+upload_env
 deploy_on_vps
 verify_live
 
 echo ""
-ok "Done! https://ana-ca.com is live."
+ok "All done! https://ana-ca.com"
+echo ""
+echo "  bash scripts/vps-status.sh   — container health"
+echo "  bash scripts/vps-logs.sh     — live backend logs"
+echo "  bash scripts/vps-rollback.sh — rollback to previous commit"

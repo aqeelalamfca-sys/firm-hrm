@@ -1,0 +1,228 @@
+AUDIT VARIABLE REGISTER — 417 Variables Total
+Category	Count	Description
+A. Primary	116	Read directly from Template Upload or Session Form
+B. Secondary	44	Auto-calculated by formula from Primary data
+C. AI Thinking	257	Need AI extraction or auditor judgment
+________________________________________
+A. PRIMARY VARIABLES (116)
+Sourced directly from the Financial Data Upload Template or Session Creation Form — no calculation needed
+Entity & Constitution (15 vars)
+#	Variable Code	Label	Source
+1	entity_name	Entity Name	Template + Session
+2	legal_name_as_per_secp	Legal Name (SECP)	Template + Session
+3	short_name	Short Name	Template + Session
+4	ntn	NTN	Session Form
+5	strn	STRN	Session Form
+6	entity_legal_form	Legal Form	Template + Session
+7	industry_sector	Industry Sector	Template + Session
+8	financial_year_start	Financial Year Start	Template + Session
+9	financial_year_end	Financial Year End	Template + Session
+10	reporting_period_start	Reporting Period Start	Template + Session
+11	reporting_period_end	Reporting Period End	Template + Session
+12	functional_currency	Functional Currency	Template + Session
+13	presentation_currency	Presentation Currency	Template + Session
+14	reporting_framework	Reporting Framework	Template + Session
+15	applicable_company_law	Applicable Company Law	Template + Session
+Engagement Acceptance (10 vars)
+#	Variable Code	Label	Source
+16	engagement_type	Engagement Type	Template + Session
+17	assurance_level	Assurance Level	Template + Session
+18	engagement_size	Engagement Size	Template + Session
+19	first_year_audit	First Year Audit	Session Form
+20	recurring_engagement	Recurring Engagement	Session Form
+21	engagement_partner	Engagement Partner	Session Form
+22	engagement_manager	Engagement Manager	Session Form
+23	engagement_start_date	Engagement Start Date	Session Form
+24	reporting_deadline	Reporting Deadline	Session Form
+25	expected_signing_date	Expected Signing Date	Session Form
+Trial Balance & COA — Aggregates (6 vars from template rows)
+#	Variable Code	Label	Source
+26	tb_line_count	TB Line Count	Template Upload
+27	tb_total_period_debit	Total Period Debit	Template Upload
+28	tb_total_period_credit	Total Period Credit	Template Upload
+29	tb_opening_balance_aggregate	Total Opening Balance	Template Upload
+30	tb_closing_balance_aggregate	Total Closing Balance	Template Upload
+31	audit_procedure_depth	Dominant Procedure Depth	Template Upload
+Materiality (1 var)
+#	Variable Code	Label	Source
+32	materiality_basis	Materiality Basis	Template Upload
+Financial Statements — Current Year (42 vars)
+#	Variable Code	Label
+33	cy_total_assets	CY: Total Assets
+34	cy_non_current_assets	CY: Non-Current Assets
+35	cy_current_assets	CY: Current Assets
+36	cy_fixed_assets	CY: Fixed Assets (PPE)
+37	cy_right_of_use_assets	CY: Right-of-Use Assets
+38	cy_capital_work_in_progress	CY: Capital Work in Progress
+39	cy_intangible_assets	CY: Intangible Assets
+40	cy_investments	CY: Investments
+41	cy_long_term_loans	CY: Long-Term Loans & Advances
+42	cy_deposits_prepayments	CY: Deposits & Prepayments
+43	cy_inventory	CY: Inventory
+44	cy_trade_receivables	CY: Trade Receivables
+45	cy_advances	CY: Advances
+46	cy_other_receivables	CY: Other Receivables
+47	cy_short_term_investments	CY: Short-Term Investments
+48	cy_tax_refunds_due	CY: Tax Refunds Due
+49	cy_cash_and_bank	CY: Cash & Bank Balances
+50	cy_total_equity	CY: Total Equity
+51	cy_share_capital_fs	CY: Share Capital (FS)
+52	cy_reserves	CY: Reserves
+53	cy_retained_earnings	CY: Retained Earnings
+54	cy_revaluation_surplus	CY: Revaluation Surplus
+55	cy_total_liabilities	CY: Total Liabilities
+56	cy_non_current_liabilities	CY: Non-Current Liabilities
+57	cy_current_liabilities	CY: Current Liabilities
+58	cy_long_term_borrowings	CY: Long-Term Borrowings
+59	cy_lease_liabilities	CY: Lease Liabilities
+60	cy_trade_payables	CY: Trade Payables
+61	cy_accruals	CY: Accrued Liabilities
+62	cy_taxation_payable	CY: Taxation Payable
+63	cy_short_term_borrowings	CY: Short-Term Borrowings
+64	cy_current_portion_long_term_debt	CY: Current Portion of LT Debt
+65	cy_revenue	CY: Revenue
+66	cy_cost_of_sales	CY: Cost of Sales
+67	cy_gross_profit	CY: Gross Profit
+68	cy_admin_expenses	CY: Administrative Expenses
+69	cy_selling_distribution_expenses	CY: Selling & Distribution Expenses
+70	cy_finance_cost	CY: Finance Cost
+71	cy_other_income	CY: Other Income
+72	cy_other_expenses	CY: Other Expenses
+73	cy_profit_before_tax	CY: Profit Before Tax
+74	cy_tax_expense	CY: Tax Expense
+75	cy_profit_after_tax	CY: Profit After Tax
+76	cy_other_comprehensive_income	CY: Other Comprehensive Income
+77	cy_total_comprehensive_income	CY: Total Comprehensive Income
+78	cy_operating_cash_flow	CY: Operating Cash Flow
+79	cy_investing_cash_flow	CY: Investing Cash Flow
+80	cy_financing_cash_flow	CY: Financing Cash Flow
+Financial Statements — Prior Year (36 vars)
+#	Variable Code	Label
+81	py_total_assets	PY: Total Assets
+82	py_non_current_assets	PY: Non-Current Assets
+83	py_current_assets	PY: Current Assets
+84	py_fixed_assets	PY: Fixed Assets (PPE)
+85	py_right_of_use_assets	PY: Right-of-Use Assets
+86	py_capital_work_in_progress	PY: Capital Work in Progress
+87	py_intangible_assets	PY: Intangible Assets
+88	py_investments	PY: Investments
+89	py_inventory	PY: Inventory
+90	py_trade_receivables	PY: Trade Receivables
+91	py_cash_and_bank	PY: Cash & Bank Balances
+92	py_total_equity	PY: Total Equity
+93	py_share_capital_fs	PY: Share Capital (FS)
+94	py_retained_earnings	PY: Retained Earnings
+95	py_total_liabilities	PY: Total Liabilities
+96	py_non_current_liabilities	PY: Non-Current Liabilities
+97	py_current_liabilities	PY: Current Liabilities
+98	py_long_term_borrowings	PY: Long-Term Borrowings
+99	py_trade_payables	PY: Trade Payables
+100	py_taxation_payable	PY: Taxation Payable
+101	py_revenue	PY: Revenue
+102	py_cost_of_sales	PY: Cost of Sales
+103	py_gross_profit	PY: Gross Profit
+104	py_admin_expenses	PY: Administrative Expenses
+105	py_selling_distribution_expenses	PY: Selling & Distribution Expenses
+106	py_finance_cost	PY: Finance Cost
+107	py_other_income	PY: Other Income
+108	py_other_expenses	PY: Other Expenses
+109	py_profit_before_tax	PY: Profit Before Tax
+110	py_tax_expense	PY: Tax Expense
+111	py_profit_after_tax	PY: Profit After Tax
+112	py_other_comprehensive_income	PY: Other Comprehensive Income
+113	py_total_comprehensive_income	PY: Total Comprehensive Income
+114	py_operating_cash_flow	PY: Operating Cash Flow
+115	py_investing_cash_flow	PY: Investing Cash Flow
+116	py_financing_cash_flow	PY: Financing Cash Flow
+________________________________________
+B. SECONDARY VARIABLES (44)
+Auto-calculated by the system during template processing — zero manual entry required
+#	Variable Code	Label	Group	Derivation Formula / Logic
+1	principal_activity	Principal Activity	Entity	Industry field + " operations" concatenation
+2	books_maintained_properly	Books Maintained Properly	Accounting	Template has complete TB rows with no critical gaps
+3	gl_available	GL Available	Accounting	AI_GL_Flag column (col R) has at least one Yes row
+4	tb_available	TB Available	Accounting	Template uploaded and TB rows parsed successfully
+5	fs_uploaded	FS Uploaded	Accounting	Financial Data Upload template detected and processed
+6	prior_year_fs_available	Prior Year FS Available	Accounting	Prior_Year column (col K) contains non-zero values
+7	inventory_records_available	Inventory Records Available	Accounting	WP_Area = Inventory exists in any TB row
+8	bank_statements_available	Bank Statements Available	Accounting	WP_Area = Cash and Bank exists in any TB row
+9	coa_available	COA Available	TB & COA	Account_Code + Account_Name columns are populated
+10	account_code_present	Account Codes Present	TB & COA	Boolean: Account_Code column (col H) is populated
+11	account_name_present	Account Names Present	TB & COA	Boolean: Account_Name column (col G) is populated
+12	account_type	Account Type Classification	TB & COA	Account_Code length: 4-digit = Detailed CoA, 5-digit = Granular
+13	account_classification	Account Classification Done	TB & COA	Statement_Type values: BS / P&L (col B) detected
+14	opening_balance_present	Opening Balance Present	TB & COA	Prior_Year column (col K) has non-zero values
+15	movement_debit_present	Movement Debit Present	TB & COA	Debit_Transaction_Value column (col L) has non-zero values
+16	movement_credit_present	Movement Credit Present	TB & COA	Credit_Transaction_Value column (col M) has non-zero values
+17	closing_balance_present	Closing Balance Present	TB & COA	Current_Year column (col J) has non-zero values
+18	tb_balanced_flag	TB Balanced	TB & COA	Total Debit == Total Credit check on all TB rows
+19	unmapped_accounts_count	Unmapped Accounts Count	TB & COA	Count of TB rows with no FS_Section assigned
+20	fs_mapping_completed	FS Mapping Completed	TB & COA	All TB rows have Statement_Type + FS_Section + Major_Head
+21	control_accounts_identified	Control Accounts Identified	TB & COA	Detection of summary control accounts in TB
+22	manual_tb_adjustments_flag	Manual TB Adjustments	TB & COA	Adjusted_TB_Flag field in template top section
+23	variance_analysis_done	Variance Analysis Done	Fin. Statements	CY vs PY movement computed; flag if > materiality threshold
+24	materiality_basis_amount	Materiality Basis Amount	Materiality	CY revenue / CY profit / CY total assets (highest base)
+25	overall_materiality_percent	Overall Materiality %	Materiality	ISA 320: 5% of profit / 1% of revenue / 2% of equity
+26	overall_materiality_amount	Overall Materiality Amount	Materiality	materiality_basis_amount × overall_materiality_percent
+27	performance_materiality_percent	Performance Materiality %	Materiality	75% of overall materiality (ISA 320)
+28	performance_materiality_amount	Performance Materiality Amount	Materiality	overall_materiality_amount × 75%
+29	trivial_threshold_percent	Trivial Threshold %	Materiality	3–5% of overall materiality (ISA 450)
+30	trivial_threshold_amount	Trivial Threshold Amount	Materiality	overall_materiality_amount × trivial_threshold_percent
+31	inherent_risk_overall	Inherent Risk (Overall)	Risk Assessment	Highest Risk_Level value across all TB rows (col P)
+32	control_risk_overall	Control Risk (Overall)	Risk Assessment	Count of High Risk_Level rows: >3 = High risk overall
+33	risk_of_material_misstatement_overall	RMM (Overall)	Risk Assessment	inherent_risk_overall combined with control_risk_overall
+34	fraud_risk_flag	Fraud Risk Identified	Risk Assessment	Any row with WP_Area = Revenue AND Risk_Level = High
+35	revenue_fraud_risk_flag	Revenue Fraud Risk	Risk Assessment	Revenue WP_Area row detected with High Risk_Level
+36	management_override_risk_flag	Management Override Risk	Risk Assessment	Mandatory ISA 240 default — always true
+37	significant_risk_areas	Significant Risk Areas	Risk Assessment	List of WP_Area values where Risk_Level = High (cols O+P)
+38	account_level_risk_mapping_done	Account-Level Risk Mapping Done	Risk Assessment	All TB rows have WP_Area assigned (col O non-empty)
+39	sampling_required	Sampling Required	Sampling	population_value > overall_materiality_amount
+40	population_value	Population Value	Sampling	cy_revenue or cy_inventory (largest auditable population)
+41	sampling_basis	Sampling Basis	Sampling	Statistical (large pop) vs Judgmental (small pop) detection
+42	gc_losses_flag	Recurring Losses	Going Concern	cy_profit_after_tax < 0
+43	gc_negative_equity_flag	Negative Equity	Going Concern	cy_total_equity < 0
+44	gc_negative_operating_cashflows_flag	Negative Operating Cash Flows	Going Concern	cy_operating_cash_flow < 0
+________________________________________
+C. AI THINKING VARIABLES (257)
+Must be populated by AI extraction from documents or auditor professional judgment
+Entity & Constitution (17 vars)
+secp_registration_no · incorporation_date · commencement_date · listed_status · public_interest_entity_flag · registered_address · business_address · principal_place_of_business · branch_offices_flag · number_of_branches · tax_jurisdiction · group_entity_flag · parent_entity_name · subsidiary_flag · associate_flag · joint_venture_flag · foreign_operations_flag
+Ownership & Governance (22 vars)
+share_capital · authorized_capital · paid_up_capital · classes_of_shares · number_of_shareholders · shareholder_pattern_available · beneficial_owners_identified · board_exists · number_of_directors · ceo_name · cfo_name · company_secretary · audit_committee_exists · internal_audit_function_exists · governance_level · key_management_personnel · related_parties_exist · related_parties_list · minutes_available · board_minutes_reviewed · agm_held · statutory_registers_available
+Engagement Acceptance (18 vars)
+previous_auditor · predecessor_communication_done · client_acceptance_approved · continuance_approved · independence_confirmed · ethical_compliance_confirmed · conflict_check_completed · engagement_letter_signed · terms_of_engagement_agreed · management_integrity_risk · client_risk_category · restricted_scope_flag · eqcr_required · specialist_required · component_auditor_required · engagement_team_members · reviewer · approver
+Accounting & Records (12 vars)
+accounting_software · erp_name · manual_or_system · prior_year_audit_file_available · fixed_asset_register_available · payroll_records_available · tax_records_available · voucher_support_available · digital_document_quality · ocr_quality_score · missing_records_flag · records_reliability_score
+Trial Balance & COA (3 vars)
+unmapped_accounts_value · adjusted_tb_flag · high_priority_gl_count
+Materiality (5 vars)
+benchmark_reason · specific_materiality_required · specific_materiality_areas · materiality_revision_flag · revised_materiality_reason
+Risk Assessment (8 vars)
+going_concern_risk_flag · related_party_risk_flag · litigation_risk_flag · tax_risk_flag · compliance_risk_flag · going_concern_indicator_count · risk_assessment_summary · assertion_level_risk_required
+Internal Controls (19 vars)
+control_environment_rating · segregation_of_duties · authorization_controls · access_controls · it_general_controls · application_controls · bank_payment_controls · procurement_controls · sales_controls · payroll_controls · inventory_controls · journal_entry_controls · controls_documented · walkthrough_completed · toc_planned · controls_reliance_planned · control_deficiencies_identified · significant_deficiency_flag · material_weakness_flag
+Sampling (12 vars)
+population_count · key_item_count · key_item_value · sample_method · sample_size · expected_misstatement · tolerable_misstatement · confidence_level · selection_interval · stratification_used · sample_generated_by_ai · sample_reviewed_by_user
+Analytical Procedures (10 vars)
+planning_analytics_performed · substantive_analytics_planned · final_analytics_performed · ratio_analysis_required · trend_analysis_required · monthwise_analysis_required · expectation_developed · threshold_for_investigation · unusual_fluctuations_identified · analytics_conclusion
+Tax & Compliance (22 vars)
+income_tax_return_filed · sales_tax_return_filed · withholding_statements_filed · annual_return_filed · secp_forms_filed · sales_tax_applicable · further_tax_applicable · minimum_tax_applicable · final_tax_regime_flag · normal_tax_regime_flag · deferred_tax_applicable · current_tax_provision · advance_tax · withholding_tax_deducted · withholding_tax_paid · sales_tax_input · sales_tax_output · sales_tax_payable_or_refundable · tax_litigation_exists · notices_received · tax_exposure_estimated · non_compliance_identified
+Related Parties (8 vars)
+related_party_register_available · related_party_transactions_exist · related_party_balances_exist · directors_loan_exists · sponsor_transactions_exist · common_control_transactions_exist · arm_length_support_available · disclosure_complete_flag
+Laws & Regulations (10 vars)
+companies_act_applicable · ifrs_applicable · ifrs_for_smes_applicable · sector_regulator · sector_specific_compliance_required · licenses_required · licenses_valid · legal_cases_exist · contingent_liabilities_exist · non_compliance_with_laws_flag
+Audit Evidence (16 vars)
+external_confirmations_required · bank_confirmations_sent · bank_confirmations_received · receivable_confirmations_sent · receivable_confirmations_received · payable_confirmations_sent · payable_confirmations_received · legal_letter_sent · legal_letter_received · physical_verification_done · management_representation_letter_received · subsequent_events_review_done · minutes_review_done · journal_testing_done · evidence_sufficiency_rating · evidence_appropriateness_rating
+Going Concern (8 vars)
+going_concern_basis_used · gc_default_on_loans_flag · gc_overdue_liabilities_flag · gc_management_plans_available · gc_financial_support_available · gc_material_uncertainty_flag · gc_disclosure_adequate_flag · going_concern_conclusion
+Misstatements (10 vars)
+identified_misstatements_count · identified_misstatements_value · corrected_misstatements_value · uncorrected_misstatements_value · clearly_trivial_items_value · proposed_adjusting_entries_count · passed_adjustments_count · waived_adjustments_count · misstatement_material_flag · summary_of_uncorrected_misstatements_done
+Completion & Reporting (19 vars)
+all_planned_procedures_completed · review_completed · partner_review_completed · eqcr_completed · final_analytics_completed · subsequent_events_cleared · contingencies_reviewed · going_concern_finalized · mrl_signed · fs_disclosures_reviewed · report_type · audit_opinion · emphasis_of_matter_flag · other_matter_flag · key_audit_matters_flag · modified_opinion_basis · reporting_framework_disclosed · report_date · signing_partner_name
+QC & Inspection (11 vars)
+engagement_quality_objectives_met · consultation_required · consultation_completed · independence_reconfirmed · differences_of_opinion_flag · archiving_due_date · file_archived · archiving_completed_date · inspection_ready_flag · unresolved_review_notes_count · unresolved_exceptions_count
+Workflow & Sign-offs (15 vars)
+preparer_name · preparer_designation · preparation_date · reviewer_name · reviewer_designation · review_date · approver_name · approver_designation · approval_date · variable_pack_status · variable_pack_locked · lock_reason · reopen_reason · current_stage · current_substage
+________________________________________
+Grand Total: 417 variables — Primary 116 (28%) | Secondary 44 (11%) | AI/Auditor 257 (61%)
+

@@ -1,55 +1,58 @@
-version: "3.8"
-
 services:
   ana-db:
     container_name: ana-db
     image: postgres:16-alpine
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ana_hrm
       POSTGRES_USER: ana_user
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me_in_production}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
     volumes:
       - ana-pgdata:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ana_user -d ana_hrm"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
 
   ana-backend:
     container_name: ana-backend
     build:
       context: ..
       dockerfile: deploy/Dockerfile
-    restart: always
+    restart: unless-stopped
     ports:
-      - "5002:5000"
+      - "127.0.0.1:5002:5000"
     environment:
       NODE_ENV: production
       PORT: "5000"
-      DATABASE_URL: postgresql://ana_user:${DB_PASSWORD:-change_me_in_production}@ana-db:5432/ana_hrm
-      JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgresql://ana_user:${DB_PASSWORD:?DB_PASSWORD is required}@ana-db:5432/ana_hrm
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       TOKEN_SECRET: ${JWT_SECRET}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
     depends_on:
       ana-db:
         condition: service_healthy
-    networks:
-      - default
-      - auditwise_auditwise
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\""]
       interval: 30s
       timeout: 10s
-      start_period: 15s
+      start_period: 20s
       retries: 3
-
-networks:
-  auditwise_auditwise:
-    external: true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
 volumes:
   ana-pgdata:
+    name: ana-pgdata

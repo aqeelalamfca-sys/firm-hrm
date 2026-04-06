@@ -1,0 +1,37 @@
+Ultimate Prompt — AI Template Library (1000+ Professional Templates with Smart Selection & User Control)
+
+Integrate a centralized Template Library Engine (1000+ professional, audit-compliant templates) across all modules (Pre-Planning to Finalization), categorized by audit phase, entity type, industry, and applicable standards (ISA, IFRS, ISQM, Companies Act 2017, FBR/SECP).
+
+Upon entering any working paper section, the system shall:
+
+Auto-analyze engagement variables, uploaded data, risk profile, materiality, and industry context.
+AI shall auto-select and recommend a prioritized list of relevant templates (Top Recommended + Optional Templates) with confidence score, purpose, and applicable standards.
+Display templates in a clean, filterable interface (Phase | Risk | Assertions | Industry | Standard | Complexity).
+
+User Interaction:
+
+User can select, deselect, or customize templates from the recommended list.
+Multi-select enabled with preview option (Word/Excel structure view).
+Templates marked as:
+Recommended (AI-selected)
+Optional (AI-suggested)
+Manual (user-added)
+
+Execution Rules:
+
+Selected templates shall auto-populate with extracted variables, TB/GL data, and AI-generated audit content.
+All templates remain fully editable until “Lock Templates” action is triggered.
+System ensures no duplication, full coverage of assertions, and ISA compliance mapping.
+
+Control & Audit Trail:
+
+Maintain selection log (AI vs User override).
+Tag each template with status: Selected / Deselected / Modified / Locked.
+Ensure gap detection (if any critical template is missing, AI shall prompt recommendation before proceeding).
+
+Final Output:
+
+Generate fully structured, professional working paper file set (Word/Excel/PDF) aligned with selected templates.
+Maintain consistent formatting, branding, indexing, cross-referencing, and review hierarchy (Staff → Senior → Manager → Partner → EQCR).
+
+System must continuously refine recommendations based on engagement context, prior selections, and audit progression, ensuring completeness, efficiency, and regulatory compliance.

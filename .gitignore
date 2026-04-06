@@ -47,15 +47,20 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Environment secrets — NEVER commit
 .env
+deploy/.env
+*.env.local
+
+# Build outputs
 node_modules
 .next
 dist
 build
+
+# Logs
 *.log
-.env
-node_modules
-.next
-dist
-build
-*.log
+
+# SSH keys (auto-generated at deploy time)
+.ssh/
