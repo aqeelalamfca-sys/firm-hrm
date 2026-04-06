@@ -2014,13 +2014,25 @@ router.post("/sessions/:id/variables/ai-fill", async (req: Request, res: Respons
     for (const v of existingVars) existingByCode[v.variableCode] = v;
 
     const isFilled = (v: any) => v && v.finalValue && String(v.finalValue).trim() !== "" && String(v.finalValue).trim() !== "N/A";
+    const isTemplateFilled = (v: any) => v && v.sourceType === "template" && isFilled(v);
+    const isUserEdited = (v: any) => v && v.userEditedValue && String(v.userEditedValue).trim() !== "";
+    const isLocked = (v: any) => v && v.isLocked;
 
     const filledSummary = existingVars
       .filter(isFilled)
-      .map(v => `${v.variableCode}: ${v.finalValue}`)
+      .map(v => `${v.variableCode}: ${v.finalValue} [source:${v.sourceType || "unknown"}]`)
       .join("\n");
 
-    const missingDefs = VARIABLE_DEFINITIONS.filter(def => !isFilled(existingByCode[def.variableCode]));
+    // AI only targets variables NOT already filled by template, user-edit, or lock
+    // Source hierarchy: Template > User Edit > AI — AI never overrides the first two
+    const missingDefs = VARIABLE_DEFINITIONS.filter(def => {
+      const ev = existingByCode[def.variableCode];
+      if (!ev) return true;                  // not yet in DB — AI should fill
+      if (isLocked(ev)) return false;        // locked — AI never touches
+      if (isUserEdited(ev)) return false;    // user confirmed — AI never touches
+      if (isTemplateFilled(ev)) return false;// template filled — AI never touches
+      return !isFilled(ev);                  // empty or AI-fillable
+    });
 
     if (missingDefs.length === 0) {
       return res.json({ filled: 0, stillMissing: 0, total: existingVars.length, message: "All variables are already filled." });
@@ -2105,13 +2117,17 @@ Example: { "entity_name": "ABC Ltd", "ntn": null, "total_assets": "5000000" }`;
 
           const existing = existingByCode[def.variableCode];
           if (existing) {
-            if (existing.isLocked || existing.userEditedValue) continue;
+            // Source hierarchy: Template > User Edit > AI
+            // AI must NEVER overwrite template-sourced or user-confirmed data
+            if (existing.isLocked) continue;
+            if (existing.userEditedValue && existing.userEditedValue.trim() !== "") continue;
+            if (existing.sourceType === "template") continue; // template always wins over AI
             await db.update(wpVariablesTable).set({
               autoFilledValue: val,
               finalValue:      val,
               sourceType:      "ai_extraction",
               confidence:      "78",
-              reviewStatus:    "auto_filled",
+              reviewStatus:    def.reviewRequiredFlag ? "review" : "ai_filled",
               updatedAt:       new Date(),
             }).where(eq(wpVariablesTable.id, existing.id));
           } else {
@@ -2124,7 +2140,7 @@ Example: { "entity_name": "ABC Ltd", "ntn": null, "total_assets": "5000000" }`;
               finalValue:    val,
               confidence:    "78",
               sourceType:    "ai_extraction",
-              reviewStatus:  def.reviewRequiredFlag ? "needs_review" : "auto_filled",
+              reviewStatus:  def.reviewRequiredFlag ? "review" : "ai_filled",
             });
           }
           totalFilled++;
@@ -2134,18 +2150,24 @@ Example: { "entity_name": "ABC Ltd", "ntn": null, "total_assets": "5000000" }`;
       }
     }
 
-    // Re-read final state to compute stillMissing
+    // Re-read final state and compute comprehensive stats
     const finalVars = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
-    const stillMissing = VARIABLE_DEFINITIONS.filter(d => {
-      const v = finalVars.find(fv => fv.variableCode === d.variableCode);
-      return !isFilled(v);
-    }).length;
+    const finalByCode: Record<string, any> = {};
+    for (const v of finalVars) finalByCode[v.variableCode] = v;
+
+    const templateProtected = VARIABLE_DEFINITIONS.filter(d => isTemplateFilled(finalByCode[d.variableCode])).length;
+    const userProtected     = VARIABLE_DEFINITIONS.filter(d => isUserEdited(finalByCode[d.variableCode])).length;
+    const lockedCount       = VARIABLE_DEFINITIONS.filter(d => isLocked(finalByCode[d.variableCode])).length;
+    const stillMissing      = VARIABLE_DEFINITIONS.filter(d => !isFilled(finalByCode[d.variableCode]) && !isLocked(finalByCode[d.variableCode])).length;
 
     res.json({
-      filled: totalFilled,
+      filled:            totalFilled,
       stillMissing,
-      total: VARIABLE_DEFINITIONS.length,
-      message: `AI filled ${totalFilled} variables. ${stillMissing} could not be determined from available documents.`,
+      total:             VARIABLE_DEFINITIONS.length,
+      templateProtected,
+      userProtected,
+      lockedCount,
+      message: `AI filled ${totalFilled} variables. ${templateProtected} already template-filled (skipped). ${stillMissing} could not be determined.`,
     });
   } catch (err: any) {
     logger.error({ err }, "ai-fill failed");
@@ -7157,12 +7179,92 @@ async function autoFillVariablesFromTemplate(
         autoFilledValue: templateVal,
         finalValue:      templateVal,
         sourceType:      "template",
-        reviewStatus:    "auto_filled",
+        reviewStatus:    "template_filled",
         confidence:      "1.00",
         updatedAt:       new Date(),
       }).where(eq(wpVariablesTable.id, ev.id));
 
       result.mapped++;
+    }
+
+    // ── 5. POST-FILL STATUS PASS ─────────────────────────────────────────
+    // Re-read all variables and stamp correct status tags for every variable
+    // regardless of whether template filled it or not.
+    const MANDATORY_CODES = new Set(
+      VARIABLE_DEFINITIONS.filter(d => d.mandatoryFlag).map(d => d.variableCode)
+    );
+    const afterFill = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+
+    for (const ev of afterFill) {
+      const code = (ev.variableCode || "").toLowerCase().trim();
+      const hasFinalValue = ev.finalValue && String(ev.finalValue).trim() !== "" && String(ev.finalValue).trim() !== "N/A";
+
+      // Determine the correct status tag
+      let statusTag: string | null = null;
+
+      if (ev.isLocked) {
+        statusTag = "locked";
+      } else if (ev.userEditedValue && ev.userEditedValue.trim() !== "") {
+        statusTag = "user_edited";
+      } else if (ev.sourceType === "template" && hasFinalValue) {
+        statusTag = "template_filled"; // already set above, but enforce here too
+      } else if (ev.sourceType === "ai_extraction" && hasFinalValue) {
+        statusTag = "ai_filled";
+      } else if (!hasFinalValue && MANDATORY_CODES.has(code)) {
+        statusTag = "missing";
+        if (!result.missingMandatory.includes(code)) result.missingMandatory.push(code);
+      } else if (!hasFinalValue) {
+        statusTag = null; // optional + empty — no tag change needed
+      }
+
+      if (statusTag && ev.reviewStatus !== statusTag) {
+        await db.update(wpVariablesTable)
+          .set({ reviewStatus: statusTag, updatedAt: new Date() })
+          .where(eq(wpVariablesTable.id, ev.id));
+      }
+    }
+
+    // ── 6. PERSIST EXCEPTIONS TO wpExceptionLogTable ─────────────────────
+    // Log conflicts and missing mandatory fields so they appear in the exception screen
+    const exceptionsToLog: Array<{ type: string; severity: string; title: string; desc: string }> = [];
+
+    for (const conflict of result.conflicts) {
+      exceptionsToLog.push({
+        type:     "MAPPING_CONFLICT",
+        severity: "medium",
+        title:    `Template Conflict: ${conflict.split(":")[0]}`,
+        desc:     conflict,
+      });
+    }
+    for (const code of result.missingMandatory) {
+      const def = VARIABLE_DEFINITIONS.find(d => d.variableCode === code);
+      exceptionsToLog.push({
+        type:     "MISSING_MANDATORY",
+        severity: "high",
+        title:    `Missing Mandatory: ${def?.variableLabel || code}`,
+        desc:     `Mandatory variable "${code}" (${def?.variableLabel || code}) has no value from the template or any other source.`,
+      });
+    }
+
+    for (const ex of exceptionsToLog) {
+      try {
+        // Upsert: check if an open exception for this title already exists
+        const existing = await db.select().from(wpExceptionLogTable).where(
+          and(eq(wpExceptionLogTable.sessionId, sessionId), eq(wpExceptionLogTable.title, ex.title))
+        );
+        if (existing.length === 0) {
+          await db.insert(wpExceptionLogTable).values({
+            sessionId,
+            exceptionType: ex.type,
+            severity:      ex.severity,
+            title:         ex.title,
+            description:   ex.desc,
+            status:        "open",
+            createdAt:     new Date(),
+            updatedAt:     new Date(),
+          } as any);
+        }
+      } catch { /* exception log insert failure is non-fatal */ }
     }
 
   } catch (err: any) {

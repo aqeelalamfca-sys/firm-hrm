@@ -5092,8 +5092,8 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
     if (filter === "missing" && v.finalValue && v.finalValue.trim() !== "") return false;
     if (filter === "reviewed" && v.reviewStatus !== "reviewed" && v.reviewStatus !== "confirmed") return false;
     if (filter === "locked" && !v.isLocked) return false;
-    if (filter === "needs_review" && v.reviewStatus !== "needs_review") return false;
-    if (filter === "extracted" && v.sourceType !== "template") return false;
+    if (filter === "needs_review" && v.reviewStatus !== "needs_review" && v.reviewStatus !== "review") return false;
+    if (filter === "extracted" && v.sourceType !== "template" && v.reviewStatus !== "template_filled") return false;
     return true;
   };
 
@@ -5354,8 +5354,20 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
                                       <Sparkles className="w-2.5 h-2.5" /> AI Processed
                                     </span>
                                   )}
-                                  {v.reviewStatus === "needs_review" && (
+                                  {(v.reviewStatus === "needs_review" || v.reviewStatus === "review") && (
                                     <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-semibold border border-purple-200">REVIEW</span>
+                                  )}
+                                  {v.reviewStatus === "missing" && (
+                                    <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold border border-red-200 uppercase tracking-wide">Missing</span>
+                                  )}
+                                  {v.reviewStatus === "conflict" && (
+                                    <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-bold border border-orange-200 uppercase tracking-wide">Conflict</span>
+                                  )}
+                                  {v.reviewStatus === "user_edited" && (
+                                    <span className="text-[9px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full font-semibold border border-violet-200">Edited</span>
+                                  )}
+                                  {v.reviewStatus === "template_filled" && !isFromTemplate && (
+                                    <span className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-full font-semibold border border-emerald-200">Template</span>
                                   )}
                                   {def?.pakistanReference && (
                                     <span className="text-[9px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded-full border border-slate-100 hidden sm:inline">{def.pakistanReference}</span>
