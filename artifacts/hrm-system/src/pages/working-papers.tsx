@@ -353,6 +353,8 @@ export default function WorkingPapers() {
     if (!activeSession) return;
     await handleParseTemplate();
     await autoFillVariables();
+    await fetchVariables();
+    setStage("extraction");
   };
 
   const runExtraction = async () => {
@@ -1452,6 +1454,7 @@ export default function WorkingPapers() {
                   )}
                   onClick={() => {
                     setStage(s.key);
+                    if (s.key === "extraction" && variables.length === 0) fetchVariables();
                     if (s.key === "variables" && variables.length === 0) { fetchVariables(); fetchCoaData(); }
                     if (s.key === "arranged_data" && !arrangedData) fetchArrangedData();
                     if (s.key === "tb_generation" || s.key === "gl_generation") {
@@ -1594,6 +1597,29 @@ export default function WorkingPapers() {
           onRerun={runExtraction}
           loading={loading}
           confidenceBadge={confidenceBadge}
+          variablesPanel={
+            <VariablesStage
+              variables={variables}
+              grouped={variableGroups}
+              stats={variableStats}
+              changeLog={changeLog}
+              editingVar={editingVar}
+              editValue={editValue}
+              editReason={editReason}
+              setEditingVar={setEditingVar}
+              setEditValue={setEditValue}
+              setEditReason={setEditReason}
+              onSave={saveVariableEdit}
+              onReview={markVariableReviewed}
+              onReviewAll={reviewAllVariables}
+              onFetch={fetchVariables}
+              onLockAll={lockAllVariables}
+              onLockSection={lockSection}
+              onValidate={validateVariables}
+              loading={loading}
+              confidenceBadge={confidenceBadge}
+            />
+          }
         />
       )}
 
@@ -2605,126 +2631,112 @@ function TemplateParsedPanel({ result, onClear }: { result: any; onClear: () => 
   );
 }
 
-function ExtractionStage({ data, session, onFetchArranged, onRerun, loading, confidenceBadge }: any) {
+function ExtractionStage({ data, session, onFetchArranged, onRerun, loading, confidenceBadge, variablesPanel }: any) {
   const extractionData = data?.data || session?.extractionData;
   const stats = data?.stats;
+  const [showRawResults, setShowRawResults] = useState(false);
+
+  const hasFlags = extractionData?.flags && extractionData.flags.length > 0;
 
   return (
-    <div className="space-y-5">
-      {stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[
-            { label: "Files Processed", value: stats.files, icon: FileText, color: "blue" },
-            { label: "Pages Scanned", value: stats.pages, icon: Layers, color: "purple" },
-            { label: "Sheets Parsed", value: stats.sheets, icon: ClipboardCheck, color: "emerald" },
-          ].map(s => (
-            <div key={s.label} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
-              <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
-                s.color === "blue" ? "bg-blue-50" : s.color === "purple" ? "bg-purple-50" : "bg-emerald-50"
-              )}>
-                <s.icon className={cn("w-5 h-5",
-                  s.color === "blue" ? "text-blue-600" : s.color === "purple" ? "text-purple-600" : "text-emerald-600"
-                )} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-900">{s.value}</p>
-                <p className="text-xs text-slate-500">{s.label}</p>
-              </div>
-            </div>
-          ))}
+    <div className="space-y-4">
+
+      {/* ── Top action banner ── */}
+      <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
+            <Bot className="w-4.5 h-4.5 text-purple-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-sm text-slate-900">Data Extraction Results</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {stats
+                ? `${stats.files} file${stats.files !== 1 ? "s" : ""} · ${stats.sheets} sheet${stats.sheets !== 1 ? "s" : ""} · ${stats.pages} page${stats.pages !== 1 ? "s" : ""} scanned — data pushed to variables below`
+                : extractionData
+                ? "Extraction complete — data pushed to variables below"
+                : "Run extraction from the Upload tab to populate variables"}
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2 shrink-0 flex-wrap">
+          {extractionData && (
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowRawResults(v => !v)}>
+              <Eye className="w-3 h-3 mr-1" /> {showRawResults ? "Hide" : "Show"} Raw Results
+            </Button>
+          )}
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onRerun} disabled={loading}>
+            <RefreshCw className={cn("w-3 h-3 mr-1", loading && "animate-spin")} /> Re-run Extraction
+          </Button>
+          <Button size="sm" className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700" onClick={onFetchArranged}>
+            <Database className="w-3 h-3 mr-1" /> Data Sheet <ArrowRight className="w-3 h-3 ml-1" />
+          </Button>
+        </div>
+      </div>
+
+      {/* ── Flags warning (always visible if present) ── */}
+      {hasFlags && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <h3 className="text-xs font-semibold text-amber-800 mb-2 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5" /> Extraction Flags ({extractionData.flags.length})
+          </h3>
+          <ul className="space-y-1">
+            {extractionData.flags.map((f: string, i: number) => (
+              <li key={i} className="text-xs text-amber-800 flex items-start gap-2 bg-white/60 rounded-lg p-2 border border-amber-100">
+                <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500" /> {f}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50/50 px-5 py-4 border-b border-slate-200/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-              <Bot className="w-5 h-5 text-purple-600" /> AI Extraction Results
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">Review AI-extracted data points and confidence levels</p>
+      {/* ── Raw AI results — collapsible ── */}
+      {showRawResults && extractionData && (
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
+            <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Raw AI Extraction Output</span>
           </div>
-          <Button variant="outline" size="sm" onClick={onRerun} disabled={loading} className="self-start">
-            <RefreshCw className={cn("w-3.5 h-3.5 mr-1.5", loading && "animate-spin")} /> Re-run Extraction
-          </Button>
-        </div>
-
-        <div className="p-5">
-          {extractionData ? (
-            <div className="space-y-4">
-              {extractionData.entity && (
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                    Entity Profile
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2.5">
-                    {Object.entries(extractionData.entity).filter(([, v]) => v && typeof v !== "object").map(([k, v]) => (
-                      <div key={k} className="flex items-baseline gap-1.5">
-                        <span className="text-xs text-slate-500 capitalize shrink-0">{k.replace(/_/g, " ")}:</span>
-                        <span className="text-sm font-medium text-slate-900 truncate">{String(v)}</span>
-                      </div>
-                    ))}
-                  </div>
+          <div className="p-4 space-y-4">
+            {extractionData.entity && (
+              <div>
+                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Entity Profile</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
+                  {Object.entries(extractionData.entity).filter(([, v]) => v && typeof v !== "object").map(([k, v]) => (
+                    <div key={k} className="flex items-baseline gap-1.5">
+                      <span className="text-[11px] text-slate-400 capitalize shrink-0">{k.replace(/_/g, " ")}:</span>
+                      <span className="text-xs font-medium text-slate-800 truncate">{String(v)}</span>
+                    </div>
+                  ))}
                 </div>
-              )}
-
-              {extractionData.confidence_scores && (
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    Confidence Scores
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {Object.entries(extractionData.confidence_scores).map(([k, v]) => {
-                      const n = Number(v);
-                      return (
-                        <div key={k} className="flex items-center gap-3 bg-white rounded-lg p-2.5 border border-slate-100">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs text-slate-500 capitalize truncate">{k.replace(/_/g, " ")}</p>
-                            <div className="w-full h-1.5 bg-slate-200 rounded-full mt-1.5 overflow-hidden">
-                              <div className={cn("h-full rounded-full transition-all", n >= 85 ? "bg-emerald-500" : n >= 70 ? "bg-amber-500" : "bg-red-500")} style={{ width: `${Math.min(n, 100)}%` }} />
-                            </div>
-                          </div>
-                          {confidenceBadge(n)}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {extractionData.flags && extractionData.flags.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                  <h3 className="text-xs font-semibold text-amber-800 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5" /> Flags & Warnings ({extractionData.flags.length})
-                  </h3>
-                  <ul className="space-y-1.5">
-                    {extractionData.flags.map((f: string, i: number) => (
-                      <li key={i} className="text-sm text-amber-800 flex items-start gap-2.5 bg-white/60 rounded-lg p-2.5 border border-amber-100">
-                        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" /> {f}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 rounded-2xl bg-slate-100 mx-auto mb-4 flex items-center justify-center">
-                <Eye className="w-8 h-8 text-slate-300" />
               </div>
-              <p className="text-slate-500 font-medium">No extraction data yet</p>
-              <p className="text-xs text-slate-400 mt-1">Go back to Upload stage and run AI Extraction</p>
-            </div>
-          )}
+            )}
+            {extractionData.confidence_scores && (
+              <div>
+                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Confidence Scores</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {Object.entries(extractionData.confidence_scores).map(([k, v]) => {
+                    const n = Number(v);
+                    return (
+                      <div key={k} className="flex items-center gap-2 bg-slate-50 rounded-lg p-2 border border-slate-100">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] text-slate-500 capitalize truncate">{k.replace(/_/g, " ")}</p>
+                          <div className="w-full h-1 bg-slate-200 rounded-full mt-1 overflow-hidden">
+                            <div className={cn("h-full rounded-full", n >= 85 ? "bg-emerald-500" : n >= 70 ? "bg-amber-500" : "bg-red-500")} style={{ width: `${Math.min(n, 100)}%` }} />
+                          </div>
+                        </div>
+                        {confidenceBadge(n)}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="flex justify-end">
-        <Button onClick={onFetchArranged} size="lg" className="px-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-md shadow-indigo-200/50 gap-2">
-          <Database className="w-4 h-4" /> Proceed to Data Sheet <ArrowRight className="w-4 h-4" />
-        </Button>
-      </div>
+      {/* ── Main: Variables one-pager ── */}
+      {variablesPanel}
+
     </div>
   );
 }

@@ -6466,6 +6466,8 @@ router.post("/sessions/:id/parse-one-sheet-template", async (req: Request, res: 
       if (tbInserts.length > 0) await db.insert(wpTrialBalanceLinesTable).values(tbInserts as any);
 
       // ── PERSIST GL ACCOUNTS ───────────────────────────────────────────────
+      // Delete entries before accounts (foreign key: wp_gl_entries.gl_account_id → wp_gl_accounts.id)
+      await db.delete(wpGlEntriesTable).where(eq(wpGlEntriesTable.sessionId, sessionId));
       await db.delete(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, sessionId));
       const glInserts = rows
         .filter(r => r.aiGlFlag?.toUpperCase() === "YES" || r.debitTransactionValue > 0 || r.creditTransactionValue > 0)
