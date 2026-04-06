@@ -721,6 +721,33 @@ export default function WorkingPapers() {
     } catch {} finally { setLoading(false); }
   };
 
+  const handleAiFill = async () => {
+    if (!activeSession) return;
+    try {
+      setLoading(true);
+      toast({
+        title: "AI Fill in progress…",
+        description: "Reading all uploaded documents and filling missing variables. This may take 30–60 seconds.",
+      });
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/variables/ai-fill`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const result = await res.json();
+        await fetchVariables();
+        toast({
+          title: `AI Fill complete`,
+          description: result.message || `Filled ${result.filled} variables. ${result.stillMissing} require manual input.`,
+        });
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "AI Fill failed", description: err.error || "Could not fill variables.", variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: "AI Fill failed", description: e?.message || "Network error", variant: "destructive" });
+    } finally { setLoading(false); }
+  };
+
   const fetchVariables = async () => {
     if (!activeSession) return;
     try {
@@ -1593,6 +1620,7 @@ export default function WorkingPapers() {
           session={activeSession}
           onFetchArranged={() => { fetchArrangedData(); setStage("arranged_data"); }}
           onRerun={handleExtractData}
+          onAiFill={handleAiFill}
           loading={loading || parseLoading}
           confidenceBadge={confidenceBadge}
           variablesPanel={
@@ -2636,7 +2664,7 @@ function TemplateParsedPanel({ result, onClear }: { result: any; onClear: () => 
   );
 }
 
-function ExtractionStage({ data, session, onFetchArranged, onRerun, loading, confidenceBadge, variablesPanel }: any) {
+function ExtractionStage({ data, session, onFetchArranged, onRerun, onAiFill, loading, confidenceBadge, variablesPanel }: any) {
   const extractionData = data?.data || session?.extractionData;
   const stats = data?.stats;
   const [showRawResults, setShowRawResults] = useState(false);
@@ -2659,7 +2687,7 @@ function ExtractionStage({ data, session, onFetchArranged, onRerun, loading, con
                 ? `${stats.files} file${stats.files !== 1 ? "s" : ""} · ${stats.sheets} sheet${stats.sheets !== 1 ? "s" : ""} · ${stats.pages} page${stats.pages !== 1 ? "s" : ""} scanned — data pushed to variables below`
                 : extractionData
                 ? "Extraction complete — data pushed to variables below"
-                : "Run extraction from the Upload tab to populate variables"}
+                : "Template variables loaded below — use AI Filled to complete all remaining fields"}
             </p>
           </div>
         </div>
@@ -2672,8 +2700,17 @@ function ExtractionStage({ data, session, onFetchArranged, onRerun, loading, con
           <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onRerun} disabled={loading}>
             <RefreshCw className={cn("w-3 h-3 mr-1", loading && "animate-spin")} /> Re-extract from Template
           </Button>
-          <Button size="sm" className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700" onClick={onFetchArranged}>
-            <Database className="w-3 h-3 mr-1" /> Data Sheet <ArrowRight className="w-3 h-3 ml-1" />
+          <Button
+            size="sm"
+            className="h-7 text-xs bg-violet-600 hover:bg-violet-700 shadow-sm"
+            onClick={onAiFill}
+            disabled={loading}
+            title="Detect all missing variables and fill them using AI — reads every uploaded document and derives values intelligently"
+          >
+            {loading
+              ? <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Filling…</>
+              : <><Sparkles className="w-3 h-3 mr-1" /> AI Filled</>
+            }
           </Button>
         </div>
       </div>

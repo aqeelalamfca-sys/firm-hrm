@@ -1974,6 +1974,185 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
   }
 });
 
+// ── POST /sessions/:id/variables/ai-fill ─────────────────────────────────────
+// Detects all unfilled variables and populates them using AI by reading every
+// uploaded file (template + supporting docs via OCR) and cross-referencing
+// already-filled variables as context.  Only leaves a variable blank if the
+// value genuinely cannot be inferred.
+router.post("/sessions/:id/variables/ai-fill", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+
+    const sessionRows = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
+    if (!sessionRows[0]) return res.status(404).json({ error: "Session not found" });
+    const session = sessionRows[0];
+
+    const ai = await getAIClient();
+    if (!ai) return res.status(503).json({ error: "AI service not configured." });
+
+    // ── 1. Extract text from every uploaded file ──────────────────────────
+    const files = await db.select().from(wpUploadedFilesTable).where(eq(wpUploadedFilesTable.sessionId, sessionId));
+    const docParts: string[] = [];
+    const imageContents: any[] = [];
+
+    for (const f of files) {
+      if (!f.fileData) continue;
+      const buf = Buffer.from(f.fileData, "base64");
+      const fakeFile = { originalname: f.originalName, mimetype: f.mimeType || "", buffer: buf, size: buf.length } as Express.Multer.File;
+      const extracted = await extractTextFromFile(fakeFile);
+      docParts.push(`=== FILE: ${f.originalName} (${f.category || "document"}) ===\n${smartChunk(extracted.text, 10000)}`);
+      if ((extracted.sourceType === "image_ocr" || extracted.sourceType === "ocr_pdf") && f.mimeType?.startsWith("image/")) {
+        imageContents.push({ type: "image_url", image_url: { url: `data:${f.mimeType};base64,${f.fileData}`, detail: "high" } });
+      }
+    }
+    const docContext = docParts.join("\n\n");
+
+    // ── 2. Classify existing variables ────────────────────────────────────
+    const existingVars = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+    const existingByCode: Record<string, any> = {};
+    for (const v of existingVars) existingByCode[v.variableCode] = v;
+
+    const isFilled = (v: any) => v && v.finalValue && String(v.finalValue).trim() !== "" && String(v.finalValue).trim() !== "N/A";
+
+    const filledSummary = existingVars
+      .filter(isFilled)
+      .map(v => `${v.variableCode}: ${v.finalValue}`)
+      .join("\n");
+
+    const missingDefs = VARIABLE_DEFINITIONS.filter(def => !isFilled(existingByCode[def.variableCode]));
+
+    if (missingDefs.length === 0) {
+      return res.json({ filled: 0, stillMissing: 0, total: existingVars.length, message: "All variables are already filled." });
+    }
+
+    // ── 3. Batch AI calls (≤100 vars per call) ───────────────────────────
+    const BATCH = 100;
+    let totalFilled = 0;
+
+    const sessionCtx = [
+      `Entity: ${session.clientName || ""}`,
+      `Type: ${session.entityType || "Private Limited"}`,
+      `Year: ${session.engagementYear || ""}`,
+      `Period: ${session.periodStart || ""} to ${session.periodEnd || ""}`,
+      `Framework: ${session.reportingFramework || "IFRS"}`,
+      `NTN: ${session.ntn || ""}`,
+      `Engagement: ${session.engagementType || "statutory_audit"}`,
+    ].join("\n");
+
+    for (let i = 0; i < missingDefs.length; i += BATCH) {
+      const batch = missingDefs.slice(i, i + BATCH);
+
+      const varList = batch.map(d => {
+        const opts = d.dropdownOptionsJson ? ` [options: ${JSON.parse(d.dropdownOptionsJson).join("|")}]` : "";
+        const req = d.mandatoryFlag ? " [REQUIRED]" : "";
+        return `${d.variableCode} | ${d.variableLabel} | ${d.dataType}${opts}${req}`;
+      }).join("\n");
+
+      const prompt = `You are a senior Pakistan ICAP-qualified chartered accountant specialising in ISA-compliant audit working papers.
+
+SESSION CONTEXT:
+${sessionCtx}
+
+ALREADY FILLED VARIABLES (use as cross-reference and context):
+${filledSummary || "(none yet)"}
+
+UPLOADED DOCUMENT CONTENT (template + supporting docs, extract every relevant fact):
+${docContext || "(no documents uploaded)"}
+
+YOUR TASK:
+Fill the MISSING AUDIT VARIABLES below. For each variable:
+- Extract the value directly from documents wherever possible
+- Derive logically from already-filled variables (e.g. compute materiality from revenue, derive dates from period end)
+- For boolean fields: return "true" or "false"
+- For dropdown fields, return EXACTLY one of the listed options
+- For numeric fields: plain number in PKR (no commas or symbols)
+- For date fields: ISO format YYYY-MM-DD
+- For percentage fields: plain number e.g. "75" for 75%
+- Only return null if the value CANNOT be determined from any available information
+- Never fabricate NTN, STRN, or CNIC — leave null if not found
+
+MISSING VARIABLES TO FILL (${batch.length} variables):
+${varList}
+
+Return ONLY valid JSON with variable codes as keys. Include every code from the list above.
+Example: { "entity_name": "ABC Ltd", "ntn": null, "total_assets": "5000000" }`;
+
+      const msgContent: any[] = [{ type: "text", text: prompt }];
+      if (i === 0) imageContents.slice(0, 3).forEach(ic => msgContent.push(ic));
+
+      try {
+        const resp = await ai.client.chat.completions.create({
+          model: ai.model,
+          messages: [
+            { role: "system", content: "You are an ISA-compliant Pakistan audit variable extractor. Return only valid JSON. Never fabricate regulated identifiers (NTN, STRN, CNIC). Use null for genuinely unknown values." },
+            { role: "user", content: msgContent },
+          ],
+          max_tokens: 4000,
+          temperature: 0.05,
+          response_format: { type: "json_object" },
+        });
+
+        const raw = resp.choices[0]?.message?.content || "{}";
+        let aiData: Record<string, any> = {};
+        try { aiData = JSON.parse(raw); } catch { aiData = {}; }
+
+        for (const def of batch) {
+          const aiVal = aiData[def.variableCode];
+          if (aiVal === null || aiVal === undefined || String(aiVal).trim() === "") continue;
+          const val = String(aiVal).trim();
+          if (val === "null" || val === "undefined") continue;
+
+          const existing = existingByCode[def.variableCode];
+          if (existing) {
+            if (existing.isLocked || existing.userEditedValue) continue;
+            await db.update(wpVariablesTable).set({
+              autoFilledValue: val,
+              finalValue:      val,
+              sourceType:      "ai_extraction",
+              confidence:      "78",
+              reviewStatus:    "auto_filled",
+              updatedAt:       new Date(),
+            }).where(eq(wpVariablesTable.id, existing.id));
+          } else {
+            await db.insert(wpVariablesTable).values({
+              sessionId,
+              variableCode:  def.variableCode,
+              variableName:  def.variableName,
+              category:      def.variableGroup,
+              autoFilledValue: val,
+              finalValue:    val,
+              confidence:    "78",
+              sourceType:    "ai_extraction",
+              reviewStatus:  def.reviewRequiredFlag ? "needs_review" : "auto_filled",
+            });
+          }
+          totalFilled++;
+        }
+      } catch (batchErr: any) {
+        logger.warn({ batchErr, batch: i }, "ai-fill batch failed, continuing");
+      }
+    }
+
+    // Re-read final state to compute stillMissing
+    const finalVars = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+    const stillMissing = VARIABLE_DEFINITIONS.filter(d => {
+      const v = finalVars.find(fv => fv.variableCode === d.variableCode);
+      return !isFilled(v);
+    }).length;
+
+    res.json({
+      filled: totalFilled,
+      stillMissing,
+      total: VARIABLE_DEFINITIONS.length,
+      message: `AI filled ${totalFilled} variables. ${stillMissing} could not be determined from available documents.`,
+    });
+  } catch (err: any) {
+    logger.error({ err }, "ai-fill failed");
+    res.status(500).json({ error: "AI fill failed" });
+  }
+});
+
 router.get("/sessions/:id/variables", async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(req.params.id);
