@@ -1842,7 +1842,9 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
       const existing = existingByCode[def.variableCode];
 
       if (existing) {
-        if (extracted && !existing.userEditedValue && !existing.isLocked) {
+        // Never overwrite template-filled or user-edited values with session meta defaults
+        const isTemplateFilled = existing.reviewStatus === "template_filled" || existing.sourceType === "template";
+        if (extracted && !existing.userEditedValue && !existing.isLocked && !isTemplateFilled) {
           const defaultSrcExisting = defaultSourceMap[def.variableCode];
           const isRealExt = !defaultSrcExisting && Number(extracted.confidence) >= 70;
           const isFormulaExt = defaultSrcExisting === "formula";

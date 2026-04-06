@@ -350,8 +350,13 @@ export default function WorkingPapers() {
 
   const handleExtractData = async () => {
     if (!activeSession) return;
-    await handleParseTemplate();
+    // Step 1: Create all variable rows from session metadata first
+    // (autoFillVariablesFromTemplate only UPDATES existing rows, so rows must exist first)
     await autoFillVariables();
+    // Step 2: Parse template and overwrite relevant variables with template values (highest source)
+    await handleParseTemplate();
+    // Step 3: Sync UI state — fetch all variables (template-filled + session-meta defaults)
+    await fetchVariables();
     setStage("extraction");
   };
 
@@ -710,14 +715,15 @@ export default function WorkingPapers() {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/variables/auto-fill`, {
         method: "POST", headers: { ...headers, "Content-Type": "application/json" },
       });
+      const result = await res.json().catch(() => ({}));
       if (res.ok) {
-        const result = await res.json();
         toast({
           title: `Variables Populated`,
           description: result.message || `${result.created} created, ${result.updated} updated from template data.`
         });
-        await fetchVariables();
       }
+      // Always fetch — template-filled variables may already be in DB even if auto-fill fails
+      await fetchVariables();
     } catch {} finally { setLoading(false); }
   };
 
@@ -1510,7 +1516,15 @@ export default function WorkingPapers() {
                   )}
                   onClick={() => {
                     setStage(s.key);
-                    if (s.key === "extraction" && variables.length === 0) { fetchVariables(); fetchCoaData(); }
+                    if (s.key === "extraction") {
+                      // If no variables yet but files are uploaded, auto-run parse + fill pipeline
+                      if (variables.length === 0 && (activeSession?.files?.length ?? 0) > 0) {
+                        handleExtractData();
+                      } else {
+                        fetchVariables();
+                        fetchCoaData();
+                      }
+                    }
                     if (s.key === "tb_generation" || s.key === "gl_generation") {
                       fetchCoaData();
                       if (!auditMaster) { fetchAuditMaster(); fetchSampling(); fetchAnalytics(); fetchControlMatrix(); fetchEvidence(); }
