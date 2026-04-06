@@ -1959,17 +1959,48 @@ function WorkbookPipelinePanel({ onExtract, extracting, report, onClose }: any) 
   );
 }
 
-function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, onUpload, onExtractData, loading, validateFile }: any) {
-  const { toast } = useToast();
-  const [dragActive, setDragActive] = useState(false);
+function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onUpload, onExtractData, loading }: any) {
+  const [tplDrag, setTplDrag] = useState(false);
+  const [supDrag, setSupDrag] = useState(false);
+  const supFileInputRef = useRef<HTMLInputElement>(null);
 
-  const hasUploaded = uploadedFiles.length > 0;
+  const isXlsExt = (name: string) => { const e = name.split(".").pop()?.toLowerCase(); return e === "xlsx" || e === "xls"; };
+  const tplQueue  = files.filter((u: any) => isXlsExt(u.file.name));
+  const supQueue  = files.filter((u: any) => !isXlsExt(u.file.name));
 
+  const tplUploaded = uploadedFiles.filter((f: any) => { const e = (f.originalName||"").split(".").pop()?.toLowerCase(); return e === "xlsx" || e === "xls" || e === "xlsm"; });
+  const supUploaded = uploadedFiles.filter((f: any) => { const e = (f.originalName||"").split(".").pop()?.toLowerCase(); return !(e === "xlsx" || e === "xls" || e === "xlsm"); });
+
+  const hasTemplate    = tplUploaded.length > 0;
+  const hasAnyUploaded = uploadedFiles.length > 0;
+
+  const removeFile = (idx: number) => setFiles((p: any) => p.filter((_: any, j: number) => j !== idx));
+
+  const supCategories = [
+    { value: "bank_statement",   label: "Bank Statement" },
+    { value: "sales_tax_return", label: "Sales Tax Return" },
+    { value: "tax_notice",       label: "Tax Notice / Assessment" },
+    { value: "schedule",         label: "Schedule / Notes" },
+    { value: "annexure",         label: "Annexure" },
+    { value: "other",            label: "Other Document" },
+  ];
+
+  const FileChip = ({ ext }: { ext: string }) => {
+    const isXl  = ext === "xlsx" || ext === "xls" || ext === "xlsm";
+    const isPdf = ext === "pdf";
+    const isImg = ["jpg","jpeg","png","webp","gif"].includes(ext);
+    return (
+      <div className={cn(
+        "w-7 h-7 rounded-md flex items-center justify-center shrink-0 font-bold text-[9px] uppercase",
+        isXl ? "bg-green-100 text-green-700" : isPdf ? "bg-red-100 text-red-700" : isImg ? "bg-purple-100 text-purple-700" : "bg-slate-100 text-slate-600"
+      )}>{ext || "?"}</div>
+    );
+  };
 
   return (
     <div className="space-y-5">
 
-      {/* ── 1. Download Template ── */}
+      {/* ── 1. Download Template Banner ── */}
       <div className="bg-gradient-to-r from-blue-700 to-indigo-800 rounded-2xl p-5 text-white shadow-md flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex items-start gap-3.5 flex-1">
           <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
@@ -1978,7 +2009,7 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
           <div className="flex-1">
             <p className="font-bold text-base mb-0.5">Audit Upload Template</p>
             <p className="text-sm text-blue-100">
-              Fill in the Engagement Header and Financial Data rows, then upload below to extract all audit variables automatically.
+              Fill in the Engagement Header and Financial Data rows, then upload the completed template below.
             </p>
           </div>
         </div>
@@ -2005,64 +2036,74 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
         </button>
       </div>
 
-      {/* ── 2. Upload Zone ── */}
+      {/* ── 2. Template Upload (.xlsx only) ── */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="bg-gradient-to-r from-slate-50 to-blue-50/30 px-5 py-3.5 border-b border-slate-200/60 flex items-center gap-2">
           <Upload className="w-4 h-4 text-blue-600" />
           <h2 className="font-semibold text-slate-900 text-sm">Upload Completed Template</h2>
-          <span className="ml-auto text-[11px] text-slate-400 hidden sm:block">Excel (.xlsx) required</span>
+          <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full">.XLSX ONLY</span>
+          {hasTemplate && (
+            <span className="ml-auto flex items-center gap-1 text-[11px] text-emerald-600 font-semibold">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Template uploaded
+            </span>
+          )}
         </div>
         <div className="p-5 space-y-4">
           <div
             className={cn(
-              "border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200",
-              dragActive ? "border-blue-400 bg-blue-50/50 scale-[1.01]" : "border-slate-200 hover:border-blue-300 hover:bg-blue-50/20"
+              "border-2 border-dashed rounded-xl p-7 text-center cursor-pointer transition-all duration-200",
+              tplDrag ? "border-blue-400 bg-blue-50/60 scale-[1.01]" : "border-slate-200 hover:border-blue-300 hover:bg-blue-50/20"
             )}
             onClick={() => fileInputRef.current?.click()}
-            onDragOver={e => { e.preventDefault(); setDragActive(true); }}
-            onDragLeave={() => setDragActive(false)}
+            onDragOver={e => { e.preventDefault(); setTplDrag(true); }}
+            onDragLeave={() => setTplDrag(false)}
             onDrop={e => {
-              e.preventDefault(); setDragActive(false);
-              const dt = e.dataTransfer.files;
-              if (dt.length) setFiles((p: any) => [...p, ...Array.from(dt).map((f: any) => ({ file: f, category: "other" }))]);
+              e.preventDefault(); setTplDrag(false);
+              const dropped = Array.from(e.dataTransfer.files).filter((f: any) => isXlsExt(f.name));
+              if (dropped.length) setFiles((p: any) => [...p, ...dropped.map((f: any) => ({ file: f, category: "financial_statements" }))]);
+              else toast({ title: "Invalid file type", description: "Only Excel (.xlsx / .xls) files are accepted here.", variant: "destructive" });
             }}
           >
-            <div className={cn("w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center transition-colors", dragActive ? "bg-blue-100" : "bg-slate-100")}>
-              <Upload className={cn("w-6 h-6 transition-colors", dragActive ? "text-blue-600" : "text-slate-400")} />
+            <div className={cn("w-11 h-11 rounded-2xl mx-auto mb-3 flex items-center justify-center", tplDrag ? "bg-blue-100" : "bg-slate-100")}>
+              <Upload className={cn("w-5 h-5", tplDrag ? "text-blue-600" : "text-slate-400")} />
             </div>
-            <p className="font-medium text-slate-700 text-sm">Drop your completed template here or <span className="text-blue-600 underline underline-offset-2">browse</span></p>
-            <p className="text-xs text-slate-400 mt-1.5">Excel (.xlsx) · PDF · Images</p>
-            <input ref={fileInputRef} type="file" multiple accept=".xlsx,.xls,.pdf,.jpg,.jpeg,.png,.webp" onChange={onFileAdd} className="hidden" />
+            <p className="font-medium text-slate-700 text-sm">
+              Drop your Excel template here or <span className="text-blue-600 underline underline-offset-2">browse</span>
+            </p>
+            <p className="text-xs text-slate-400 mt-1">Only <span className="font-semibold text-slate-500">.xlsx / .xls</span> files accepted</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={e => {
+                const fs = Array.from(e.target.files || []);
+                if (fs.length) setFiles((p: any) => [...p, ...fs.map((f: any) => ({ file: f, category: "financial_statements" }))]);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+              }}
+              className="hidden"
+            />
           </div>
 
-          {files.length > 0 && (
+          {tplQueue.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold text-slate-600">{files.length} file{files.length > 1 ? "s" : ""} ready to upload</h3>
+                <span className="text-xs font-semibold text-slate-600">{tplQueue.length} template file{tplQueue.length > 1 ? "s" : ""} ready</span>
                 <Button onClick={onUpload} disabled={loading} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white h-7 text-xs px-3">
-                  {loading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Upload className="w-3 h-3 mr-1" />}
-                  Upload
+                  {loading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Upload className="w-3 h-3 mr-1" />} Upload
                 </Button>
               </div>
               <div className="space-y-1.5">
-                {files.map((uf: any, i: number) => {
-                  const err = validateFile(uf.file, uf.category);
+                {tplQueue.map((uf: any) => {
+                  const globalIdx = files.indexOf(uf);
                   const ext = uf.file.name.split(".").pop()?.toLowerCase();
                   return (
-                    <div key={i} className={cn(
-                      "flex items-center gap-2.5 p-2.5 rounded-xl border text-xs",
-                      err ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200"
-                    )}>
-                      <div className={cn(
-                        "w-7 h-7 rounded-md flex items-center justify-center shrink-0 font-bold text-[9px] uppercase",
-                        ext === "pdf" ? "bg-red-100 text-red-700" : ext === "xlsx" || ext === "xls" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"
-                      )}>{ext}</div>
+                    <div key={globalIdx} className="flex items-center gap-2.5 p-2.5 rounded-xl border bg-blue-50/50 border-blue-100 text-xs">
+                      <FileChip ext={ext} />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-slate-800 truncate">{uf.file.name}</p>
-                        <p className="text-[10px] text-slate-400">{(uf.file.size / 1024).toFixed(0)} KB</p>
-                        {err && <p className="text-red-600 font-medium mt-0.5">{err}</p>}
+                        <p className="text-[10px] text-slate-400">{(uf.file.size / 1024).toFixed(0)} KB · Financial Data Template</p>
                       </div>
-                      <button onClick={() => setFiles((p: any) => p.filter((_: any, j: number) => j !== i))} className="p-1 hover:bg-red-50 rounded-lg transition-colors">
+                      <button onClick={() => removeFile(globalIdx)} className="p-1 hover:bg-red-50 rounded-lg transition-colors">
                         <X className="w-3.5 h-3.5 text-slate-400 hover:text-red-500" />
                       </button>
                     </div>
@@ -2072,28 +2113,20 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
             </div>
           )}
 
-          {uploadedFiles.length > 0 && (
-            <div className={cn("pt-4", files.length > 0 ? "border-t border-slate-100" : "")}>
-              <div className="flex items-center gap-2 mb-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <h3 className="text-xs font-semibold text-slate-600">{uploadedFiles.length} uploaded file{uploadedFiles.length > 1 ? "s" : ""}</h3>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                {uploadedFiles.map((f: any) => {
+          {tplUploaded.length > 0 && (
+            <div className={cn(tplQueue.length > 0 ? "pt-3 border-t border-slate-100" : "")}>
+              <p className="text-[11px] font-semibold text-slate-500 mb-2 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3 h-3 text-emerald-500" /> {tplUploaded.length} template file{tplUploaded.length > 1 ? "s" : ""} uploaded
+              </p>
+              <div className="space-y-1.5">
+                {tplUploaded.map((f: any) => {
                   const ext = (f.originalName || "").split(".").pop()?.toLowerCase();
-                  const isXl = ext === "xlsx" || ext === "xls" || ext === "xlsm";
                   return (
-                    <div key={f.id} className={cn(
-                      "flex items-center gap-2.5 p-2.5 rounded-xl border text-xs",
-                      isXl ? "bg-blue-50/50 border-blue-100" : "bg-slate-50 border-slate-100"
-                    )}>
-                      <div className={cn(
-                        "w-7 h-7 rounded-md flex items-center justify-center shrink-0 font-bold text-[9px] uppercase",
-                        ext === "pdf" ? "bg-red-100 text-red-700" : isXl ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"
-                      )}>{ext}</div>
+                    <div key={f.id} className="flex items-center gap-2.5 p-2.5 rounded-xl border bg-emerald-50/50 border-emerald-100 text-xs">
+                      <FileChip ext={ext} />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-slate-800 truncate">{f.originalName}</p>
-                        {isXl && <p className="text-[10px] text-blue-600 font-medium mt-0.5">Primary template</p>}
+                        <p className="text-[10px] text-blue-600 font-medium mt-0.5">Primary template</p>
                       </div>
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                     </div>
@@ -2105,36 +2138,157 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onFileAdd, 
         </div>
       </div>
 
-      {/* ── 3. Extract Data button (shown after upload) ── */}
-      {hasUploaded && (
+      {/* ── 3. Supporting Documents (all formats) ── */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-slate-50 to-violet-50/30 px-5 py-3.5 border-b border-slate-200/60 flex items-center gap-2">
+          <FileText className="w-4 h-4 text-violet-600" />
+          <h2 className="font-semibold text-slate-900 text-sm">Supporting Documents</h2>
+          <span className="text-[11px] text-slate-400 ml-1">— optional</span>
+          {supUploaded.length > 0 && (
+            <span className="ml-auto flex items-center gap-1 text-[11px] text-violet-600 font-semibold">
+              <CheckCircle2 className="w-3.5 h-3.5" /> {supUploaded.length} file{supUploaded.length > 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+        <div className="p-5 space-y-4">
+          <div
+            className={cn(
+              "border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200",
+              supDrag ? "border-violet-400 bg-violet-50/60 scale-[1.01]" : "border-slate-200 hover:border-violet-300 hover:bg-violet-50/20"
+            )}
+            onClick={() => supFileInputRef.current?.click()}
+            onDragOver={e => { e.preventDefault(); setSupDrag(true); }}
+            onDragLeave={() => setSupDrag(false)}
+            onDrop={e => {
+              e.preventDefault(); setSupDrag(false);
+              const dropped = Array.from(e.dataTransfer.files);
+              if (dropped.length) setFiles((p: any) => [...p, ...dropped.map((f: any) => ({ file: f, category: "other" }))]);
+            }}
+          >
+            <div className={cn("w-11 h-11 rounded-2xl mx-auto mb-3 flex items-center justify-center", supDrag ? "bg-violet-100" : "bg-slate-100")}>
+              <FileText className={cn("w-5 h-5", supDrag ? "text-violet-600" : "text-slate-400")} />
+            </div>
+            <p className="font-medium text-slate-700 text-sm">
+              Attach bank statements, PDFs, images &amp; more or <span className="text-violet-600 underline underline-offset-2">browse</span>
+            </p>
+            <p className="text-xs text-slate-400 mt-1">PDF · Excel · Word · Images · CSV — multiple files allowed</p>
+            <input
+              ref={supFileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.jpg,.jpeg,.png,.webp,.txt"
+              onChange={e => {
+                const fs = Array.from(e.target.files || []);
+                if (fs.length) setFiles((p: any) => [...p, ...fs.map((f: any) => ({ file: f, category: "other" }))]);
+                if (supFileInputRef.current) supFileInputRef.current.value = "";
+              }}
+              className="hidden"
+            />
+          </div>
+
+          {supQueue.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-600">{supQueue.length} document{supQueue.length > 1 ? "s" : ""} ready</span>
+                <Button onClick={onUpload} disabled={loading} size="sm" className="bg-violet-600 hover:bg-violet-700 text-white h-7 text-xs px-3">
+                  {loading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Upload className="w-3 h-3 mr-1" />} Upload
+                </Button>
+              </div>
+              <div className="space-y-1.5">
+                {supQueue.map((uf: any) => {
+                  const globalIdx = files.indexOf(uf);
+                  const ext = uf.file.name.split(".").pop()?.toLowerCase();
+                  return (
+                    <div key={globalIdx} className="flex items-center gap-2.5 p-2.5 rounded-xl border bg-slate-50 border-slate-200 text-xs">
+                      <FileChip ext={ext} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-slate-800 truncate">{uf.file.name}</p>
+                        <p className="text-[10px] text-slate-400">{(uf.file.size / 1024).toFixed(0)} KB</p>
+                      </div>
+                      <select
+                        className="text-[10px] border border-slate-200 rounded-lg px-1.5 py-1 bg-white text-slate-700 focus:ring-2 focus:ring-violet-200 focus:border-violet-400 shrink-0"
+                        value={uf.category}
+                        onChange={ev => { const u = [...files]; u[globalIdx].category = ev.target.value; setFiles(u); }}
+                      >
+                        {supCategories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      </select>
+                      <button onClick={() => removeFile(globalIdx)} className="p-1 hover:bg-red-50 rounded-lg transition-colors">
+                        <X className="w-3.5 h-3.5 text-slate-400 hover:text-red-500" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {supUploaded.length > 0 && (
+            <div className={cn(supQueue.length > 0 ? "pt-3 border-t border-slate-100" : "")}>
+              <p className="text-[11px] font-semibold text-slate-500 mb-2 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3 h-3 text-emerald-500" /> {supUploaded.length} supporting document{supUploaded.length > 1 ? "s" : ""} uploaded
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {supUploaded.map((f: any) => {
+                  const ext = (f.originalName || "").split(".").pop()?.toLowerCase();
+                  const catLabel = supCategories.find(c => c.value === f.category)?.label || "Document";
+                  return (
+                    <div key={f.id} className="flex items-center gap-2.5 p-2.5 rounded-xl border bg-slate-50 border-slate-100 text-xs">
+                      <FileChip ext={ext} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-slate-800 truncate">{f.originalName}</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">{catLabel}</p>
+                      </div>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {supQueue.length === 0 && supUploaded.length === 0 && (
+            <p className="text-xs text-slate-400 text-center py-1">No supporting documents attached yet</p>
+          )}
+        </div>
+      </div>
+
+      {/* ── 4. Extract Data (shown after any upload) ── */}
+      {hasAnyUploaded && (
         <div className="bg-white border border-emerald-200 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-center gap-4">
           <div className="flex items-start gap-3 flex-1">
             <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
               <Sparkles className="w-5 h-5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-900">Template uploaded — ready to extract</p>
+              <p className="text-sm font-bold text-slate-900">
+                {hasTemplate ? "Template ready — extract audit variables" : "Files uploaded — add the template to extract"}
+              </p>
               <p className="text-xs text-slate-500 mt-0.5">
-                Parses the template and auto-populates all audit variables — materiality, risk, sampling, and more.
+                {hasTemplate
+                  ? "Parses the template and auto-populates all audit variables — materiality, risk, sampling, and more."
+                  : "Upload the completed Excel template above to proceed with AI extraction."}
               </p>
             </div>
           </div>
-          <Button
-            onClick={onExtractData}
-            disabled={loading}
-            size="lg"
-            className="px-7 shadow-md shrink-0 font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-200/50"
-          >
-            {loading
-              ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Extracting…</>
-              : <><Sparkles className="w-4 h-4 mr-2" /> Extract Data <ArrowRight className="w-4 h-4 ml-2" /></>
-            }
-          </Button>
+          {hasTemplate && (
+            <Button
+              onClick={onExtractData}
+              disabled={loading}
+              size="lg"
+              className="px-7 shadow-md shrink-0 font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-200/50"
+            >
+              {loading
+                ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Extracting…</>
+                : <><Sparkles className="w-4 h-4 mr-2" /> Extract Data <ArrowRight className="w-4 h-4 ml-2" /></>
+              }
+            </Button>
+          )}
         </div>
       )}
     </div>
   );
 }
+
 // ── Template Parse Results Panel ─────────────────────────────────────────────
 
 function TemplateParsedPanel({ result, onClear }: { result: any; onClear: () => void }) {
