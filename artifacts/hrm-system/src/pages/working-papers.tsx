@@ -1259,34 +1259,65 @@ export default function WorkingPapers() {
 
           {sessions.length > 0 && (
             <div>
-              <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-1">Existing Sessions ({sessions.length})</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center justify-between mb-3 px-0.5">
+                <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <div className="w-5 h-5 rounded bg-slate-100 flex items-center justify-center">
+                    <FileCheck className="w-3 h-3 text-slate-500" />
+                  </div>
+                  Engagement Sessions
+                  <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">{sessions.length}</span>
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {sessions.map((s: any) => {
-                  const statusCls = s.status === "completed" || s.status === "exported" ? "bg-emerald-500" :
-                    s.status === "generation" || s.status === "variables" ? "bg-blue-500" :
-                    s.status === "upload" || s.status === "draft" ? "bg-slate-400" : "bg-amber-500";
+                  const stageOrder = ["upload", "extraction", "data_sheet", "arranged_data", "variables", "audit_engine", "generation", "export"];
+                  const stageIdx = stageOrder.indexOf(s.status);
+                  const progressPct = stageIdx < 0 ? 0 : Math.round(((stageIdx + 1) / stageOrder.length) * 100);
+                  const isDone = s.status === "completed" || s.status === "exported";
+                  const progressColor = isDone ? "bg-emerald-500" : s.status === "generation" || s.status === "variables" ? "bg-blue-500" : s.status === "upload" || s.status === "draft" ? "bg-slate-300" : "bg-amber-500";
+                  const statusDot = isDone ? "bg-emerald-500" : s.status === "generation" || s.status === "variables" ? "bg-blue-500" : s.status === "upload" || s.status === "draft" ? "bg-slate-300" : "bg-amber-400";
+                  const initials = (s.clientName || "?").split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase();
                   return (
-                    <div key={s.id} className="group bg-white border border-slate-200/80 rounded-xl p-4 hover:shadow-lg hover:border-blue-200 cursor-pointer transition-all duration-200" onClick={() => fetchSession(s.id)}>
-                      <div className="flex items-start gap-3">
-                        <div className={cn("w-2 h-2 rounded-full mt-2 shrink-0", statusCls)} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">{s.clientName}</p>
-                            {s.entityType && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium border border-blue-100">{s.entityType}</span>}
+                    <div key={s.id} className="group bg-white border border-slate-200/80 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-200/80 cursor-pointer transition-all duration-200" onClick={() => fetchSession(s.id)}>
+                      <div className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[13px] font-bold text-white shrink-0"
+                            style={{ background: isDone ? "linear-gradient(135deg,#10b981,#059669)" : "linear-gradient(135deg,hsl(217 78% 54%),hsl(262 70% 55%))" }}>
+                            {initials}
                           </div>
-                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                            <span className="text-xs text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md">{s.engagementYear}</span>
-                            <span className="text-xs text-slate-500">{s.reportingFramework || "IFRS"}</span>
-                            <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium capitalize", statusColor(s.status))}>{s.status?.replace(/_/g, " ")}</span>
-                          </div>
-                          {(s.preparerName || s.reviewerName || s.approverName) && (
-                            <div className="flex items-center gap-3 mt-2 flex-wrap">
-                              {s.preparerName && <span className="text-[11px] text-slate-400"><span className="font-medium text-slate-600">{s.preparerName}</span></span>}
-                              {s.reviewerName && <span className="text-[11px] text-slate-400"><span className="font-medium text-slate-600">{s.reviewerName}</span></span>}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors text-[14px] leading-tight">{s.clientName}</p>
+                              <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all shrink-0 mt-0.5" />
                             </div>
-                          )}
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              {s.entityType && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-500 font-medium border border-slate-100">{s.entityType}</span>}
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 font-medium border border-blue-100">{s.engagementYear}</span>
+                              <span className="text-[10px] text-slate-400">{s.reportingFramework || "IFRS"}</span>
+                            </div>
+                          </div>
                         </div>
-                        <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all shrink-0 mt-1" />
+
+                        <div className="mt-3">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", statusDot)} />
+                              <span className="text-[11px] font-medium text-slate-500 capitalize">{(s.status || "upload").replace(/_/g, " ")}</span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-medium">{isDone ? "Complete" : `${progressPct}%`}</span>
+                          </div>
+                          <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                            <div className={cn("h-full rounded-full transition-all", progressColor)} style={{ width: `${isDone ? 100 : Math.max(progressPct, 4)}%` }} />
+                          </div>
+                        </div>
+
+                        {(s.preparerName || s.reviewerName || s.auditFirmName) && (
+                          <div className="flex items-center gap-2.5 mt-2.5 pt-2.5 border-t border-slate-100/80 flex-wrap">
+                            {s.auditFirmName && <span className="text-[10.5px] text-slate-400 font-medium truncate">{s.auditFirmName}</span>}
+                            {s.preparerName && <span className="text-[10.5px] text-slate-400">Prep: <span className="text-slate-600 font-medium">{s.preparerName}</span></span>}
+                            {s.reviewerName && <span className="text-[10.5px] text-slate-400">Rev: <span className="text-slate-600 font-medium">{s.reviewerName}</span></span>}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

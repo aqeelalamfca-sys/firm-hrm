@@ -602,50 +602,70 @@ export default function Dashboard() {
     hrPendingLeaves: "Leave requests awaiting approval. Click to review and act.",
   };
 
+  const greetingMsg = React.useMemo(() => {
+    const hour = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Karachi" })).getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  }, []);
+
   return (
     <div className="space-y-6 pb-10">
       {/* Welcome Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-bold tracking-tight">
-              Welcome, {user?.name?.split(" ")[0]}
-            </h1>
-            <Badge className={`${roleConf.bg} ${roleConf.color} ${roleConf.accent} border text-[11px] font-semibold px-2 py-0.5`}>
-              {roleConf.label}
-            </Badge>
-          </div>
-          <p className="text-sm text-muted-foreground">{pktTime}</p>
+      <div className="relative overflow-hidden rounded-2xl border border-primary/10 shadow-sm"
+        style={{ background: "linear-gradient(135deg, hsl(217 78% 14%) 0%, hsl(224 60% 18%) 50%, hsl(262 50% 20%) 100%)" }}>
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full opacity-[0.07]" style={{ background: "radial-gradient(circle, hsl(217 78% 65%) 0%, transparent 70%)" }} />
+          <div className="absolute -bottom-12 -left-4 w-40 h-40 rounded-full opacity-[0.05]" style={{ background: "radial-gradient(circle, hsl(262 70% 65%) 0%, transparent 70%)" }} />
         </div>
-        <div className="flex gap-2">
-          {!isTrainee && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link href="/attendance">
-                  <Button variant="outline" size="sm" className="gap-2 text-[13px] h-8">
-                    <CalendarCheck className="w-3.5 h-3.5" /> Attendance
-                  </Button>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-[220px] text-xs">
-                <p>{TOOLTIP_HELP.markAttendance}</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
-          {(isPartnerOrAdmin || isFinance) && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link href="/invoices">
-                  <Button size="sm" className="gap-2 text-[13px] h-8 shadow-sm">
-                    <FileText className="w-3.5 h-3.5" /> New Invoice
-                  </Button>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-[220px] text-xs">
-                <p>{TOOLTIP_HELP.createInvoice}</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
+        <div className="relative px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold text-white shrink-0"
+              style={{ background: "linear-gradient(135deg, hsl(217 78% 50%) 0%, hsl(262 70% 55%) 100%)", boxShadow: "0 4px 16px rgba(59,130,246,0.35)" }}>
+              {user?.name?.charAt(0)}
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                  {greetingMsg}, {user?.name?.split(" ")[0]}
+                </h1>
+                <span className={`text-[10.5px] px-2 py-0.5 rounded-full font-semibold border ${roleConf.bg} ${roleConf.color} ${roleConf.accent}`}>
+                  {roleConf.label}
+                </span>
+              </div>
+              <p className="text-blue-200/70 text-xs mt-0.5">{pktTime} · Pakistan Standard Time</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {!isTrainee && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link href="/attendance">
+                    <Button variant="outline" size="sm" className="gap-2 text-[13px] h-8 bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/30 hover:text-white">
+                      <CalendarCheck className="w-3.5 h-3.5" /> Attendance
+                    </Button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[220px] text-xs">
+                  <p>{TOOLTIP_HELP.markAttendance}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            {(isPartnerOrAdmin || isFinance) && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link href="/invoices">
+                    <Button size="sm" className="gap-2 text-[13px] h-8 bg-white text-slate-900 hover:bg-white/90 shadow-sm font-medium">
+                      <FileText className="w-3.5 h-3.5" /> New Invoice
+                    </Button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[220px] text-xs">
+                  <p>{TOOLTIP_HELP.createInvoice}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
         </div>
       </div>
 
