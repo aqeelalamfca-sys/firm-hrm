@@ -18,11 +18,11 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
+// NOTE: "Validation" tab has been removed; all variable review/editing lives in "Data Extraction".
 const STAGES = [
   { key: "upload",        label: "Upload",          icon: Upload,         phase: "facts",    desc: "Template & Supporting Documents" },
-  { key: "extraction",    label: "Data Extraction", icon: Sparkles,       phase: "facts",    desc: "Extract 100% Template Data (Category A)" },
+  { key: "extraction",    label: "Data Extraction", icon: Sparkles,       phase: "facts",    desc: "Extract 100% Template Data + Variable Review, Exceptions & Confirmation" },
   { key: "arranged_data", label: "AI Data Sheet",    icon: Bot,            phase: "facts",    desc: "AI-Completed Variable Sheet — All Fields Populated" },
-  { key: "variables",     label: "Validation",      icon: CheckCheck,     phase: "facts",    desc: "Editable Variables + Reconciliation + Audit Trail" },
   { key: "tb_generation", label: "Trial Balance",   icon: BarChart2,      phase: "judgment", desc: "Fully Balanced TB – Zero Difference" },
   { key: "gl_generation", label: "General Ledger",  icon: GitMerge,       phase: "judgment", desc: "Transaction-wise GL – Reconciled with TB" },
   { key: "generation",    label: "Working Papers",  icon: FileCheck,      phase: "output",   desc: "AI Generated Complete WPs (ISA Compliant)" },
@@ -1323,12 +1323,12 @@ export default function WorkingPapers() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {sessions.map((s: any) => {
-                  const stageOrder = ["upload", "extraction", "data_sheet", "arranged_data", "variables", "audit_engine", "generation", "export"];
+                  const stageOrder = ["upload", "extraction", "data_sheet", "arranged_data", "audit_engine", "generation", "export"];
                   const stageIdx = stageOrder.indexOf(s.status);
                   const progressPct = stageIdx < 0 ? 0 : Math.round(((stageIdx + 1) / stageOrder.length) * 100);
                   const isDone = s.status === "completed" || s.status === "exported";
-                  const progressColor = isDone ? "bg-emerald-500" : s.status === "generation" || s.status === "variables" ? "bg-blue-500" : s.status === "upload" || s.status === "draft" ? "bg-slate-300" : "bg-amber-500";
-                  const statusDot = isDone ? "bg-emerald-500" : s.status === "generation" || s.status === "variables" ? "bg-blue-500" : s.status === "upload" || s.status === "draft" ? "bg-slate-300" : "bg-amber-400";
+                  const progressColor = isDone ? "bg-emerald-500" : s.status === "generation" ? "bg-blue-500" : s.status === "upload" || s.status === "draft" ? "bg-slate-300" : "bg-amber-500";
+                  const statusDot = isDone ? "bg-emerald-500" : s.status === "generation" ? "bg-blue-500" : s.status === "upload" || s.status === "draft" ? "bg-slate-300" : "bg-amber-400";
                   const initials = (s.clientName || "?").split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase();
                   return (
                     <div key={s.id} className="group bg-white border border-slate-200/80 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-200/80 cursor-pointer transition-all duration-200" onClick={() => fetchSession(s.id)}>
@@ -1433,7 +1433,7 @@ export default function WorkingPapers() {
           {/* Phase strip */}
           <div className="hidden sm:flex items-center gap-0 pt-2 pb-0 text-[9px] font-bold uppercase tracking-widest">
             {([ 
-              { label: "Facts", keys: ["upload","extraction","arranged_data","variables"], color: "blue" },
+              { label: "Facts", keys: ["upload","extraction","arranged_data"], color: "blue" },
               { label: "Audit Judgment", keys: ["tb_generation","gl_generation"], color: "violet" },
               { label: "Defensible Output", keys: ["generation","review","export"], color: "emerald" },
             ] as const).map((ph, pi) => {
@@ -1479,8 +1479,7 @@ export default function WorkingPapers() {
                   )}
                   onClick={() => {
                     setStage(s.key);
-                    if (s.key === "extraction" && variables.length === 0) fetchVariables();
-                    if (s.key === "variables" && variables.length === 0) { fetchVariables(); fetchCoaData(); }
+                    if (s.key === "extraction" && variables.length === 0) { fetchVariables(); fetchCoaData(); }
                     if (s.key === "arranged_data" && !arrangedData) fetchArrangedData();
                     if (s.key === "tb_generation" || s.key === "gl_generation") {
                       fetchCoaData();
@@ -1509,14 +1508,13 @@ export default function WorkingPapers() {
             { step: "Upload",          phase: "facts",    active: stage === "upload" },
             { step: "Data Extraction", phase: "facts",    active: stage === "extraction" },
             { step: "AI Data Sheet",   phase: "facts",    active: stage === "arranged_data" },
-            { step: "Validation",      phase: "facts",    active: stage === "variables" },
             { step: "Trial Balance",   phase: "judgment", active: stage === "tb_generation" },
             { step: "GL Generation",   phase: "judgment", active: stage === "gl_generation" },
             { step: "WP Generation",   phase: "output",   active: stage === "generation" },
             { step: "Review",          phase: "output",   active: stage === "review" },
             { step: "Final Output",    phase: "output",   active: stage === "export" },
           ].map((item, idx) => {
-            const stageOrder = ["upload","extraction","arranged_data","variables","tb_generation","gl_generation","generation","review","export"];
+            const stageOrder = ["upload","extraction","arranged_data","tb_generation","gl_generation","generation","review","export"];
             const pastIdx = stageOrder.indexOf(stage);
             const isPast = pastIdx > idx;
             return (
@@ -1613,7 +1611,7 @@ export default function WorkingPapers() {
         />
       )}
 
-      {/* TAB 2 — Data Extraction */}
+      {/* TAB 2 — Data Extraction (owns ALL variable review, editing, exceptions & confirmation) */}
       {stage === "extraction" && (
         <ExtractionStage
           data={extractionData}
@@ -1644,7 +1642,7 @@ export default function WorkingPapers() {
               onValidate={validateVariables}
               loading={loading}
               confidenceBadge={confidenceBadge}
-              hideControls={true}
+              hideControls={false}
             />
           }
         />
@@ -1658,38 +1656,13 @@ export default function WorkingPapers() {
           setActiveTab={setActiveTab}
           onFetch={fetchArrangedData}
           onApproveAll={approveAllFields}
-          onNext={() => { autoFillVariables(); setStage("variables"); }}
+          onNext={() => { autoFillVariables(); setStage("tb_generation"); }}
           loading={loading}
           confidenceBadge={confidenceBadge}
         />
       )}
 
-      {/* TAB 4 — Validation (Editable Variables) */}
-      {stage === "variables" && (
-        <VariablesStage
-          variables={variables}
-          grouped={variableGroups}
-          stats={variableStats}
-          changeLog={changeLog}
-          editingVar={editingVar}
-          editValue={editValue}
-          editReason={editReason}
-          setEditingVar={setEditingVar}
-          setEditValue={setEditValue}
-          setEditReason={setEditReason}
-          onSave={saveVariableEdit}
-          onReview={markVariableReviewed}
-          onReviewAll={reviewAllVariables}
-          onFetch={fetchVariables}
-          onLockAll={lockAllVariables}
-          onLockSection={lockSection}
-          onValidate={validateVariables}
-          loading={loading}
-          confidenceBadge={confidenceBadge}
-        />
-      )}
-
-      {/* TAB 5 — Trial Balance */}
+      {/* TAB 4 — Trial Balance (Validation tab removed; variables now live in Data Extraction) */}
       {stage === "tb_generation" && (
         <TbGenerationStage
           coaData={coaData}
