@@ -788,6 +788,22 @@ export default function WorkingPapers() {
     } catch {}
   };
 
+  const saveVariableDirect = async (varId: number, value: string, reason: string = "User edit") => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/variables/${varId}`, {
+        method: "PATCH", headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ value, reason: reason || "User edit via extraction form", editedBy: user?.id }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "Autosave failed", description: err.error || "Unknown error", variant: "destructive" });
+      } else {
+        await fetchVariables();
+      }
+    } catch {}
+  };
+
   const lockAllVariables = async () => {
     if (!activeSession) return;
     try {
@@ -1671,22 +1687,13 @@ export default function WorkingPapers() {
               grouped={variableGroups}
               stats={variableStats}
               changeLog={changeLog}
-              editingVar={editingVar}
-              editValue={editValue}
-              editReason={editReason}
-              setEditingVar={setEditingVar}
-              setEditValue={setEditValue}
-              setEditReason={setEditReason}
               onSave={saveVariableEdit}
-              onReview={markVariableReviewed}
-              onReviewAll={reviewAllVariables}
+              onSaveDirect={saveVariableDirect}
+              onAiFill={handleAiFill}
               onFetch={fetchVariables}
               onLockAll={lockAllVariables}
-              onLockSection={lockSection}
-              onValidate={validateVariables}
               loading={loading}
               confidenceBadge={confidenceBadge}
-              hideControls={false}
             />
           }
         />
@@ -5071,92 +5078,225 @@ function RenderDisplayValue({ def, value, sourceType }: { def: any; value: strin
   }
 }
 
-function VariablesStage({ variables, grouped, stats, changeLog, editingVar, editValue, editReason, setEditingVar, setEditValue, setEditReason, onSave, onReview, onReviewAll, onFetch, onLockAll, onLockSection, onValidate, loading, confidenceBadge, hideControls }: any) {
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<string>("all");
-  const [validationIssues, setValidationIssues] = useState<any[]>([]);
+// Modes where saving should fire immediately on change (not on blur)
+const IMMEDIATE_SAVE_MODES = new Set([
+  "toggle", "yes_no_na", "pass_fail", "risk_level", "rating_level",
+  "exception_flag", "checkbox", "dropdown", "status", "conclusion",
+  "radio", "date", "time", "datetime",
+]);
+
+function VariableRow({ v, onSaveDirect, confidenceBadge }: any) {
+  const def = v.definition;
+  const inputMode = def?.inputMode || "text";
+  const isMandatory = def?.mandatoryFlag;
+
+  // Derive status flags
+  const isLocked       = !!v.isLocked;
+  const isTemplateFilled = v.reviewStatus === "template_filled" || v.sourceType === "template";
+  const isAiFilled     = ["ai_filled", "auto_filled", "ai_extraction", "autofill"].includes(v.reviewStatus)
+                          || v.sourceType === "ai_fill";
+  const isUserEdited   = !!(v.userEditedValue || v.reviewStatus === "user_edited");
+  const isEmpty        = !v.finalValue || v.finalValue.trim() === "" || v.finalValue === "N/A";
+  const isLowConf      = !!(v.confidence && Number(v.confidence) < 70);
+
+  // Local value state + autosave
+  const [localValue, setLocalValue] = useState<string>(v.finalValue || "");
+  const [saving, setSaving]         = useState(false);
+
+  // Sync when server pushes an update
+  useEffect(() => { setLocalValue(v.finalValue || ""); }, [v.finalValue]);
+
+  const triggerSave = async (val: string) => {
+    if (isLocked) return;
+    if (val === (v.finalValue ?? "")) return;
+    setSaving(true);
+    await onSaveDirect?.(v.id, val, "User edit via extraction form");
+    setSaving(false);
+  };
+
+  const handleChange = (val: string) => {
+    setLocalValue(val);
+    if (IMMEDIATE_SAVE_MODES.has(inputMode)) triggerSave(val);
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    if (!IMMEDIATE_SAVE_MODES.has(inputMode)) triggerSave(localValue);
+  };
+
+  // Determine status tag
+  type StatusKey = "locked" | "from_upload" | "user_edited" | "ai_filled" | "missing" | "low_conf" | null;
+  const statusKey: StatusKey =
+    isLocked         ? "locked"      :
+    isTemplateFilled ? "from_upload" :
+    isUserEdited     ? "user_edited" :
+    isAiFilled       ? "ai_filled"   :
+    isEmpty          ? "missing"     :
+    isLowConf        ? "low_conf"    : null;
+
+  const STATUS_LABELS: Record<NonNullable<StatusKey>, string> = {
+    locked:      "Locked",
+    from_upload: "From Upload",
+    user_edited: "User Edited",
+    ai_filled:   "AI Filled",
+    missing:     "Missing",
+    low_conf:    "Low Conf.",
+  };
+  const STATUS_STYLES: Record<NonNullable<StatusKey>, string> = {
+    locked:      "bg-slate-100 text-slate-500 border-slate-200",
+    from_upload: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    user_edited: "bg-violet-100 text-violet-700 border-violet-200",
+    ai_filled:   "bg-blue-50 text-blue-600 border-blue-100",
+    missing:     "bg-red-100 text-red-700 border-red-200",
+    low_conf:    "bg-amber-100 text-amber-700 border-amber-200",
+  };
+
+  // Row styling
+  const rowBg = isLocked          ? "bg-slate-50/50"
+    : isEmpty && isMandatory       ? "bg-red-50/30"
+    : isLowConf                    ? "bg-amber-50/20"
+    : isTemplateFilled             ? "bg-emerald-50/10"
+    : "bg-white";
+
+  const leftAccent = isLocked          ? "border-l-2 border-l-slate-300"
+    : isEmpty && isMandatory           ? "border-l-2 border-l-red-400"
+    : isTemplateFilled                 ? "border-l-2 border-l-emerald-400"
+    : isAiFilled                       ? "border-l-2 border-l-blue-300"
+    : "border-l-2 border-l-transparent";
+
+  const groupLabel = (def?.variableGroup || "Other").replace(/_/g, " ");
+
+  return (
+    <div className={cn("flex items-start gap-3 px-5 py-3 hover:bg-slate-50/60 transition-colors", rowBg, leftAccent)}>
+
+      {/* Category pill */}
+      <span className="hidden sm:block text-[9px] font-semibold text-slate-400 bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5 uppercase tracking-wide whitespace-nowrap mt-0.5 shrink-0 w-28 text-center truncate" title={groupLabel}>
+        {groupLabel}
+      </span>
+
+      {/* Variable name + status badge */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start gap-1.5 flex-wrap">
+          <p className="text-[12.5px] font-medium text-slate-800 leading-tight">
+            {def?.variableLabel || (v.variableName || "").replace(/_/g, " ")}
+            {isMandatory && <span className="ml-1 text-red-500 text-[10px]" title="Required">*</span>}
+          </p>
+          {statusKey && (
+            <span className={cn(
+              "inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide border whitespace-nowrap shrink-0",
+              STATUS_STYLES[statusKey]
+            )}>
+              {statusKey === "from_upload" && <Upload className="w-2.5 h-2.5" />}
+              {statusKey === "ai_filled"   && <Sparkles className="w-2.5 h-2.5" />}
+              {statusKey === "user_edited" && <Pencil className="w-2.5 h-2.5" />}
+              {statusKey === "locked"      && <Lock className="w-2.5 h-2.5" />}
+              {statusKey === "missing"     && <AlertCircle className="w-2.5 h-2.5" />}
+              {statusKey === "low_conf"    && <AlertTriangle className="w-2.5 h-2.5" />}
+              {STATUS_LABELS[statusKey]}
+            </span>
+          )}
+        </div>
+        <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{v.variableCode}</p>
+      </div>
+
+      {/* Editable value */}
+      <div className="shrink-0 min-w-[180px] max-w-[300px]" onBlur={handleBlur}>
+        {isLocked ? (
+          <RenderDisplayValue def={def} value={v.finalValue || "—"} sourceType={v.sourceType} />
+        ) : (
+          <RenderEditInput def={def} value={localValue} onChange={handleChange} />
+        )}
+      </div>
+
+      {/* Confidence badge + saving indicator */}
+      <div className="shrink-0 flex items-center gap-1 mt-0.5">
+        {saving
+          ? <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
+          : confidenceBadge(v.confidence ? Number(v.confidence) : null)
+        }
+        {isLocked && <Lock className="w-3 h-3 text-slate-300 ml-0.5" />}
+      </div>
+    </div>
+  );
+}
+
+function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDirect, onAiFill, onFetch, onLockAll, loading, confidenceBadge }: any) {
+  const [search, setSearch]           = useState("");
+  const [filter, setFilter]           = useState<string>("all");
   const [showAuditTrail, setShowAuditTrail] = useState(false);
+  const [aiFilling, setAiFilling]     = useState(false);
 
   useEffect(() => { if (variables.length === 0) onFetch(); }, []);
 
-  const runValidation = async () => {
-    const result = await onValidate();
-    setValidationIssues(result.issues || []);
-  };
+  // Computed counts (client-side, always fresh)
+  const templateFilledCount = variables.filter((v: any) =>
+    v.reviewStatus === "template_filled" || v.sourceType === "template").length;
+  const aiFilledCount = variables.filter((v: any) =>
+    ["ai_filled", "auto_filled", "ai_extraction", "autofill"].includes(v.reviewStatus) || v.sourceType === "ai_fill").length;
+  const missingCount = variables.filter((v: any) =>
+    !v.finalValue || v.finalValue.trim() === "" || v.finalValue === "N/A").length;
+  const lowConfCount = variables.filter((v: any) =>
+    v.confidence && Number(v.confidence) < 70).length;
+
+  // Lock All is only enabled when zero variables are missing
+  const canLockAll = missingCount === 0 && variables.length > 0 && !loading;
 
   const filterVar = (v: any) => {
     if (search) {
       const s = search.toLowerCase();
-      const label = v.definition?.variableLabel || v.variableName || "";
-      const code = v.variableCode || "";
-      if (!label.toLowerCase().includes(s) && !code.toLowerCase().includes(s)) return false;
+      const label = (v.definition?.variableLabel || v.variableName || "").toLowerCase();
+      const code  = (v.variableCode || "").toLowerCase();
+      if (!label.includes(s) && !code.includes(s)) return false;
     }
-    if (filter === "mandatory" && !v.definition?.mandatoryFlag) return false;
-    if (filter === "low_confidence" && (!v.confidence || Number(v.confidence) >= 70)) return false;
-    if (filter === "missing" && v.finalValue && v.finalValue.trim() !== "") return false;
-    if (filter === "reviewed" && v.reviewStatus !== "reviewed" && v.reviewStatus !== "confirmed") return false;
-    if (filter === "locked" && !v.isLocked) return false;
-    if (filter === "needs_review" && v.reviewStatus !== "needs_review" && v.reviewStatus !== "review") return false;
-    if (filter === "extracted" && v.sourceType !== "template" && v.reviewStatus !== "template_filled") return false;
+    if (filter === "from_upload") return v.reviewStatus === "template_filled" || v.sourceType === "template";
+    if (filter === "ai_filled")   return ["ai_filled", "auto_filled", "ai_extraction", "autofill"].includes(v.reviewStatus) || v.sourceType === "ai_fill";
+    if (filter === "missing")     return !v.finalValue || v.finalValue.trim() === "" || v.finalValue === "N/A";
+    if (filter === "low_conf")    return !!(v.confidence && Number(v.confidence) < 70);
     return true;
   };
 
-  const groupEntries = Object.entries(grouped).filter(([, g]: any) => {
-    if (!g.subgroups) return false;
-    const allVars = Object.values(g.subgroups).flat() as any[];
-    return allVars.some(filterVar);
-  });
+  const filteredVars = variables.filter(filterVar);
 
-  const extractedCount = variables.filter((v: any) => v.sourceType === "template").length;
-  const requiredCount  = variables.filter((v: any) => v.definition?.mandatoryFlag).length;
+  const handleAiFillClick = async () => {
+    setAiFilling(true);
+    await onAiFill?.();
+    setAiFilling(false);
+  };
 
-  const allStatTiles = [
-    { label: "Total",       value: stats?.total,         icon: Settings2,    bg: "bg-slate-50",   iconColor: "text-slate-500",   filterKey: "all" },
-    { label: "From Upload", value: extractedCount,        icon: Upload,       bg: "bg-emerald-50", iconColor: "text-emerald-600", filterKey: "extracted" },
-    { label: "Required",    value: requiredCount,         icon: BookOpen,     bg: "bg-blue-50",    iconColor: "text-blue-600",    filterKey: "mandatory" },
-    { label: "Missing",     value: stats?.missing,        icon: AlertCircle,  bg: "bg-red-50",     iconColor: "text-red-600",     filterKey: "missing" },
-    { label: "Low Conf.",   value: stats?.lowConfidence,  icon: AlertTriangle,bg: "bg-amber-50",   iconColor: "text-amber-600",   filterKey: "low_confidence" },
-    { label: "Review",      value: stats?.needsReview,    icon: Eye,          bg: "bg-purple-50",  iconColor: "text-purple-600",  filterKey: "needs_review" },
-    { label: "Locked",      value: stats?.locked,         icon: Lock,         bg: "bg-slate-100",  iconColor: "text-slate-600",   filterKey: "locked" },
+  const statTiles = [
+    { label: "Total",       value: variables.length,    icon: Settings2,     bg: "bg-slate-50",   iconColor: "text-slate-500",   key: "all" },
+    { label: "From Upload", value: templateFilledCount, icon: Upload,        bg: "bg-emerald-50", iconColor: "text-emerald-600", key: "from_upload" },
+    { label: "AI Filled",   value: aiFilledCount,       icon: Sparkles,      bg: "bg-blue-50",    iconColor: "text-blue-600",    key: "ai_filled" },
+    { label: "Missing",     value: missingCount,        icon: AlertCircle,   bg: "bg-red-50",     iconColor: "text-red-600",     key: "missing" },
+    { label: "Low Conf.",   value: lowConfCount,        icon: AlertTriangle, bg: "bg-amber-50",   iconColor: "text-amber-600",   key: "low_conf" },
   ];
 
-  const visibleStatTiles = hideControls
-    ? allStatTiles.filter(t => ["all", "extracted", "mandatory"].includes(t.filterKey))
-    : allStatTiles;
-
-  const allFilterChips = [
-    { key: "all",            label: "All" },
-    { key: "extracted",      label: "From Upload" },
-    { key: "mandatory",      label: "Required" },
-    { key: "missing",        label: "Missing" },
-    { key: "low_confidence", label: "Low Conf." },
-    { key: "needs_review",   label: "Needs Review" },
-    { key: "locked",         label: "Locked" },
+  const filterChips = [
+    { key: "all",         label: "All" },
+    { key: "from_upload", label: "From Upload" },
+    { key: "ai_filled",   label: "AI Filled" },
+    { key: "missing",     label: "Missing" },
+    { key: "low_conf",    label: "Low Conf." },
   ];
-
-  const visibleFilterChips = hideControls
-    ? allFilterChips.filter(c => ["all", "extracted", "mandatory"].includes(c.key))
-    : allFilterChips;
 
   return (
     <div className="space-y-4">
-      {/* ── Stats bar ── */}
-      {stats && (
-        <div className={cn("grid gap-2.5", hideControls ? "grid-cols-3" : "grid-cols-3 sm:grid-cols-4 lg:grid-cols-7")}>
-          {visibleStatTiles.map(s => (
-            <button key={s.label} onClick={() => setFilter(s.filterKey)} className={cn(
-              "bg-white border rounded-xl p-3 text-center transition-all hover:shadow-sm cursor-pointer",
-              filter === s.filterKey ? "ring-2 ring-blue-500 ring-offset-1 border-blue-200 shadow-sm" : "border-slate-200"
-            )}>
-              <div className={cn("w-7 h-7 rounded-lg mx-auto mb-1 flex items-center justify-center", s.bg)}>
-                <s.icon className={cn("w-3.5 h-3.5", s.iconColor)} />
-              </div>
-              <p className="text-lg font-bold text-slate-900 tabular-nums">{s.value ?? 0}</p>
-              <p className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">{s.label}</p>
-            </button>
-          ))}
-        </div>
-      )}
+
+      {/* ── Stat tiles ── */}
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
+        {statTiles.map(s => (
+          <button key={s.key} onClick={() => setFilter(s.key)} className={cn(
+            "bg-white border rounded-xl p-3 text-center transition-all hover:shadow-sm cursor-pointer",
+            filter === s.key ? "ring-2 ring-blue-500 ring-offset-1 border-blue-200 shadow-sm" : "border-slate-200"
+          )}>
+            <div className={cn("w-7 h-7 rounded-lg mx-auto mb-1 flex items-center justify-center", s.bg)}>
+              <s.icon className={cn("w-3.5 h-3.5", s.iconColor)} />
+            </div>
+            <p className="text-lg font-bold text-slate-900 tabular-nums">{s.value}</p>
+            <p className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">{s.label}</p>
+          </button>
+        ))}
+      </div>
 
       {/* ── Main card ── */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
@@ -5171,40 +5311,59 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
                 {stats && <span className="text-xs font-normal text-slate-400 ml-1">({stats.filled}/{stats.total} filled)</span>}
               </h2>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                {hideControls
-                  ? "Variables extracted from your template. Edit any field and save, then proceed to the Variables tab to validate and lock."
-                  : "All variables pre-filled from template upload. Edit any field, then lock & proceed to generation."}
+                All variables editable inline — changes autosave on blur.
+                {!canLockAll && missingCount > 0 && <span className="text-red-500 ml-1">Fill {missingCount} missing variable{missingCount !== 1 ? "s" : ""} to enable Lock All.</span>}
               </p>
             </div>
-            {!hideControls && (
-              <div className="flex gap-1.5 flex-wrap shrink-0">
-                <Button variant="outline" size="sm" onClick={onFetch} className="h-7 text-xs">
-                  <RefreshCw className="w-3 h-3 mr-1" /> Refresh
+
+            {/* Action buttons */}
+            <div className="flex gap-1.5 flex-wrap shrink-0">
+              <Button variant="outline" size="sm" onClick={onFetch} disabled={loading} className="h-7 text-xs">
+                <RefreshCw className="w-3 h-3 mr-1" /> Refresh
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowAuditTrail(v => !v)} className="h-7 text-xs">
+                <ClipboardCheck className="w-3 h-3 mr-1" /> Trail ({changeLog.length})
+              </Button>
+              {onAiFill && (
+                <Button size="sm" onClick={handleAiFillClick} disabled={aiFilling || loading}
+                  className="h-7 text-xs bg-violet-600 hover:bg-violet-700 shadow-none"
+                  title="Fill all Missing and Low Confidence variables using AI — respects Template > User Edit > AI priority">
+                  {aiFilling
+                    ? <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                    : <Sparkles className="w-3 h-3 mr-1" />}
+                  AI Fill
                 </Button>
-                <Button variant="outline" size="sm" onClick={runValidation} className="h-7 text-xs">
-                  <Shield className="w-3 h-3 mr-1" /> Validate
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setShowAuditTrail(!showAuditTrail)} className="h-7 text-xs">
-                  <ClipboardCheck className="w-3 h-3 mr-1" /> Trail ({changeLog.length})
-                </Button>
-                <Button size="sm" onClick={onReviewAll} disabled={loading} className="h-7 text-xs bg-purple-600 hover:bg-purple-700 shadow-none">
-                  <CheckCircle2 className="w-3 h-3 mr-1" /> Review All
-                </Button>
-                <Button size="sm" onClick={onLockAll} disabled={loading} className="h-7 text-xs bg-amber-500 hover:bg-amber-600 shadow-none">
-                  <Lock className="w-3 h-3 mr-1" /> Lock All
-                </Button>
-              </div>
-            )}
+              )}
+              <Button
+                size="sm"
+                onClick={onLockAll}
+                disabled={!canLockAll}
+                title={canLockAll
+                  ? "Lock all variables — downstream modules will use this locked dataset"
+                  : `${missingCount} variable${missingCount !== 1 ? "s" : ""} still missing — fill all before locking`}
+                className={cn(
+                  "h-7 text-xs shadow-none",
+                  canLockAll ? "bg-amber-500 hover:bg-amber-600 text-white" : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                )}
+              >
+                <Lock className="w-3 h-3 mr-1" />
+                Lock All
+                {!canLockAll && missingCount > 0 && (
+                  <span className="ml-1 text-[10px] font-normal">({missingCount})</span>
+                )}
+              </Button>
+            </div>
           </div>
 
-          {/* Search + filter row */}
+          {/* Search + filter chips */}
           <div className="flex flex-col sm:flex-row gap-2 mt-3">
             <div className="relative flex-1 sm:max-w-sm">
-              <Input className="h-8 text-xs pl-8 bg-white" placeholder="Search variables by name or code…" value={search} onChange={e => setSearch(e.target.value)} />
+              <Input className="h-8 text-xs pl-8 bg-white" placeholder="Search by variable name or code…"
+                value={search} onChange={e => setSearch(e.target.value)} />
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
             </div>
             <div className="flex flex-wrap gap-1">
-              {visibleFilterChips.map(f => (
+              {filterChips.map(f => (
                 <button key={f.key} onClick={() => setFilter(f.key)} className={cn(
                   "px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all",
                   filter === f.key ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
@@ -5219,34 +5378,16 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
         {/* Legend */}
         <div className="px-5 py-2 border-b border-slate-100 bg-slate-50/60 flex flex-wrap items-center gap-3 text-[10px] text-slate-500">
           <span className="font-semibold text-slate-600 uppercase tracking-wide">Key:</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-emerald-400" /> Extracted from Upload</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-blue-400" /> AI Processed</span>
-          {!hideControls && <>
-            <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-400" /> Missing / Empty</span>
-            <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-amber-400" /> Low Confidence</span>
-            <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-slate-300" /> Locked</span>
-          </>}
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-emerald-400" /> From Upload</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-blue-400" /> AI Filled</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-violet-400" /> User Edited</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-400" /> Missing</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-amber-400" /> Low Confidence</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-slate-300" /> Locked</span>
+          <span className="ml-auto text-slate-400 italic">Inline edit — changes autosave on blur</span>
         </div>
 
-        {/* Validation issues */}
-        {validationIssues.length > 0 && (
-          <div className="mx-5 mt-4 p-3.5 bg-amber-50 border border-amber-200 rounded-xl">
-            <h3 className="text-xs font-semibold text-amber-900 mb-2 flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5" /> Validation Issues ({validationIssues.length})
-            </h3>
-            <div className="space-y-1 max-h-28 overflow-y-auto">
-              {validationIssues.map((issue: any, i: number) => (
-                <div key={i} className="text-xs flex items-center gap-2 p-1.5 bg-white/60 rounded-lg border border-amber-100">
-                  <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", issue.severity === "high" ? "bg-red-500" : issue.severity === "medium" ? "bg-amber-500" : "bg-blue-500")} />
-                  <span className="font-medium text-slate-800">{issue.label}</span>
-                  <span className="text-slate-500">{issue.issue}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Variable sections — always expanded, no accordion */}
+        {/* Flat variable list */}
         <div className="divide-y divide-slate-100">
           {variables.length === 0 ? (
             <div className="text-center py-16">
@@ -5254,185 +5395,20 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
                 <ClipboardList className="w-7 h-7 text-slate-300" />
               </div>
               <p className="text-slate-500 font-medium text-sm">No variables yet</p>
-              <p className="text-xs text-slate-400 mt-1">Go to the Upload tab and click "Extract Data" to populate variables from your template</p>
+              <p className="text-xs text-slate-400 mt-1">Upload a template and click "Extract Data" to populate all audit variables.</p>
             </div>
-          ) : groupEntries.length === 0 ? (
+          ) : filteredVars.length === 0 ? (
             <div className="text-center py-10">
               <p className="text-sm text-slate-400">No variables match the current filter.</p>
               <button onClick={() => { setFilter("all"); setSearch(""); }} className="text-xs text-blue-600 underline mt-1">Clear filter</button>
             </div>
-          ) : groupEntries.map(([groupName, groupData]: any) => {
-            const gs = groupData.stats || { total: 0, filled: 0, missing: 0, locked: 0 };
-            const pct = gs.total > 0 ? Math.round((gs.filled / gs.total) * 100) : 0;
-            const allLocked = gs.locked === gs.total && gs.total > 0;
-
-            return (
-              <div key={groupName}>
-                {/* Group header */}
-                <div className={cn("px-5 py-3 flex items-center justify-between", allLocked ? "bg-emerald-50/60" : "bg-slate-50/70")}>
-                  <div className="flex items-center gap-2.5">
-                    <div className={cn("w-1.5 h-6 rounded-full", allLocked ? "bg-emerald-400" : "bg-blue-400")} />
-                    <span className="font-bold text-sm text-slate-900">{groupName}</span>
-                    {allLocked && <span className="text-[9px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-bold flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" /> ALL LOCKED</span>}
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <div className="hidden sm:flex items-center gap-1.5">
-                      <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                        <div className={cn("h-full rounded-full", pct === 100 ? "bg-emerald-500" : pct > 50 ? "bg-blue-500" : "bg-amber-400")} style={{ width: `${pct}%` }} />
-                      </div>
-                      <span className="text-[11px] text-slate-500 tabular-nums w-7 text-right">{pct}%</span>
-                    </div>
-                    <span className="text-[11px] text-slate-400">{gs.filled}/{gs.total}</span>
-                    {gs.missing > 0 && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-semibold">{gs.missing} missing</span>}
-                    {!allLocked && (
-                      <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300"
-                        onClick={() => onLockSection(groupName)}>
-                        <Lock className="w-2.5 h-2.5 mr-1" /> Lock section
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Subgroups + variable rows */}
-                {Object.entries(groupData.subgroups || {}).map(([subName, subVars]: any) => {
-                  const filtered = subVars.filter(filterVar);
-                  if (filtered.length === 0) return null;
-                  return (
-                    <div key={subName}>
-                      {/* Subgroup label */}
-                      <div className="px-5 py-1.5 bg-white border-t border-b border-slate-100">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{subName}</span>
-                      </div>
-
-                      {/* Variable rows — 2-col form layout */}
-                      <div className="divide-y divide-slate-50">
-                        {filtered.map((v: any) => {
-                          const def = v.definition;
-                          const isMandatory = def?.mandatoryFlag;
-                          const isEditing = editingVar === v.id;
-                          const isEmpty = !v.finalValue || v.finalValue.trim() === "";
-                          const isLowConf = v.confidence && Number(v.confidence) < 70;
-                          const isFromTemplate = v.sourceType === "template";
-                          const isAiProcessed = v.sourceType === "ai_extraction" || v.sourceType === "autofill";
-                          const src = sourceIcon(v.sourceType);
-
-                          const rowBg = v.isLocked
-                            ? "bg-slate-50/40"
-                            : isEmpty && isMandatory
-                            ? "bg-red-50/30"
-                            : isLowConf
-                            ? "bg-amber-50/20"
-                            : isFromTemplate
-                            ? "bg-emerald-50/10"
-                            : "bg-white";
-
-                          const leftAccent = v.isLocked
-                            ? "border-l-2 border-l-slate-300"
-                            : isEmpty && isMandatory
-                            ? "border-l-2 border-l-red-400"
-                            : isFromTemplate
-                            ? "border-l-2 border-l-emerald-400"
-                            : isAiProcessed
-                            ? "border-l-2 border-l-blue-300"
-                            : "border-l-2 border-l-transparent";
-
-                          return (
-                            <div key={v.id} className={cn("grid grid-cols-1 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-0 sm:gap-0", rowBg, leftAccent, "px-5 py-3 hover:bg-slate-50/60 transition-colors")}>
-
-                              {/* LEFT: label + badges */}
-                              <div className="flex flex-col justify-center min-w-0 pr-4 sm:border-r sm:border-slate-100">
-                                <div className="flex items-start gap-1.5 flex-wrap">
-                                  <p className="text-[12.5px] font-medium text-slate-800 leading-tight">
-                                    {def?.variableLabel || (v.variableName || "").replace(/_/g, " ")}
-                                    {isMandatory && <span className="ml-1 text-red-500" title="Required">*</span>}
-                                  </p>
-                                </div>
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                  {isFromTemplate && (
-                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 uppercase tracking-wide">
-                                      <Upload className="w-2.5 h-2.5" /> Extracted from Upload
-                                    </span>
-                                  )}
-                                  {isAiProcessed && !isFromTemplate && (
-                                    <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">
-                                      <Sparkles className="w-2.5 h-2.5" /> AI Processed
-                                    </span>
-                                  )}
-                                  {(v.reviewStatus === "needs_review" || v.reviewStatus === "review") && (
-                                    <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-semibold border border-purple-200">REVIEW</span>
-                                  )}
-                                  {v.reviewStatus === "missing" && (
-                                    <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold border border-red-200 uppercase tracking-wide">Missing</span>
-                                  )}
-                                  {v.reviewStatus === "conflict" && (
-                                    <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-bold border border-orange-200 uppercase tracking-wide">Conflict</span>
-                                  )}
-                                  {v.reviewStatus === "user_edited" && (
-                                    <span className="text-[9px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full font-semibold border border-violet-200">Edited</span>
-                                  )}
-                                  {v.reviewStatus === "template_filled" && !isFromTemplate && (
-                                    <span className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-full font-semibold border border-emerald-200">Template</span>
-                                  )}
-                                  {def?.pakistanReference && (
-                                    <span className="text-[9px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded-full border border-slate-100 hidden sm:inline">{def.pakistanReference}</span>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* RIGHT: value + actions */}
-                              <div className="flex items-center gap-2 mt-2 sm:mt-0 sm:pl-4">
-                                <div className="flex-1 min-w-0">
-                                  {isEditing ? (
-                                    <div className="space-y-2">
-                                      <RenderEditInput def={def} value={editValue} onChange={setEditValue} />
-                                      <div className="flex flex-wrap gap-2 items-center">
-                                        <Input className="h-7 text-xs w-40 placeholder:text-slate-400" value={editReason} onChange={e => setEditReason(e.target.value)} placeholder="Reason for change…" />
-                                        <Button size="sm" className="h-7 text-xs px-3 bg-blue-600 hover:bg-blue-700" onClick={() => onSave(v.id)}><Save className="w-3 h-3 mr-1" /> Save</Button>
-                                        <Button size="sm" variant="ghost" className="h-7 text-xs px-2.5" onClick={() => setEditingVar(null)}>Cancel</Button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <RenderDisplayValue def={def} value={v.finalValue || v.autoFilledValue || ""} sourceType={v.sourceType} />
-                                  )}
-                                </div>
-
-                                {/* Action buttons */}
-                                <div className="flex items-center gap-1 shrink-0">
-                                  {confidenceBadge(v.confidence ? Number(v.confidence) : null)}
-                                  {v.reviewStatus === "needs_review" && !v.isLocked && (
-                                    <button onClick={() => onReview(v.id)} className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 hover:bg-purple-200 border border-purple-200 whitespace-nowrap">
-                                      <Check className="w-2.5 h-2.5 inline mr-0.5" /> Review
-                                    </button>
-                                  )}
-                                  {v.isLocked ? (
-                                    <div className="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center" title="Locked">
-                                      <Lock className="w-3 h-3 text-slate-400" />
-                                    </div>
-                                  ) : (
-                                    <button
-                                      onClick={() => { setEditingVar(v.id); setEditValue(v.finalValue || ""); setEditReason(""); }}
-                                      className="w-6 h-6 rounded-md hover:bg-blue-50 flex items-center justify-center border border-transparent hover:border-blue-200 transition-colors"
-                                      title="Edit"
-                                    >
-                                      <Pencil className="w-3 h-3 text-slate-400 hover:text-blue-600" />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
+          ) : filteredVars.map((v: any) => (
+            <VariableRow key={v.id} v={v} onSaveDirect={onSaveDirect} confidenceBadge={confidenceBadge} />
+          ))}
         </div>
 
         {/* Audit trail */}
-        {!hideControls && showAuditTrail && changeLog.length > 0 && (
+        {showAuditTrail && changeLog.length > 0 && (
           <div className="m-5 mt-0 bg-slate-50 border border-slate-200 rounded-xl p-4">
             <h3 className="text-xs font-semibold text-slate-700 mb-3 flex items-center gap-2 uppercase tracking-wider">
               <ClipboardCheck className="w-4 h-4 text-slate-500" /> Audit Trail ({changeLog.length} changes)
