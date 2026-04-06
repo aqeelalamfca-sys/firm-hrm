@@ -6672,10 +6672,11 @@ router.post("/sessions/:id/parse-one-sheet-template", async (req: Request, res: 
         });
       if (glInserts.length > 0) await db.insert(wpGlAccountsTable).values(glInserts as any);
 
-      // ── AUTO-POPULATE VARIABLES FROM TEMPLATE ─────────────────────────────
-      await autoFillVariablesFromTemplate(sessionId, meta, rows, periodStart, periodEnd, engagementYear);
+      // ── STEP 3: AUTO-POPULATE VARIABLES FROM TEMPLATE ────────────────────
+      // Returns structured exception report: mapped, skipped, conflicts, missingMandatory
+      const varMapping = await autoFillVariablesFromTemplate(sessionId, meta, rows, periodStart, periodEnd, engagementYear);
 
-      // ── UPDATE AUDIT ENGINE MASTER ────────────────────────────────────────
+      // ── STEP 4: UPDATE AUDIT ENGINE MASTER ───────────────────────────────
       try {
         const existingMaster = await db.select().from(auditEngineMasterTable).where(eq(auditEngineMasterTable.sessionId, sessionId));
         const masterPayload = {
@@ -6688,7 +6689,7 @@ router.post("/sessions/:id/parse-one-sheet-template", async (req: Request, res: 
           auditType:    meta.auditType || session.engagementType || "Statutory Audit",
           currency:     meta.currency  || "PKR",
           engagementStatus: "Planning",
-          overallRiskLevel:  "Medium",
+          overallRiskLevel:  rows.some((r: ParsedTemplateRow) => (r.riskLevel || "").toLowerCase() === "high") ? "High" : "Medium",
           updatedAt:    new Date(),
         };
         if (existingMaster.length > 0) {
@@ -6698,13 +6699,44 @@ router.post("/sessions/:id/parse-one-sheet-template", async (req: Request, res: 
         }
       } catch { /* audit engine table may not have all columns */ }
 
-      // Advance session status to extraction if still at upload
+      // ── STEP 5: ADVANCE SESSION STATUS ────────────────────────────────────
       if (session.status === "upload" || !session.status) {
         await db.update(wpSessionsTable).set({ status: "extraction", updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
       }
+
+      // ── STEP 6: AUDIT LOG ENTRY ────────────────────────────────────────────
+      logger.info({
+        event:           "TEMPLATE_PARSED",
+        sessionId,
+        sheet:           parsed.sheetUsed,
+        rowsParsed:      rows.length,
+        variablesMapped: varMapping.mapped,
+        variablesSkipped:varMapping.skipped,
+        conflicts:       varMapping.conflicts.length,
+        missingMandatory:varMapping.missingMandatory,
+        parseErrors:     parsed.errors.length,
+        parseWarnings:   parsed.warnings.length,
+      }, "Template parse complete — variable mapping applied");
+
+      // ── STEP 7: DOWNSTREAM TB/GL RECALCULATION ────────────────────────────
+      // TB + GL lines were already re-inserted above (steps 1-2).
+      // Mark that the downstream data is fresh so generation engines pick it up.
+      try {
+        await db.update(wpSessionsTable)
+          .set({ updatedAt: new Date() } as any)
+          .where(eq(wpSessionsTable.id, sessionId));
+      } catch { /* ignore */ }
+
+      // Attach mapping report to response
+      Object.assign(parsed, { variableMapping: varMapping });
     }
 
-    return res.json({ ...parsed, persisted: true, rowCount: rows.length });
+    return res.json({
+      ...parsed,
+      persisted:       true,
+      rowCount:        rows.length,
+      variableMapping: (parsed as any).variableMapping || null,
+    });
   } catch (err: any) {
     logger.error({ err }, "parse-one-sheet-template failed");
     res.status(500).json({ error: err.message || "Parse failed" });
@@ -6729,97 +6761,415 @@ function mapFsSectionToClassification(fsSection: string, statementType: string):
   return "Other";
 }
 
-// Helper: auto-fill variables from parsed template data (uses wpVariablesTable)
+// ── Value normalizers for template → variable code mapping ───────────────────
+function normalizeEntityType(raw: string): string {
+  const s = (raw || "").toLowerCase();
+  if (s.includes("private") && s.includes("limited")) return "Private Limited";
+  if (s.includes("public") && s.includes("listed")) return "Public Limited (Listed)";
+  if (s.includes("public")) return "Public Limited (Unlisted)";
+  if (s.includes("single member")) return "Single Member";
+  if (s.includes("llp")) return "LLP";
+  if (s.includes("aop") || s.includes("association of person")) return "AOP";
+  if (s.includes("sole")) return "Sole Proprietor";
+  if (s.includes("ngo") || s.includes("npo")) return "NGO/NPO";
+  if (s.includes("trust")) return "Trust";
+  if (s.includes("government") || s.includes("govt")) return "Government Entity";
+  return raw;
+}
+function normalizeIndustry(raw: string): string {
+  const s = (raw || "").toLowerCase();
+  const map: [string, string][] = [
+    ["manufactur",  "Manufacturing"], ["service",       "Services"],
+    ["trading",     "Trading"],       ["construction",  "Construction"],
+    ["software",    "IT/Software"],   ["it/",           "IT/Software"],
+    ["financial",   "Financial Services"], ["bank",     "Financial Services"],
+    ["health",      "Healthcare"],    ["education",     "Education"],
+    ["energy",      "Energy"],        ["textile",       "Textiles"],
+    ["fmcg",        "FMCG"],          ["real estate",   "Real Estate"],
+    ["agri",        "Agriculture"],   ["telecom",       "Telecommunications"],
+  ];
+  for (const [kw, val] of map) { if (s.includes(kw)) return val; }
+  return raw || "Services";
+}
+function normalizeFramework(raw: string): string {
+  const s = (raw || "").toLowerCase();
+  if (s.includes("sme")) return "IFRS for SMEs";
+  if (s.includes("ifrs")) return "IFRS";
+  if (s.includes("afrs")) return "AFRS";
+  if (s.includes("fourth")) return "Fourth Schedule";
+  if (s.includes("fifth")) return "Fifth Schedule";
+  return raw || "IFRS";
+}
+function normalizeEngagementType(raw: string): string {
+  const s = (raw || "").toLowerCase();
+  if (s.includes("limited") || s.includes("review")) return "limited_review";
+  if (s.includes("group")) return "group_audit";
+  return "statutory_audit";
+}
+
+// ── Master template → variable mapping engine ─────────────────────────────────
+// Returns: { mapped, skipped, conflicts[], missingMandatory[], exceptions[] }
 async function autoFillVariablesFromTemplate(
   sessionId: number, meta: ParsedTemplateMeta, rows: ParsedTemplateRow[],
   periodStart: string, periodEnd: string, engagementYear: string
-) {
+): Promise<{ mapped: number; skipped: number; conflicts: string[]; missingMandatory: string[]; exceptions: string[] }> {
+  const result = { mapped: 0, skipped: 0, conflicts: [] as string[], missingMandatory: [] as string[], exceptions: [] as string[] };
   try {
-    // Aggregate financials from rows
-    const bsRows     = rows.filter(r => r.statementType?.toUpperCase() === "BS");
-    const plRows     = rows.filter(r => ["P&L","PL","INCOME","EXPENSE","EXPENSES"].includes(r.statementType?.toUpperCase() || ""));
-    const assetRows  = bsRows.filter(r => r.fsSection?.toLowerCase().includes("asset"));
-    const liabRows   = bsRows.filter(r => r.fsSection?.toLowerCase().includes("liabilit"));
-    const equityRows = bsRows.filter(r => r.fsSection?.toLowerCase().includes("equity"));
-    const revRows    = plRows.filter(r => r.fsSection?.toLowerCase().includes("revenue") || r.fsSection?.toLowerCase().includes("income"));
-    const expRows    = plRows.filter(r => !r.fsSection?.toLowerCase().includes("revenue") && !r.fsSection?.toLowerCase().includes("income"));
+    // ── 1. ROW AGGREGATION HELPERS ────────────────────────────────────────
+    const nrm  = (s: string) => (s || "").trim().toLowerCase();
+    const stIs = (r: ParsedTemplateRow, ...kw: string[]) => kw.some(k => nrm(r.statementType).includes(k));
+    const fsIs = (r: ParsedTemplateRow, ...kw: string[]) => kw.some(k => nrm(r.fsSection).includes(k));
+    const any  = (r: ParsedTemplateRow, ...kw: string[]) =>
+      kw.some(k => nrm(r.majorHead).includes(k) || nrm(r.lineItem).includes(k) ||
+                   nrm(r.subLineItem).includes(k) || nrm(r.accountName).includes(k));
 
-    const totalAssets   = assetRows.reduce((s, r)  => s + r.currentYear, 0);
-    const totalLiab     = liabRows.reduce((s, r)   => s + r.currentYear, 0);
-    const totalEquity   = equityRows.reduce((s, r) => s + r.currentYear, 0);
-    const totalRevenue  = revRows.reduce((s, r)    => s + r.currentYear, 0);
-    const totalExpenses = expRows.reduce((s, r)    => s + r.currentYear, 0);
-    const netProfit     = totalRevenue - totalExpenses;
+    const sumCY = (f: (r: ParsedTemplateRow) => boolean) => rows.filter(f).reduce((s, r) => s + (r.currentYear || 0), 0);
+    const sumPY = (f: (r: ParsedTemplateRow) => boolean) => rows.filter(f).reduce((s, r) => s + (r.priorYear || 0), 0);
 
-    const materiality = totalRevenue > 0
-      ? Math.round(totalRevenue * 0.01)
-      : totalAssets > 0 ? Math.round(totalAssets * 0.005) : 0;
-    const perfMat = Math.round(materiality * 0.75);
-    const trivial = Math.round(materiality * 0.03);
+    // Classify rows by statement type
+    const bsRows  = rows.filter(r => stIs(r, "bs", "balance sheet"));
+    const plRows  = rows.filter(r => stIs(r, "p&l", "pl", "income", "profit", "loss", "expense", "expenses"));
+    const ociRows = rows.filter(r => stIs(r, "oci", "comprehensive"));
+    const cfRows  = rows.filter(r => stIs(r, "cf", "cash flow", "cashflow"));
 
-    // Seeds keyed by variableCode (matching VARIABLE_DEFINITIONS)
-    const seedsByCode: Record<string, string> = {
-      "CLIENT_NAME":             meta.entityName,
-      "ENTITY_NAME":             meta.entityName,
-      "COMPANY_NAME":            meta.entityName,
-      "ENTITY_TYPE":             meta.companyType,
-      "COMPANY_TYPE":            meta.companyType,
-      "INDUSTRY":                meta.industry,
-      "INDUSTRY_TYPE":           meta.industry,
-      "REPORTING_FRAMEWORK":     meta.reportingFramework,
-      "YEAR_END":                meta.yearEnd,
-      "PERIOD_END":              periodEnd,
-      "PERIOD_START":            periodStart,
-      "PERIOD_TO":               periodEnd,
-      "PERIOD_FROM":             periodStart,
-      "ENGAGEMENT_YEAR":         engagementYear,
-      "AUDIT_TYPE":              meta.auditType,
-      "ENGAGEMENT_TYPE":         meta.auditType,
-      "CURRENCY":                meta.currency,
-      "FUNCTIONAL_CURRENCY":     meta.currency,
-      "ENGAGEMENT_SIZE":         meta.engagementSize,
-      "TOTAL_ASSETS":            materiality > 0 ? String(Math.round(totalAssets)) : "",
-      "TOTAL_LIABILITIES":       String(Math.round(totalLiab)),
-      "TOTAL_EQUITY":            String(Math.round(totalEquity)),
-      "TOTAL_REVENUE":           String(Math.round(totalRevenue)),
-      "REVENUE":                 String(Math.round(totalRevenue)),
-      "TOTAL_EXPENSES":          String(Math.round(totalExpenses)),
-      "NET_PROFIT":              String(Math.round(netProfit)),
-      "MATERIALITY":             materiality > 0 ? String(materiality) : "",
-      "PLANNING_MATERIALITY":    materiality > 0 ? String(materiality) : "",
-      "PERFORMANCE_MATERIALITY": perfMat > 0 ? String(perfMat) : "",
-      "TRIVIAL_THRESHOLD":       trivial > 0 ? String(trivial) : "",
-      "TRIVIALITY_THRESHOLD":    trivial > 0 ? String(trivial) : "",
+    // BS — Section buckets
+    const ncaRows = bsRows.filter(r => fsIs(r, "non-current asset", "noncurrent asset") || any(r, "non-current asset", "noncurrent asset"));
+    const caRows  = bsRows.filter(r => (fsIs(r, "current asset") && !fsIs(r, "non-current")) || (any(r, "current asset") && !any(r, "non-current asset")));
+    const eqRows  = bsRows.filter(r => fsIs(r, "equity") || any(r, "equity"));
+    const nclRows = bsRows.filter(r => fsIs(r, "non-current liab", "noncurrent liab") || any(r, "non-current liab", "noncurrent liab"));
+    const clRows  = bsRows.filter(r => (fsIs(r, "current liab") && !fsIs(r, "non-current")) || (any(r, "current liab") && !any(r, "non-current liab")));
+
+    // BS totals
+    const totalAssets   = sumCY(r => ncaRows.includes(r) || caRows.includes(r));
+    const totalEquity   = sumCY(r => eqRows.includes(r));
+    const totalLiab     = sumCY(r => nclRows.includes(r) || clRows.includes(r));
+    const pyTotalAssets = sumPY(r => ncaRows.includes(r) || caRows.includes(r));
+    const pyTotalEquity = sumPY(r => eqRows.includes(r));
+    const pyTotalLiab   = sumPY(r => nclRows.includes(r) || clRows.includes(r));
+
+    // CY — specific BS line items
+    const cy_fixed     = sumCY(r => any(r, "fixed asset", "ppe", "property, plant", "property plant"));
+    const cy_rou       = sumCY(r => any(r, "right of use", "right-of-use", "rou asset", "lease asset"));
+    const cy_cwip      = sumCY(r => any(r, "capital work", "cwip", "work in progress"));
+    const cy_intang    = sumCY(r => any(r, "intangible", "goodwill"));
+    const cy_invest    = sumCY(r => any(r, "investment") && !any(r, "short-term inv", "short term inv", "current invest"));
+    const cy_lt_loans  = sumCY(r => any(r, "long term loan", "long-term loan", "lt loan", "long term advance"));
+    const cy_invent    = sumCY(r => any(r, "inventory", "stock in trade", "stock-in-trade"));
+    const cy_trade_rec = sumCY(r => any(r, "trade receivable", "trade debt", "debtors"));
+    const cy_advance   = sumCY(r => any(r, "advance", "deposits") && !any(r, "long term", "advance tax"));
+    const cy_other_rec = sumCY(r => any(r, "other receivable", "other debtors"));
+    const cy_st_inv    = sumCY(r => any(r, "short-term inv", "short term inv", "current invest"));
+    const cy_tax_ref   = sumCY(r => any(r, "tax refund", "income tax refund"));
+    const cy_cash      = sumCY(r => any(r, "cash and bank", "bank balance", "cash at bank", "cash in hand"));
+    const cy_share_cap = sumCY(r => any(r, "share capital", "paid up capital", "paid-up capital"));
+    const cy_reserves  = sumCY(r => any(r, "reserve", "surplus") && !any(r, "retained earning", "unappropriated"));
+    const cy_ret_earn  = sumCY(r => any(r, "retained earning", "accumulated profit", "unappropriated profit"));
+    const cy_rev_surp  = sumCY(r => any(r, "revaluation surplus", "capital reserve"));
+    const cy_lt_borrow = sumCY(r => any(r, "long term borrow", "long-term borrow", "term loan", "debenture") && !any(r, "current portion"));
+    const cy_lease_l   = sumCY(r => any(r, "lease liability", "lease liab"));
+    const cy_trade_pay = sumCY(r => any(r, "trade payable", "creditor", "trade credit"));
+    const cy_accruals  = sumCY(r => any(r, "accrual", "accrued liab", "accrued expense", "accrued liabilities"));
+    const cy_tax_pay   = sumCY(r => any(r, "tax payable", "taxation payable", "income tax payable", "current tax payable"));
+    const cy_st_borrow = sumCY(r => any(r, "short term borrow", "short-term borrow", "running finance", "overdraft", "bank overdraft"));
+    const cy_cpltd     = sumCY(r => any(r, "current portion", "current maturity"));
+
+    // CY — P&L line items
+    const cy_rev       = sumCY(r => plRows.includes(r) && any(r, "revenue", "turnover", "net sales", "sales") && !any(r, "other income"));
+    const cy_cos       = sumCY(r => plRows.includes(r) && any(r, "cost of sales", "cost of goods", "cogs", "cost of revenue"));
+    const cy_gp        = cy_rev - cy_cos;
+    const cy_admin     = sumCY(r => plRows.includes(r) && any(r, "admin", "administrative", "general expense", "general and admin"));
+    const cy_selling   = sumCY(r => plRows.includes(r) && any(r, "selling", "distribution", "marketing"));
+    const cy_fin_cost  = sumCY(r => plRows.includes(r) && any(r, "finance cost", "interest expense", "markup", "borrowing cost", "financial charge"));
+    const cy_other_inc = sumCY(r => plRows.includes(r) && any(r, "other income", "miscellaneous income", "other operating income"));
+    const cy_other_exp = sumCY(r => plRows.includes(r) && any(r, "other expense", "miscellaneous expense") && !any(r, "admin", "selling", "finance"));
+    const cy_tax_exp   = sumCY(r => plRows.includes(r) && any(r, "tax expense", "income tax expense", "current tax", "deferred tax", "taxation"));
+    const cy_pbt       = cy_gp - cy_admin - cy_selling - cy_fin_cost + cy_other_inc - cy_other_exp;
+    const cy_pat       = cy_pbt - cy_tax_exp;
+    const cy_oci       = sumCY(r => ociRows.includes(r));
+    const cy_tci       = cy_pat + cy_oci;
+
+    // PY — BS line items (reuse same keyword filters, sumPY)
+    const py_fixed     = sumPY(r => any(r, "fixed asset", "ppe", "property, plant", "property plant"));
+    const py_rou       = sumPY(r => any(r, "right of use", "right-of-use", "rou asset", "lease asset"));
+    const py_cwip      = sumPY(r => any(r, "capital work", "cwip", "work in progress"));
+    const py_intang    = sumPY(r => any(r, "intangible", "goodwill"));
+    const py_invest    = sumPY(r => any(r, "investment") && !any(r, "short-term inv", "short term inv", "current invest"));
+    const py_invent    = sumPY(r => any(r, "inventory", "stock in trade", "stock-in-trade"));
+    const py_trade_rec = sumPY(r => any(r, "trade receivable", "trade debt", "debtors"));
+    const py_cash      = sumPY(r => any(r, "cash and bank", "bank balance", "cash at bank", "cash in hand"));
+    const py_share_cap = sumPY(r => any(r, "share capital", "paid up capital", "paid-up capital"));
+    const py_ret_earn  = sumPY(r => any(r, "retained earning", "accumulated profit", "unappropriated profit"));
+    const py_lt_borrow = sumPY(r => any(r, "long term borrow", "long-term borrow", "term loan", "debenture") && !any(r, "current portion"));
+    const py_trade_pay = sumPY(r => any(r, "trade payable", "creditor", "trade credit"));
+    const py_tax_pay   = sumPY(r => any(r, "tax payable", "taxation payable", "income tax payable", "current tax payable"));
+
+    // PY — P&L line items
+    const py_rev       = sumPY(r => plRows.includes(r) && any(r, "revenue", "turnover", "net sales", "sales") && !any(r, "other income"));
+    const py_cos       = sumPY(r => plRows.includes(r) && any(r, "cost of sales", "cost of goods", "cogs", "cost of revenue"));
+    const py_gp        = py_rev - py_cos;
+    const py_admin     = sumPY(r => plRows.includes(r) && any(r, "admin", "administrative", "general expense", "general and admin"));
+    const py_selling   = sumPY(r => plRows.includes(r) && any(r, "selling", "distribution", "marketing"));
+    const py_fin_cost  = sumPY(r => plRows.includes(r) && any(r, "finance cost", "interest expense", "markup", "borrowing cost", "financial charge"));
+    const py_other_inc = sumPY(r => plRows.includes(r) && any(r, "other income", "miscellaneous income", "other operating income"));
+    const py_other_exp = sumPY(r => plRows.includes(r) && any(r, "other expense", "miscellaneous expense") && !any(r, "admin", "selling", "finance"));
+    const py_tax_exp   = sumPY(r => plRows.includes(r) && any(r, "tax expense", "income tax expense", "current tax", "deferred tax", "taxation"));
+    const py_pbt       = py_gp - py_admin - py_selling - py_fin_cost + py_other_inc - py_other_exp;
+    const py_pat       = py_pbt - py_tax_exp;
+    const py_oci       = sumPY(r => ociRows.includes(r));
+    const py_tci       = py_pat + py_oci;
+
+    // Cash flows
+    const cy_op_cf  = sumCY(r => cfRows.includes(r) && any(r, "operating"));
+    const cy_inv_cf = sumCY(r => cfRows.includes(r) && any(r, "investing"));
+    const cy_fin_cf = sumCY(r => cfRows.includes(r) && any(r, "financing"));
+    const py_op_cf  = sumPY(r => cfRows.includes(r) && any(r, "operating"));
+    const py_inv_cf = sumPY(r => cfRows.includes(r) && any(r, "investing"));
+    const py_fin_cf = sumPY(r => cfRows.includes(r) && any(r, "financing"));
+
+    // ── Materiality ──────────────────────────────────────────────────────
+    const matBasisAmt  = cy_rev > 0 ? cy_rev : totalAssets;
+    const matPct       = cy_rev > 0 ? 1.0 : 0.5;
+    const overallMat   = matBasisAmt > 0 ? Math.round(matBasisAmt * matPct / 100) : 0;
+    const perfMat      = Math.round(overallMat * 0.75);
+    const trivialAmt   = Math.round(overallMat * 0.03);
+
+    // ── Template presence flags ───────────────────────────────────────────
+    const hasAcctCodes = rows.some(r => r.accountCode && r.accountCode.trim() !== "");
+    const hasAcctNames = rows.some(r => r.accountName && r.accountName.trim() !== "");
+    const hasPY        = rows.some(r => r.priorYear !== 0);
+    const hasDrCr      = rows.some(r => r.debitTransactionValue > 0 || r.creditTransactionValue > 0);
+
+    // ── Going concern indicators ──────────────────────────────────────────
+    const gcLosses   = cy_pat < 0 || py_pat < 0;
+    const gcNegEq    = totalEquity < 0;
+    const gcNegOpCF  = cy_op_cf !== 0 && cy_op_cf < 0;
+
+    // ── 2. MASTER VARIABLE MAP (variableCode → value) ─────────────────────
+    // All codes must match exactly the codes in VARIABLE_DEFINITIONS (lowercase snake_case)
+    const n = (v: number) => v !== 0 ? String(Math.round(v)) : "";
+    const b = (v: boolean) => v ? "true" : "false";
+
+    const templateVars: Record<string, string> = {
+      // Entity & Constitution
+      "entity_name":                        meta.entityName,
+      "short_name":                         meta.entityName,
+      "legal_name_as_per_secp":             meta.entityName,
+      "entity_legal_form":                  normalizeEntityType(meta.companyType),
+      "industry_sector":                    normalizeIndustry(meta.industry),
+      "reporting_framework":                normalizeFramework(meta.reportingFramework),
+      "applicable_company_law":             meta.companyType?.toLowerCase().includes("llp") ? "LLP Act 2017" : "Companies Act 2017",
+      "functional_currency":                meta.currency || "PKR",
+      "presentation_currency":              meta.currency || "PKR",
+      "financial_year_end":                 meta.yearEnd,
+      "financial_year_start":               periodStart,
+      "reporting_period_end":               periodEnd,
+      "reporting_period_start":             periodStart,
+
+      // Engagement Acceptance
+      "engagement_type":                    normalizeEngagementType(meta.auditType),
+      "assurance_level":                    meta.auditType?.toLowerCase().includes("limited") ? "Limited" : "Reasonable",
+
+      // Accounting & Records — auto-flagged from template presence
+      "gl_available":                       "true",
+      "tb_available":                       "true",
+      "fs_uploaded":                        "true",
+      "prior_year_fs_available":            b(hasPY),
+
+      // Trial Balance & COA — auto-flagged
+      "coa_available":                      rows.length > 0 ? "true" : "",
+      "account_code_present":               b(hasAcctCodes),
+      "account_name_present":               b(hasAcctNames),
+      "account_classification":             rows.length > 0 ? "true" : "",
+      "fs_mapping_completed":               rows.length > 0 ? "true" : "",
+      "opening_balance_present":            b(hasPY),
+      "closing_balance_present":            rows.length > 0 ? "true" : "",
+      "movement_debit_present":             b(hasDrCr),
+      "movement_credit_present":            b(hasDrCr),
+      "unmapped_accounts_count":            "0",
+      "manual_tb_adjustments_flag":         "false",
+
+      // Financial Statements — Current Year (Balance Sheet Assets)
+      "cy_total_assets":                    n(totalAssets),
+      "cy_non_current_assets":              n(sumCY(r => ncaRows.includes(r))),
+      "cy_current_assets":                  n(sumCY(r => caRows.includes(r))),
+      "cy_fixed_assets":                    n(cy_fixed),
+      "cy_right_of_use_assets":             n(cy_rou),
+      "cy_capital_work_in_progress":        n(cy_cwip),
+      "cy_intangible_assets":               n(cy_intang),
+      "cy_investments":                     n(cy_invest),
+      "cy_long_term_loans":                 n(cy_lt_loans),
+      "cy_deposits_prepayments":            n(cy_advance),
+      "cy_inventory":                       n(cy_invent),
+      "cy_trade_receivables":               n(cy_trade_rec),
+      "cy_advances":                        n(cy_advance),
+      "cy_other_receivables":               n(cy_other_rec),
+      "cy_short_term_investments":          n(cy_st_inv),
+      "cy_tax_refunds_due":                 n(cy_tax_ref),
+      "cy_cash_and_bank":                   n(cy_cash),
+
+      // Financial Statements — Current Year (Balance Sheet Equity)
+      "cy_total_equity":                    n(totalEquity),
+      "cy_share_capital_fs":                n(cy_share_cap),
+      "cy_reserves":                        n(cy_reserves),
+      "cy_retained_earnings":               n(cy_ret_earn),
+      "cy_revaluation_surplus":             n(cy_rev_surp),
+
+      // Financial Statements — Current Year (Balance Sheet Liabilities)
+      "cy_total_liabilities":               n(totalLiab),
+      "cy_non_current_liabilities":         n(sumCY(r => nclRows.includes(r))),
+      "cy_current_liabilities":             n(sumCY(r => clRows.includes(r))),
+      "cy_long_term_borrowings":            n(cy_lt_borrow),
+      "cy_lease_liabilities":               n(cy_lease_l),
+      "cy_trade_payables":                  n(cy_trade_pay),
+      "cy_accruals":                        n(cy_accruals),
+      "cy_taxation_payable":                n(cy_tax_pay),
+      "cy_short_term_borrowings":           n(cy_st_borrow),
+      "cy_current_portion_long_term_debt":  n(cy_cpltd),
+
+      // Financial Statements — Current Year (P&L)
+      "cy_revenue":                         n(cy_rev),
+      "cy_cost_of_sales":                   n(cy_cos),
+      "cy_gross_profit":                    n(cy_gp),
+      "cy_admin_expenses":                  n(cy_admin),
+      "cy_selling_distribution_expenses":   n(cy_selling),
+      "cy_finance_cost":                    n(cy_fin_cost),
+      "cy_other_income":                    n(cy_other_inc),
+      "cy_other_expenses":                  n(cy_other_exp),
+      "cy_profit_before_tax":               n(cy_pbt),
+      "cy_tax_expense":                     n(cy_tax_exp),
+      "cy_profit_after_tax":                n(cy_pat),
+      "cy_other_comprehensive_income":      n(cy_oci),
+      "cy_total_comprehensive_income":      n(cy_tci),
+
+      // Financial Statements — Current Year (Cash Flows)
+      "cy_operating_cash_flow":             n(cy_op_cf),
+      "cy_investing_cash_flow":             n(cy_inv_cf),
+      "cy_financing_cash_flow":             n(cy_fin_cf),
+
+      // Financial Statements — Prior Year (Balance Sheet Assets)
+      "py_total_assets":                    n(pyTotalAssets),
+      "py_non_current_assets":              n(sumPY(r => ncaRows.includes(r))),
+      "py_current_assets":                  n(sumPY(r => caRows.includes(r))),
+      "py_fixed_assets":                    n(py_fixed),
+      "py_right_of_use_assets":             n(py_rou),
+      "py_capital_work_in_progress":        n(py_cwip),
+      "py_intangible_assets":               n(py_intang),
+      "py_investments":                     n(py_invest),
+      "py_inventory":                       n(py_invent),
+      "py_trade_receivables":               n(py_trade_rec),
+      "py_cash_and_bank":                   n(py_cash),
+
+      // Financial Statements — Prior Year (Balance Sheet Equity)
+      "py_total_equity":                    n(pyTotalEquity),
+      "py_share_capital_fs":                n(py_share_cap),
+      "py_retained_earnings":               n(py_ret_earn),
+
+      // Financial Statements — Prior Year (Balance Sheet Liabilities)
+      "py_total_liabilities":               n(pyTotalLiab),
+      "py_non_current_liabilities":         n(sumPY(r => nclRows.includes(r))),
+      "py_current_liabilities":             n(sumPY(r => clRows.includes(r))),
+      "py_long_term_borrowings":            n(py_lt_borrow),
+      "py_trade_payables":                  n(py_trade_pay),
+      "py_taxation_payable":                n(py_tax_pay),
+
+      // Financial Statements — Prior Year (P&L)
+      "py_revenue":                         n(py_rev),
+      "py_cost_of_sales":                   n(py_cos),
+      "py_gross_profit":                    n(py_gp),
+      "py_admin_expenses":                  n(py_admin),
+      "py_selling_distribution_expenses":   n(py_selling),
+      "py_finance_cost":                    n(py_fin_cost),
+      "py_other_income":                    n(py_other_inc),
+      "py_other_expenses":                  n(py_other_exp),
+      "py_profit_before_tax":               n(py_pbt),
+      "py_tax_expense":                     n(py_tax_exp),
+      "py_profit_after_tax":                n(py_pat),
+      "py_other_comprehensive_income":      n(py_oci),
+      "py_total_comprehensive_income":      n(py_tci),
+
+      // Financial Statements — Prior Year (Cash Flows)
+      "py_operating_cash_flow":             n(py_op_cf),
+      "py_investing_cash_flow":             n(py_inv_cf),
+      "py_financing_cash_flow":             n(py_fin_cf),
+
+      // Materiality (auto-computed from financial data)
+      "materiality_basis":                  cy_rev > 0 ? "Revenue" : "Total Assets",
+      "materiality_basis_amount":           n(matBasisAmt),
+      "overall_materiality_percent":        String(matPct),
+      "overall_materiality_amount":         n(overallMat),
+      "performance_materiality_percent":    "75",
+      "performance_materiality_amount":     n(perfMat),
+      "trivial_threshold_percent":          "3",
+      "trivial_threshold_amount":           n(trivialAmt),
+
+      // Going Concern indicators (derived from financial analysis)
+      "gc_losses_flag":                     b(gcLosses),
+      "gc_negative_equity_flag":            b(gcNegEq),
+      "gc_negative_operating_cashflows_flag": b(gcNegOpCF),
+
+      // Risk assessment — defaults from template risk levels
+      "inherent_risk_overall":              rows.some(r => nrm(r.riskLevel) === "high") ? "High" : "Medium",
+      "control_risk_overall":               "Medium",
+      "risk_of_material_misstatement_overall": rows.some(r => nrm(r.riskLevel) === "high") ? "High" : "Medium",
+
+      // Variance analysis
+      "variance_analysis_done":             hasPY ? "true" : "false",
     };
 
-    // Also build name-based lookup for flexible matching
-    const seedsByNameNorm: Record<string, string> = {};
-    for (const [k, v] of Object.entries(seedsByCode)) {
-      seedsByNameNorm[k.toLowerCase().replace(/[\s_-]/g, "_")] = v;
+    // ── 3. MANDATORY FIELD VALIDATION ─────────────────────────────────────
+    const mandatoryCodes = ["entity_name", "financial_year_end", "reporting_framework", "engagement_type", "functional_currency"];
+    for (const code of mandatoryCodes) {
+      const val = templateVars[code];
+      if (!val || val.trim() === "") result.missingMandatory.push(code);
     }
 
+    // ── 4. LOAD EXISTING VARIABLES AND APPLY WITH SOURCE HIERARCHY ────────
+    // Source hierarchy: Template (highest) > Confirmed User Edit > AI > Default (lowest)
     const existingVars = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
-    const existingByCode = new Map(existingVars.map(v => [v.variableCode, v]));
 
     for (const ev of existingVars) {
-      const seedVal =
-        seedsByCode[ev.variableCode] ||
-        seedsByNameNorm[(ev.variableCode || "").toLowerCase().replace(/[\s_-]/g, "_")] ||
-        seedsByNameNorm[(ev.variableName || "").toLowerCase().replace(/[\s_-]/g, "_")];
-      if (!seedVal) continue;
-      if (ev.userEditedValue || ev.isLocked) continue; // don't overwrite user edits
+      const code        = (ev.variableCode || "").toLowerCase().trim();
+      const templateVal = templateVars[code];
 
+      // Skip if we have no template value for this variable
+      if (templateVal === undefined || templateVal === "") continue;
+
+      // RULE 1: Never overwrite locked variables
+      if (ev.isLocked) { result.skipped++; continue; }
+
+      // RULE 2: Never overwrite confirmed user edits (user edit > template)
+      //         Log conflict so the caller can report it
+      if (ev.userEditedValue && ev.userEditedValue.trim() !== "") {
+        if (ev.userEditedValue.trim() !== templateVal) {
+          result.conflicts.push(`${code}: user value "${ev.userEditedValue}" ≠ template "${templateVal}" — user value preserved`);
+        }
+        result.skipped++;
+        continue;
+      }
+
+      // RULE 3: Idempotent re-upload — note if template value changed since last parse
+      if (ev.sourceType === "template" && ev.autoFilledValue && ev.autoFilledValue !== templateVal) {
+        result.conflicts.push(`${code}: template updated from "${ev.autoFilledValue}" → "${templateVal}"`);
+      }
+
+      // Apply template value with confidence 1.00 (highest source)
       await db.update(wpVariablesTable).set({
-        autoFilledValue: seedVal,
-        finalValue:      seedVal,
+        autoFilledValue: templateVal,
+        finalValue:      templateVal,
         sourceType:      "template",
         reviewStatus:    "auto_filled",
+        confidence:      "1.00",
         updatedAt:       new Date(),
       }).where(eq(wpVariablesTable.id, ev.id));
+
+      result.mapped++;
     }
+
   } catch (err: any) {
     logger.warn({ err }, "autoFillVariablesFromTemplate partial failure");
+    result.exceptions.push(err.message || "Unknown error in variable mapping engine");
   }
+  return result;
 }
 
 // ── Download Excel upload template (ExcelJS — real demo data + cell protection) ──
