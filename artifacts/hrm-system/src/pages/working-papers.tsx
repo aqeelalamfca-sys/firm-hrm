@@ -13,7 +13,7 @@ import {
   Info, AlertOctagon, Calculator, CircleDot,
   ExternalLink, Gauge, Table2, Trash2, Database,
   GitMerge, BarChart2, Cpu, CheckCheck, ListChecks, Network, BookOpen,
-  Search, ClipboardList,
+  Search, ClipboardList, XCircle,
 } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
@@ -1162,9 +1162,9 @@ export default function WorkingPapers() {
   const confidenceBadge = (conf: number | null) => {
     if (conf === null || conf === undefined) return null;
     const c = Number(conf);
-    if (c >= 90) return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{c}%</span>;
-    if (c >= 70) return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">{c}% Review</span>;
-    return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">{c}% Confirm</span>;
+    if (c >= 85) return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700 border border-green-200">High</span>;
+    if (c >= 60) return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200">Medium</span>;
+    return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 border border-red-200">Low</span>;
   };
 
   // ── SESSION LIST ──
@@ -5097,7 +5097,7 @@ function VariableRow({ v, onSaveDirect, confidenceBadge }: any) {
                           || v.sourceType === "ai_fill";
   const isUserEdited   = !!(v.userEditedValue || v.reviewStatus === "user_edited");
   const isEmpty        = !v.finalValue || v.finalValue.trim() === "" || v.finalValue === "N/A";
-  const isLowConf      = !!(v.confidence && Number(v.confidence) < 70);
+  const isLowConf      = !!(v.confidence && Number(v.confidence) < 60);
 
   // Local value state + autosave
   const [localValue, setLocalValue] = useState<string>(v.finalValue || "");
@@ -5235,8 +5235,12 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
     ["ai_filled", "auto_filled", "ai_extraction", "autofill"].includes(v.reviewStatus) || v.sourceType === "ai_fill").length;
   const missingCount = variables.filter((v: any) =>
     !v.finalValue || v.finalValue.trim() === "" || v.finalValue === "N/A").length;
+  const highConfCount = variables.filter((v: any) =>
+    v.confidence && Number(v.confidence) >= 85).length;
+  const medConfCount = variables.filter((v: any) =>
+    v.confidence && Number(v.confidence) >= 60 && Number(v.confidence) < 85).length;
   const lowConfCount = variables.filter((v: any) =>
-    v.confidence && Number(v.confidence) < 70).length;
+    v.confidence && Number(v.confidence) < 60).length;
 
   // Lock All is only enabled when zero variables are missing
   const canLockAll = missingCount === 0 && variables.length > 0 && !loading;
@@ -5248,10 +5252,12 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
       const code  = (v.variableCode || "").toLowerCase();
       if (!label.includes(s) && !code.includes(s)) return false;
     }
-    if (filter === "from_upload") return v.reviewStatus === "template_filled" || v.sourceType === "template";
-    if (filter === "ai_filled")   return ["ai_filled", "auto_filled", "ai_extraction", "autofill"].includes(v.reviewStatus) || v.sourceType === "ai_fill";
-    if (filter === "missing")     return !v.finalValue || v.finalValue.trim() === "" || v.finalValue === "N/A";
-    if (filter === "low_conf")    return !!(v.confidence && Number(v.confidence) < 70);
+    if (filter === "from_upload")  return v.reviewStatus === "template_filled" || v.sourceType === "template";
+    if (filter === "ai_filled")    return ["ai_filled", "auto_filled", "ai_extraction", "autofill"].includes(v.reviewStatus) || v.sourceType === "ai_fill";
+    if (filter === "missing")      return !v.finalValue || v.finalValue.trim() === "" || v.finalValue === "N/A";
+    if (filter === "high_conf")    return !!(v.confidence && Number(v.confidence) >= 85);
+    if (filter === "medium_conf")  return !!(v.confidence && Number(v.confidence) >= 60 && Number(v.confidence) < 85);
+    if (filter === "low_conf")     return !!(v.confidence && Number(v.confidence) < 60);
     return true;
   };
 
@@ -5268,22 +5274,26 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
     { label: "From Upload", value: templateFilledCount, icon: Upload,        bg: "bg-emerald-50", iconColor: "text-emerald-600", key: "from_upload" },
     { label: "AI Filled",   value: aiFilledCount,       icon: Sparkles,      bg: "bg-blue-50",    iconColor: "text-blue-600",    key: "ai_filled" },
     { label: "Missing",     value: missingCount,        icon: AlertCircle,   bg: "bg-red-50",     iconColor: "text-red-600",     key: "missing" },
-    { label: "Low Conf.",   value: lowConfCount,        icon: AlertTriangle, bg: "bg-amber-50",   iconColor: "text-amber-600",   key: "low_conf" },
+    { label: "High Conf.",  value: highConfCount,       icon: CheckCircle2,  bg: "bg-green-50",   iconColor: "text-green-600",   key: "high_conf" },
+    { label: "Med. Conf.",  value: medConfCount,        icon: AlertTriangle, bg: "bg-amber-50",   iconColor: "text-amber-500",   key: "medium_conf" },
+    { label: "Low Conf.",   value: lowConfCount,        icon: XCircle,       bg: "bg-red-50",     iconColor: "text-red-500",     key: "low_conf" },
   ];
 
   const filterChips = [
-    { key: "all",         label: "All" },
-    { key: "from_upload", label: "From Upload" },
-    { key: "ai_filled",   label: "AI Filled" },
-    { key: "missing",     label: "Missing" },
-    { key: "low_conf",    label: "Low Conf." },
+    { key: "all",          label: "All" },
+    { key: "from_upload",  label: "From Upload" },
+    { key: "ai_filled",    label: "AI Filled" },
+    { key: "missing",      label: "Missing" },
+    { key: "high_conf",    label: "High Conf." },
+    { key: "medium_conf",  label: "Med. Conf." },
+    { key: "low_conf",     label: "Low Conf." },
   ];
 
   return (
     <div className="space-y-4">
 
       {/* ── Stat tiles ── */}
-      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
+      <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
         {statTiles.map(s => (
           <button key={s.key} onClick={() => setFilter(s.key)} className={cn(
             "bg-white border rounded-xl p-3 text-center transition-all hover:shadow-sm cursor-pointer",
@@ -5382,7 +5392,9 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
           <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-blue-400" /> AI Filled</span>
           <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-violet-400" /> User Edited</span>
           <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-400" /> Missing</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-amber-400" /> Low Confidence</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-400" /> High Conf.</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-amber-400" /> Med. Conf.</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-400" /> Low Conf.</span>
           <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-slate-300" /> Locked</span>
           <span className="ml-auto text-slate-400 italic">Inline edit — changes autosave on blur</span>
         </div>

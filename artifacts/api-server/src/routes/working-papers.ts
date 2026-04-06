@@ -180,8 +180,8 @@ function getFileFormat(file: Express.Multer.File): string {
 }
 
 function getConfidenceColor(c: number): string {
-  if (c >= 90) return "high";
-  if (c >= 70) return "review";
+  if (c >= 85) return "high";
+  if (c >= 60) return "medium";
   return "low";
 }
 
@@ -6909,7 +6909,7 @@ router.post("/sessions/:id/parse-one-sheet-template", async (req: Request, res: 
           balance:         String(balance),
           priorYearBalance:String(row.priorYear),
           source:          "template",
-          confidence:      "1.00",
+          confidence:      "100",
         };
       });
       if (tbInserts.length > 0) await db.insert(wpTrialBalanceLinesTable).values(tbInserts as any);
@@ -7491,13 +7491,13 @@ async function autoFillVariablesFromTemplate(
         result.conflicts.push(`${code}: template updated from "${ev.autoFilledValue}" → "${templateVal}"`);
       }
 
-      // Apply template value with confidence 1.00 (highest source)
+      // Apply template value with confidence 100 (highest source)
       await db.update(wpVariablesTable).set({
         autoFilledValue: templateVal,
         finalValue:      templateVal,
         sourceType:      "template",
         reviewStatus:    "template_filled",
-        confidence:      "1.00",
+        confidence:      "100",
         updatedAt:       new Date(),
       }).where(eq(wpVariablesTable.id, ev.id));
 
