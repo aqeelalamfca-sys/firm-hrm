@@ -144,6 +144,7 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("engagement_start_date", "Engagement Acceptance", "Timeline", "Engagement Start Date", { dataType: "date", inputMode: "date", displayOrder: 25 }),
   v("reporting_deadline", "Engagement Acceptance", "Timeline", "Reporting Deadline", { dataType: "date", inputMode: "date", displayOrder: 26 }),
   v("expected_signing_date", "Engagement Acceptance", "Timeline", "Expected Signing Date", { dataType: "date", inputMode: "date", displayOrder: 27 }),
+  v("engagement_size", "Engagement Acceptance", "Profile", "Engagement Size", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Small","Medium","Large","Very Large"]), displayOrder: 28 }),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GROUP 4 — Accounting & Records Environment
@@ -187,6 +188,11 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("control_accounts_identified", "Trial Balance & COA", "Mapping", "Control Accounts Identified", { dataType: "boolean", inputMode: "toggle", displayOrder: 14 }),
   v("manual_tb_adjustments_flag", "Trial Balance & COA", "Adjustments", "Manual TB Adjustments", { dataType: "boolean", inputMode: "toggle", displayOrder: 15 }),
   v("adjusted_tb_flag", "Trial Balance & COA", "Adjustments", "Adjusted TB Prepared", { dataType: "boolean", inputMode: "toggle", displayOrder: 16 }),
+  v("tb_line_count", "Trial Balance & COA", "Structure", "TB Line Count", { dataType: "number", inputMode: "number", displayOrder: 17 }),
+  v("tb_total_period_debit", "Trial Balance & COA", "Balances", "Total Period Debit", { dataType: "number", inputMode: "currency", displayOrder: 18 }),
+  v("tb_total_period_credit", "Trial Balance & COA", "Balances", "Total Period Credit", { dataType: "number", inputMode: "currency", displayOrder: 19 }),
+  v("tb_opening_balance_aggregate", "Trial Balance & COA", "Balances", "Total Opening Balance", { dataType: "number", inputMode: "currency", displayOrder: 20 }),
+  v("tb_closing_balance_aggregate", "Trial Balance & COA", "Balances", "Total Closing Balance", { dataType: "number", inputMode: "currency", displayOrder: 21 }),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GROUP 6 — Financial Statement Figures (CY + PY)

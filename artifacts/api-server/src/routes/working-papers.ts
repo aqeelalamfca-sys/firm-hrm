@@ -7384,6 +7384,54 @@ async function autoFillVariablesFromTemplate(
 
       // Variance analysis
       "variance_analysis_done":             hasPY ? "true" : "false",
+
+      // ── ENGAGEMENT PROFILE (from template top section) ────────────────────
+      "engagement_size":                    meta.engagementSize || "",
+
+      // ── TB AGGREGATE AMOUNTS (computed directly from template rows) ────────
+      // These are 100% template-driven: no AI involvement
+      "tb_line_count":                      String(rows.length),
+      "tb_total_period_debit":              n(rows.reduce((s, r) => s + (r.debitTransactionValue || 0), 0)),
+      "tb_total_period_credit":             n(rows.reduce((s, r) => s + (r.creditTransactionValue || 0), 0)),
+      "tb_opening_balance_aggregate":       n(rows.reduce((s, r) => s + (r.priorYear || 0), 0)),
+      "tb_closing_balance_aggregate":       n(rows.reduce((s, r) => s + (r.currentYear || 0), 0)),
+
+      // ── TB STRUCTURE FLAGS (derived from template) ─────────────────────────
+      "tb_balanced_flag":                   (() => {
+        const dr = rows.reduce((s, r) => s + (r.debitTransactionValue || 0), 0);
+        const cr = rows.reduce((s, r) => s + (r.creditTransactionValue || 0), 0);
+        return Math.abs(dr - cr) < 1 ? "true" : "false";
+      })(),
+      "control_accounts_identified":        rows.length > 0 ? "true" : "false",
+      "account_type":                       rows.some(r => r.accountCode && /^\d{4}$/.test(r.accountCode.trim())) ? "4-digit COA"
+                                          : rows.some(r => r.accountCode && /^\d{5}$/.test(r.accountCode.trim())) ? "5-digit COA"
+                                          : rows.length > 0 ? "Custom" : "",
+
+      // ── RISK ASSESSMENT (from template per-row Risk_Level and WP_Area) ─────
+      // Significant risk areas: unique WP areas where Risk_Level = "High"
+      "significant_risk_areas":            rows
+        .filter(r => nrm(r.riskLevel) === "high")
+        .map(r => r.wpArea)
+        .filter((v, i, arr) => v && arr.indexOf(v) === i)
+        .join(", "),
+      "account_level_risk_mapping_done":   rows.length > 0 ? "true" : "false",
+      // Fraud risk: revenue is standard ISA 240 presumed fraud risk area
+      "fraud_risk_flag":                   rows.some(r => nrm(r.wpArea).includes("revenue")) ? "true" : "false",
+      "revenue_fraud_risk_flag":           rows.some(r => nrm(r.statementType).includes("p&l") && nrm(r.wpArea).includes("revenue")) ? "true" : "false",
+      "management_override_risk_flag":     "true",  // ISA 240.31 — always presumed
+
+      // ── SAMPLING (from template — presence of financial data implies testing) ──
+      "sampling_required":                 rows.length > 0 ? "true" : "false",
+      "population_value":                  n(totalAssets > 0 ? totalAssets : cy_rev),
+      "sampling_basis":                    "Value-based",
+
+      // ── ACCOUNTING & RECORDS (from template — GL/TB data confirms availability) ─
+      "books_maintained_properly":         rows.length > 0 ? "true" : "false",
+      "inventory_records_available":       rows.some(r => nrm(r.wpArea).includes("inventory")) ? "true" : "false",
+      "bank_statements_available":         rows.some(r => nrm(r.wpArea).includes("cash and bank") || nrm(r.wpArea).includes("cash")) ? "true" : "false",
+
+      // ── PRINCIPAL ACTIVITY (derived from industry in top section) ──────────
+      "principal_activity":                meta.industry ? `${meta.industry} operations` : "",
     };
 
     // ── 3. MANDATORY FIELD VALIDATION ─────────────────────────────────────
