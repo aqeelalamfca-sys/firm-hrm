@@ -6892,14 +6892,18 @@ router.get("/download-template", async (_req: Request, res: Response) => {
       "6501","6502","6510",
     ];
 
-    // Write lists to hidden sheet (A=Line_Item, B=Sub_Line_Item, C=Account_Name, D=Account_Code)
-    const maxRows = Math.max(lineItems.length, subLineItems.length, accountNames.length, accountCodes.length);
+    // Note numbers 1–100 (col E of Lists sheet)
+    const noteNumbers = Array.from({ length: 100 }, (_, i) => i + 1);
+
+    // Write lists to hidden sheet (A=Line_Item, B=Sub_Line_Item, C=Account_Name, D=Account_Code, E=Note_No)
+    const maxRows = Math.max(lineItems.length, subLineItems.length, accountNames.length, accountCodes.length, noteNumbers.length);
     for (let r = 0; r < maxRows; r++) {
       const row = wsList.getRow(r + 1);
       if (lineItems[r])    row.getCell(1).value = lineItems[r];
       if (subLineItems[r]) row.getCell(2).value = subLineItems[r];
       if (accountNames[r]) row.getCell(3).value = accountNames[r];
       if (accountCodes[r]) row.getCell(4).value = accountCodes[r];
+      if (noteNumbers[r])  row.getCell(5).value = noteNumbers[r];
     }
 
     const D0 = DATA_ROWS.split(":")[0];
@@ -6945,14 +6949,14 @@ router.get("/download-template", async (_req: Request, res: Response) => {
       prompt: "Select from the standard chart of accounts or enter a custom code",
     });
 
-    // Col I — Note_No (inline list 1–35)
+    // Col I — Note_No (1–100 via hidden sheet, avoids 255-char inline limit)
     ws.dataValidations.add(`I${D0}:I${D1}`, {
       type: "list", allowBlank: true,
-      formulae: ['"1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35"'],
+      formulae: [`Lists!$E$1:$E${noteNumbers.length}`],
       showErrorMessage: true, errorStyle: "warning",
-      errorTitle: "Invalid Note_No", error: "Please select a note number between 1 and 35",
+      errorTitle: "Invalid Note_No", error: "Please select a note number between 1 and 100",
       showInputMessage: true, promptTitle: "Note_No",
-      prompt: "Select the financial statement note number (1–35)",
+      prompt: "Select the financial statement note number (1–100)",
     });
 
     // ── Row 39: Totals ────────────────────────────────────────────────────────
