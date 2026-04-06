@@ -6269,65 +6269,212 @@ function GlGenerationStage({ auditMaster, tbGlProgress, onGenerateTbGl, reconRes
 // ─────────────────────────────────────────────────────────────────────────────
 // TAB 5 — Working Paper Listing Stage
 // ─────────────────────────────────────────────────────────────────────────────
+// ─── WP Library Types ───────────────────────────────────────────────────────
+interface WpItem {
+  code: string;
+  label: string;
+  description: string;
+  category: string;
+  phase: string;
+  mandatory: boolean;
+  risk: "all" | "medium" | "high";
+  isa: string;
+  type: "planning" | "risk" | "analytical" | "controls" | "substantive" | "completion" | "reporting" | "quality";
+  complexity: "low" | "medium" | "high";
+  outputType: "word" | "excel" | "word+excel";
+  assertions: string[];
+  industry: "all" | "manufacturing" | "trading" | "services" | "financial" | "listed";
+}
+
 const WP_CATEGORY_LABELS: Record<string, string> = {
-  pre_planning:  "Pre-Planning & Engagement Acceptance",
-  planning:      "Planning & Strategy",
-  risk:          "Risk Assessment (ISA 315/240)",
-  analytical:    "Analytical Procedures (ISA 520)",
-  controls:      "Internal Controls (ISA 315)",
-  substantive:   "Substantive Procedures",
-  evidence:      "Audit Evidence (ISA 500 Series)",
-  misstatements: "Misstatements & Communication (ISA 450/260)",
-  completion:    "Completion Procedures (ISA 560/570/580)",
-  reporting:     "Reporting (ISA 700 Series)",
-  quality:       "Quality Control (ISQM 1)",
-  archiving:     "Archiving & File Closure",
+  pre_planning:  "A — Pre-Planning & Engagement Acceptance",
+  planning:      "B — Planning, Strategy & Materiality",
+  risk:          "C — Risk Assessment (ISA 315 / ISA 240)",
+  analytical:    "D — Analytical Procedures (ISA 520)",
+  controls:      "E — Internal Controls (ISA 315)",
+  substantive_assets:   "F — Substantive — Balance Sheet: Assets",
+  substantive_liab:     "G — Substantive — Balance Sheet: Liabilities & Equity",
+  substantive_pl:       "H — Substantive — Profit & Loss",
+  tax:           "I — Taxation (FBR / ITO 2001 / Sales Tax)",
+  estimates:     "J — Estimates, Judgments & Fair Value (ISA 540)",
+  related_party: "K — Related Parties & Compliance (ISA 550 / ISA 250)",
+  evidence:      "L — Audit Evidence & Misstatements (ISA 500 / 450)",
+  completion:    "M — Completion Procedures (ISA 560 / 570 / 580)",
+  reporting:     "N — Reporting & Opinion (ISA 700 Series)",
+  quality:       "O — Quality Control & EQCR (ISQM 1)",
+  archiving:     "P — Archiving & File Closure",
 };
 
-const DEFAULT_WP_ITEMS = [
-  { code:"A1", label:"Engagement Acceptance & Continuance",       category:"pre_planning",  mandatory:true  },
-  { code:"A2", label:"Client Background & Entity Profile",        category:"pre_planning",  mandatory:true  },
-  { code:"A3", label:"Independence & Ethics Confirmation",        category:"pre_planning",  mandatory:true  },
-  { code:"B1", label:"Audit Strategy & Planning Memorandum",     category:"planning",      mandatory:true  },
-  { code:"B2", label:"Materiality Computation",                  category:"planning",      mandatory:true  },
-  { code:"B3", label:"Overall Risk Assessment",                  category:"risk",          mandatory:true  },
-  { code:"B4", label:"Fraud Risk Assessment (ISA 240)",          category:"risk",          mandatory:true  },
-  { code:"C1", label:"Analytical Review — Ratios & Variance",    category:"analytical",    mandatory:false },
-  { code:"C2", label:"Trend Analysis — Revenue & Costs",         category:"analytical",    mandatory:false },
-  { code:"D1", label:"Internal Controls Walkthrough",            category:"controls",      mandatory:false },
-  { code:"D2", label:"Control Deficiency Documentation",         category:"controls",      mandatory:false },
-  { code:"E1", label:"Cash & Bank — Substantive Testing",        category:"substantive",   mandatory:false },
-  { code:"E2", label:"Trade Receivables — Confirmation",         category:"substantive",   mandatory:false },
-  { code:"E3", label:"Inventory — Observation & Valuation",      category:"substantive",   mandatory:false },
-  { code:"E4", label:"Property, Plant & Equipment",              category:"substantive",   mandatory:false },
-  { code:"E5", label:"Trade Payables & Accruals",                category:"substantive",   mandatory:false },
-  { code:"E6", label:"Revenue Testing & Cut-off",                category:"substantive",   mandatory:false },
-  { code:"E7", label:"Borrowings & Finance Costs",               category:"substantive",   mandatory:false },
-  { code:"E8", label:"Taxation — Current & Deferred",            category:"substantive",   mandatory:false },
-  { code:"F1", label:"Audit Evidence Summary",                   category:"evidence",      mandatory:true  },
-  { code:"G1", label:"Misstatement Schedule (ISA 450)",          category:"misstatements", mandatory:false },
-  { code:"H1", label:"Subsequent Events Review (ISA 560)",       category:"completion",    mandatory:true  },
-  { code:"H2", label:"Going Concern Assessment (ISA 570)",       category:"completion",    mandatory:true  },
-  { code:"H3", label:"Management Representation Letter (ISA 580)", category:"completion",  mandatory:true  },
-  { code:"I1", label:"Audit Opinion & Report Drafting (ISA 700)", category:"reporting",   mandatory:true  },
-  { code:"J1", label:"EQCR Review (ISQM 1)",                    category:"quality",       mandatory:false },
-  { code:"K1", label:"File Closure & Archiving Checklist",       category:"archiving",     mandatory:true  },
+const WP_TYPE_LABELS: Record<string, string> = {
+  planning: "Planning", risk: "Risk", analytical: "Analytical",
+  controls: "Controls", substantive: "Substantive", completion: "Completion",
+  reporting: "Reporting", quality: "Quality",
+};
+
+const DEFAULT_WP_ITEMS: WpItem[] = [
+  // ─── A: Pre-Planning ────────────────────────────────────────────────────────
+  { code:"A1",  label:"Engagement Acceptance & Continuance",      description:"Documents firm's decision to accept/continue the engagement per ISQM 1 and ISA 220, including risk evaluation.",                                         category:"pre_planning", phase:"Pre-Planning", mandatory:true,  risk:"all",    isa:"ISA 220, ISQM 1",        type:"planning",    complexity:"medium", outputType:"word",       assertions:["completeness"],                                     industry:"all" },
+  { code:"A2",  label:"Client Background & Entity Profile",       description:"Comprehensive entity profile — ownership, governance, business model, regulatory status under Companies Act 2017.",                                       category:"pre_planning", phase:"Pre-Planning", mandatory:true,  risk:"all",    isa:"ISA 315",                type:"planning",    complexity:"medium", outputType:"word",       assertions:["completeness","accuracy"],                          industry:"all" },
+  { code:"A3",  label:"Independence & Ethics Declaration",        description:"Independence confirmation for all team members; threats, safeguards, and rotation per ICAP Code of Ethics.",                                              category:"pre_planning", phase:"Pre-Planning", mandatory:true,  risk:"all",    isa:"ISA 220, ICAP Code",     type:"planning",    complexity:"low",    outputType:"word",       assertions:["completeness"],                                     industry:"all" },
+  { code:"A4",  label:"Engagement Letter",                        description:"Formal engagement letter establishing scope, terms, fees, and responsibilities per ISA 210.",                                                             category:"pre_planning", phase:"Pre-Planning", mandatory:true,  risk:"all",    isa:"ISA 210",                type:"planning",    complexity:"low",    outputType:"word",       assertions:["completeness"],                                     industry:"all" },
+  { code:"A5",  label:"KYC / AML Procedures",                    description:"Know-Your-Customer and Anti-Money Laundering checks per FATF, State Bank directives, and ICAP guidelines.",                                              category:"pre_planning", phase:"Pre-Planning", mandatory:false, risk:"medium", isa:"ISQM 1, AML Regs",       type:"planning",    complexity:"medium", outputType:"word",       assertions:["completeness"],                                     industry:"all" },
+  { code:"A6",  label:"Prior Auditor Communication",             description:"Communication with predecessor auditor; review of predecessor's reports and significant matters per ISA 510.",                                            category:"pre_planning", phase:"Pre-Planning", mandatory:false, risk:"all",    isa:"ISA 510",                type:"planning",    complexity:"low",    outputType:"word",       assertions:["completeness","accuracy"],                          industry:"all" },
+  { code:"A7",  label:"Management Integrity Assessment",         description:"Assessment of management integrity and competence; fraud indicators at entity level per ISA 240.",                                                        category:"pre_planning", phase:"Pre-Planning", mandatory:false, risk:"medium", isa:"ISA 240",                type:"risk",        complexity:"medium", outputType:"word",       assertions:["completeness"],                                     industry:"all" },
+  { code:"A8",  label:"Group Audit Considerations",              description:"Planning and coordination for group audits including component auditor instructions per ISA 600.",                                                         category:"pre_planning", phase:"Pre-Planning", mandatory:false, risk:"all",    isa:"ISA 600",                type:"planning",    complexity:"high",   outputType:"word",       assertions:["completeness","accuracy"],                          industry:"all" },
+
+  // ─── B: Planning & Strategy ─────────────────────────────────────────────────
+  { code:"B1",  label:"Audit Strategy & Planning Memorandum",    description:"Overall audit strategy documenting scope, timing, direction, and key decisions per ISA 300.",                                                             category:"planning",     phase:"Planning",     mandatory:true,  risk:"all",    isa:"ISA 300",                type:"planning",    complexity:"high",   outputType:"word",       assertions:["completeness"],                                     industry:"all" },
+  { code:"B2",  label:"Materiality Computation",                 description:"Overall materiality, performance materiality, and trivial threshold with benchmark selection rationale per ISA 320.",                                      category:"planning",     phase:"Planning",     mandatory:true,  risk:"all",    isa:"ISA 320",                type:"planning",    complexity:"medium", outputType:"word+excel",  assertions:["completeness","accuracy"],                          industry:"all" },
+  { code:"B3",  label:"Understanding the Entity (ISA 315)",      description:"Documented understanding of entity, environment, internal control system, and information systems.",                                                      category:"planning",     phase:"Planning",     mandatory:true,  risk:"all",    isa:"ISA 315",                type:"planning",    complexity:"high",   outputType:"word",       assertions:["completeness"],                                     industry:"all" },
+  { code:"B4",  label:"Audit Program — Overall",                 description:"Comprehensive audit program covering all significant areas; linked to risk assessment and materiality.",                                                   category:"planning",     phase:"Planning",     mandatory:true,  risk:"all",    isa:"ISA 300",                type:"planning",    complexity:"high",   outputType:"word",       assertions:["completeness"],                                     industry:"all" },
+  { code:"B5",  label:"Key Accounting Estimates (ISA 540)",      description:"Identification and planning for key accounting estimates including expected credit losses, provisions, and depreciation.",                                 category:"planning",     phase:"Planning",     mandatory:false, risk:"medium", isa:"ISA 540",                type:"planning",    complexity:"medium", outputType:"word",       assertions:["accuracy","valuation"],                             industry:"all" },
+  { code:"B6",  label:"IT Systems Understanding",                description:"Understanding of entity's IT environment, general IT controls, automated controls, and IT-related risks.",                                                category:"planning",     phase:"Planning",     mandatory:false, risk:"medium", isa:"ISA 315",                type:"controls",    complexity:"medium", outputType:"word",       assertions:["completeness","accuracy"],                          industry:"all" },
+  { code:"B7",  label:"Going Concern — Initial Assessment",      description:"Preliminary assessment of going concern indicators, management plans, and audit response per ISA 570.",                                                   category:"planning",     phase:"Planning",     mandatory:false, risk:"medium", isa:"ISA 570",                type:"planning",    complexity:"medium", outputType:"word",       assertions:["completeness"],                                     industry:"all" },
+
+  // ─── C: Risk Assessment ─────────────────────────────────────────────────────
+  { code:"C1",  label:"Overall Risk Assessment",                 description:"Entity-level risks: business, operational, and financial risks affecting the audit. Risk register with response mapped.",                                 category:"risk",         phase:"Planning",     mandatory:true,  risk:"all",    isa:"ISA 315",                type:"risk",        complexity:"high",   outputType:"word",       assertions:["completeness","accuracy"],                          industry:"all" },
+  { code:"C2",  label:"Fraud Risk Assessment (ISA 240)",         description:"Fraud inquiries, risk factors (incentives/pressures, opportunity, rationalization), and planned responses.",                                              category:"risk",         phase:"Planning",     mandatory:true,  risk:"all",    isa:"ISA 240",                type:"risk",        complexity:"high",   outputType:"word",       assertions:["completeness","occurrence"],                        industry:"all" },
+  { code:"C3",  label:"Significant Risk Documentation",         description:"Identification and documentation of significant risks with specific audit responses and linkage to audit program.",                                        category:"risk",         phase:"Planning",     mandatory:false, risk:"medium", isa:"ISA 315",                type:"risk",        complexity:"high",   outputType:"word",       assertions:["completeness","accuracy"],                          industry:"all" },
+  { code:"C4",  label:"Account-Level Risk Register",            description:"Account-by-account risk assessment mapped to assertions, risk level, and planned procedures.",                                                            category:"risk",         phase:"Planning",     mandatory:false, risk:"all",    isa:"ISA 315",                type:"risk",        complexity:"medium", outputType:"word+excel",  assertions:["completeness","accuracy","valuation","existence"],  industry:"all" },
+  { code:"C5",  label:"Revenue Recognition Risk (IFRS 15)",     description:"Revenue recognition policy review, risk of manipulation, and specific procedures for IFRS 15 compliance.",                                               category:"risk",         phase:"Planning",     mandatory:false, risk:"high",   isa:"ISA 240, IFRS 15",       type:"risk",        complexity:"high",   outputType:"word",       assertions:["occurrence","accuracy","cut-off"],                   industry:"all" },
+
+  // ─── D: Analytical Procedures ───────────────────────────────────────────────
+  { code:"D1",  label:"Preliminary Analytical Review",           description:"High-level analytical procedures on TB, ratios, and prior year comparatives to identify unusual fluctuations.",                                          category:"analytical",   phase:"Planning",     mandatory:true,  risk:"all",    isa:"ISA 520",                type:"analytical",  complexity:"medium", outputType:"word+excel",  assertions:["completeness","accuracy"],                          industry:"all" },
+  { code:"D2",  label:"Ratio Analysis & Industry Benchmarking",  description:"Liquidity, profitability, efficiency, and leverage ratios vs. industry benchmarks and prior year.",                                                      category:"analytical",   phase:"Planning",     mandatory:false, risk:"all",    isa:"ISA 520",                type:"analytical",  complexity:"medium", outputType:"excel",       assertions:["completeness","accuracy"],                          industry:"all" },
+  { code:"D3",  label:"Revenue Trend & Disaggregation Analysis", description:"Month-by-month revenue trend, revenue streams disaggregation, and unusual spikes/drops investigation.",                                                  category:"analytical",   phase:"Execution",    mandatory:false, risk:"all",    isa:"ISA 520",                type:"analytical",  complexity:"medium", outputType:"excel",       assertions:["completeness","occurrence","cut-off"],              industry:"all" },
+  { code:"D4",  label:"Expense Completeness Analytics",          description:"Expense run-rate analysis, unusual variance identification, and accrual completeness checks.",                                                           category:"analytical",   phase:"Execution",    mandatory:false, risk:"all",    isa:"ISA 520",                type:"analytical",  complexity:"medium", outputType:"excel",       assertions:["completeness","accuracy"],                          industry:"all" },
+  { code:"D5",  label:"Final Analytical Review",                 description:"Completion-stage analytical procedures confirming no unusual relationships remain unexplained.",                                                          category:"analytical",   phase:"Completion",   mandatory:true,  risk:"all",    isa:"ISA 520",                type:"analytical",  complexity:"low",    outputType:"word+excel",  assertions:["completeness","accuracy"],                          industry:"all" },
+
+  // ─── E: Internal Controls ───────────────────────────────────────────────────
+  { code:"E1",  label:"Controls Walkthrough — Revenue Cycle",    description:"Walkthrough of revenue recognition, invoicing, and credit controls from initiation to collection.",                                                      category:"controls",     phase:"Execution",    mandatory:false, risk:"all",    isa:"ISA 315",                type:"controls",    complexity:"high",   outputType:"word",       assertions:["occurrence","completeness","cut-off"],              industry:"all" },
+  { code:"E2",  label:"Controls Walkthrough — Procure-to-Pay",   description:"Procurement, purchase order, GRN, invoice approval, and payment controls walkthrough.",                                                                 category:"controls",     phase:"Execution",    mandatory:false, risk:"all",    isa:"ISA 315",                type:"controls",    complexity:"high",   outputType:"word",       assertions:["completeness","accuracy","occurrence"],             industry:"all" },
+  { code:"E3",  label:"Controls Walkthrough — Payroll",          description:"Payroll processing, authorizations, HR-to-payroll link, and bank transfer controls walkthrough.",                                                       category:"controls",     phase:"Execution",    mandatory:false, risk:"all",    isa:"ISA 315",                type:"controls",    complexity:"medium", outputType:"word",       assertions:["completeness","accuracy","occurrence"],             industry:"all" },
+  { code:"E4",  label:"Controls Walkthrough — IT General Controls", description:"IT access management, change management, backup, and security controls evaluation.",                                                                  category:"controls",     phase:"Execution",    mandatory:false, risk:"medium", isa:"ISA 315",                type:"controls",    complexity:"high",   outputType:"word",       assertions:["completeness","accuracy"],                          industry:"all" },
+  { code:"E5",  label:"Control Deficiencies & MMADs",            description:"Documentation of identified control deficiencies, material weaknesses, and significant deficiencies with management communication.",                     category:"controls",     phase:"Execution",    mandatory:false, risk:"all",    isa:"ISA 265",                type:"controls",    complexity:"medium", outputType:"word",       assertions:["completeness"],                                     industry:"all" },
+
+  // ─── F: Substantive — Assets ────────────────────────────────────────────────
+  { code:"F1",  label:"Cash & Bank — Confirmation & Reconciliation", description:"Bank confirmations, reconciliation testing, petty cash count, and cut-off verification per ISA 505.",                                             category:"substantive_assets", phase:"Execution", mandatory:false, risk:"all",   isa:"ISA 505",                type:"substantive", complexity:"medium", outputType:"word+excel",  assertions:["existence","completeness","accuracy"],              industry:"all" },
+  { code:"F2",  label:"Trade Receivables — Confirmation & Aging",    description:"Debtor confirmation (positive/negative), aging analysis, bad debt provision adequacy, and cut-off testing.",                                      category:"substantive_assets", phase:"Execution", mandatory:false, risk:"all",   isa:"ISA 505",                type:"substantive", complexity:"high",   outputType:"word+excel",  assertions:["existence","valuation","completeness","cut-off"],   industry:"all" },
+  { code:"F3",  label:"Inventory — Physical Count & Valuation",      description:"Physical observation planning, count sheets, NRV assessment, overhead absorption, and FIFO/AVCO validation.",                                    category:"substantive_assets", phase:"Execution", mandatory:false, risk:"all",   isa:"ISA 501",                type:"substantive", complexity:"high",   outputType:"word+excel",  assertions:["existence","valuation","completeness"],             industry:"manufacturing" },
+  { code:"F4",  label:"PPE — Roll-Forward & Depreciation Test",      description:"Fixed asset register reconciliation, additions/disposals testing, depreciation recalculation, and impairment indicators.",                       category:"substantive_assets", phase:"Execution", mandatory:false, risk:"all",   isa:"IAS 16",                 type:"substantive", complexity:"high",   outputType:"word+excel",  assertions:["existence","valuation","completeness","rights"],    industry:"all" },
+  { code:"F5",  label:"Investments — Valuation & Classification",    description:"Investment portfolio valuation, IFRS 9 classification, impairment, and disclosure testing.",                                                     category:"substantive_assets", phase:"Execution", mandatory:false, risk:"all",   isa:"IFRS 9, ISA 500",        type:"substantive", complexity:"high",   outputType:"word+excel",  assertions:["valuation","existence","rights"],                   industry:"financial" },
+  { code:"F6",  label:"Prepayments & Other Receivables",             description:"Prepayment recoverability, other receivables ageing, and completeness of accrued income.",                                                       category:"substantive_assets", phase:"Execution", mandatory:false, risk:"all",   isa:"ISA 500",                type:"substantive", complexity:"low",    outputType:"word+excel",  assertions:["existence","valuation","completeness"],             industry:"all" },
+  { code:"F7",  label:"Intangible Assets & Impairment (IAS 38/36)",  description:"Intangible asset capitalization criteria, amortization, and impairment testing with CGU analysis.",                                             category:"substantive_assets", phase:"Execution", mandatory:false, risk:"medium", isa:"IAS 38, IAS 36",         type:"substantive", complexity:"high",   outputType:"word+excel",  assertions:["existence","valuation","rights"],                   industry:"all" },
+  { code:"F8",  label:"Right-of-Use Assets & Lease Liabilities (IFRS 16)", description:"Lease identification, ROU asset and lease liability computation, discount rate, and modification testing.",                              category:"substantive_assets", phase:"Execution", mandatory:false, risk:"all",   isa:"IFRS 16",                type:"substantive", complexity:"high",   outputType:"word+excel",  assertions:["existence","valuation","completeness"],             industry:"all" },
+  { code:"F9",  label:"Long-Term Deposits & Advances",               description:"Recoverability assessment, impairment, and presentation of long-term deposits and staff advances.",                                              category:"substantive_assets", phase:"Execution", mandatory:false, risk:"all",   isa:"ISA 500",                type:"substantive", complexity:"low",    outputType:"word+excel",  assertions:["existence","valuation"],                            industry:"all" },
+
+  // ─── G: Substantive — Liabilities & Equity ──────────────────────────────────
+  { code:"G1",  label:"Trade Payables — Confirmation & Reconciliation", description:"Creditor confirmation, reconciliation to supplier statements, and GRN-invoice matching.",                                                    category:"substantive_liab",  phase:"Execution", mandatory:false, risk:"all",   isa:"ISA 500",                type:"substantive", complexity:"medium", outputType:"word+excel",  assertions:["completeness","accuracy","existence"],              industry:"all" },
+  { code:"G2",  label:"Borrowings & Finance Costs",                   description:"Loan confirmation from banks, interest recalculation, covenant compliance, and presentation testing.",                                         category:"substantive_liab",  phase:"Execution", mandatory:false, risk:"all",   isa:"IFRS 9, ISA 505",        type:"substantive", complexity:"medium", outputType:"word+excel",  assertions:["existence","completeness","accuracy"],              industry:"all" },
+  { code:"G3",  label:"Accruals, Provisions & Contingencies",         description:"Completeness of accruals, provision adequacy (IAS 37), and contingent liability disclosure.",                                                  category:"substantive_liab",  phase:"Execution", mandatory:false, risk:"all",   isa:"IAS 37, ISA 500",        type:"substantive", complexity:"medium", outputType:"word+excel",  assertions:["completeness","accuracy","valuation"],              industry:"all" },
+  { code:"G4",  label:"Share Capital & Reserves",                     description:"Share capital verification, retained earnings reconciliation, and dividend legality per Companies Act 2017.",                                  category:"substantive_liab",  phase:"Execution", mandatory:false, risk:"all",   isa:"Companies Act 2017",     type:"substantive", complexity:"low",    outputType:"word+excel",  assertions:["accuracy","completeness","rights"],                 industry:"all" },
+  { code:"G5",  label:"Deferred Tax — Asset & Liability (IAS 12)",    description:"Temporary differences schedule, DTA/DTL computation, recoverability of DTA, and effective tax rate reconciliation.",                          category:"substantive_liab",  phase:"Execution", mandatory:false, risk:"medium", isa:"IAS 12",                 type:"substantive", complexity:"high",   outputType:"word+excel",  assertions:["accuracy","completeness","valuation"],              industry:"all" },
+  { code:"G6",  label:"Staff Retirement Benefits (IAS 19)",           description:"Gratuity/pension actuarial assessment, EOBI compliance, and DBO disclosure testing.",                                                         category:"substantive_liab",  phase:"Execution", mandatory:false, risk:"medium", isa:"IAS 19",                 type:"substantive", complexity:"high",   outputType:"word+excel",  assertions:["completeness","accuracy","valuation"],              industry:"all" },
+
+  // ─── H: Substantive — Profit & Loss ─────────────────────────────────────────
+  { code:"H1",  label:"Revenue — Completeness & Cut-off (IFRS 15)",   description:"Revenue recognition testing against IFRS 15 five-step model, cut-off, and journal entry testing for revenue manipulation.",                  category:"substantive_pl",    phase:"Execution", mandatory:false, risk:"all",   isa:"IFRS 15, ISA 240",       type:"substantive", complexity:"high",   outputType:"word+excel",  assertions:["occurrence","completeness","accuracy","cut-off"],   industry:"all" },
+  { code:"H2",  label:"Cost of Sales — Vouching & Reconciliation",    description:"COGS testing including opening stock, purchases, direct costs, and closing stock reconciliation.",                                             category:"substantive_pl",    phase:"Execution", mandatory:false, risk:"all",   isa:"IAS 2, ISA 500",         type:"substantive", complexity:"high",   outputType:"word+excel",  assertions:["completeness","accuracy","occurrence"],             industry:"manufacturing" },
+  { code:"H3",  label:"Operating Expenses — Completeness & Vouching", description:"Expense completeness, cut-off, capital vs. revenue split, and unusual item investigation.",                                                    category:"substantive_pl",    phase:"Execution", mandatory:false, risk:"all",   isa:"ISA 500",                type:"substantive", complexity:"medium", outputType:"word+excel",  assertions:["completeness","accuracy","occurrence","cut-off"],   industry:"all" },
+  { code:"H4",  label:"Payroll & Staff Costs — Detail Test",          description:"Payroll vouching, EOBI/PESSI deductions, income tax on salaries, and reconciliation to HR records.",                                          category:"substantive_pl",    phase:"Execution", mandatory:false, risk:"all",   isa:"ISA 500",                type:"substantive", complexity:"medium", outputType:"word+excel",  assertions:["accuracy","completeness","occurrence"],             industry:"all" },
+  { code:"H5",  label:"Directors' Remuneration & Related Disclosures", description:"Directors' fees, salaries, benefits, and disclosure verification per Companies Act 2017 s.220.",                                            category:"substantive_pl",    phase:"Execution", mandatory:false, risk:"all",   isa:"Companies Act 2017",     type:"substantive", complexity:"low",    outputType:"word",        assertions:["accuracy","completeness"],                          industry:"all" },
+  { code:"H6",  label:"Finance Cost & Interest Expense",              description:"Interest expense recalculation, effective interest method verification, and borrowing cost capitalization.",                                    category:"substantive_pl",    phase:"Execution", mandatory:false, risk:"all",   isa:"IAS 23, IFRS 9",         type:"substantive", complexity:"medium", outputType:"word+excel",  assertions:["accuracy","completeness","occurrence"],             industry:"all" },
+
+  // ─── I: Taxation ────────────────────────────────────────────────────────────
+  { code:"I1",  label:"Income Tax — Current & Deferred",              description:"Current tax liability per ITO 2001, minimum tax/super tax computation, and deferred tax reconciliation.",                                       category:"tax",               phase:"Execution", mandatory:false, risk:"all",   isa:"IAS 12, ITO 2001",       type:"substantive", complexity:"high",   outputType:"word+excel",  assertions:["accuracy","completeness","valuation"],              industry:"all" },
+  { code:"I2",  label:"Sales Tax / FED — Reconciliation",             description:"GST/FED return reconciliation with FBR records, input/output tax matching, and annexure verification.",                                        category:"tax",               phase:"Execution", mandatory:false, risk:"all",   isa:"Sales Tax Act 1990",     type:"substantive", complexity:"medium", outputType:"word+excel",  assertions:["accuracy","completeness","occurrence"],             industry:"all" },
+  { code:"I3",  label:"Withholding Tax — Deductions & Compliance",    description:"WHT deduction on payments, deposition in time, and IRIS/FBR filing compliance review.",                                                       category:"tax",               phase:"Execution", mandatory:false, risk:"all",   isa:"ITO 2001, WHT Rules",    type:"substantive", complexity:"medium", outputType:"word+excel",  assertions:["completeness","accuracy"],                          industry:"all" },
+  { code:"I4",  label:"Super Tax & Minimum Tax Computation",          description:"Super tax computation for high-earning entities, turnover-based minimum tax, and AMT per Finance Act 2023.",                                    category:"tax",               phase:"Execution", mandatory:false, risk:"all",   isa:"ITO 2001, FA 2023",      type:"substantive", complexity:"high",   outputType:"word+excel",  assertions:["accuracy","completeness"],                          industry:"all" },
+  { code:"I5",  label:"Tax Contingencies & Notices",                  description:"Open tax assessments, FBR notices, pending litigation, and adequacy of tax provision for contingencies.",                                      category:"tax",               phase:"Execution", mandatory:false, risk:"medium", isa:"IAS 37, ISA 250",        type:"substantive", complexity:"medium", outputType:"word",        assertions:["completeness","valuation"],                         industry:"all" },
+  { code:"I6",  label:"Transfer Pricing Compliance",                  description:"Related-party pricing documentation, arm's length analysis, and TP documentation compliance per ITO 2001 s.108.",                             category:"tax",               phase:"Execution", mandatory:false, risk:"high",   isa:"ITO 2001 s.108",         type:"substantive", complexity:"high",   outputType:"word",        assertions:["accuracy","completeness"],                          industry:"all" },
+
+  // ─── J: Estimates & Judgments ────────────────────────────────────────────────
+  { code:"J1",  label:"Key Accounting Estimates — Critical Review",   description:"Challenge of management's estimates for impairment, provisions, fair values, and deferred tax; point estimate vs. range.",                     category:"estimates",         phase:"Execution", mandatory:false, risk:"medium", isa:"ISA 540",                type:"substantive", complexity:"high",   outputType:"word",        assertions:["accuracy","valuation"],                             industry:"all" },
+  { code:"J2",  label:"Expected Credit Loss Model (IFRS 9)",         description:"ECL model review, staging criteria, PD/LGD/EAD parameters, and provision adequacy per IFRS 9.",                                               category:"estimates",         phase:"Execution", mandatory:false, risk:"medium", isa:"IFRS 9, ISA 540",        type:"substantive", complexity:"high",   outputType:"word+excel",  assertions:["valuation","accuracy"],                             industry:"financial" },
+  { code:"J3",  label:"Fair Value Measurements (IFRS 13)",           description:"Level 1/2/3 fair value hierarchy, valuation techniques, significant inputs, and sensitivity analysis.",                                        category:"estimates",         phase:"Execution", mandatory:false, risk:"high",   isa:"IFRS 13, ISA 540",       type:"substantive", complexity:"high",   outputType:"word",        assertions:["valuation","accuracy"],                             industry:"all" },
+  { code:"J4",  label:"Goodwill & Impairment Testing (IAS 36)",      description:"CGU identification, recoverable amount computation, VIU/FVLCD comparison, and sensitivity testing.",                                           category:"estimates",         phase:"Execution", mandatory:false, risk:"medium", isa:"IAS 36, ISA 540",        type:"substantive", complexity:"high",   outputType:"word+excel",  assertions:["valuation","existence"],                            industry:"all" },
+
+  // ─── K: Related Parties & Compliance ────────────────────────────────────────
+  { code:"K1",  label:"Related Party Transactions (ISA 550)",        description:"Identification of related parties, authorization of transactions, arm's length basis, and IFRS disclosure adequacy.",                           category:"related_party",     phase:"Execution", mandatory:false, risk:"all",   isa:"ISA 550, IAS 24",        type:"substantive", complexity:"high",   outputType:"word",        assertions:["completeness","accuracy","occurrence"],             industry:"all" },
+  { code:"K2",  label:"Compliance with Laws & Regulations (ISA 250)", description:"Review of significant laws/regulations (Companies Act, SECP, FBR, SBP) and instances of non-compliance.",                                     category:"related_party",     phase:"Execution", mandatory:false, risk:"all",   isa:"ISA 250",                type:"substantive", complexity:"medium", outputType:"word",        assertions:["completeness","occurrence"],                        industry:"all" },
+  { code:"K3",  label:"SECP & FBR Regulatory Filings Review",        description:"Annual return, form A/29, SECP compliance, and FBR registration/filing status verification.",                                                  category:"related_party",     phase:"Execution", mandatory:false, risk:"all",   isa:"Companies Act 2017",     type:"substantive", complexity:"low",    outputType:"word",        assertions:["completeness"],                                     industry:"all" },
+  { code:"K4",  label:"Litigation & Claims Review",                  description:"Legal confirmation requests, solicitor letters, pending cases, and adequacy of provision for litigation.",                                      category:"related_party",     phase:"Execution", mandatory:false, risk:"medium", isa:"IAS 37, ISA 501",        type:"substantive", complexity:"medium", outputType:"word",        assertions:["completeness","valuation"],                         industry:"all" },
+
+  // ─── L: Evidence & Misstatements ────────────────────────────────────────────
+  { code:"L1",  label:"Audit Evidence — Sufficiency & Appropriateness", description:"Summary evaluation of audit evidence obtained across all areas and assertion coverage assessment.",                                          category:"evidence",          phase:"Completion", mandatory:true,  risk:"all",   isa:"ISA 500",                type:"completion",  complexity:"medium", outputType:"word",        assertions:["completeness","accuracy","existence"],              industry:"all" },
+  { code:"L2",  label:"Unadjusted Misstatements Schedule (ISA 450)", description:"Schedule of all identified misstatements, both adjusted and unadjusted, with management communication.",                                       category:"evidence",          phase:"Completion", mandatory:false, risk:"all",   isa:"ISA 450",                type:"completion",  complexity:"medium", outputType:"word+excel",  assertions:["accuracy","completeness"],                          industry:"all" },
+  { code:"L3",  label:"Summary of Audit Differences",                description:"Aggregated misstatement analysis vs. materiality threshold with conclusion on overall impact.",                                                 category:"evidence",          phase:"Completion", mandatory:false, risk:"all",   isa:"ISA 450",                type:"completion",  complexity:"low",    outputType:"word+excel",  assertions:["accuracy"],                                         industry:"all" },
+  { code:"L4",  label:"Management Communication — Control Deficiencies", description:"Draft management letter on internal control weaknesses, significant deficiencies, and recommendations.",                                   category:"evidence",          phase:"Completion", mandatory:false, risk:"all",   isa:"ISA 265",                type:"completion",  complexity:"medium", outputType:"word",        assertions:["completeness"],                                     industry:"all" },
+
+  // ─── M: Completion ──────────────────────────────────────────────────────────
+  { code:"M1",  label:"Subsequent Events Review (ISA 560)",          description:"Procedures for identifying post-balance-sheet events requiring adjustment or disclosure; dual-dating considerations.",                          category:"completion",        phase:"Completion", mandatory:true,  risk:"all",   isa:"ISA 560",                type:"completion",  complexity:"medium", outputType:"word",        assertions:["completeness"],                                     industry:"all" },
+  { code:"M2",  label:"Going Concern — Final Assessment (ISA 570)",  description:"Final going concern conclusion, management's assessment review, and disclosure adequacy per ISA 570.",                                         category:"completion",        phase:"Completion", mandatory:true,  risk:"all",   isa:"ISA 570",                type:"completion",  complexity:"high",   outputType:"word",        assertions:["completeness","accuracy"],                          industry:"all" },
+  { code:"M3",  label:"Management Representation Letter (ISA 580)",  description:"Signed management representations covering all significant matters and specific representations requested.",                                     category:"completion",        phase:"Completion", mandatory:true,  risk:"all",   isa:"ISA 580",                type:"completion",  complexity:"low",    outputType:"word",        assertions:["completeness"],                                     industry:"all" },
+  { code:"M4",  label:"Completion Memorandum",                       description:"Overall audit conclusion, significant judgments, quality control sign-offs, and engagement completion checklist.",                               category:"completion",        phase:"Completion", mandatory:true,  risk:"all",   isa:"ISA 220",                type:"completion",  complexity:"medium", outputType:"word",        assertions:["completeness"],                                     industry:"all" },
+  { code:"M5",  label:"Written Representations Log",                 description:"Record of all representations obtained from management and those charged with governance.",                                                     category:"completion",        phase:"Completion", mandatory:false, risk:"all",   isa:"ISA 580",                type:"completion",  complexity:"low",    outputType:"word",        assertions:["completeness"],                                     industry:"all" },
+
+  // ─── N: Reporting ───────────────────────────────────────────────────────────
+  { code:"N1",  label:"Audit Opinion Drafting (ISA 700)",            description:"Draft audit report — unmodified opinion, basis paragraph, key audit matters, and emphasis paragraphs.",                                         category:"reporting",         phase:"Reporting",  mandatory:true,  risk:"all",   isa:"ISA 700",                type:"reporting",   complexity:"high",   outputType:"word",        assertions:["completeness","accuracy"],                          industry:"all" },
+  { code:"N2",  label:"Key Audit Matters (ISA 701)",                 description:"Identification and drafting of KAMs — significant risks, how they were addressed, and key observations.",                                       category:"reporting",         phase:"Reporting",  mandatory:false, risk:"all",   isa:"ISA 701",                type:"reporting",   complexity:"high",   outputType:"word",        assertions:["completeness","accuracy"],                          industry:"listed" },
+  { code:"N3",  label:"Modified Opinion Assessment (ISA 705)",       description:"Qualification, disclaimer, or adverse opinion analysis — materiality, pervasiveness, and effect assessment.",                                   category:"reporting",         phase:"Reporting",  mandatory:false, risk:"medium", isa:"ISA 705",                type:"reporting",   complexity:"high",   outputType:"word",        assertions:["completeness"],                                     industry:"all" },
+  { code:"N4",  label:"Emphasis of Matter / Other Matters (ISA 706)", description:"EOM and OM paragraph drafting and appropriateness assessment.",                                                                               category:"reporting",         phase:"Reporting",  mandatory:false, risk:"all",   isa:"ISA 706",                type:"reporting",   complexity:"medium", outputType:"word",        assertions:["completeness"],                                     industry:"all" },
+  { code:"N5",  label:"Management Letter & Recommendations",         description:"Formal management letter covering control weaknesses, operational improvements, and tax recommendations.",                                       category:"reporting",         phase:"Reporting",  mandatory:false, risk:"all",   isa:"ISA 265",                type:"reporting",   complexity:"medium", outputType:"word",        assertions:["completeness"],                                     industry:"all" },
+  { code:"N6",  label:"Financial Statements — Final Review",         description:"Tie-out of financial statements to audit workpapers, disclosure checklist, and formatting per SECP requirements.",                             category:"reporting",         phase:"Reporting",  mandatory:true,  risk:"all",   isa:"IAS 1, IFRS",            type:"reporting",   complexity:"medium", outputType:"word",        assertions:["completeness","accuracy"],                          industry:"all" },
+
+  // ─── O: Quality Control ─────────────────────────────────────────────────────
+  { code:"O1",  label:"Engagement Quality Control Review (ISQM 1)", description:"EQCR review of significant judgments, audit opinion, and selected working papers by independent reviewer.",                                     category:"quality",           phase:"Reporting",  mandatory:false, risk:"all",   isa:"ISQM 1",                 type:"quality",     complexity:"high",   outputType:"word",        assertions:["completeness"],                                     industry:"all" },
+  { code:"O2",  label:"EQCR Findings & Resolution",                 description:"Documentation of EQCR findings, partner responses, and resolution before report issuance.",                                                    category:"quality",           phase:"Reporting",  mandatory:false, risk:"all",   isa:"ISQM 1",                 type:"quality",     complexity:"medium", outputType:"word",        assertions:["completeness"],                                     industry:"all" },
+  { code:"O3",  label:"Hot Review Checklist",                       description:"Pre-issuance hot review by senior manager — completeness of file, sign-offs, and key risks addressed.",                                        category:"quality",           phase:"Reporting",  mandatory:false, risk:"all",   isa:"ISQM 1",                 type:"quality",     complexity:"low",    outputType:"word",        assertions:["completeness"],                                     industry:"all" },
+  { code:"O4",  label:"Cold Review / Inspection Documentation",     description:"Post-issuance inspection documentation, monitoring findings, and remediation actions.",                                                         category:"quality",           phase:"Archiving",  mandatory:false, risk:"all",   isa:"ISQM 1",                 type:"quality",     complexity:"medium", outputType:"word",        assertions:["completeness"],                                     industry:"all" },
+
+  // ─── P: Archiving ───────────────────────────────────────────────────────────
+  { code:"P1",  label:"File Closure & Assembly Checklist",          description:"Assembly of complete audit file — checklist of all required documents, cross-references, and index.",                                           category:"archiving",         phase:"Archiving",  mandatory:true,  risk:"all",   isa:"ISA 230",                type:"completion",  complexity:"low",    outputType:"word",        assertions:["completeness"],                                     industry:"all" },
+  { code:"P2",  label:"Archiving Memorandum & Retention Log",       description:"Archiving date confirmation (within 60 days of report), retention period documentation, and access controls.",                                   category:"archiving",         phase:"Archiving",  mandatory:false, risk:"all",   isa:"ISA 230, ISQM 1",        type:"completion",  complexity:"low",    outputType:"word",        assertions:["completeness"],                                     industry:"all" },
+  { code:"P3",  label:"Subsequent Changes to Audit Documentation",  description:"Log of any documentation added or amended after assembly date with justification per ISA 230.",                                                 category:"archiving",         phase:"Archiving",  mandatory:false, risk:"all",   isa:"ISA 230",                type:"completion",  complexity:"low",    outputType:"word",        assertions:["completeness"],                                     industry:"all" },
 ];
+
+// ─── WP type / complexity badge colours ─────────────────────────────────────
+const WP_TYPE_COLORS: Record<string, string> = {
+  planning:    "bg-blue-100 text-blue-700 border-blue-200",
+  risk:        "bg-orange-100 text-orange-700 border-orange-200",
+  analytical:  "bg-cyan-100 text-cyan-700 border-cyan-200",
+  controls:    "bg-purple-100 text-purple-700 border-purple-200",
+  substantive: "bg-teal-100 text-teal-700 border-teal-200",
+  completion:  "bg-amber-100 text-amber-700 border-amber-200",
+  reporting:   "bg-violet-100 text-violet-700 border-violet-200",
+  quality:     "bg-pink-100 text-pink-700 border-pink-200",
+};
+const COMPLEXITY_COLORS: Record<string, string> = {
+  low:    "text-emerald-600 bg-emerald-50",
+  medium: "text-amber-600 bg-amber-50",
+  high:   "text-red-600 bg-red-50",
+};
+const OUTPUT_ICONS: Record<string, string> = { word:"W", excel:"XLS", "word+excel":"W+XLS" };
 
 function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTriggers, onRefresh, onNext }: any) {
   const allTriggers: any[]  = wpTriggers || [];
   const allHeads: any[]     = heads || [];
   const mandatoryCodes      = new Set(DEFAULT_WP_ITEMS.filter(w => w.mandatory).map(w => w.code));
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(DEFAULT_WP_ITEMS.filter(w => w.mandatory).map(w => w.code)));
-  const [evaluated, setEvaluated] = useState(allTriggers.some((t: any) => t.triggered));
-  const [evaluating, setEvaluating] = useState(false);
+
+  const [selected, setSelected]       = useState<Set<string>>(() => new Set(DEFAULT_WP_ITEMS.filter(w => w.mandatory).map(w => w.code)));
+  const [evaluated, setEvaluated]     = useState(allTriggers.some((t: any) => t.triggered));
+  const [evaluating, setEvaluating]   = useState(false);
+  const [search, setSearch]           = useState("");
+  const [fPhase, setFPhase]           = useState("all");
+  const [fType, setFType]             = useState("all");
+  const [fRisk, setFRisk]             = useState("all");
+  const [fComplexity, setFComplexity] = useState("all");
+  const [fStatus, setFStatus]         = useState("all"); // all | mandatory | ai_recommended | optional | selected | unselected
+  const [preview, setPreview]         = useState<WpItem | null>(null);
+  const [collapsed, setCollapsed]     = useState<Set<string>>(new Set());
+
   const triggeredCodes = new Set(allTriggers.filter((t: any) => t.triggered).map((t: any) => t.wpCode));
+  const triggerConf: Record<string, number> = {};
+  allTriggers.forEach((t: any) => { if (t.triggered && t.wpCode) triggerConf[t.wpCode] = t.confidence || 75; });
 
   const handleEvaluate = async () => {
     setEvaluating(true);
     await onEvaluateTriggers?.();
     await onRefresh?.();
-    // After refresh, auto-apply AI recommendation (triggers will update from parent)
     const newSel = new Set<string>(mandatoryCodes);
     for (const t of allTriggers) { if (t.triggered && t.wpCode) newSel.add(t.wpCode); }
     setSelected(newSel);
@@ -6335,7 +6482,6 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
     setEvaluating(false);
   };
 
-  // Sync selected when triggers update from parent
   useEffect(() => {
     if (allTriggers.some((t: any) => t.triggered)) {
       setEvaluated(true);
@@ -6352,136 +6498,420 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
     setSelected(prev => { const n = new Set(prev); n.has(code) ? n.delete(code) : n.add(code); return n; });
   };
 
+  const toggleCategory = (cat: string, items: WpItem[]) => {
+    const nonMandatory = items.filter(w => !w.mandatory).map(w => w.code);
+    const allSel = nonMandatory.every(c => selected.has(c));
+    setSelected(prev => {
+      const n = new Set(prev);
+      nonMandatory.forEach(c => allSel ? n.delete(c) : n.add(c));
+      return n;
+    });
+  };
+
+  const toggleCollapse = (cat: string) => setCollapsed(prev => {
+    const n = new Set(prev); n.has(cat) ? n.delete(cat) : n.add(cat); return n;
+  });
+
+  // Apply filters
+  const phases = Array.from(new Set(DEFAULT_WP_ITEMS.map(w => w.phase)));
+
+  const filterWp = (wp: WpItem) => {
+    if (search) {
+      const s = search.toLowerCase();
+      if (!wp.label.toLowerCase().includes(s) && !wp.code.toLowerCase().includes(s) && !wp.isa.toLowerCase().includes(s) && !wp.description.toLowerCase().includes(s)) return false;
+    }
+    if (fPhase !== "all" && wp.phase !== fPhase) return false;
+    if (fType !== "all" && wp.type !== fType) return false;
+    if (fRisk !== "all") {
+      if (fRisk === "high" && wp.risk !== "high") return false;
+      if (fRisk === "medium" && !["medium","high"].includes(wp.risk)) return false;
+    }
+    if (fComplexity !== "all" && wp.complexity !== fComplexity) return false;
+    if (fStatus === "mandatory" && !wp.mandatory) return false;
+    if (fStatus === "ai_recommended" && !triggeredCodes.has(wp.code)) return false;
+    if (fStatus === "optional" && (wp.mandatory || triggeredCodes.has(wp.code))) return false;
+    if (fStatus === "selected" && !selected.has(wp.code)) return false;
+    if (fStatus === "unselected" && selected.has(wp.code)) return false;
+    return true;
+  };
+
+  const filteredAll = DEFAULT_WP_ITEMS.filter(filterWp);
   const grouped = Object.keys(WP_CATEGORY_LABELS).map(cat => ({
     cat, label: WP_CATEGORY_LABELS[cat],
-    items: DEFAULT_WP_ITEMS.filter(w => w.category === cat),
+    items: filteredAll.filter(w => w.category === cat),
+    allItems: DEFAULT_WP_ITEMS.filter(w => w.category === cat),
   })).filter(g => g.items.length > 0);
 
-  const selectedCount  = selected.size;
-  const mandatoryCount = DEFAULT_WP_ITEMS.filter(w => w.mandatory).length;
-  const triggeredCount = DEFAULT_WP_ITEMS.filter(w => triggeredCodes.has(w.code) && !w.mandatory).length;
+  const selectedCount    = selected.size;
+  const mandatoryCount   = DEFAULT_WP_ITEMS.filter(w => w.mandatory).length;
+  const triggeredCount   = DEFAULT_WP_ITEMS.filter(w => triggeredCodes.has(w.code) && !w.mandatory).length;
+  const optionalCount    = DEFAULT_WP_ITEMS.filter(w => !w.mandatory && !triggeredCodes.has(w.code)).length;
+
+  const applyAiRecommendations = () => {
+    const n = new Set<string>(mandatoryCodes);
+    triggeredCodes.forEach(c => n.add(c));
+    setSelected(n);
+  };
+
+  const resetToMandatory = () => setSelected(new Set(mandatoryCodes));
+  const selectAll = () => setSelected(new Set(DEFAULT_WP_ITEMS.map(w => w.code)));
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-700 to-violet-800 rounded-2xl p-5 text-white shadow-md">
+    <div className="space-y-4">
+
+      {/* ── Hero Header ── */}
+      <div className="bg-gradient-to-r from-indigo-700 to-violet-800 rounded-2xl p-5 text-white shadow-lg">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
             <ClipboardList className="w-6 h-6 text-indigo-200" />
           </div>
-          <div className="flex-1">
-            <h2 className="text-lg font-bold">Working Paper Listing</h2>
-            <p className="text-sm text-indigo-100 mt-0.5">
-              AI evaluates your TB, GL, risk indicators, materiality, and account areas to recommend which working papers are required for this engagement.
-              Mandatory papers are always included. Review the AI recommendation, then confirm selection before generation begins.
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-bold">Working Paper Template Library</h2>
+            <p className="text-sm text-indigo-100 mt-0.5 leading-relaxed">
+              {DEFAULT_WP_ITEMS.length} ISA/ISQM-compliant templates across {Object.keys(WP_CATEGORY_LABELS).length} audit phases.
+              AI evaluates your engagement context, risk profile, TB, GL, and entity type to recommend the optimal template set.
+              Mandatory templates are pre-selected. Review AI recommendations, add or remove any optional templates, then proceed to generation.
             </p>
-            <div className="flex flex-wrap gap-2 mt-2.5">
-              {["ISA/ISQM Compliant","Materiality-Driven","Risk-Based Selection","Account-Area Mapped"].map(t => (
-                <span key={t} className="text-[11px] px-2 py-0.5 bg-white/10 border border-white/20 rounded-full text-indigo-100">{t}</span>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {["ISA/ISQM 1 Compliant","Pakistan FBR/SECP","Materiality-Driven","Risk-Based","ICAP Standards","Companies Act 2017"].map(t => (
+                <span key={t} className="text-[10px] px-2 py-0.5 bg-white/10 border border-white/20 rounded-full text-indigo-100">{t}</span>
               ))}
             </div>
           </div>
-          <Button onClick={handleEvaluate} disabled={evaluating || loading} className="shrink-0 bg-white text-indigo-800 hover:bg-indigo-50 font-semibold shadow-sm">
+          <Button onClick={handleEvaluate} disabled={evaluating || loading}
+            className="shrink-0 bg-white text-indigo-800 hover:bg-indigo-50 font-semibold shadow-sm">
             {evaluating
-              ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Evaluating…</>
+              ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Analysing…</>
               : <><Sparkles className="w-4 h-4 mr-2" />AI Recommend</>}
           </Button>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* ── Stats ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
         {[
-          { label:"Total in Library", value:DEFAULT_WP_ITEMS.length, color:"slate",   sub:"working papers" },
-          { label:"Mandatory",        value:mandatoryCount,           color:"blue",    sub:"always included" },
-          { label:"AI Triggered",     value:triggeredCount,           color:"violet",  sub:evaluated ? "AI recommended" : "click AI Recommend" },
-          { label:"Selected",         value:selectedCount,            color:"emerald", sub:"will be generated" },
+          { label:"Library Total",    value:DEFAULT_WP_ITEMS.length, color:"slate",   sub:"templates available",          onClick:() => { setFStatus("all"); setSearch(""); } },
+          { label:"Mandatory",        value:mandatoryCount,           color:"blue",    sub:"always included",              onClick:() => setFStatus("mandatory") },
+          { label:"AI Recommended",   value:triggeredCount,           color:"violet",  sub:evaluated?"from AI analysis":"click AI Recommend",  onClick:() => setFStatus("ai_recommended") },
+          { label:"Optional",         value:optionalCount,            color:"amber",   sub:"user discretion",              onClick:() => setFStatus("optional") },
+          { label:"Selected",         value:selectedCount,            color:"emerald", sub:"will be generated",            onClick:() => setFStatus("selected") },
         ].map(s => (
-          <div key={s.label} className={cn("bg-white border rounded-xl p-3.5 text-center shadow-sm",
-            s.color==="blue"?"border-blue-200":s.color==="violet"?"border-violet-200":s.color==="emerald"?"border-emerald-200":"border-slate-200"
+          <button key={s.label} onClick={s.onClick} className={cn(
+            "bg-white border rounded-xl p-3 text-center transition-all hover:shadow-sm cursor-pointer",
+            fStatus === (s.label==="Library Total"?"all":s.label==="Mandatory"?"mandatory":s.label==="AI Recommended"?"ai_recommended":s.label==="Optional"?"optional":"selected")
+              ? "ring-2 ring-indigo-400 ring-offset-1 shadow-sm" : "",
+            s.color==="blue"?"border-blue-200":s.color==="violet"?"border-violet-200":s.color==="emerald"?"border-emerald-200":s.color==="amber"?"border-amber-200":"border-slate-200"
           )}>
             <p className={cn("text-2xl font-bold",
-              s.color==="blue"?"text-blue-700":s.color==="violet"?"text-violet-700":s.color==="emerald"?"text-emerald-700":"text-slate-800"
+              s.color==="blue"?"text-blue-700":s.color==="violet"?"text-violet-700":s.color==="emerald"?"text-emerald-700":s.color==="amber"?"text-amber-600":"text-slate-800"
             )}>{s.value}</p>
-            <p className="text-[11px] text-slate-600 font-semibold mt-0.5">{s.label}</p>
-            <p className="text-[10px] text-slate-400">{s.sub}</p>
-          </div>
+            <p className="text-[10px] text-slate-600 font-semibold mt-0.5">{s.label}</p>
+            <p className="text-[9px] text-slate-400">{s.sub}</p>
+          </button>
         ))}
       </div>
 
-      {/* Selection controls */}
-      <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 justify-between">
-        <div className="flex items-center gap-2 text-sm text-slate-600">
-          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-          <span><strong>{selectedCount}</strong> of <strong>{DEFAULT_WP_ITEMS.length}</strong> working papers selected</span>
-          {evaluated && <span className="text-xs text-violet-600 font-semibold ml-2">· AI recommendations applied</span>}
+      {/* ── AI Recommendation Banner (when evaluated) ── */}
+      {evaluated && (
+        <div className="bg-violet-50 border border-violet-200 rounded-xl px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="flex items-start gap-2 flex-1 min-w-0">
+            <Sparkles className="w-4 h-4 text-violet-600 shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-violet-800">AI analysis complete — {triggeredCount} templates recommended</p>
+              <p className="text-[11px] text-violet-600 mt-0.5">
+                Based on your engagement profile ({session?.entityType || "entity"}, {session?.reportingFramework || "IFRS"}, {session?.engagementYear || "2024"}), 
+                risk indicators, TB structure, and applicable ISA standards.
+                {mandatoryCodes.size} mandatory + {triggeredCount} AI-recommended = {mandatoryCodes.size + triggeredCount} templates.
+              </p>
+            </div>
+          </div>
+          <Button size="sm" onClick={applyAiRecommendations}
+            className="shrink-0 bg-violet-600 hover:bg-violet-700 text-white h-8 text-xs shadow-sm">
+            <Sparkles className="w-3 h-3 mr-1.5" /> Apply AI Selection
+          </Button>
         </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSelected(new Set(mandatoryCodes))}>Mandatory Only</Button>
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSelected(new Set(DEFAULT_WP_ITEMS.map(w => w.code)))}>Select All</Button>
+      )}
+
+      {/* ── Filter + Search Bar ── */}
+      <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 space-y-2.5">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <input
+              className="w-full pl-8 pr-3 py-1.5 text-[12px] border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              placeholder="Search by name, code, ISA standard, description…"
+              value={search} onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={resetToMandatory}>Mandatory Only</Button>
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={applyAiRecommendations}>AI Recommended</Button>
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={selectAll}>Select All</Button>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {/* Phase filter */}
+          <select value={fPhase} onChange={e => setFPhase(e.target.value)}
+            className="h-7 text-[11px] border border-slate-200 rounded-md px-2 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300">
+            <option value="all">All Phases</option>
+            {phases.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          {/* Type filter */}
+          <select value={fType} onChange={e => setFType(e.target.value)}
+            className="h-7 text-[11px] border border-slate-200 rounded-md px-2 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300">
+            <option value="all">All Types</option>
+            {Object.entries(WP_TYPE_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          {/* Risk filter */}
+          <select value={fRisk} onChange={e => setFRisk(e.target.value)}
+            className="h-7 text-[11px] border border-slate-200 rounded-md px-2 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300">
+            <option value="all">Any Risk</option>
+            <option value="high">High Risk</option>
+            <option value="medium">Med/High Risk</option>
+          </select>
+          {/* Complexity filter */}
+          <select value={fComplexity} onChange={e => setFComplexity(e.target.value)}
+            className="h-7 text-[11px] border border-slate-200 rounded-md px-2 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300">
+            <option value="all">Any Complexity</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+          {/* Status filter */}
+          <select value={fStatus} onChange={e => setFStatus(e.target.value)}
+            className="h-7 text-[11px] border border-slate-200 rounded-md px-2 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300">
+            <option value="all">All Status</option>
+            <option value="mandatory">Mandatory</option>
+            <option value="ai_recommended">AI Recommended</option>
+            <option value="optional">Optional</option>
+            <option value="selected">Selected</option>
+            <option value="unselected">Not Selected</option>
+          </select>
+          {(search || fPhase!=="all" || fType!=="all" || fRisk!=="all" || fComplexity!=="all" || fStatus!=="all") && (
+            <button onClick={() => { setSearch(""); setFPhase("all"); setFType("all"); setFRisk("all"); setFComplexity("all"); setFStatus("all"); }}
+              className="h-7 px-2 text-[11px] text-slate-500 hover:text-red-600 border border-slate-200 rounded-md bg-white flex items-center gap-1">
+              <XCircle className="w-3 h-3" /> Clear
+            </button>
+          )}
+          <span className="ml-auto self-center text-[11px] text-slate-400">{filteredAll.length} of {DEFAULT_WP_ITEMS.length} shown · {selectedCount} selected</span>
         </div>
       </div>
 
-      {/* WP List grouped by ISA category */}
-      <div className="space-y-3">
-        {grouped.map(({ cat, label: catLabel, items }) => {
-          const catSelected = items.filter(w => selected.has(w.code)).length;
+      {/* ── WP List ── */}
+      <div className="space-y-2.5">
+        {grouped.map(({ cat, label: catLabel, items, allItems }) => {
+          const catSelected = allItems.filter(w => selected.has(w.code)).length;
+          const catNonMandatory = allItems.filter(w => !w.mandatory);
+          const catAllNonMandSel = catNonMandatory.length > 0 && catNonMandatory.every(w => selected.has(w.code));
+          const isCollapsed = collapsed.has(cat);
           return (
             <div key={cat} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-              <div className="bg-gradient-to-r from-slate-50 to-indigo-50/20 px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
-                <span className="text-[12px] font-semibold text-slate-700">{catLabel}</span>
-                <span className="text-[11px] text-slate-400">{catSelected}/{items.length} selected</span>
+              {/* Category header */}
+              <div className="bg-gradient-to-r from-slate-50 to-indigo-50/30 px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+                <button onClick={() => toggleCollapse(cat)} className="flex items-center gap-2 flex-1 min-w-0 text-left">
+                  <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform shrink-0", isCollapsed && "-rotate-90")} />
+                  <span className="text-[12px] font-semibold text-slate-700 truncate">{catLabel}</span>
+                  <span className="text-[10px] text-slate-400 shrink-0 ml-1">{catSelected}/{allItems.length}</span>
+                </button>
+                {catNonMandatory.length > 0 && (
+                  <button
+                    onClick={() => toggleCategory(cat, allItems)}
+                    className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold shrink-0 ml-3 px-2 py-0.5 rounded border border-indigo-200 hover:bg-indigo-50"
+                  >
+                    {catAllNonMandSel ? "Deselect All" : "Select All"}
+                  </button>
+                )}
               </div>
-              <div className="divide-y divide-slate-50">
-                {items.map(wp => {
-                  const isSelected  = selected.has(wp.code);
-                  const isTriggered = triggeredCodes.has(wp.code);
-                  const hasHead     = allHeads.some((h: any) => {
-                    const idx = DEFAULT_WP_ITEMS.findIndex(d => d.code === wp.code);
-                    return h.headIndex === idx && ["generated","approved","completed"].includes(h.status);
-                  });
-                  return (
-                    <div
-                      key={wp.code}
-                      onClick={() => toggle(wp.code, wp.mandatory)}
-                      className={cn(
-                        "flex items-center gap-3 px-4 py-3 transition-colors",
-                        wp.mandatory ? "cursor-default" : "cursor-pointer hover:bg-slate-50/80",
-                        isSelected ? "bg-emerald-50/25" : ""
-                      )}
-                    >
-                      <div className={cn(
-                        "w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all",
-                        isSelected ? "bg-emerald-500 border-emerald-500" : "border-slate-300 bg-white",
-                        wp.mandatory ? "opacity-70" : ""
-                      )}>
-                        {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
-                      </div>
-                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded w-7 text-center shrink-0">{wp.code}</span>
-                      <span className="flex-1 text-[13px] font-medium text-slate-800 min-w-0">{wp.label}</span>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {wp.mandatory && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 uppercase">Required</span>}
-                        {isTriggered && !wp.mandatory && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200 flex items-center gap-1 uppercase">
-                            <Sparkles className="w-2.5 h-2.5" /> AI
-                          </span>
+
+              {!isCollapsed && (
+                <div className="divide-y divide-slate-50">
+                  {items.map(wp => {
+                    const isSelected  = selected.has(wp.code);
+                    const isTriggered = triggeredCodes.has(wp.code);
+                    const conf        = triggerConf[wp.code];
+                    const hasHead     = allHeads.some((h: any) => ["generated","approved","completed","exported"].includes(h.status));
+                    const selectionType: "mandatory" | "ai" | "manual" | "none" =
+                      wp.mandatory ? "mandatory" : isTriggered && isSelected ? "ai" : isSelected ? "manual" : "none";
+
+                    return (
+                      <div
+                        key={wp.code}
+                        className={cn(
+                          "group flex items-start gap-3 px-4 py-3 transition-colors relative",
+                          wp.mandatory ? "cursor-default" : "cursor-pointer hover:bg-slate-50/80",
+                          isSelected  ? (selectionType==="ai" ? "bg-violet-50/30" : selectionType==="mandatory" ? "bg-blue-50/20" : "bg-emerald-50/20") : ""
                         )}
-                        {hasHead && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 uppercase">✓ Done</span>}
+                      >
+                        {/* Left accent bar */}
+                        <div className={cn(
+                          "absolute left-0 top-0 bottom-0 w-0.5",
+                          selectionType==="mandatory" ? "bg-blue-400" :
+                          selectionType==="ai"        ? "bg-violet-400" :
+                          selectionType==="manual"    ? "bg-emerald-400" : "bg-transparent"
+                        )} />
+
+                        {/* Checkbox */}
+                        <div
+                          onClick={() => toggle(wp.code, wp.mandatory)}
+                          className={cn(
+                            "w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all",
+                            isSelected
+                              ? selectionType==="mandatory" ? "bg-blue-500 border-blue-500"
+                              : selectionType==="ai"        ? "bg-violet-500 border-violet-500"
+                              : "bg-emerald-500 border-emerald-500"
+                              : "border-slate-300 bg-white hover:border-indigo-400",
+                            wp.mandatory ? "opacity-80" : ""
+                          )}>
+                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                        </div>
+
+                        {/* Main content */}
+                        <div className="flex-1 min-w-0" onClick={() => toggle(wp.code, wp.mandatory)}>
+                          <div className="flex items-start gap-2 flex-wrap">
+                            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-mono shrink-0">{wp.code}</span>
+                            <span className="text-[13px] font-semibold text-slate-800 leading-tight">{wp.label}</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1 leading-relaxed line-clamp-2">{wp.description}</p>
+
+                          {/* Meta row */}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                            <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase", WP_TYPE_COLORS[wp.type] || "bg-slate-100 text-slate-600 border-slate-200")}>
+                              {WP_TYPE_LABELS[wp.type] || wp.type}
+                            </span>
+                            <span className={cn("text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase", COMPLEXITY_COLORS[wp.complexity])}>
+                              {wp.complexity} complexity
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-mono bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">{wp.isa}</span>
+                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200">
+                              {OUTPUT_ICONS[wp.outputType] || wp.outputType}
+                            </span>
+                            {wp.assertions.slice(0,3).map(a => (
+                              <span key={a} className="text-[9px] px-1 py-0.5 rounded bg-indigo-50 text-indigo-500 border border-indigo-100 capitalize">{a}</span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Right badges */}
+                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                          {wp.mandatory && (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 uppercase whitespace-nowrap">Required</span>
+                          )}
+                          {isTriggered && !wp.mandatory && (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200 flex items-center gap-1 uppercase whitespace-nowrap">
+                              <Sparkles className="w-2.5 h-2.5" /> AI {conf ? `${conf}%` : ""}
+                            </span>
+                          )}
+                          {isSelected && !wp.mandatory && !isTriggered && (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 uppercase whitespace-nowrap">Manual</span>
+                          )}
+                          {hasHead && (
+                            <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 border border-teal-200 uppercase whitespace-nowrap">✓ Generated</span>
+                          )}
+                          {/* Preview button */}
+                          <button
+                            onClick={e => { e.stopPropagation(); setPreview(preview?.code === wp.code ? null : wp); }}
+                            className="text-[9px] text-slate-400 hover:text-indigo-600 underline underline-offset-2 mt-0.5"
+                          >
+                            {preview?.code === wp.code ? "Hide" : "Preview"}
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
+        {filteredAll.length === 0 && (
+          <div className="bg-white border border-slate-200 rounded-xl px-6 py-10 text-center text-slate-400">
+            <Search className="w-8 h-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">No templates match your filters.</p>
+            <button onClick={() => { setSearch(""); setFPhase("all"); setFType("all"); setFRisk("all"); setFComplexity("all"); setFStatus("all"); }}
+              className="mt-2 text-xs text-indigo-600 hover:underline">Clear all filters</button>
+          </div>
+        )}
       </div>
 
-      {/* Proceed bar */}
+      {/* ── WP Preview Panel ── */}
+      {preview && (
+        <div className="bg-white border border-indigo-200 rounded-xl p-5 shadow-md">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded font-mono">{preview.code}</span>
+                <h3 className="text-sm font-bold text-slate-900">{preview.label}</h3>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">{preview.description}</p>
+            </div>
+            <button onClick={() => setPreview(null)} className="text-slate-400 hover:text-slate-700 shrink-0">
+              <XCircle className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+            {[
+              ["Phase", preview.phase],
+              ["Standard", preview.isa],
+              ["Output", preview.outputType.toUpperCase()],
+              ["Complexity", preview.complexity.charAt(0).toUpperCase() + preview.complexity.slice(1)],
+            ].map(([k,v]) => (
+              <div key={k} className="bg-slate-50 rounded-lg p-2">
+                <p className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide">{k}</p>
+                <p className="text-[11px] font-semibold text-slate-700 mt-0.5">{v}</p>
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-slate-100 pt-3">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-2">Assertions Covered</p>
+            <div className="flex flex-wrap gap-1">
+              {preview.assertions.map(a => (
+                <span key={a} className="text-[10px] px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full capitalize">{a}</span>
+              ))}
+            </div>
+          </div>
+          <div className="border-t border-slate-100 pt-3 mt-3">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-2">Standard Template Structure</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[10px] text-slate-600">
+              {[
+                "1. Cover Header (Auto-Filled)",
+                "2. Document Control & Indexing",
+                "3. Objective",
+                "4. Scope & Risk Context",
+                "5. Data Source & Population",
+                "6. Procedures Performed",
+                ...(preview.outputType.includes("excel") ? ["7. Sampling Details", "8. Evidence Obtained"] : ["7. Evidence Obtained"]),
+                "Findings / Exceptions",
+                "Conclusion (ISA-Referenced)",
+                "Review & Sign-Off Hierarchy",
+              ].map((s,i) => (
+                <div key={i} className="flex items-start gap-1.5 bg-slate-50 rounded px-2 py-1.5">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0 mt-0.5" />
+                  <span>{s}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="mt-3 flex gap-2">
+            <Button size="sm" onClick={() => toggle(preview.code, preview.mandatory)}
+              className={cn("h-7 text-xs", selected.has(preview.code) ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100" : "bg-emerald-600 hover:bg-emerald-700 text-white")}
+              variant={selected.has(preview.code) ? "outline" : "default"}>
+              {selected.has(preview.code) ? <><XCircle className="w-3 h-3 mr-1" /> Deselect</> : <><CheckCircle2 className="w-3 h-3 mr-1" /> Select</>}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Proceed Bar ── */}
       <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-start gap-2 text-sm text-slate-500">
-          <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-          <span>Required papers cannot be deselected. All {selectedCount} selected papers will be generated sequentially, one complete section before the next.</span>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            <span>{selectedCount} templates selected</span>
+            <span className="text-slate-300">|</span>
+            <span className="text-blue-600">{mandatoryCount} mandatory</span>
+            {evaluated && <><span className="text-slate-300">|</span><span className="text-violet-600">{triggeredCount} AI recommended</span></>}
+          </div>
+          <p className="text-[11px] text-slate-400">Required templates cannot be deselected. Templates generate sequentially, section by section, with full sign-off hierarchy.</p>
         </div>
         <Button
           onClick={onNext}
@@ -6490,7 +6920,7 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
           className="shrink-0 px-6 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-md shadow-indigo-200/40"
         >
           <FileCheck className="w-4 h-4 mr-2" />
-          Generate {selectedCount} WPs
+          Generate {selectedCount} Working Papers
           <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
