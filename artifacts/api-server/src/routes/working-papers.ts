@@ -5998,6 +5998,462 @@ router.get("/sessions/:id/wp-audit-trail", async (req: Request, res: Response) =
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ONE-SHEET TEMPLATE PARSER  ─  parseOneSheetAuditTemplate()
+// Parses the Financial_Data_Upload one-sheet format into normalised objects
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface ParsedTemplateMeta {
+  entityName: string; companyType: string; industry: string;
+  reportingFramework: string; yearEnd: string; auditType: string;
+  currency: string; engagementSize: string;
+}
+interface ParsedTemplateRow {
+  lineId: number | string; statementType: string; fsSection: string;
+  majorHead: string; lineItem: string; subLineItem: string;
+  accountName: string; accountCode: string; noteNo: string;
+  currentYear: number; priorYear: number;
+  debitTransactionValue: number; creditTransactionValue: number;
+  normalBalance: string; wpArea: string; riskLevel: string;
+  procedureScale: string; aiGlFlag: string; glGenerationPriority: string;
+  remarks: string;
+}
+interface ParsedTemplateResult {
+  meta: ParsedTemplateMeta;
+  rows: ParsedTemplateRow[];
+  errors: string[];
+  warnings: string[];
+  isOneSheetFormat: boolean;
+  sheetUsed: string;
+}
+
+function parseOneSheetAuditTemplate(wb: XLSX.WorkBook): ParsedTemplateResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // Find the template sheet (tolerant name matching)
+  const candidateNames = wb.SheetNames.filter(n => {
+    const l = n.toLowerCase().replace(/[\s_-]/g, "");
+    return l.includes("financialdata") || l.includes("audittemplate") ||
+           l.includes("dataupload") || l.includes("dataupload") ||
+           l.includes("financial") || l === "sheet1";
+  });
+  const sheetUsed = candidateNames[0] || wb.SheetNames[0];
+  const ws = wb.Sheets[sheetUsed];
+
+  if (!ws) return { meta: {} as any, rows: [], errors: ["No sheet found in workbook."], warnings: [], isOneSheetFormat: false, sheetUsed: "" };
+
+  const allRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as any[][];
+
+  // ── Detect format by looking for metadata pattern in rows 5-6 ───────────
+  const row5 = allRows[4] || [];
+  const row6 = allRows[5] || [];
+  const row8 = allRows[7] || [];
+
+  const isOneSheetFormat = (
+    String(row5[0]).toLowerCase().includes("entity") ||
+    String(row5[0]).toLowerCase().includes("entity_name") ||
+    String(row8[0]).toLowerCase().includes("line_id") ||
+    String(row8[1]).toLowerCase().includes("statement")
+  );
+
+  // ── Extract metadata ─────────────────────────────────────────────────────
+  // Template layout: Label in col A/D/G/J/M, value in B/E/H/K/N (0-indexed 1/4/7/10/13)
+  let yearEndVal = row5[13];
+  let yearEndStr = "";
+  if (typeof yearEndVal === "number") {
+    // Excel serial date → JS date
+    const d = new Date(Math.round((yearEndVal - 25569) * 86400 * 1000));
+    yearEndStr = d.toISOString().split("T")[0];
+  } else {
+    yearEndStr = String(yearEndVal || "").trim();
+  }
+
+  const meta: ParsedTemplateMeta = {
+    entityName:         String(row5[1]  || "").trim(),
+    companyType:        String(row5[4]  || "").trim(),
+    industry:           String(row5[7]  || "").trim(),
+    reportingFramework: String(row5[10] || "").trim(),
+    yearEnd:            yearEndStr,
+    auditType:          String(row6[1]  || "").trim(),
+    currency:           String(row6[4]  || "PKR").trim(),
+    engagementSize:     String(row6[7]  || "").trim(),
+  };
+
+  if (!meta.entityName) errors.push("Entity_Name is missing from engagement profile (row 5, col B).");
+  if (!meta.reportingFramework) warnings.push("Reporting_Framework not found — defaulting to IFRS.");
+  if (!meta.yearEnd) warnings.push("Year_End not found in engagement profile (row 5, col N).");
+
+  // ── Find header row ─────────────────────────────────────────────────────
+  // Headers should be in row 8 (index 7), look for Line_ID in col A
+  let headerRowIdx = 7;
+  for (let i = 5; i <= Math.min(12, allRows.length - 1); i++) {
+    const r = allRows[i];
+    if (r && String(r[0]).toLowerCase().replace(/_/g, "").includes("lineid")) { headerRowIdx = i; break; }
+    if (r && String(r[0]).toLowerCase().includes("line_id")) { headerRowIdx = i; break; }
+  }
+  const headerRow = allRows[headerRowIdx] || [];
+  const hdr = (headerRow as any[]).map(h => String(h).trim().toLowerCase().replace(/[\s_]/g, "_"));
+
+  // ── Extract data rows ────────────────────────────────────────────────────
+  const rows: ParsedTemplateRow[] = [];
+  const seenCodes = new Map<string, number>();
+  const VALID_ST   = new Set(["bs","p&l","pl","oci","eq","cf","income","expense","expenses"]);
+  const VALID_NB   = new Set(["debit","credit"]);
+
+  for (let i = headerRowIdx + 1; i < allRows.length; i++) {
+    const raw = allRows[i];
+    if (!raw || raw.every((c: any) => c === "" || c === null || c === undefined)) continue;
+
+    // Build a keyed object from header
+    const obj: Record<string, any> = {};
+    hdr.forEach((h, j) => { obj[h] = raw[j] ?? ""; });
+
+    const lineId = obj["line_id"] ?? obj["lineid"] ?? "";
+    if (String(lineId).toLowerCase() === "total" || String(lineId) === "") continue;
+
+    const stRaw = String(obj["statement_type"] ?? obj["statementtype"] ?? "").trim().toLowerCase();
+    const nbRaw = String(obj["normal_balance"] ?? obj["normalbalance"] ?? "").trim().toLowerCase();
+    const acctCode = String(obj["account_code"] ?? obj["accountcode"] ?? "").trim();
+
+    // Validation
+    if (!VALID_ST.has(stRaw) && stRaw !== "") warnings.push(`Row ${i + 1}: Statement_Type "${stRaw}" is not standard (BS/P&L/OCI/EQ/CF).`);
+    if (nbRaw && !VALID_NB.has(nbRaw)) warnings.push(`Row ${i + 1}: Normal_Balance "${nbRaw}" should be Debit or Credit.`);
+    if (!acctCode) { warnings.push(`Row ${i + 1} (Line_ID ${lineId}): Account_Code is blank.`); }
+    else if (seenCodes.has(acctCode)) {
+      warnings.push(`Row ${i + 1}: Account_Code "${acctCode}" duplicated (first seen on row ${seenCodes.get(acctCode)}).`);
+    } else { seenCodes.set(acctCode, i + 1); }
+
+    const cyRaw  = obj["current_year"] ?? obj["currentyear"] ?? 0;
+    const pyRaw  = obj["prior_year"] ?? obj["prioryear"] ?? 0;
+    const drRaw  = obj["debit_transaction_value"] ?? obj["debittransactionvalue"] ?? 0;
+    const crRaw  = obj["credit_transaction_value"] ?? obj["credittransactionvalue"] ?? 0;
+
+    if (typeof cyRaw === "string" && cyRaw !== "" && isNaN(Number(cyRaw))) errors.push(`Row ${i + 1}: Current_Year "${cyRaw}" is not numeric.`);
+    if (typeof drRaw === "string" && drRaw !== "" && isNaN(Number(drRaw))) errors.push(`Row ${i + 1}: Debit_Transaction_Value "${drRaw}" is not numeric.`);
+
+    rows.push({
+      lineId:                String(lineId),
+      statementType:         String(obj["statement_type"] ?? obj["statementtype"] ?? "").trim(),
+      fsSection:             String(obj["fs_section"] ?? obj["fssection"] ?? "").trim(),
+      majorHead:             String(obj["major_head"] ?? obj["majorhead"] ?? "").trim(),
+      lineItem:              String(obj["line_item"] ?? obj["lineitem"] ?? "").trim(),
+      subLineItem:           String(obj["sub_line_item"] ?? obj["sublineitem"] ?? "").trim(),
+      accountName:           String(obj["account_name"] ?? obj["accountname"] ?? "").trim(),
+      accountCode:           acctCode,
+      noteNo:                String(obj["note_no"] ?? obj["noteno"] ?? "").trim(),
+      currentYear:           parseFloat(String(cyRaw)) || 0,
+      priorYear:             parseFloat(String(pyRaw)) || 0,
+      debitTransactionValue: parseFloat(String(drRaw)) || 0,
+      creditTransactionValue:parseFloat(String(crRaw)) || 0,
+      normalBalance:         nbRaw === "credit" ? "Credit" : "Debit",
+      wpArea:                String(obj["wp_area"] ?? obj["wparea"] ?? "").trim(),
+      riskLevel:             String(obj["risk_level"] ?? obj["risklevel"] ?? "Medium").trim(),
+      procedureScale:        String(obj["procedure_scale"] ?? obj["procedurescale"] ?? "Standard").trim(),
+      aiGlFlag:              String(obj["ai_gl_flag"] ?? obj["aiglflag"] ?? "No").trim(),
+      glGenerationPriority:  String(obj["gl_generation_priority"] ?? obj["glgenerationpriority"] ?? "Low").trim(),
+      remarks:               String(obj["remarks"] ?? "").trim(),
+    });
+  }
+
+  if (rows.length === 0) errors.push("No financial data rows found in the template (expected from row 9 onward).");
+
+  return { meta, rows, errors, warnings, isOneSheetFormat, sheetUsed };
+}
+
+// ── WP_Area → Head index mapping ─────────────────────────────────────────────
+const WP_AREA_HEAD_MAP: Record<string, number[]> = {
+  "ppe":             [7],  "property, plant":  [7],
+  "intangibles":     [7],  "inventory":        [7],
+  "receivables":     [7],  "receivable":       [7],
+  "cash and bank":   [4, 7], "cash":           [4, 7],
+  "taxation":        [6, 7, 8], "tax":          [6, 7, 8],
+  "equity":          [3, 8], "borrowings":      [4, 7],
+  "payables":        [7],  "other assets":     [7],
+  "other income":    [7],  "revenue":          [7],
+  "cost of sales":   [7],  "operating expenses":[7],
+  "provisions":      [7],  "planning":         [6],
+  "completion":      [8],  "risk":             [6],
+};
+
+function mapWpAreaToHeads(wpArea: string): number[] {
+  const lower = wpArea.toLowerCase();
+  for (const [key, heads] of Object.entries(WP_AREA_HEAD_MAP)) {
+    if (lower.includes(key)) return heads;
+  }
+  return [7]; // default → execution
+}
+
+// ── POST /sessions/:id/parse-one-sheet-template ──────────────────────────────
+// Parses the uploaded one-sheet template, validates it, and auto-populates
+// session metadata, TB, GL queue, and variables from the template data.
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/sessions/:id/parse-one-sheet-template", async (req: Request, res: Response) => {
+  const sessionId = parseInt(req.params.id);
+  const { fileId, persistData = true } = req.body;
+
+  try {
+    const [session] = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    // Find uploaded Excel file
+    let files = await db.select().from(wpUploadedFilesTable).where(eq(wpUploadedFilesTable.sessionId, sessionId));
+    if (fileId) files = files.filter(f => f.id === parseInt(fileId));
+    const xlFile = files.find(f => {
+      const ext = (f.originalName || "").split(".").pop()?.toLowerCase();
+      return ext === "xlsx" || ext === "xls" || ext === "xlsm";
+    });
+    if (!xlFile) return res.status(400).json({ error: "No Excel file uploaded for this session. Please upload the Financial_Data_Upload template first." });
+
+    let wb: XLSX.WorkBook;
+    try {
+      if ((xlFile as any).fileData) {
+        // Stored as base64 in DB
+        const buf = Buffer.from((xlFile as any).fileData, "base64");
+        wb = XLSX.read(buf, { type: "buffer" });
+      } else {
+        const filePath = `uploads/${(xlFile as any).storedName || xlFile.originalName}`;
+        wb = XLSX.readFile(filePath);
+      }
+    } catch {
+      return res.status(400).json({ error: `Cannot read file: ${xlFile.originalName}` });
+    }
+
+    const parsed = parseOneSheetAuditTemplate(wb);
+
+    // Return early if hard errors and not persisting
+    if (!persistData) return res.json(parsed);
+
+    // ── PERSIST META ──────────────────────────────────────────────────────
+    const { meta, rows } = parsed;
+
+    // Parse yearEnd into engagement year / period dates
+    let engagementYear = session.engagementYear;
+    let periodEnd = session.periodEnd || "";
+    let periodStart = session.periodStart || "";
+    if (meta.yearEnd) {
+      const d = new Date(meta.yearEnd);
+      if (!isNaN(d.getTime())) {
+        engagementYear = String(d.getFullYear());
+        periodEnd = meta.yearEnd;
+        if (!periodStart) periodStart = `${d.getFullYear() - 1}-07-01`;
+      }
+    }
+
+    const sessionUpdates: Record<string, any> = { updatedAt: new Date() };
+    if (meta.entityName)         sessionUpdates.clientName       = meta.entityName;
+    if (meta.entityName)         sessionUpdates.entityName       = meta.entityName;
+    if (meta.companyType)        sessionUpdates.entityType       = meta.companyType;
+    if (meta.industry)           sessionUpdates.industry         = meta.industry;
+    if (meta.reportingFramework) sessionUpdates.reportingFramework = meta.reportingFramework;
+    if (meta.auditType)          sessionUpdates.engagementType   = meta.auditType;
+    if (meta.currency)           sessionUpdates.currency         = meta.currency;
+    if (engagementYear)          sessionUpdates.engagementYear   = engagementYear;
+    if (periodStart)             sessionUpdates.periodStart      = periodStart;
+    if (periodEnd)               sessionUpdates.periodEnd        = periodEnd;
+
+    await db.update(wpSessionsTable).set(sessionUpdates).where(eq(wpSessionsTable.id, sessionId));
+
+    // ── PERSIST COA/TB LINES ──────────────────────────────────────────────
+    if (rows.length > 0) {
+      // Clear old TB lines for this session
+      await db.delete(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+
+      const tbInserts = rows.map(row => {
+        const isCredit = row.normalBalance === "Credit";
+        const balance  = isCredit ? -Math.abs(row.currentYear) : Math.abs(row.currentYear);
+        return {
+          sessionId,
+          accountCode:     row.accountCode || `AUTO-${row.lineId}`,
+          accountName:     row.accountName || row.lineItem || `Line ${row.lineId}`,
+          classification:  mapFsSectionToClassification(row.fsSection, row.statementType),
+          fsLineMapping:   [row.fsSection, row.majorHead].filter(Boolean).join(" > "),
+          debit:           isCredit ? "0" : String(row.currentYear),
+          credit:          isCredit ? String(row.currentYear) : "0",
+          balance:         String(balance),
+          priorYearBalance:String(row.priorYear),
+          source:          "template",
+          confidence:      "1.00",
+        };
+      });
+      if (tbInserts.length > 0) await db.insert(wpTrialBalanceLinesTable).values(tbInserts as any);
+
+      // ── PERSIST GL ACCOUNTS ───────────────────────────────────────────────
+      await db.delete(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, sessionId));
+      const glInserts = rows
+        .filter(r => r.aiGlFlag?.toUpperCase() === "YES" || r.debitTransactionValue > 0 || r.creditTransactionValue > 0)
+        .map(row => {
+          const isCredit = row.normalBalance === "Credit";
+          const openingBal = isCredit ? -Math.abs(row.priorYear) : Math.abs(row.priorYear);
+          const closingBal = isCredit ? -Math.abs(row.currentYear) : Math.abs(row.currentYear);
+          const rateHint = `WP:${row.wpArea||"—"} Risk:${row.riskLevel||"M"} Scale:${row.procedureScale||"Std"} Remarks:${row.remarks||"—"}`;
+          return {
+            sessionId,
+            accountCode:        row.accountCode || `AUTO-${row.lineId}`,
+            accountName:        row.accountName || row.lineItem,
+            accountType:        mapFsSectionToClassification(row.fsSection, row.statementType),
+            openingBalance:     String(openingBal),
+            closingBalance:     String(closingBal),
+            totalDebit:         String(row.debitTransactionValue),
+            totalCredit:        String(row.creditTransactionValue),
+            tbDebit:            isCredit ? "0" : String(row.currentYear),
+            tbCredit:           isCredit ? String(row.currentYear) : "0",
+            isSynthetic:        true,
+            generationRationale: rateHint,
+          };
+        });
+      if (glInserts.length > 0) await db.insert(wpGlAccountsTable).values(glInserts as any);
+
+      // ── AUTO-POPULATE VARIABLES FROM TEMPLATE ─────────────────────────────
+      await autoFillVariablesFromTemplate(sessionId, meta, rows, periodStart, periodEnd, engagementYear);
+
+      // ── UPDATE AUDIT ENGINE MASTER ────────────────────────────────────────
+      try {
+        const existingMaster = await db.select().from(auditEngineMasterTable).where(eq(auditEngineMasterTable.sessionId, sessionId));
+        const masterPayload = {
+          sessionId,
+          engagementId: `ENG-${sessionId}`,
+          entityType:   meta.companyType || session.entityType || "Private Limited",
+          industryType: meta.industry    || session.industry   || "Services",
+          financialYear:`${periodStart} to ${periodEnd}`,
+          reportingFramework: meta.reportingFramework || session.reportingFramework || "IFRS",
+          auditType:    meta.auditType || session.engagementType || "Statutory Audit",
+          currency:     meta.currency  || "PKR",
+          engagementStatus: "Planning",
+          overallRiskLevel:  "Medium",
+          updatedAt:    new Date(),
+        };
+        if (existingMaster.length > 0) {
+          await db.update(auditEngineMasterTable).set(masterPayload).where(eq(auditEngineMasterTable.sessionId, sessionId));
+        } else {
+          await db.insert(auditEngineMasterTable).values({ ...masterPayload, createdAt: new Date() } as any);
+        }
+      } catch { /* audit engine table may not have all columns */ }
+
+      // Advance session status to extraction if still at upload
+      if (session.status === "upload" || !session.status) {
+        await db.update(wpSessionsTable).set({ status: "extraction", updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
+      }
+    }
+
+    return res.json({ ...parsed, persisted: true, rowCount: rows.length });
+  } catch (err: any) {
+    logger.error({ err }, "parse-one-sheet-template failed");
+    res.status(500).json({ error: err.message || "Parse failed" });
+  }
+});
+
+// Helper: map FS_Section + Statement_Type to classification string
+function mapFsSectionToClassification(fsSection: string, statementType: string): string {
+  const s = (fsSection || "").toLowerCase();
+  const st = (statementType || "").toLowerCase();
+  if (s.includes("non-current asset") || s.includes("noncurrent asset")) return "Non-Current Asset";
+  if (s.includes("asset")) return "Current Asset";
+  if (s.includes("non-current liab") || s.includes("noncurrent liab")) return "Non-Current Liability";
+  if (s.includes("liabilit")) return "Current Liability";
+  if (s.includes("equity")) return "Equity";
+  if (s.includes("revenue") || s.includes("income")) return "Revenue";
+  if (s.includes("cost")) return "Cost of Sales";
+  if (s.includes("expense") || s.includes("admin") || s.includes("selling")) return "Operating Expense";
+  if (s.includes("finance")) return "Finance Cost";
+  if (s.includes("tax")) return "Tax";
+  if (st.includes("p&l") || st.includes("pl") || st.includes("income") || st.includes("expense")) return "P&L";
+  return "Other";
+}
+
+// Helper: auto-fill variables from parsed template data (uses wpVariablesTable)
+async function autoFillVariablesFromTemplate(
+  sessionId: number, meta: ParsedTemplateMeta, rows: ParsedTemplateRow[],
+  periodStart: string, periodEnd: string, engagementYear: string
+) {
+  try {
+    // Aggregate financials from rows
+    const bsRows     = rows.filter(r => r.statementType?.toUpperCase() === "BS");
+    const plRows     = rows.filter(r => ["P&L","PL","INCOME","EXPENSE","EXPENSES"].includes(r.statementType?.toUpperCase() || ""));
+    const assetRows  = bsRows.filter(r => r.fsSection?.toLowerCase().includes("asset"));
+    const liabRows   = bsRows.filter(r => r.fsSection?.toLowerCase().includes("liabilit"));
+    const equityRows = bsRows.filter(r => r.fsSection?.toLowerCase().includes("equity"));
+    const revRows    = plRows.filter(r => r.fsSection?.toLowerCase().includes("revenue") || r.fsSection?.toLowerCase().includes("income"));
+    const expRows    = plRows.filter(r => !r.fsSection?.toLowerCase().includes("revenue") && !r.fsSection?.toLowerCase().includes("income"));
+
+    const totalAssets   = assetRows.reduce((s, r)  => s + r.currentYear, 0);
+    const totalLiab     = liabRows.reduce((s, r)   => s + r.currentYear, 0);
+    const totalEquity   = equityRows.reduce((s, r) => s + r.currentYear, 0);
+    const totalRevenue  = revRows.reduce((s, r)    => s + r.currentYear, 0);
+    const totalExpenses = expRows.reduce((s, r)    => s + r.currentYear, 0);
+    const netProfit     = totalRevenue - totalExpenses;
+
+    const materiality = totalRevenue > 0
+      ? Math.round(totalRevenue * 0.01)
+      : totalAssets > 0 ? Math.round(totalAssets * 0.005) : 0;
+    const perfMat = Math.round(materiality * 0.75);
+    const trivial = Math.round(materiality * 0.03);
+
+    // Seeds keyed by variableCode (matching VARIABLE_DEFINITIONS)
+    const seedsByCode: Record<string, string> = {
+      "CLIENT_NAME":             meta.entityName,
+      "ENTITY_NAME":             meta.entityName,
+      "COMPANY_NAME":            meta.entityName,
+      "ENTITY_TYPE":             meta.companyType,
+      "COMPANY_TYPE":            meta.companyType,
+      "INDUSTRY":                meta.industry,
+      "INDUSTRY_TYPE":           meta.industry,
+      "REPORTING_FRAMEWORK":     meta.reportingFramework,
+      "YEAR_END":                meta.yearEnd,
+      "PERIOD_END":              periodEnd,
+      "PERIOD_START":            periodStart,
+      "PERIOD_TO":               periodEnd,
+      "PERIOD_FROM":             periodStart,
+      "ENGAGEMENT_YEAR":         engagementYear,
+      "AUDIT_TYPE":              meta.auditType,
+      "ENGAGEMENT_TYPE":         meta.auditType,
+      "CURRENCY":                meta.currency,
+      "FUNCTIONAL_CURRENCY":     meta.currency,
+      "ENGAGEMENT_SIZE":         meta.engagementSize,
+      "TOTAL_ASSETS":            materiality > 0 ? String(Math.round(totalAssets)) : "",
+      "TOTAL_LIABILITIES":       String(Math.round(totalLiab)),
+      "TOTAL_EQUITY":            String(Math.round(totalEquity)),
+      "TOTAL_REVENUE":           String(Math.round(totalRevenue)),
+      "REVENUE":                 String(Math.round(totalRevenue)),
+      "TOTAL_EXPENSES":          String(Math.round(totalExpenses)),
+      "NET_PROFIT":              String(Math.round(netProfit)),
+      "MATERIALITY":             materiality > 0 ? String(materiality) : "",
+      "PLANNING_MATERIALITY":    materiality > 0 ? String(materiality) : "",
+      "PERFORMANCE_MATERIALITY": perfMat > 0 ? String(perfMat) : "",
+      "TRIVIAL_THRESHOLD":       trivial > 0 ? String(trivial) : "",
+      "TRIVIALITY_THRESHOLD":    trivial > 0 ? String(trivial) : "",
+    };
+
+    // Also build name-based lookup for flexible matching
+    const seedsByNameNorm: Record<string, string> = {};
+    for (const [k, v] of Object.entries(seedsByCode)) {
+      seedsByNameNorm[k.toLowerCase().replace(/[\s_-]/g, "_")] = v;
+    }
+
+    const existingVars = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+    const existingByCode = new Map(existingVars.map(v => [v.variableCode, v]));
+
+    for (const ev of existingVars) {
+      const seedVal =
+        seedsByCode[ev.variableCode] ||
+        seedsByNameNorm[(ev.variableCode || "").toLowerCase().replace(/[\s_-]/g, "_")] ||
+        seedsByNameNorm[(ev.variableName || "").toLowerCase().replace(/[\s_-]/g, "_")];
+      if (!seedVal) continue;
+      if (ev.userEditedValue || ev.isLocked) continue; // don't overwrite user edits
+
+      await db.update(wpVariablesTable).set({
+        autoFilledValue: seedVal,
+        finalValue:      seedVal,
+        sourceType:      "template",
+        reviewStatus:    "auto_filled",
+        updatedAt:       new Date(),
+      }).where(eq(wpVariablesTable.id, ev.id));
+    }
+  } catch (err: any) {
+    logger.warn({ err }, "autoFillVariablesFromTemplate partial failure");
+  }
+}
+
 // ── Download Excel upload template (ExcelJS — real demo data + cell protection) ──
 router.get("/download-template", async (_req: Request, res: Response) => {
   try {
