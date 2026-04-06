@@ -25,6 +25,7 @@ export interface WpLibraryEntry {
   linkedWpCodes?: string;
   linkedAssertion?: string;
   linkedAuditProcedureType?: string;
+  linkedFsHead?: string;
   linkedEvidenceType?: string;
   linkedReportArea?: string;
   pakistanLawTag?: string;

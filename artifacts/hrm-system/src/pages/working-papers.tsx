@@ -1486,12 +1486,12 @@ export default function WorkingPapers() {
           {/* Phase strip */}
           <div className="hidden sm:flex items-center gap-0 pt-2 pb-0 text-[9px] font-bold uppercase tracking-widest">
             {([ 
-              { label: "Facts", keys: ["upload","extraction"], color: "blue" },
-              { label: "Audit Judgment", keys: ["tb_generation","gl_generation"], color: "violet" },
-              { label: "Defensible Output", keys: ["wp_listing","generation","export"], color: "emerald" },
-            ] as const).map((ph, pi) => {
-              const phaseStages = STAGES.filter(s => ph.keys.includes(s.key as any));
-              const isCurrentPhase = ph.keys.includes(stage as any);
+              { label: "Facts", keys: ["upload","extraction"] as string[], color: "blue" },
+              { label: "Audit Judgment", keys: ["tb_generation","gl_generation"] as string[], color: "violet" },
+              { label: "Defensible Output", keys: ["wp_listing","generation","export"] as string[], color: "emerald" },
+            ]).map((ph, pi) => {
+              const phaseStages = STAGES.filter(s => ph.keys.includes(s.key));
+              const isCurrentPhase = ph.keys.includes(stage);
               const lastKeyInPhase = ph.keys[ph.keys.length - 1];
               const lastIdxInPhase = STAGES.findIndex(s => s.key === lastKeyInPhase);
               const isPastPhase = lastIdxInPhase < stageIndex;
@@ -2042,6 +2042,7 @@ function WorkbookPipelinePanel({ onExtract, extracting, report, onClose }: any) 
 }
 
 function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onUpload, onExtractData, onDeleteFile, loading }: any) {
+  const { toast } = useToast();
   const [tplDrag, setTplDrag] = useState(false);
   const [supDrag, setSupDrag] = useState(false);
   const supFileInputRef = useRef<HTMLInputElement>(null);
@@ -3084,6 +3085,7 @@ function AuditEngineStage({
   onRefreshSampling, onRefreshAnalytics, onUpdateControl, onAddControl, onDeleteControl,
   onAddEvidence, onUpdateEvidence, onDeleteEvidence, onRunRecon
 }: any) {
+  const { toast } = useToast();
   const [activeEngineTab, setActiveEngineTab] = useState("engagement");
   const [masterForm, setMasterForm] = useState<any>(null);
   const [saving, setSaving] = useState(false);

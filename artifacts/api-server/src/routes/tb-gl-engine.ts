@@ -406,7 +406,7 @@ export async function runTBEngine(sessionId: number, ai: { client: OpenAI; model
 
   const vars = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
   const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
-  const varSummary = vars.filter(v => v.finalValue).map(v => `${v.variableName}: ${v.finalValue}`).join("\n");
+  const varSummary = vars.filter((v: any) => v.finalValue).map((v: any) => `${v.variableName}: ${v.finalValue}`).join("\n");
 
   const systemPrompt = `You are a Pakistan CA firm's audit AI. Generate a complete, IFRS-compliant Trial Balance for a Pakistani entity.
 RULES:
@@ -700,8 +700,8 @@ export async function runReconciliation(sessionId: number): Promise<{
     tbByCategory[cls] = (tbByCategory[cls] || 0) + bal;
   }
 
-  const fsTotalAssets = fsFields.filter(f => ["fixed_assets","intangible_assets","inventory","trade_receivables","cash_and_bank"].includes(f.fieldName))
-    .reduce((s, f) => s + Number(f.finalValue || f.extractedValue || 0), 0);
+  const fsTotalAssets = fsFields.filter((f: any) => ["fixed_assets","intangible_assets","inventory","trade_receivables","cash_and_bank"].includes(f.fieldName))
+    .reduce((s: number, f: any) => s + Number(f.finalValue || f.extractedValue || 0), 0);
   const tbTotalAssets = tbByCategory["Asset"] || 0;
   const fsTbVariance = Math.abs(fsTotalAssets - tbTotalAssets);
 
@@ -719,7 +719,7 @@ export async function runReconciliation(sessionId: number): Promise<{
   let variantAccounts = 0;
 
   for (const tb of tbLines) {
-    const gl = glAccounts.find(g => g.accountCode === tb.accountCode);
+    const gl = glAccounts.find((g: any) => g.accountCode === tb.accountCode);
     if (!gl) continue;
 
     const tbBal = Number(tb.debit || 0) - Number(tb.credit || 0);
@@ -791,7 +791,7 @@ export async function checkFinalEnforcement(sessionId: number): Promise<{
   const glAccounts = await db.select().from(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, sessionId));
   if (glAccounts.length === 0) { blockers.push("General Ledger not generated"); }
   else {
-    const unreconciled = glAccounts.filter(g => !g.isReconciled);
+    const unreconciled = glAccounts.filter((g: any) => !g.isReconciled);
     if (unreconciled.length > 0) blockers.push(`${unreconciled.length} GL accounts not reconciled to TB`);
   }
 

@@ -39,6 +39,9 @@ import {
 
 const router = Router();
 
+/** Express v5 types req.params as string | string[] — this helper always returns a plain string */
+const p = (v: string | string[] | undefined): string => Array.isArray(v) ? (v[0] || "") : (v || "");
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 30 * 1024 * 1024 },
@@ -282,7 +285,7 @@ router.post("/sessions", async (req: Request, res: Response) => {
 
 router.get("/sessions/:id", async (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(p(req.params.id));
     const sessions = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, id));
     if (!sessions[0]) return res.status(404).json({ error: "Session not found" });
     const heads = await db.select().from(wpHeadsTable).where(eq(wpHeadsTable.sessionId, id)).orderBy(asc(wpHeadsTable.headIndex));
@@ -298,7 +301,7 @@ router.get("/sessions/:id", async (req: Request, res: Response) => {
 
 router.patch("/sessions/:id/status", async (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(p(req.params.id));
     if (isNaN(id)) return res.status(400).json({ error: "Invalid session ID" });
     const { status } = req.body;
     const validStatuses = ["upload", "extraction", "data_sheet", "arranged_data", "variables", "generation", "export", "completed"];
@@ -334,7 +337,7 @@ router.patch("/sessions/:id/status", async (req: Request, res: Response) => {
 
 router.post("/sessions/:id/upload", upload.array("files", 20), async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const files = req.files as Express.Multer.File[] | undefined;
     if (!files || files.length === 0) {
       return res.status(400).json({ error: "No files uploaded" });
@@ -385,8 +388,8 @@ router.post("/sessions/:id/upload", upload.array("files", 20), async (req: Reque
 
 router.delete("/sessions/:id/files/:fileId", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
-    const fileId    = parseInt(req.params.fileId);
+    const sessionId = parseInt(p(req.params.id));
+    const fileId    = parseInt(p(req.params.fileId));
     if (isNaN(sessionId) || isNaN(fileId)) return res.status(400).json({ error: "Invalid id" });
     const [deleted] = await db
       .delete(wpUploadedFilesTable)
@@ -406,7 +409,7 @@ router.delete("/sessions/:id/files/:fileId", async (req: Request, res: Response)
 
 router.post("/sessions/:id/extract", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const sessionRows = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
     if (!sessionRows[0]) return res.status(404).json({ error: "Session not found" });
     const sessionMeta = sessionRows[0];
@@ -659,7 +662,7 @@ Return ONLY valid JSON:
 
 router.get("/sessions/:id/coa", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const rows = await db.select().from(wpMasterCoaTable)
       .where(eq(wpMasterCoaTable.sessionId, sessionId))
       .orderBy(asc(wpMasterCoaTable.displayOrder));
@@ -671,7 +674,7 @@ router.get("/sessions/:id/coa", async (req: Request, res: Response) => {
 
 router.post("/sessions/:id/coa/populate", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const ai = await getAIClient();
 
     // Gather extracted FS fields
@@ -827,7 +830,7 @@ function getWorkingPaperCode(cls: string): string {
 
 router.post("/sessions/:id/coa", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const {
       accountCode, parentCode, accountName, fsHead, fsSubHead, accountType, normalBalance,
       industryTag, entityTypeTag, ifrsReference, taxTreatment, isControlAccount, isSubLedger,
@@ -893,7 +896,7 @@ router.post("/sessions/:id/coa", async (req: Request, res: Response) => {
 
 router.patch("/sessions/:id/coa/:rowId", async (req: Request, res: Response) => {
   try {
-    const rowId = parseInt(req.params.rowId);
+    const rowId = parseInt(p(req.params.rowId));
     const {
       accountCode, parentCode, accountName, fsHead, fsSubHead, accountType, normalBalance,
       industryTag, entityTypeTag, ifrsReference, taxTreatment, isControlAccount, isSubLedger,
@@ -958,7 +961,7 @@ router.patch("/sessions/:id/coa/:rowId", async (req: Request, res: Response) => 
 
 router.delete("/sessions/:id/coa/:rowId", async (req: Request, res: Response) => {
   try {
-    const rowId = parseInt(req.params.rowId);
+    const rowId = parseInt(p(req.params.rowId));
     await db.delete(wpMasterCoaTable).where(eq(wpMasterCoaTable.id, rowId));
     res.json({ success: true });
   } catch (err: any) {
@@ -968,7 +971,7 @@ router.delete("/sessions/:id/coa/:rowId", async (req: Request, res: Response) =>
 
 router.post("/sessions/:id/coa/validate", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const rows = await db.select().from(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, sessionId));
 
     let totalDebit = 0, totalCredit = 0;
@@ -1009,7 +1012,7 @@ router.post("/sessions/:id/coa/validate", async (req: Request, res: Response) =>
 
 router.post("/sessions/:id/coa/approve", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const rows = await db.select().from(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, sessionId));
     if (rows.length === 0) return res.status(422).json({ error: "No COA data to approve. Populate first." });
 
@@ -1027,7 +1030,7 @@ router.post("/sessions/:id/coa/approve", async (req: Request, res: Response) => 
 
 router.get("/sessions/:id/arranged-data", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const fields = await db.select().from(wpExtractedFieldsTable).where(eq(wpExtractedFieldsTable.sessionId, sessionId));
     const arranged = await db.select().from(wpArrangedDataTable).where(eq(wpArrangedDataTable.sessionId, sessionId));
 
@@ -1076,7 +1079,7 @@ router.get("/sessions/:id/arranged-data", async (req: Request, res: Response) =>
 
 router.patch("/sessions/:id/arranged-data/:fieldId", async (req: Request, res: Response) => {
   try {
-    const fieldId = parseInt(req.params.fieldId);
+    const fieldId = parseInt(p(req.params.fieldId));
     const { overrideValue, isApproved } = req.body;
     const updates: any = { updatedAt: new Date() };
     if (overrideValue !== undefined) {
@@ -1093,7 +1096,7 @@ router.patch("/sessions/:id/arranged-data/:fieldId", async (req: Request, res: R
 
 router.post("/sessions/:id/arranged-data/approve-all", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     await db.update(wpExtractedFieldsTable).set({ isApproved: true, updatedAt: new Date() }).where(eq(wpExtractedFieldsTable.sessionId, sessionId));
     await db.update(wpSessionsTable).set({ status: "arranged_data", updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
     res.json({ success: true });
@@ -1168,7 +1171,7 @@ router.post("/variable-definitions/seed", async (req: Request, res: Response) =>
 
 router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
 
     const sessions = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
@@ -2018,7 +2021,7 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
 // value genuinely cannot be inferred.
 router.post("/sessions/:id/variables/ai-fill", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
 
     const sessionRows = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
@@ -2220,7 +2223,7 @@ Example: { "entity_name": "ABC Ltd", "ntn": null, "total_assets": "5000000" }`;
 
 router.get("/sessions/:id/variables", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
 
     const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
@@ -2275,8 +2278,8 @@ router.get("/sessions/:id/variables", async (req: Request, res: Response) => {
 
 router.patch("/sessions/:id/variables/:varId", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
-    const varId = parseInt(req.params.varId);
+    const sessionId = parseInt(p(req.params.id));
+    const varId = parseInt(p(req.params.varId));
     if (isNaN(sessionId) || isNaN(varId)) return res.status(400).json({ error: "Invalid ID" });
 
     const { value, reason, editedBy, reviewStatus } = req.body;
@@ -2323,8 +2326,8 @@ router.patch("/sessions/:id/variables/:varId", async (req: Request, res: Respons
 
 router.patch("/sessions/:id/variables/:varId/review", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
-    const varId = parseInt(req.params.varId);
+    const sessionId = parseInt(p(req.params.id));
+    const varId = parseInt(p(req.params.varId));
     if (isNaN(sessionId) || isNaN(varId)) return res.status(400).json({ error: "Invalid ID" });
     const { reviewStatus } = req.body;
     const validStatuses = ["pending", "auto_filled", "needs_review", "reviewed", "confirmed"];
@@ -2339,7 +2342,7 @@ router.patch("/sessions/:id/variables/:varId/review", async (req: Request, res: 
 
 router.post("/sessions/:id/variables/review-all", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
 
     const vars = await db.select().from(wpVariablesTable).where(and(eq(wpVariablesTable.sessionId, sessionId), eq(wpVariablesTable.isLocked, false)));
@@ -2359,7 +2362,7 @@ router.post("/sessions/:id/variables/review-all", async (req: Request, res: Resp
 
 router.post("/sessions/:id/variables/lock-section", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
     const { group } = req.body;
     if (!group) return res.status(400).json({ error: "Group name required" });
@@ -2392,7 +2395,7 @@ router.post("/sessions/:id/variables/lock-section", async (req: Request, res: Re
 
 router.post("/sessions/:id/variables/lock-all", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
 
     const vars = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
@@ -2434,7 +2437,7 @@ router.post("/sessions/:id/variables/lock-all", async (req: Request, res: Respon
 
 router.post("/sessions/:id/variables/validate", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
 
     const vars = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
@@ -2534,7 +2537,7 @@ async function checkVariableImpact(sessionId: number, variableCode: string): Pro
 
 router.post("/sessions/:id/generate-tb", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
 
     const currentHead = (await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, 0))))[0];
     if (currentHead && (currentHead.status === "validating" || currentHead.status === "review")) {
@@ -2609,7 +2612,7 @@ router.post("/sessions/:id/generate-tb", async (req: Request, res: Response) => 
 
 router.post("/sessions/:id/generate-gl", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
 
     const currentGlHead = (await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, 1))))[0];
     if (currentGlHead && (currentGlHead.status === "validating" || currentGlHead.status === "review")) {
@@ -2665,7 +2668,7 @@ router.post("/sessions/:id/generate-gl", async (req: Request, res: Response) => 
 
 router.post("/sessions/:id/generate-tb-gl", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const stages: { stage: string; status: "ok" | "warn" | "fail"; detail: string }[] = [];
 
     // ── Validate prerequisites
@@ -2795,12 +2798,12 @@ router.post("/sessions/:id/generate-tb-gl", async (req: Request, res: Response) 
           severity: reconResult.status === "fail" ? "critical" : "medium",
           title: "3-Way Reconciliation — " + reconResult.status.toUpperCase(),
           description: reconResult.report.join("\n"),
-          status: reconResult.status === "pass" ? "resolved" : "open",
+          status: "open",
         });
       }
       stages.push({
         stage: "Reconciliation",
-        status: reconResult.status,
+        status: reconResult.status === "pass" ? "ok" : reconResult.status,
         detail: reconResult.report.join(" | "),
       });
     } catch (reconErr: any) {
@@ -2859,8 +2862,8 @@ router.post("/sessions/:id/generate-tb-gl", async (req: Request, res: Response) 
 
 router.post("/sessions/:id/heads/:headIndex/generate", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
-    const headIndex = parseInt(req.params.headIndex);
+    const sessionId = parseInt(p(req.params.id));
+    const headIndex = parseInt(p(req.params.headIndex));
 
     if (headIndex < 2) {
       return res.status(400).json({ error: "Use /generate-tb or /generate-gl for heads 0-1" });
@@ -2994,8 +2997,9 @@ Return JSON:
 const autoProcessInProgress = new Set<number>();
 
 router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Response) => {
+  let sessionId = -1;
   try {
-    const sessionId = parseInt(req.params.id);
+    sessionId = parseInt(p(req.params.id));
     if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
 
     const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
@@ -3179,8 +3183,8 @@ router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Re
 
 router.post("/sessions/:id/heads/:headIndex/approve", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
-    const headIndex = parseInt(req.params.headIndex);
+    const sessionId = parseInt(p(req.params.id));
+    const headIndex = parseInt(p(req.params.headIndex));
 
     const heads = await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, headIndex)));
     if (!heads[0]) return res.status(404).json({ error: "Head not found" });
@@ -3275,7 +3279,7 @@ function xValue(cell: ExcelJS.Cell, v: any) {
   cell.alignment = { vertical: "middle", horizontal: "left" };
 }
 async function xProtect(ws: ExcelJS.Worksheet) {
-  await ws.protect("", { sheet: true, selectLockedCells: true, selectUnlockedCells: true });
+  await (ws as any).protect("", { sheet: true, selectLockedCells: true, selectUnlockedCells: true });
 }
 
 // ── Build a standard ANA firm header block on an ExcelJS sheet ───────────────
@@ -3325,7 +3329,7 @@ const DOCX_BLUE  = "1E3A8A";
 const DOCX_SLATE = "475569";
 const DOCX_LIGHTBG = "EFF6FF";
 
-function dxFirmHeader(firmName: string, clientName: string, docTitle: string, period: string, ntn: string, isaRef: string): Paragraph[] {
+function dxFirmHeader(firmName: string, clientName: string, docTitle: string, period: string, ntn: string, isaRef: string): (Paragraph | Table)[] {
   return [
     new Paragraph({
       children: [new TextRun({ text: firmName, bold: true, size: 32, color: DOCX_NAVY, font: "Calibri" })],
@@ -3449,8 +3453,8 @@ function parseDocxContent(content: string, clientName: string): Paragraph[] {
 
 router.post("/sessions/:id/heads/:headIndex/export", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
-    const headIndex = parseInt(req.params.headIndex);
+    const sessionId = parseInt(p(req.params.id));
+    const headIndex = parseInt(p(req.params.headIndex));
 
     const heads = await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, headIndex)));
     if (!heads[0]) return res.status(404).json({ error: "Head not found" });
@@ -3837,7 +3841,7 @@ router.post("/sessions/:id/heads/:headIndex/export", async (req: Request, res: R
 
 router.get("/sessions/:id/exceptions", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const exceptions = await db.select().from(wpExceptionLogTable).where(eq(wpExceptionLogTable.sessionId, sessionId));
     res.json(exceptions);
   } catch (err: any) {
@@ -3847,7 +3851,7 @@ router.get("/sessions/:id/exceptions", async (req: Request, res: Response) => {
 
 router.patch("/sessions/:id/exceptions/:excId", async (req: Request, res: Response) => {
   try {
-    const excId = parseInt(req.params.excId);
+    const excId = parseInt(p(req.params.excId));
     const { status, resolution, resolvedBy } = req.body;
     const updates: any = { updatedAt: new Date() };
     if (status) updates.status = status;
@@ -3927,7 +3931,7 @@ async function checkDependencies(sessionId: number, headIndex: number): Promise<
 
 router.post("/sessions/:id/export-bundle", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
     if (!session) return res.status(404).json({ error: "Session not found" });
 
@@ -4219,7 +4223,7 @@ function evaluateTrigger(triggerCondition: string, auditMaster: any, variables: 
 // ── Audit Engine Master: GET (create if missing)
 router.get("/sessions/:id/audit-engine", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const rows = await db.select().from(auditEngineMasterTable).where(eq(auditEngineMasterTable.sessionId, sessionId));
     if (rows.length > 0) return res.json(rows[0]);
 
@@ -4244,7 +4248,7 @@ router.get("/sessions/:id/audit-engine", async (req: Request, res: Response) => 
 // ── Audit Engine Master: PATCH
 router.patch("/sessions/:id/audit-engine", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const updates = req.body;
     delete updates.id; delete updates.sessionId; delete updates.createdAt;
     updates.updatedAt = new Date();
@@ -4259,7 +4263,7 @@ router.patch("/sessions/:id/audit-engine", async (req: Request, res: Response) =
 // ── Audit Engine Master: Auto-populate from session variables
 router.post("/sessions/:id/audit-engine/auto-populate", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
     const sessions = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
     if (!sessions.length) return res.status(404).json({ error: "Session not found" });
@@ -4319,7 +4323,7 @@ router.get("/wp-trigger-defs", async (_req: Request, res: Response) => {
 // ── WP Trigger Session: GET (evaluate triggers)
 router.get("/sessions/:id/wp-triggers", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const defs = await db.select().from(wpTriggerDefsTable).orderBy(asc(wpTriggerDefsTable.displayOrder));
     if (defs.length === 0) return res.json([]);
 
@@ -4353,7 +4357,7 @@ router.get("/sessions/:id/wp-triggers", async (req: Request, res: Response) => {
 // ── WP Trigger Session: Evaluate & persist all triggers
 router.post("/sessions/:id/wp-triggers/evaluate", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const defs = await db.select().from(wpTriggerDefsTable).orderBy(asc(wpTriggerDefsTable.displayOrder));
     const [auditMaster] = await db.select().from(auditEngineMasterTable).where(eq(auditEngineMasterTable.sessionId, sessionId));
     const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
@@ -4381,7 +4385,7 @@ router.post("/sessions/:id/wp-triggers/evaluate", async (req: Request, res: Resp
 // ── WP Trigger Session: PATCH status/conclusion
 router.patch("/sessions/:id/wp-triggers/:wpCode", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const { wpCode } = req.params;
     const { status, preparedBy, reviewedBy, conclusion, exceptionNote } = req.body;
     const updates: any = { updatedAt: new Date() };
@@ -4440,7 +4444,7 @@ router.post("/sampling-rules/seed", async (_req: Request, res: Response) => {
 // ── Sampling Rules: GET + compute for session
 router.get("/sessions/:id/sampling", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const rules = await db.select().from(samplingRulesTable);
     const [auditMaster] = await db.select().from(auditEngineMasterTable).where(eq(auditEngineMasterTable.sessionId, sessionId));
 
@@ -4497,7 +4501,7 @@ router.get("/analytics-defs", async (_req: Request, res: Response) => {
 // ── Analytics Session: GET computed results
 router.get("/sessions/:id/analytics", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const defs = await db.select().from(analyticsEngineTable).orderBy(asc(analyticsEngineTable.displayOrder));
     const existing = await db.select().from(analyticsSessionTable).where(eq(analyticsSessionTable.sessionId, sessionId));
     const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
@@ -4514,7 +4518,7 @@ router.get("/sessions/:id/analytics", async (req: Request, res: Response) => {
 
       const num = getVal(def.numeratorField);
       const den = getVal(def.denominatorField);
-      let computed = null, breached = false;
+      let computed: number | null = null, breached = false;
 
       if (num !== null && den !== null && den !== 0) {
         if (def.ratioCode.endsWith("_percent")) computed = (num / den) * 100;
@@ -4536,7 +4540,7 @@ router.get("/sessions/:id/analytics", async (req: Request, res: Response) => {
 // ── Analytics Session: Save/update result
 router.patch("/sessions/:id/analytics/:ratioCode", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const { ratioCode } = req.params;
     const updates = req.body;
     const existing = await db.select().from(analyticsSessionTable).where(and(eq(analyticsSessionTable.sessionId, sessionId), eq(analyticsSessionTable.ratioCode, ratioCode)));
@@ -4555,7 +4559,7 @@ router.patch("/sessions/:id/analytics/:ratioCode", async (req: Request, res: Res
 // ── Control Matrix: GET
 router.get("/sessions/:id/control-matrix", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const rows = await db.select().from(controlMatrixTable).where(eq(controlMatrixTable.sessionId, sessionId));
 
     // Seed with defaults if empty
@@ -4580,7 +4584,7 @@ router.get("/sessions/:id/control-matrix", async (req: Request, res: Response) =
 // ── Control Matrix: POST
 router.post("/sessions/:id/control-matrix", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const [inserted] = await db.insert(controlMatrixTable).values({ sessionId, ...req.body }).returning();
     return res.status(201).json(inserted);
   } catch (err: any) {
@@ -4591,7 +4595,7 @@ router.post("/sessions/:id/control-matrix", async (req: Request, res: Response) 
 // ── Control Matrix: PATCH
 router.patch("/sessions/:id/control-matrix/:cmId", async (req: Request, res: Response) => {
   try {
-    const cmId = parseInt(req.params.cmId);
+    const cmId = parseInt(p(req.params.cmId));
     const updates = { ...req.body, updatedAt: new Date() };
     const [updated] = await db.update(controlMatrixTable).set(updates).where(eq(controlMatrixTable.id, cmId)).returning();
     return res.json(updated);
@@ -4603,7 +4607,7 @@ router.patch("/sessions/:id/control-matrix/:cmId", async (req: Request, res: Res
 // ── Control Matrix: DELETE
 router.delete("/sessions/:id/control-matrix/:cmId", async (req: Request, res: Response) => {
   try {
-    await db.delete(controlMatrixTable).where(eq(controlMatrixTable.id, parseInt(req.params.cmId)));
+    await db.delete(controlMatrixTable).where(eq(controlMatrixTable.id, parseInt(p(req.params.cmId))));
     return res.json({ deleted: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -4613,7 +4617,7 @@ router.delete("/sessions/:id/control-matrix/:cmId", async (req: Request, res: Re
 // ── Evidence Log: GET
 router.get("/sessions/:id/evidence", async (req: Request, res: Response) => {
   try {
-    const rows = await db.select().from(evidenceLogTable).where(eq(evidenceLogTable.sessionId, parseInt(req.params.id)));
+    const rows = await db.select().from(evidenceLogTable).where(eq(evidenceLogTable.sessionId, parseInt(p(req.params.id))));
     return res.json(rows);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -4623,7 +4627,7 @@ router.get("/sessions/:id/evidence", async (req: Request, res: Response) => {
 // ── Evidence Log: POST
 router.post("/sessions/:id/evidence", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const evidenceId = `EV-${Date.now().toString(36).toUpperCase()}`;
     const [inserted] = await db.insert(evidenceLogTable).values({ sessionId, evidenceId, ...req.body }).returning();
     return res.status(201).json(inserted);
@@ -4635,7 +4639,7 @@ router.post("/sessions/:id/evidence", async (req: Request, res: Response) => {
 // ── Evidence Log: PATCH
 router.patch("/sessions/:id/evidence/:evId", async (req: Request, res: Response) => {
   try {
-    const [updated] = await db.update(evidenceLogTable).set(req.body).where(eq(evidenceLogTable.id, parseInt(req.params.evId))).returning();
+    const [updated] = await db.update(evidenceLogTable).set(req.body).where(eq(evidenceLogTable.id, parseInt(p(req.params.evId)))).returning();
     return res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -4645,7 +4649,7 @@ router.patch("/sessions/:id/evidence/:evId", async (req: Request, res: Response)
 // ── Evidence Log: DELETE
 router.delete("/sessions/:id/evidence/:evId", async (req: Request, res: Response) => {
   try {
-    await db.delete(evidenceLogTable).where(eq(evidenceLogTable.id, parseInt(req.params.evId)));
+    await db.delete(evidenceLogTable).where(eq(evidenceLogTable.id, parseInt(p(req.params.evId))));
     return res.json({ deleted: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -4655,7 +4659,7 @@ router.delete("/sessions/:id/evidence/:evId", async (req: Request, res: Response
 // ── Reconciliation Engine: GET results
 router.get("/sessions/:id/recon", async (req: Request, res: Response) => {
   try {
-    const rows = await db.select().from(reconEngineTable).where(eq(reconEngineTable.sessionId, parseInt(req.params.id)));
+    const rows = await db.select().from(reconEngineTable).where(eq(reconEngineTable.sessionId, parseInt(p(req.params.id))));
     return res.json(rows);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -4665,7 +4669,7 @@ router.get("/sessions/:id/recon", async (req: Request, res: Response) => {
 // ── Reconciliation Engine: Run all checks
 router.post("/sessions/:id/recon/run", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id);
+    const sessionId = parseInt(p(req.params.id));
     const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
     const glAccounts = await db.select().from(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, sessionId));
     const coaRows = await db.select().from(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, sessionId));
@@ -4792,7 +4796,7 @@ async function aiEnhanceNarration(raw: string, voucherType: string, accountName:
 
 /** Master workbook extraction pipeline */
 router.post("/sessions/:id/extract-workbook", async (req: Request, res: Response) => {
-  const sessionId = parseInt(req.params.id);
+  const sessionId = parseInt(p(req.params.id));
   const { fileId, useAiClassification = true, generateGlTb = true, runRecon = true } = req.body;
 
   const report: {
@@ -4886,7 +4890,7 @@ router.post("/sessions/:id/extract-workbook", async (req: Request, res: Response
         if (validRows.length > 0) {
           // Clear existing COA for session then re-import
           await db.delete(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, sessionId));
-          const coaInserts = [];
+          const coaInserts: any[] = [];
           let order = 0;
           for (const r of validRows) {
             const code = String(r["Account_Code"]).trim();
@@ -5044,7 +5048,7 @@ router.post("/sessions/:id/extract-workbook", async (req: Request, res: Response
         const rows = parseSheetRows(wb.Sheets["Journal_Import"], ["Journal_ID", "Account_Code", "Debit_Amount", "Credit_Amount"]);
         if (rows.length > 0) {
           await db.delete(wpJournalImportTable).where(eq(wpJournalImportTable.sessionId, sessionId));
-          const inserts = [];
+          const inserts: any[] = [];
           for (const r of rows.filter(r => r["Account_Code"])) {
             const code = String(r["Account_Code"]).trim();
             const debit = safeNum(r["Debit_Amount"]);
@@ -5154,7 +5158,7 @@ router.post("/sessions/:id/extract-workbook", async (req: Request, res: Response
 
         // Clear and rebuild TB lines
         await db.delete(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
-        const tbInserts = [];
+        const tbInserts: any[] = [];
         let totalDebit = 0; let totalCredit = 0;
 
         for (const [code, agg] of Object.entries(tbAgg)) {
@@ -5399,7 +5403,7 @@ router.post("/sessions/:id/extract-workbook", async (req: Request, res: Response
 
 // ── Get extraction report for a session ──────────────────────────────────────
 router.get("/sessions/:id/extraction-report", async (req: Request, res: Response) => {
-  const sessionId = parseInt(req.params.id);
+  const sessionId = parseInt(p(req.params.id));
   try {
     const [journals, coa, tb, glAccts, fsMappings, fsExtraction, recon, wpIndex, libWps] = await Promise.all([
       db.select().from(wpJournalImportTable).where(eq(wpJournalImportTable.sessionId, sessionId)),
@@ -5434,7 +5438,7 @@ router.get("/sessions/:id/extraction-report", async (req: Request, res: Response
 
 // ── GET journal imports for session ──────────────────────────────────────────
 router.get("/sessions/:id/journal-imports", async (req: Request, res: Response) => {
-  const sessionId = parseInt(req.params.id);
+  const sessionId = parseInt(p(req.params.id));
   try {
     const rows = await db.select().from(wpJournalImportTable).where(eq(wpJournalImportTable.sessionId, sessionId)).orderBy(asc(wpJournalImportTable.entryDate));
     res.json(rows);
@@ -5443,7 +5447,7 @@ router.get("/sessions/:id/journal-imports", async (req: Request, res: Response) 
 
 // ── GET FS extraction rows for session ───────────────────────────────────────
 router.get("/sessions/:id/fs-extraction", async (req: Request, res: Response) => {
-  const sessionId = parseInt(req.params.id);
+  const sessionId = parseInt(p(req.params.id));
   try {
     const rows = await db.select().from(wpFsExtractionTable).where(eq(wpFsExtractionTable.sessionId, sessionId));
     res.json(rows);
@@ -5452,7 +5456,7 @@ router.get("/sessions/:id/fs-extraction", async (req: Request, res: Response) =>
 
 // ── GET FS mappings for session ───────────────────────────────────────────────
 router.get("/sessions/:id/fs-mappings", async (req: Request, res: Response) => {
-  const sessionId = parseInt(req.params.id);
+  const sessionId = parseInt(p(req.params.id));
   try {
     const rows = await db.select().from(wpFsMappingTable).where(eq(wpFsMappingTable.sessionId, sessionId));
     res.json(rows);
@@ -5573,7 +5577,7 @@ router.get("/wp-library", async (req: Request, res: Response) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/sessions/:id/activate-wp-library", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id, 10);
+    const sessionId = parseInt(p(req.params.id), 10);
     if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
 
     const [session] = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
@@ -5603,7 +5607,7 @@ router.post("/sessions/:id/activate-wp-library", async (req: Request, res: Respo
         medium: (master?.inherentRiskLevel || "").toLowerCase() === "medium",
       },
       controlMode: (master?.controlMode || "Mixed").toLowerCase(),
-      fsHeads: presentFsHeads.map((h) => (h || "").toLowerCase()),
+      fsHeads: presentFsHeads.map((h: any) => (String(h || "")).toLowerCase()),
       isListed: false,
       isGroup: false,
       isNgo: false,
@@ -5743,7 +5747,7 @@ router.post("/sessions/:id/activate-wp-library", async (req: Request, res: Respo
 // ─────────────────────────────────────────────────────────────────────────────
 router.get("/sessions/:id/wp-library-session", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id, 10);
+    const sessionId = parseInt(p(req.params.id), 10);
     if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
 
     const all = await db.select().from(wpLibrarySessionTable)
@@ -5788,7 +5792,7 @@ router.get("/sessions/:id/wp-library-session", async (req: Request, res: Respons
 // ─────────────────────────────────────────────────────────────────────────────
 router.patch("/sessions/:id/wp-library-session/:wpCode", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id, 10);
+    const sessionId = parseInt(p(req.params.id), 10);
     const { wpCode } = req.params;
     const { status, preparedBy, reviewedBy, approvedBy, preparedDate, reviewedDate, approvedDate, conclusion, notes } = req.body;
     const now = new Date().toISOString();
@@ -5870,7 +5874,7 @@ router.post("/seed-trigger-rules", async (req: Request, res: Response) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/sessions/:id/validate-for-generation", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id, 10);
+    const sessionId = parseInt(p(req.params.id), 10);
     const { validatedBy } = req.body;
 
     // Check session lock
@@ -5989,7 +5993,7 @@ router.post("/sessions/:id/validate-for-generation", async (req: Request, res: R
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/sessions/:id/auto-flag-exceptions", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id, 10);
+    const sessionId = parseInt(p(req.params.id), 10);
 
     // Clear old auto-flagged exceptions for this session
     await db.delete(wpExceptionsTable).where(
@@ -6076,7 +6080,7 @@ router.post("/sessions/:id/auto-flag-exceptions", async (req: Request, res: Resp
 // ─────────────────────────────────────────────────────────────────────────────
 router.get("/sessions/:id/isa-exceptions", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id, 10);
+    const sessionId = parseInt(p(req.params.id), 10);
     const { severity, type, resolved } = req.query;
 
     let q = db.select().from(wpExceptionsTable).where(eq(wpExceptionsTable.sessionId, sessionId));
@@ -6111,8 +6115,8 @@ router.get("/sessions/:id/isa-exceptions", async (req: Request, res: Response) =
 // ─────────────────────────────────────────────────────────────────────────────
 router.patch("/sessions/:id/isa-exceptions/:exId/resolve", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id, 10);
-    const exId = parseInt(req.params.exId, 10);
+    const sessionId = parseInt(p(req.params.id), 10);
+    const exId = parseInt(p(req.params.exId), 10);
     const { resolvedBy, resolutionNote } = req.body;
     if (!resolvedBy) return res.status(400).json({ error: "resolvedBy is required" });
 
@@ -6132,7 +6136,7 @@ router.patch("/sessions/:id/isa-exceptions/:exId/resolve", async (req: Request, 
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/sessions/:id/lock", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id, 10);
+    const sessionId = parseInt(p(req.params.id), 10);
     const { lockedBy, lockLevel, lockJustification, archiveRef, eqcrCompleted, eqcrBy } = req.body;
     if (!lockedBy) return res.status(400).json({ error: "lockedBy (partner name) is required" });
 
@@ -6177,7 +6181,7 @@ router.post("/sessions/:id/lock", async (req: Request, res: Response) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get("/sessions/:id/lock-status", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id, 10);
+    const sessionId = parseInt(p(req.params.id), 10);
     const lock = await db.select().from(wpSessionLockTable).where(eq(wpSessionLockTable.sessionId, sessionId)).limit(1);
     if (lock.length === 0) return res.json({ locked: false });
     return res.json({ locked: true, lock: lock[0] });
@@ -6193,7 +6197,7 @@ router.get("/sessions/:id/lock-status", async (req: Request, res: Response) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/sessions/:id/generate-output", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id, 10);
+    const sessionId = parseInt(p(req.params.id), 10);
     const { jobType = "full_file", triggeredBy } = req.body;
 
     const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
@@ -6576,7 +6580,7 @@ router.post("/sessions/:id/generate-output", async (req: Request, res: Response)
 // ─────────────────────────────────────────────────────────────────────────────
 router.get("/sessions/:id/output-jobs", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id, 10);
+    const sessionId = parseInt(p(req.params.id), 10);
     const jobs = await db.select().from(wpOutputJobTable)
       .where(eq(wpOutputJobTable.sessionId, sessionId))
       .orderBy(sql`created_at DESC`);
@@ -6591,7 +6595,7 @@ router.get("/sessions/:id/output-jobs", async (req: Request, res: Response) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get("/sessions/:id/wp-audit-trail", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.id, 10);
+    const sessionId = parseInt(p(req.params.id), 10);
     const trail: any[] = [];
 
     // WP status changes
@@ -6866,7 +6870,7 @@ function mapWpAreaToHeads(wpArea: string): number[] {
 // session metadata, TB, GL queue, and variables from the template data.
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/sessions/:id/parse-one-sheet-template", async (req: Request, res: Response) => {
-  const sessionId = parseInt(req.params.id);
+  const sessionId = parseInt(p(req.params.id));
   const { fileId, persistData = true } = req.body;
 
   try {
@@ -8088,7 +8092,7 @@ router.get("/download-template", async (_req: Request, res: Response) => {
     const D1 = DATA_ROWS.split(":")[1];
 
     // Col E — Line_Item  (range reference to Lists!$A$1:$A$N)
-    ws.dataValidations.add(`E${D0}:E${D1}`, {
+    (ws as any).dataValidations.add(`E${D0}:E${D1}`, {
       type: "list", allowBlank: true,
       formulae: [`Lists!$A$1:$A${lineItems.length}`],
       showErrorMessage: true, errorStyle: "warning",
@@ -8098,7 +8102,7 @@ router.get("/download-template", async (_req: Request, res: Response) => {
     });
 
     // Col F — Sub_Line_Item
-    ws.dataValidations.add(`F${D0}:F${D1}`, {
+    (ws as any).dataValidations.add(`F${D0}:F${D1}`, {
       type: "list", allowBlank: true,
       formulae: [`Lists!$B$1:$B${subLineItems.length}`],
       showErrorMessage: true, errorStyle: "warning",
@@ -8108,7 +8112,7 @@ router.get("/download-template", async (_req: Request, res: Response) => {
     });
 
     // Col G — Account_Name
-    ws.dataValidations.add(`G${D0}:G${D1}`, {
+    (ws as any).dataValidations.add(`G${D0}:G${D1}`, {
       type: "list", allowBlank: true,
       formulae: [`Lists!$C$1:$C${accountNames.length}`],
       showErrorMessage: true, errorStyle: "warning",
@@ -8118,7 +8122,7 @@ router.get("/download-template", async (_req: Request, res: Response) => {
     });
 
     // Col H — Account_Code
-    ws.dataValidations.add(`H${D0}:H${D1}`, {
+    (ws as any).dataValidations.add(`H${D0}:H${D1}`, {
       type: "list", allowBlank: true,
       formulae: [`Lists!$D$1:$D${accountCodes.length}`],
       showErrorMessage: true, errorStyle: "warning",
@@ -8128,7 +8132,7 @@ router.get("/download-template", async (_req: Request, res: Response) => {
     });
 
     // Col I — Note_No (1–100 via hidden sheet, avoids 255-char inline limit)
-    ws.dataValidations.add(`I${D0}:I${D1}`, {
+    (ws as any).dataValidations.add(`I${D0}:I${D1}`, {
       type: "list", allowBlank: true,
       formulae: [`Lists!$E$1:$E${noteNumbers.length}`],
       showErrorMessage: true, errorStyle: "warning",
@@ -8245,7 +8249,7 @@ router.get("/download-template-OLD_DO_NOT_USE", async (_req: Request, res: Respo
       cell.alignment = { vertical: "middle", wrapText: true };
     }
     async function protect(ws: ExcelJS.Worksheet) {
-      await ws.protect("", {
+      await (ws as any).protect("", {
         sheet: true, selectLockedCells: true, selectUnlockedCells: true,
         formatCells: false, formatColumns: false, formatRows: false,
         insertRows: false, insertColumns: false, deleteRows: false, deleteColumns: false,
