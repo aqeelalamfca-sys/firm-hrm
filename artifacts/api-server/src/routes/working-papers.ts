@@ -6001,6 +6001,215 @@ router.get("/sessions/:id/wp-audit-trail", async (req: Request, res: Response) =
 // ── Download Excel upload template (ExcelJS — real demo data + cell protection) ──
 router.get("/download-template", async (_req: Request, res: Response) => {
   try {
+    // ── Exact replica of user-provided "Financial_Data_Upload" master template ──
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "Alam & Aulakh Chartered Accountants";
+    wb.created = new Date();
+
+    const ws = wb.addWorksheet("Financial_Data_Upload");
+
+    // Column widths (matches attached template exactly)
+    ws.columns = [
+      { width: 10 }, // A Line_ID
+      { width: 14 }, // B Statement_Type
+      { width: 16 }, // C FS_Section
+      { width: 22 }, // D Major_Head
+      { width: 24 }, // E Line_Item
+      { width: 20 }, // F Sub_Line_Item
+      { width: 24 }, // G Account_Name
+      { width: 12 }, // H Account_Code
+      { width: 10 }, // I Note_No
+      { width: 14 }, // J Current_Year
+      { width: 14 }, // K Prior_Year
+      { width: 18 }, // L Debit_Transaction_Value
+      { width: 18 }, // M Credit_Transaction_Value
+      { width: 15 }, // N Normal_Balance
+      { width: 18 }, // O WP_Area
+      { width: 12 }, // P Risk_Level
+      { width: 16 }, // Q Procedure_Scale
+      { width: 12 }, // R AI_GL_Flag
+      { width: 20 }, // S GL_Generation_Priority
+      { width: 28 }, // T Remarks
+    ];
+
+    const NAVY  = "FF1F4E78"; // dark navy header
+    const GREEN = "FFE2F0D9"; // light green editable
+    const LBLUE = "FFDCE6F1"; // light blue instructions
+    const WHITE = "FFFFFFFF";
+
+    function cellNavy(cell: ExcelJS.Cell, v: any) {
+      cell.value = v;
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
+      cell.font = { bold: true, color: { argb: WHITE }, size: 10, name: "Calibri" };
+      cell.alignment = { vertical: "middle", horizontal: "left", wrapText: false };
+    }
+    function cellGreen(cell: ExcelJS.Cell, v: any, numFmt?: string) {
+      cell.value = v;
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: GREEN } };
+      cell.font = { size: 10, name: "Calibri", color: { argb: "FF000000" } };
+      cell.alignment = { vertical: "middle", horizontal: typeof v === "number" ? "right" : "left" };
+      if (numFmt) cell.numFmt = numFmt;
+    }
+    function cellPlain(cell: ExcelJS.Cell, v: any) {
+      cell.value = v;
+      cell.font = { size: 10, name: "Calibri" };
+      cell.alignment = { vertical: "middle", horizontal: typeof v === "number" ? "right" : "left" };
+    }
+
+    // ── Row 1: Title ─────────────────────────────────────────────────────────
+    ws.getRow(1).height = 24;
+    const r1c1 = ws.getRow(1).getCell(1);
+    r1c1.value = "Audit Financial Data Upload Template - One Sheet Master";
+    r1c1.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
+    r1c1.font = { bold: true, color: { argb: WHITE }, size: 13, name: "Calibri" };
+    r1c1.alignment = { vertical: "middle", horizontal: "left" };
+    ws.mergeCells(1, 1, 1, 20);
+
+    // ── Rows 2-3: Instructions ────────────────────────────────────────────────
+    ws.getRow(2).height = 42;
+    ws.getRow(3).height = 8;
+    const r2c1 = ws.getRow(2).getCell(1);
+    r2c1.value = "Complete only this sheet. Use the engagement profile in rows 5-6 and enter or paste audited Balance Sheet and Profit & Loss line items from row 9 onward. All relevant dropdowns are fixed. The uploaded data should support Trial Balance mapping, General Ledger generation, debit/credit transaction logic, and working paper depth.";
+    r2c1.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LBLUE } };
+    r2c1.font = { size: 10, name: "Calibri", color: { argb: "FF1F4E78" } };
+    r2c1.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
+    ws.mergeCells(2, 1, 3, 20);
+
+    // ── Row 4: Spacer ─────────────────────────────────────────────────────────
+    ws.getRow(4).height = 6;
+
+    // ── Row 5: Engagement profile line 1 ────────────────────────────────────
+    ws.getRow(5).height = 20;
+    cellNavy(ws.getRow(5).getCell(1),  "Entity_Name");
+    cellGreen(ws.getRow(5).getCell(2), "ABC Manufacturing (Private) Limited");
+    ws.mergeCells(5, 2, 5, 3);
+    cellNavy(ws.getRow(5).getCell(4),  "Company_Type");
+    cellGreen(ws.getRow(5).getCell(5), "Private Company");
+    ws.mergeCells(5, 5, 5, 6);
+    cellNavy(ws.getRow(5).getCell(7),  "Industry");
+    cellGreen(ws.getRow(5).getCell(8), "Manufacturing");
+    ws.mergeCells(5, 8, 5, 9);
+    cellNavy(ws.getRow(5).getCell(10), "Reporting_Framework");
+    cellGreen(ws.getRow(5).getCell(11), "IFRS for SMEs");
+    ws.mergeCells(5, 11, 5, 12);
+    cellNavy(ws.getRow(5).getCell(13), "Year_End");
+    // 45838 = Excel serial for 2025-06-30
+    const yeCell = ws.getRow(5).getCell(14);
+    yeCell.value = new Date(2025, 5, 30); // June 30 2025
+    yeCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: GREEN } };
+    yeCell.font = { size: 10, name: "Calibri" };
+    yeCell.numFmt = "YYYY-MM-DD";
+    yeCell.alignment = { vertical: "middle" };
+    ws.mergeCells(5, 14, 5, 15);
+
+    // ── Row 6: Engagement profile line 2 ────────────────────────────────────
+    ws.getRow(6).height = 20;
+    cellNavy(ws.getRow(6).getCell(1),  "Audit_Type");
+    cellGreen(ws.getRow(6).getCell(2), "Statutory Audit");
+    ws.mergeCells(6, 2, 6, 3);
+    cellNavy(ws.getRow(6).getCell(4),  "Currency");
+    cellGreen(ws.getRow(6).getCell(5), "PKR");
+    ws.mergeCells(6, 5, 6, 6);
+    cellNavy(ws.getRow(6).getCell(7),  "Engagement_Size");
+    cellGreen(ws.getRow(6).getCell(8), "Medium");
+    ws.mergeCells(6, 8, 6, 9);
+
+    // ── Row 7: Spacer ─────────────────────────────────────────────────────────
+    ws.getRow(7).height = 6;
+
+    // ── Row 8: Column headers ────────────────────────────────────────────────
+    ws.getRow(8).height = 22;
+    const headers = [
+      "Line_ID","Statement_Type","FS_Section","Major_Head","Line_Item","Sub_Line_Item",
+      "Account_Name","Account_Code","Note_No","Current_Year","Prior_Year",
+      "Debit_Transaction_Value","Credit_Transaction_Value","Normal_Balance",
+      "WP_Area","Risk_Level","Procedure_Scale","AI_GL_Flag","GL_Generation_Priority","Remarks",
+    ];
+    headers.forEach((h, i) => { cellNavy(ws.getRow(8).getCell(i + 1), h); });
+    ws.views = [{ state: "frozen", ySplit: 8 }];
+
+    // ── Rows 9-38: Sample data (30 rows) ─────────────────────────────────────
+    // [Line_ID, Statement_Type, FS_Section, Major_Head, Line_Item, Sub_Line_Item, Account_Name, Account_Code, Note_No,
+    //  Current_Year, Prior_Year, Debit_Transaction_Value, Credit_Transaction_Value, Normal_Balance,
+    //  WP_Area, Risk_Level, Procedure_Scale, AI_GL_Flag, GL_Generation_Priority, Remarks]
+    const sampleData: any[][] = [
+      [1,"BS","Assets","Non-Current Assets","Property, plant and equipment","Land","Freehold land","1501","5",6000000,6000000,0,0,"Debit","PPE","Medium","Standard","Yes","Low","Carry forward from prior year; no movement."],
+      [2,"BS","Assets","Non-Current Assets","Property, plant and equipment","Building","Factory building","1510","5",12500000,13200000,150000,850000,"Debit","PPE","Medium","Standard","Yes","Medium","Includes depreciation impact during the year."],
+      [3,"BS","Assets","Non-Current Assets","Property, plant and equipment","Plant and machinery","Production machinery","1520","5",9800000,8450000,2500000,1150000,"Debit","PPE","High","Expanded","Yes","High","Significant additions and depreciation recorded."],
+      [4,"BS","Assets","Non-Current Assets","Intangible assets","ERP software","ERP software","1601","6",420000,500000,0,80000,"Debit","Intangibles","Medium","Standard","No","Low","Amortising intangible asset."],
+      [5,"BS","Assets","Current Assets","Inventories","Raw materials","Raw material inventory","1301","7",4180000,3600000,16500000,15920000,"Debit","Inventory","High","Expanded","Yes","High","Key area for counts and valuation testing."],
+      [6,"BS","Assets","Current Assets","Inventories","Work in progress","WIP inventory","1302","7",2150000,1880000,5400000,5130000,"Debit","Inventory","High","Expanded","Yes","Medium","Requires costing and stage-of-completion reconciliation."],
+      [7,"BS","Assets","Current Assets","Inventories","Finished goods","Finished goods inventory","1303","7",3320000,2950000,12450000,12080000,"Debit","Inventory","High","Expanded","Yes","Medium","Aging review and NRV testing required."],
+      [8,"BS","Assets","Current Assets","Trade debts","Local customers","Trade receivables","1201","8",5875000,4960000,33350000,32435000,"Debit","Receivables","High","Expanded","Yes","High","Collections and subsequent receipts to be reviewed."],
+      [9,"BS","Assets","Current Assets","Advances and deposits","Security deposits","Security deposits","1210","9",450000,450000,0,0,"Debit","Other Assets","Low","Basic","No","Low","Static balance carried forward."],
+      [10,"BS","Assets","Current Assets","Cash and bank balances","Current account","MCB current account","1101","10",1860000,1420000,38900000,38460000,"Debit","Cash and Bank","Medium","Standard","Yes","High","Bank confirmation and reconciliation required."],
+      [11,"BS","Equity","Equity","Share capital","Ordinary shares","Issued share capital","3101","11",10000000,10000000,0,0,"Credit","Equity","Low","Basic","No","Low","No movement during the year."],
+      [12,"BS","Equity","Equity","Reserves","General reserve","General reserve","3201","11",1200000,1000000,0,200000,"Credit","Equity","Low","Basic","No","Low","Appropriation by management."],
+      [13,"BS","Equity","Equity","Retained earnings","Accumulated profit","Retained earnings","3301","11",2840000,2140000,0,700000,"Credit","Equity","Low","Basic","No","Low","Net of dividend paid during the year."],
+      [14,"BS","Liabilities","Non-Current Liabilities","Long-term loans","Term finance","Term finance from HBL","2101","12",3500000,4200000,700000,0,"Credit","Borrowings","High","Expanded","Yes","High","Confirm loan repayment schedule and covenant compliance."],
+      [15,"BS","Liabilities","Non-Current Liabilities","Deferred tax","Deferred tax liability","Deferred tax liability","2201","13",620000,480000,0,140000,"Credit","Taxation","Medium","Standard","No","Low","Calculate temporary difference and effective tax rate."],
+      [16,"BS","Liabilities","Current Liabilities","Trade and other payables","Suppliers","Trade payables","2301","14",980000,760000,760000,980000,"Credit","Payables","Medium","Standard","No","Low","Year-end accruals and cut-off testing required."],
+      [17,"BS","Liabilities","Current Liabilities","Taxation","Income tax payable","Income tax payable","2201","14",650000,540000,540000,650000,"Credit","Taxation","Medium","Standard","No","Low","Reconcile with current tax computation."],
+      [18,"BS","Liabilities","Current Liabilities","Short-term borrowings","Running finance","Running finance","2301","15",1750000,900000,4250000,5100000,"Credit","Borrowings","High","Expanded","Yes","Medium","Obtain bank statement and draw-down schedule."],
+      [19,"P&L","Income","Revenue","Sales","Local sales","Local product sales","5101","16",18200000,15800000,350000,18550000,"Credit","Revenue","High","Expanded","Yes","High","High-risk area; cut-off and completeness testing."],
+      [20,"P&L","Income","Revenue","Sales","Export sales","Export product sales","5102","16",4850000,3960000,50000,4900000,"Credit","Revenue","High","Expanded","Yes","High","Foreign customer sales subject to cut-off review."],
+      [21,"P&L","Income","Other income","Scrap sales","Scrap sales","Scrap sales","5201","17",420000,300000,5000,425000,"Credit","Other Income","Low","Basic","No","Low","Ancillary income stream."],
+      [22,"P&L","Expenses","Cost of Sales","Direct material","Raw material consumed","Raw material consumed","6101","18",14500000,12800000,14500000,0,"Debit","Cost of Sales","High","Expanded","Yes","High","Tie to purchases and inventory movement."],
+      [23,"P&L","Expenses","Cost of Sales","Direct labour","Factory wages","Factory wages","6102","18",3200000,2850000,3200000,0,"Debit","Cost of Sales","High","Expanded","Yes","Medium","Payroll testing required."],
+      [24,"P&L","Expenses","Cost of Sales","Manufacturing overhead","Factory utilities","Factory utilities","6103","18",2150000,1980000,2150000,0,"Debit","Cost of Sales","Medium","Standard","Yes","Medium","Analytical procedures useful."],
+      [25,"P&L","Expenses","Administrative Expenses","Salaries and benefits","Admin salaries","Admin salaries","6201","19",2450000,2240000,2450000,0,"Debit","Operating Expenses","Medium","Standard","Yes","Medium","Monthly payroll analytics to be prepared."],
+      [26,"P&L","Expenses","Administrative Expenses","Utilities","Office utilities","Office utilities","6202","19",340000,315000,340000,0,"Debit","Operating Expenses","Low","Basic","No","Low","Routine expense."],
+      [27,"P&L","Expenses","Administrative Expenses","Depreciation","Depreciation expense","Depreciation expense","6203","19",980000,910000,980000,0,"Debit","PPE","Medium","Standard","No","Low","Link with fixed asset register."],
+      [28,"P&L","Expenses","Selling and Distribution","Freight outward","Delivery expense","Delivery expense","6301","20",560000,490000,560000,0,"Debit","Operating Expenses","Low","Basic","No","Low","Sample of freight invoices may suffice."],
+      [29,"P&L","Expenses","Finance Cost","Markup on borrowings","Bank markup","Markup on term finance","6401","21",870000,795000,870000,0,"Debit","Borrowings","Medium","Standard","No","Low","Recompute finance charges."],
+      [30,"P&L","Expenses","Taxation","Current tax","Current tax expense","Current tax expense","6501","22",1150000,980000,1150000,0,"Debit","Taxation","Medium","Standard","No","Low","Link to tax provision sheet."],
+    ];
+
+    for (let i = 0; i < sampleData.length; i++) {
+      const row = sampleData[i];
+      const r = ws.getRow(9 + i);
+      r.height = 18;
+      // Cols A-I: plain (no fill)
+      for (let c = 0; c < 9; c++) cellPlain(r.getCell(c + 1), row[c]);
+      // Cols J-M: green editable (indices 9-12)
+      for (let c = 9; c <= 12; c++) cellGreen(r.getCell(c + 1), row[c], "#,##0");
+      // Cols N-T: plain (indices 13-19)
+      for (let c = 13; c <= 19; c++) cellPlain(r.getCell(c + 1), row[c]);
+    }
+
+    // ── Row 39: Totals ────────────────────────────────────────────────────────
+    const totRow = 39;
+    ws.getRow(totRow).height = 20;
+    const totals = [143330000, 130430000, 171380000, 178410000];
+    const tCell = ws.getRow(totRow).getCell(1);
+    tCell.value = "Total";
+    tCell.font = { bold: true, size: 10, name: "Calibri" };
+    tCell.alignment = { vertical: "middle" };
+    ws.mergeCells(totRow, 1, totRow, 9);
+    // J, K, L, M totals
+    for (let c = 0; c < 4; c++) {
+      const tc = ws.getRow(totRow).getCell(10 + c);
+      tc.value = totals[c];
+      tc.font = { bold: true, size: 10, name: "Calibri" };
+      tc.numFmt = "#,##0";
+      tc.alignment = { vertical: "middle", horizontal: "right" };
+    }
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", 'attachment; filename="Financial_Data_Upload_Template.xlsx"');
+    await wb.xlsx.write(res);
+    return res.end();
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/download-template-OLD_DO_NOT_USE", async (_req: Request, res: Response) => {
+  // This old route is disabled — kept here only for reference.
+  res.status(410).json({ error: "Use /download-template" });
+  return;
+  // ── ORIGINAL MULTI-SHEET TEMPLATE BELOW (disabled) ──
+  try {
     const wb = new ExcelJS.Workbook();
     wb.creator = "Alam & Aulakh Chartered Accountants";
     wb.created = new Date();

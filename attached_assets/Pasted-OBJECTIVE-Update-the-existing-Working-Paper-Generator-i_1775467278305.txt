@@ -1,0 +1,383 @@
+OBJECTIVE
+Update the existing Working Paper Generator in the current codebase so that it uses the uploaded Excel template `Audit_Working_Paper_Template_One_Sheet_Fixed_Demo_GL.xlsx` as the primary and preferred input format for the entire workflow. Do not redesign the product unnecessarily. Keep the existing UI theme, routes, layout style, and general flow intact, but refactor the frontend and backend so the module becomes stable, template-driven, and production-ready.
+
+CORE INSTRUCTION
+Scan the current project completely, especially:
+- frontend page: working papers module
+- backend route: working-papers APIs
+- current TB / GL / extraction / variables / generation flow
+- any DB tables already linked with working papers
+Then update the current implementation so that the uploaded one-sheet template becomes the default source for extraction, validation, arrangement, variable population, TB generation, GL generation, and working paper generation.
+
+IMPORTANT
+The uploaded one-sheet template has:
+1. engagement/profile fields at top
+2. financial statement line items in one master sheet
+3. debit transaction value and credit transaction value columns
+4. risk / procedure / WP area / AI GL flags
+Use this exact structure as the new standard input design.
+
+DO NOT
+- do not break any existing route unless replacing it with a backward-compatible upgrade
+- do not remove useful existing features like sessions, variable review, audit engine, exceptions, approvals, exports
+- do not create dummy workflows disconnected from database
+- do not rely on hardcoded mock data except fallback demo seed data where strictly necessary
+- do not change UI/UX branding unless required for usability
+- do not leave half-connected buttons
+- do not create duplicate buttons for same action
+- do not require multiple sheets for the new primary flow
+
+NEW TARGET WORKFLOW
+Make the working paper generator run in this order:
+
+STEP 1 — TEMPLATE-BASED UPLOAD
+User uploads only the one-sheet Excel template as the primary input.
+Optional supporting files may also be uploaded later, but the one-sheet template is enough to run the core process.
+
+STEP 2 — TEMPLATE PARSING
+Backend must read the uploaded workbook and detect:
+- entity name
+- company type
+- industry
+- reporting framework
+- year end
+- audit type
+- currency
+- engagement size
+- line id
+- statement type
+- fs section
+- major head
+- line item
+- sub line item
+- account name
+- account code
+- note no
+- current year
+- prior year
+- debit transaction value
+- credit transaction value
+- normal balance
+- wp area
+- risk level
+- procedure scale
+- ai gl flag
+- gl generation priority
+- remarks
+
+STEP 3 — VALIDATION ENGINE
+Before further processing, validate:
+- required header fields exist
+- the sheet name is accepted even if changed slightly
+- account codes are not blank for material rows
+- Current_Year values are numeric where needed
+- debit / credit transaction values are numeric
+- statement types are only BS / PL / OCI / EQ / CF if permitted
+- normal balance values are valid
+- duplicate line/account conflicts are flagged
+- missing major heads / FS sections are flagged
+- blank rows are ignored safely
+- user sees exact validation errors in frontend
+
+STEP 4 — DATA NORMALIZATION
+Convert the one-sheet template into normalized backend datasets:
+- session master
+- entity profile
+- fs line items
+- account master / coa session table
+- TB seed lines
+- GL generation queue
+- variable seed values
+- risk seed values
+- working paper trigger seed values
+
+STEP 5 — AUTO VARIABLES
+Auto-fill all possible variables from the template without waiting for manual entry.
+Map top-sheet fields and financial rows into existing variable engine.
+If a variable cannot be derived, mark it as:
+- missing
+- review required
+- unable to infer
+Do not leave silent blanks.
+
+STEP 6 — TRIAL BALANCE GENERATION
+Generate a balanced TB from the one-sheet data.
+Rules:
+- each line maps into a TB account using account code + account name
+- CY closing shall align with uploaded current year figure
+- PY shall align with prior year figure where applicable
+- debit / credit side shall respect normal balance
+- total debits and total credits must reconcile
+- if balancing difference exists, log exception and show exact reason
+- store the generated TB in session tables and expose download/export
+
+STEP 7 — GENERAL LEDGER GENERATION
+Generate transaction-wise GL for rows where AI_GL_Flag = Yes or priority requires generation.
+Rules:
+- opening balance + transactions = closing balance
+- transaction count should be logical based on amount, risk level, and procedure scale
+- large or high-risk balances should generate richer transaction detail
+- debit and credit transaction value columns should guide the volume and direction of generated postings
+- keep the GL realistic, not random nonsense
+- ensure each GL account ties back to TB and FS values exactly or within controlled zero-difference logic
+- static balances with no movement may generate carry-forward logic
+- store account summary and entries separately in DB
+
+STEP 8 — AUDIT ENGINE LINKAGE
+Push the parsed and normalized data into:
+- wp triggers
+- assertions
+- sampling rules
+- analytics engine
+- control matrix seeds
+- evidence requirements
+- head readiness status
+- exceptions panel
+The uploaded WP_Area, Risk_Level, Procedure_Scale, AI_GL_Flag, and GL_Generation_Priority must directly influence working paper depth.
+
+STEP 9 — HEADWISE WORKING PAPER GENERATION
+Generate outputs in proper sequence:
+1. Trial Balance
+2. General Ledger
+3. Pre-Planning
+4. Trial Balance & GL
+5. Client Documents
+6. OB Verification
+7. Planning
+8. Execution
+9. Finalization
+10. Deliverables
+11. EQCR
+12. Inspection
+
+Each head must:
+- only start after prior dependency is complete
+- show status clearly
+- save generated content in DB/file records
+- support approval and export
+- use session data from the uploaded template
+- include risk-responsive and balance-responsive narrative
+
+STEP 10 — EXPORT
+Allow export of:
+- TB in Excel
+- GL in Excel
+- Working papers in Word / Excel / PDF as per head
+- bundled export
+All exports must use actual session data, not placeholder text.
+
+FRONTEND CHANGES REQUIRED
+Update the frontend working papers page so that:
+
+1. Upload stage
+- prominently shows “Upload One-Sheet Audit Template”
+- supports drag-drop and file picker
+- validates file extension and structure before processing
+- shows downloadable latest template button
+- shows upload progress, parse progress, validation result, and extraction summary
+
+2. Extraction / data sheet stage
+- show extracted engagement fields in editable cards
+- show extracted FS rows in a grid
+- show validation issues panel
+- show missing fields / duplicate account codes / invalid numeric cells
+- allow correction inline before final approval
+
+3. Arranged data stage
+- show normalized sections:
+  - engagement profile
+  - fs lines
+  - tb preview
+  - gl generation candidates
+  - wp trigger summary
+- user can approve arranged data
+
+4. Variables stage
+- auto-populate variables from template
+- highlight:
+  - auto-filled
+  - inferred
+  - missing
+  - user-edited
+- keep review and lock actions
+- remove confusion and duplicate controls
+
+5. Audit engine stage
+- show:
+  - risk summary
+  - analytics summary
+  - sampling summary
+  - trigger count
+  - exception count
+  - head readiness
+- use the uploaded template data to drive these summaries
+
+6. Generation stage
+- single clean generate flow
+- remove duplicate generation buttons doing same thing
+- support:
+  - generate TB only
+  - generate GL only
+  - generate all sequentially
+  - generate selected heads
+- show live per-head progress and exact success/failure messages
+
+7. Export stage
+- show available exports only after generation
+- allow per-head export and full bundle export
+- show file name, time, status, and download action
+
+BACKEND CHANGES REQUIRED
+Refactor backend APIs and services so that:
+
+1. Template ingestion
+- add robust parser for the uploaded one-sheet template
+- do not depend only on old multi-sheet names like Entity_Profile / COA_Master
+- support this new one-sheet format first
+- keep old format backward-compatible where practical
+
+2. New parsing service
+Create a dedicated parser service, e.g.:
+- parseOneSheetAuditTemplate()
+This should:
+- identify header metadata area
+- identify financial rows area
+- normalize row objects
+- validate field types
+- return structured errors and warnings
+
+3. New mapping logic
+Map one-sheet columns into:
+- wp session metadata
+- master COA/session COA
+- TB lines
+- GL account queues
+- variable seeds
+- trigger seeds
+
+4. TB engine update
+Upgrade current TB engine so it accepts one-sheet normalized rows directly and not only prior COA formats.
+
+5. GL engine update
+Upgrade current GL engine so it uses:
+- normal balance
+- debit transaction value
+- credit transaction value
+- risk level
+- procedure scale
+- remarks
+to generate better transaction-wise ledgers.
+
+6. Exception engine
+Log structured exceptions for:
+- missing mandatory metadata
+- duplicate account code conflicts
+- invalid normal balance
+- negative values where not expected
+- unmapped FS lines
+- TB imbalance
+- GL closing mismatch
+- head generation dependency failure
+
+7. Database writes
+Ensure parsed data persists properly in existing relevant tables. Reuse current schema where possible. Only add new columns/tables if required and justify each change.
+
+8. Backward compatibility
+Do not break existing endpoints. Where new behavior replaces old logic, preserve old route names and upgrade their internals.
+
+9. Output generation
+Ensure generated outputs use real session data from parsed template and not static narrative. Word/Excel/PDF generation must pull actual session, TB, GL, variables, risks, and head content.
+
+DATA MAPPING RULES
+Use these direct mappings from the uploaded one-sheet template:
+
+Top metadata section:
+- Entity_Name → session.entityName / clientName
+- Company_Type → entityType
+- Industry → industry
+- Reporting_Framework → reportingFramework
+- Year_End → periodEnd / engagementYear
+- Audit_Type → engagementType
+- Currency → currency
+- Engagement_Size → size/materiality seed
+
+Financial row section:
+- Line_ID → source row reference
+- Statement_Type → statement classification
+- FS_Section → high-level grouping
+- Major_Head → reporting bucket
+- Line_Item → line bucket
+- Sub_Line_Item → detailed bucket
+- Account_Name → coa/tb/gl account name
+- Account_Code → coa/tb/gl account code
+- Note_No → note reference
+- Current_Year → closing figure
+- Prior_Year → prior comparative
+- Debit_Transaction_Value → debit movement guide
+- Credit_Transaction_Value → credit movement guide
+- Normal_Balance → expected sign/balance logic
+- WP_Area → working paper head mapping
+- Risk_Level → risk rating
+- Procedure_Scale → extent of work
+- AI_GL_Flag → whether GL should be auto-generated
+- GL_Generation_Priority → queue priority
+- Remarks → supporting logic and assumptions
+
+WP AREA TO HEAD MAPPING
+Map WP_Area intelligently to the correct head. Example:
+- PPE → Execution / assets testing
+- Inventory → Execution / inventory
+- Receivables → Execution / receivables
+- Cash and Bank → Client documents + execution + confirmations
+- Taxation → planning + execution + finalization
+- Equity → TB/GL + finalization
+- Borrowings → execution + client docs
+- Payables → execution
+This mapping should be configurable, not hardcoded in scattered files.
+
+UI/UX RULES
+- preserve existing app look and feel
+- keep professional enterprise style
+- improve clarity, not redesign
+- make statuses visible
+- no duplicate buttons
+- no dead tabs
+- no fake progress
+- no page should appear complete if data is missing
+- all major actions should show toast + inline status
+- keep role-based approval flow where already present
+
+ACCEPTANCE CRITERIA
+The update is complete only if all below work:
+
+1. user uploads the one-sheet template successfully
+2. template is parsed correctly
+3. validation errors show clearly
+4. engagement fields auto-populate
+5. financial rows show in data grid
+6. variables auto-fill
+7. TB generates and balances
+8. GL generates logically and ties with TB/FS
+9. audit engine receives mapped data
+10. headwise generation works sequentially
+11. exports download successfully
+12. no broken API route or blank screen
+13. current existing sessions still load
+14. current code remains maintainable and modular
+
+DELIVERABLES REQUIRED FROM THE CODE UPDATE
+Provide all of the following in the updated code:
+- refactored frontend upload/extraction/data sheet/generation flow
+- backend parser for one-sheet template
+- updated TB generation logic
+- updated GL generation logic
+- updated variable auto-fill logic
+- updated trigger/risk linkage
+- updated export flow
+- clean error handling
+- comments on key logic
+- migration or schema update only if needed
+- no incomplete TODO placeholders for core logic
+
+FINAL IMPLEMENTATION RULE
+Do the work directly in the current codebase. Reuse and improve what already exists. Replace weak logic with production-ready logic, but preserve compatibility. The final system must allow the uploaded one-sheet template to drive the full working paper generator from upload to TB, GL, variables, audit engine, working papers, and exports.
