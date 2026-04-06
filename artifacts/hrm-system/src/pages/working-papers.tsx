@@ -5104,21 +5104,42 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
   });
 
   const extractedCount = variables.filter((v: any) => v.sourceType === "template").length;
+  const requiredCount  = variables.filter((v: any) => v.definition?.mandatoryFlag).length;
+
+  const allStatTiles = [
+    { label: "Total",       value: stats?.total,         icon: Settings2,    bg: "bg-slate-50",   iconColor: "text-slate-500",   filterKey: "all" },
+    { label: "From Upload", value: extractedCount,        icon: Upload,       bg: "bg-emerald-50", iconColor: "text-emerald-600", filterKey: "extracted" },
+    { label: "Required",    value: requiredCount,         icon: BookOpen,     bg: "bg-blue-50",    iconColor: "text-blue-600",    filterKey: "mandatory" },
+    { label: "Missing",     value: stats?.missing,        icon: AlertCircle,  bg: "bg-red-50",     iconColor: "text-red-600",     filterKey: "missing" },
+    { label: "Low Conf.",   value: stats?.lowConfidence,  icon: AlertTriangle,bg: "bg-amber-50",   iconColor: "text-amber-600",   filterKey: "low_confidence" },
+    { label: "Review",      value: stats?.needsReview,    icon: Eye,          bg: "bg-purple-50",  iconColor: "text-purple-600",  filterKey: "needs_review" },
+    { label: "Locked",      value: stats?.locked,         icon: Lock,         bg: "bg-slate-100",  iconColor: "text-slate-600",   filterKey: "locked" },
+  ];
+
+  const visibleStatTiles = hideControls
+    ? allStatTiles.filter(t => ["all", "extracted", "mandatory"].includes(t.filterKey))
+    : allStatTiles;
+
+  const allFilterChips = [
+    { key: "all",            label: "All" },
+    { key: "extracted",      label: "From Upload" },
+    { key: "mandatory",      label: "Required" },
+    { key: "missing",        label: "Missing" },
+    { key: "low_confidence", label: "Low Conf." },
+    { key: "needs_review",   label: "Needs Review" },
+    { key: "locked",         label: "Locked" },
+  ];
+
+  const visibleFilterChips = hideControls
+    ? allFilterChips.filter(c => ["all", "extracted", "mandatory"].includes(c.key))
+    : allFilterChips;
 
   return (
     <div className="space-y-4">
       {/* ── Stats bar ── */}
       {stats && (
-        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
-          {[
-            { label: "Total", value: stats.total, icon: Settings2, bg: "bg-slate-50", iconColor: "text-slate-500", filterKey: "all" },
-            { label: "From Upload", value: extractedCount, icon: Upload, bg: "bg-emerald-50", iconColor: "text-emerald-600", filterKey: "extracted" },
-            { label: "Filled", value: stats.filled, icon: CheckCircle2, bg: "bg-blue-50", iconColor: "text-blue-600", filterKey: "reviewed" },
-            { label: "Missing", value: stats.missing, icon: AlertCircle, bg: "bg-red-50", iconColor: "text-red-600", filterKey: "missing" },
-            { label: "Low Conf.", value: stats.lowConfidence, icon: AlertTriangle, bg: "bg-amber-50", iconColor: "text-amber-600", filterKey: "low_confidence" },
-            { label: "Review", value: stats.needsReview, icon: Eye, bg: "bg-purple-50", iconColor: "text-purple-600", filterKey: "needs_review" },
-            { label: "Locked", value: stats.locked, icon: Lock, bg: "bg-slate-100", iconColor: "text-slate-600", filterKey: "locked" },
-          ].map(s => (
+        <div className={cn("grid gap-2.5", hideControls ? "grid-cols-3" : "grid-cols-3 sm:grid-cols-4 lg:grid-cols-7")}>
+          {visibleStatTiles.map(s => (
             <button key={s.label} onClick={() => setFilter(s.filterKey)} className={cn(
               "bg-white border rounded-xl p-3 text-center transition-all hover:shadow-sm cursor-pointer",
               filter === s.filterKey ? "ring-2 ring-blue-500 ring-offset-1 border-blue-200 shadow-sm" : "border-slate-200"
@@ -5126,7 +5147,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
               <div className={cn("w-7 h-7 rounded-lg mx-auto mb-1 flex items-center justify-center", s.bg)}>
                 <s.icon className={cn("w-3.5 h-3.5", s.iconColor)} />
               </div>
-              <p className="text-lg font-bold text-slate-900 tabular-nums">{s.value}</p>
+              <p className="text-lg font-bold text-slate-900 tabular-nums">{s.value ?? 0}</p>
               <p className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">{s.label}</p>
             </button>
           ))}
@@ -5179,15 +5200,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
             </div>
             <div className="flex flex-wrap gap-1">
-              {[
-                { key: "all", label: "All" },
-                { key: "extracted", label: "From Upload" },
-                { key: "mandatory", label: "Required" },
-                { key: "missing", label: "Missing" },
-                { key: "low_confidence", label: "Low Conf." },
-                { key: "needs_review", label: "Needs Review" },
-                { key: "locked", label: "Locked" },
-              ].map(f => (
+              {visibleFilterChips.map(f => (
                 <button key={f.key} onClick={() => setFilter(f.key)} className={cn(
                   "px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all",
                   filter === f.key ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
@@ -5204,9 +5217,11 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
           <span className="font-semibold text-slate-600 uppercase tracking-wide">Key:</span>
           <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-emerald-400" /> Extracted from Upload</span>
           <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-blue-400" /> AI Processed</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-400" /> Missing / Empty</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-amber-400" /> Low Confidence</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-slate-300" /> Locked</span>
+          {!hideControls && <>
+            <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-400" /> Missing / Empty</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-amber-400" /> Low Confidence</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-slate-300" /> Locked</span>
+          </>}
         </div>
 
         {/* Validation issues */}
