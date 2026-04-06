@@ -6098,8 +6098,27 @@ function parseOneSheetAuditTemplate(wb: XLSX.WorkBook): ParsedTemplateResult {
   // ── Extract data rows ────────────────────────────────────────────────────
   const rows: ParsedTemplateRow[] = [];
   const seenCodes = new Map<string, number>();
-  const VALID_ST   = new Set(["bs","p&l","pl","oci","eq","cf","income","expense","expenses"]);
-  const VALID_NB   = new Set(["debit","credit"]);
+
+  // Valid values for every dropdown column (matches the Excel template Lists sheet)
+  const VALID_ST  = new Set(["bs","p&l","pl","oci","eq","cf","income","expense","expenses"]);
+  const VALID_NB  = new Set(["debit","credit"]);
+  const VALID_FS  = new Set(["assets","equity","liabilities","income","expenses","oci","notes"]);
+  const VALID_MH  = new Set([
+    "non-current assets","current assets","equity",
+    "non-current liabilities","current liabilities",
+    "revenue","other income","cost of sales","gross profit",
+    "administrative expenses","selling and distribution",
+    "finance cost","taxation","other expenses",
+  ]);
+  const VALID_RL  = new Set(["high","medium","low"]);
+  const VALID_WP  = new Set([
+    "ppe","intangibles","inventory","receivables","cash and bank",
+    "other assets","equity","borrowings","payables","taxation",
+    "revenue","cost of sales","operating expenses","other income","provisions",
+  ]);
+  const VALID_PS  = new Set(["expanded","standard","basic"]);
+  const VALID_AI  = new Set(["yes","no"]);
+  const VALID_GP  = new Set(["high","medium","low"]);
 
   for (let i = headerRowIdx + 1; i < allRows.length; i++) {
     const raw = allRows[i];
@@ -6112,15 +6131,41 @@ function parseOneSheetAuditTemplate(wb: XLSX.WorkBook): ParsedTemplateResult {
     const lineId = obj["line_id"] ?? obj["lineid"] ?? "";
     if (String(lineId).toLowerCase() === "total" || String(lineId) === "") continue;
 
-    const stRaw = String(obj["statement_type"] ?? obj["statementtype"] ?? "").trim().toLowerCase();
-    const nbRaw = String(obj["normal_balance"] ?? obj["normalbalance"] ?? "").trim().toLowerCase();
+    const stRaw  = String(obj["statement_type"] ?? obj["statementtype"] ?? "").trim().toLowerCase();
+    const nbRaw  = String(obj["normal_balance"] ?? obj["normalbalance"] ?? "").trim().toLowerCase();
+    const fsRaw  = String(obj["fs_section"] ?? obj["fssection"] ?? "").trim().toLowerCase();
+    const mhRaw  = String(obj["major_head"] ?? obj["majorhead"] ?? "").trim().toLowerCase();
+    const rlRaw  = String(obj["risk_level"] ?? obj["risklevel"] ?? "").trim().toLowerCase();
+    const wpRaw  = String(obj["wp_area"] ?? obj["wparea"] ?? "").trim().toLowerCase();
+    const psRaw  = String(obj["procedure_scale"] ?? obj["procedurescale"] ?? "").trim().toLowerCase();
+    const aiRaw  = String(obj["ai_gl_flag"] ?? obj["aiglflag"] ?? "").trim().toLowerCase();
+    const gpRaw  = String(obj["gl_generation_priority"] ?? obj["glgenerationpriority"] ?? "").trim().toLowerCase();
     const acctCode = String(obj["account_code"] ?? obj["accountcode"] ?? "").trim();
 
-    // Validation
-    if (!VALID_ST.has(stRaw) && stRaw !== "") warnings.push(`Row ${i + 1}: Statement_Type "${stRaw}" is not standard (BS/P&L/OCI/EQ/CF).`);
-    if (nbRaw && !VALID_NB.has(nbRaw)) warnings.push(`Row ${i + 1}: Normal_Balance "${nbRaw}" should be Debit or Credit.`);
-    if (!acctCode) { warnings.push(`Row ${i + 1} (Line_ID ${lineId}): Account_Code is blank.`); }
-    else if (seenCodes.has(acctCode)) {
+    // ── Per-row dropdown validation ───────────────────────────────────────
+    if (stRaw && !VALID_ST.has(stRaw))
+      warnings.push(`Row ${i + 1}: Statement_Type "${stRaw}" — expected BS/P&L/OCI/EQ/CF.`);
+    if (nbRaw && !VALID_NB.has(nbRaw))
+      warnings.push(`Row ${i + 1}: Normal_Balance "${nbRaw}" — expected Debit or Credit.`);
+    if (fsRaw && !VALID_FS.has(fsRaw))
+      warnings.push(`Row ${i + 1}: FS_Section "${obj["fs_section"] ?? fsRaw}" — expected Assets/Equity/Liabilities/Income/Expenses/OCI/Notes.`);
+    if (mhRaw && !VALID_MH.has(mhRaw))
+      warnings.push(`Row ${i + 1}: Major_Head "${obj["major_head"] ?? mhRaw}" is not a standard classification head.`);
+    if (rlRaw && !VALID_RL.has(rlRaw))
+      warnings.push(`Row ${i + 1}: Risk_Level "${rlRaw}" — expected High/Medium/Low.`);
+    if (wpRaw && !VALID_WP.has(wpRaw))
+      warnings.push(`Row ${i + 1}: WP_Area "${obj["wp_area"] ?? wpRaw}" is not a recognised audit area.`);
+    if (psRaw && !VALID_PS.has(psRaw))
+      warnings.push(`Row ${i + 1}: Procedure_Scale "${psRaw}" — expected Expanded/Standard/Basic.`);
+    if (aiRaw && !VALID_AI.has(aiRaw))
+      warnings.push(`Row ${i + 1}: AI_GL_Flag "${aiRaw}" — expected Yes or No.`);
+    if (gpRaw && !VALID_GP.has(gpRaw))
+      warnings.push(`Row ${i + 1}: GL_Generation_Priority "${gpRaw}" — expected High/Medium/Low.`);
+
+    // ── Account code uniqueness ───────────────────────────────────────────
+    if (!acctCode) {
+      warnings.push(`Row ${i + 1} (Line_ID ${lineId}): Account_Code is blank.`);
+    } else if (seenCodes.has(acctCode)) {
       warnings.push(`Row ${i + 1}: Account_Code "${acctCode}" duplicated (first seen on row ${seenCodes.get(acctCode)}).`);
     } else { seenCodes.set(acctCode, i + 1); }
 
@@ -6130,7 +6175,9 @@ function parseOneSheetAuditTemplate(wb: XLSX.WorkBook): ParsedTemplateResult {
     const crRaw  = obj["credit_transaction_value"] ?? obj["credittransactionvalue"] ?? 0;
 
     if (typeof cyRaw === "string" && cyRaw !== "" && isNaN(Number(cyRaw))) errors.push(`Row ${i + 1}: Current_Year "${cyRaw}" is not numeric.`);
+    if (typeof pyRaw === "string" && pyRaw !== "" && isNaN(Number(pyRaw))) errors.push(`Row ${i + 1}: Prior_Year "${pyRaw}" is not numeric.`);
     if (typeof drRaw === "string" && drRaw !== "" && isNaN(Number(drRaw))) errors.push(`Row ${i + 1}: Debit_Transaction_Value "${drRaw}" is not numeric.`);
+    if (typeof crRaw === "string" && crRaw !== "" && isNaN(Number(crRaw))) errors.push(`Row ${i + 1}: Credit_Transaction_Value "${crRaw}" is not numeric.`);
 
     rows.push({
       lineId:                String(lineId),

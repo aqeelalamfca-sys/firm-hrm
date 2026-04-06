@@ -2197,54 +2197,112 @@ function TemplateParsedPanel({ result, onClear }: { result: any; onClear: () => 
         {rows.length > 0 && (
           <div>
             <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> Financial Statement Rows ({rows.length})
+              <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> Financial Statement Rows ({rows.length}) — all 20 template columns
             </h3>
             <div className="border border-slate-200 rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-xs">
+                <table className="w-full text-xs min-w-[1400px]">
                   <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200">
-                      {["#","Statement","FS Section","Major Head","Account","Code","CY","PY","Risk","WP Area","GL Flag"].map(h => (
-                        <th key={h} className="px-3 py-2 text-left font-semibold text-slate-600 whitespace-nowrap">{h}</th>
+                    <tr className="bg-slate-800 text-white">
+                      {[
+                        "#","Type","FS Section","Major Head","Line Item","Sub-Line","Account Name",
+                        "Code","Note","CY","PY","Debit","Credit","Norm Bal",
+                        "Risk","WP Area","Procedure","GL?","GL Priority","Remarks"
+                      ].map(h => (
+                        <th key={h} className="px-2.5 py-2 text-left font-semibold text-[11px] whitespace-nowrap text-slate-200">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {displayRows.map((row: any, i: number) => (
-                      <tr key={i} className={cn("border-b border-slate-100 hover:bg-slate-50/50 transition-colors",
-                        i % 2 === 0 ? "" : "bg-slate-50/30"
+                      <tr key={i} className={cn("border-b border-slate-100 hover:bg-blue-50/30 transition-colors",
+                        i % 2 === 0 ? "bg-white" : "bg-slate-50/40"
                       )}>
-                        <td className="px-3 py-2 text-slate-400">{row.lineId}</td>
-                        <td className="px-3 py-2">
+                        {/* # */}
+                        <td className="px-2.5 py-1.5 text-slate-400 font-mono">{row.lineId}</td>
+                        {/* Type */}
+                        <td className="px-2.5 py-1.5">
                           <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold",
-                            row.statementType?.toUpperCase() === "BS" ? "bg-blue-100 text-blue-700" :
+                            row.statementType?.toUpperCase() === "BS"  ? "bg-blue-100 text-blue-700" :
                             ["P&L","PL"].includes(row.statementType?.toUpperCase() || "") ? "bg-purple-100 text-purple-700" :
+                            row.statementType?.toUpperCase() === "OCI" ? "bg-teal-100 text-teal-700" :
+                            row.statementType?.toUpperCase() === "EQ"  ? "bg-emerald-100 text-emerald-700" :
+                            row.statementType?.toUpperCase() === "CF"  ? "bg-cyan-100 text-cyan-700" :
                             "bg-slate-100 text-slate-600"
                           )}>{row.statementType || "—"}</span>
                         </td>
-                        <td className="px-3 py-2 text-slate-700 max-w-[120px] truncate">{row.fsSection || "—"}</td>
-                        <td className="px-3 py-2 text-slate-700 max-w-[100px] truncate">{row.majorHead || "—"}</td>
-                        <td className="px-3 py-2 font-medium text-slate-900 max-w-[140px] truncate">{row.accountName || row.lineItem || "—"}</td>
-                        <td className="px-3 py-2 text-slate-500 font-mono">{row.accountCode || "—"}</td>
-                        <td className="px-3 py-2 text-right text-slate-900 font-medium whitespace-nowrap">
+                        {/* FS Section */}
+                        <td className="px-2.5 py-1.5 text-slate-700 max-w-[90px] truncate" title={row.fsSection}>{row.fsSection || "—"}</td>
+                        {/* Major Head */}
+                        <td className="px-2.5 py-1.5 text-slate-600 max-w-[110px] truncate" title={row.majorHead}>{row.majorHead || "—"}</td>
+                        {/* Line Item */}
+                        <td className="px-2.5 py-1.5 font-medium text-slate-900 max-w-[130px] truncate" title={row.lineItem}>{row.lineItem || "—"}</td>
+                        {/* Sub-Line */}
+                        <td className="px-2.5 py-1.5 text-slate-600 max-w-[100px] truncate" title={row.subLineItem}>{row.subLineItem || "—"}</td>
+                        {/* Account Name */}
+                        <td className="px-2.5 py-1.5 text-slate-700 max-w-[120px] truncate" title={row.accountName}>{row.accountName || "—"}</td>
+                        {/* Code */}
+                        <td className="px-2.5 py-1.5 text-slate-500 font-mono">{row.accountCode || "—"}</td>
+                        {/* Note */}
+                        <td className="px-2.5 py-1.5 text-slate-500 text-center">{row.noteNo || "—"}</td>
+                        {/* CY */}
+                        <td className="px-2.5 py-1.5 text-right text-slate-900 font-medium whitespace-nowrap">
                           {row.currentYear ? row.currentYear.toLocaleString() : "—"}
                         </td>
-                        <td className="px-3 py-2 text-right text-slate-500 whitespace-nowrap">
+                        {/* PY */}
+                        <td className="px-2.5 py-1.5 text-right text-slate-400 whitespace-nowrap">
                           {row.priorYear ? row.priorYear.toLocaleString() : "—"}
                         </td>
-                        <td className="px-3 py-2">
+                        {/* Debit */}
+                        <td className="px-2.5 py-1.5 text-right text-blue-700 whitespace-nowrap">
+                          {row.debitTransactionValue ? row.debitTransactionValue.toLocaleString() : "—"}
+                        </td>
+                        {/* Credit */}
+                        <td className="px-2.5 py-1.5 text-right text-rose-700 whitespace-nowrap">
+                          {row.creditTransactionValue ? row.creditTransactionValue.toLocaleString() : "—"}
+                        </td>
+                        {/* Normal Bal */}
+                        <td className="px-2.5 py-1.5">
                           <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold",
-                            row.riskLevel?.toLowerCase() === "high" ? "bg-red-100 text-red-700" :
+                            row.normalBalance?.toLowerCase() === "debit"  ? "bg-blue-50 text-blue-600" :
+                            row.normalBalance?.toLowerCase() === "credit" ? "bg-rose-50 text-rose-600" :
+                            "bg-slate-100 text-slate-500"
+                          )}>{row.normalBalance || "—"}</span>
+                        </td>
+                        {/* Risk */}
+                        <td className="px-2.5 py-1.5">
+                          <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold",
+                            row.riskLevel?.toLowerCase() === "high"   ? "bg-red-100 text-red-700" :
                             row.riskLevel?.toLowerCase() === "medium" ? "bg-amber-100 text-amber-700" :
                             "bg-emerald-100 text-emerald-700"
                           )}>{row.riskLevel || "—"}</span>
                         </td>
-                        <td className="px-3 py-2 text-slate-600 max-w-[100px] truncate">{row.wpArea || "—"}</td>
-                        <td className="px-3 py-2">
+                        {/* WP Area */}
+                        <td className="px-2.5 py-1.5 text-slate-600 max-w-[90px] truncate" title={row.wpArea}>{row.wpArea || "—"}</td>
+                        {/* Procedure */}
+                        <td className="px-2.5 py-1.5">
+                          <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium",
+                            row.procedureScale?.toLowerCase() === "expanded" ? "bg-indigo-100 text-indigo-700" :
+                            row.procedureScale?.toLowerCase() === "standard" ? "bg-slate-100 text-slate-600" :
+                            "bg-gray-100 text-gray-500"
+                          )}>{row.procedureScale || "—"}</span>
+                        </td>
+                        {/* GL? */}
+                        <td className="px-2.5 py-1.5 text-center">
                           {row.aiGlFlag?.toUpperCase() === "YES"
                             ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700">GL</span>
                             : <span className="text-slate-300">—</span>}
                         </td>
+                        {/* GL Priority */}
+                        <td className="px-2.5 py-1.5">
+                          <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium",
+                            row.glGenerationPriority?.toLowerCase() === "high"   ? "bg-orange-100 text-orange-700" :
+                            row.glGenerationPriority?.toLowerCase() === "medium" ? "bg-yellow-100 text-yellow-700" :
+                            "bg-slate-100 text-slate-400"
+                          )}>{row.glGenerationPriority || "—"}</span>
+                        </td>
+                        {/* Remarks */}
+                        <td className="px-2.5 py-1.5 text-slate-400 max-w-[140px] truncate" title={row.remarks}>{row.remarks || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
