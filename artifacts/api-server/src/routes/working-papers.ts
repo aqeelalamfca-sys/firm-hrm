@@ -2854,6 +2854,7 @@ router.post("/sessions/:id/heads/:headIndex/export", async (req: Request, res: R
     if (headIndex === 1) {
       const glAccounts = await db.select().from(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, sessionId));
       const wb = XLSX.utils.book_new();
+      const usedSheetNames = new Set<string>();
 
       for (const acc of glAccounts.slice(0, 50)) {
         const entries = await db.select().from(wpGlEntriesTable).where(eq(wpGlEntriesTable.glAccountId, acc.id));
@@ -2866,7 +2867,15 @@ router.post("/sessions/:id/heads/:headIndex/export", async (req: Request, res: R
         for (const e of entries) {
           wsData.push([e.entryDate, e.voucherNo || "", e.narration || "", String(e.debit), String(e.credit), String(e.runningBalance || "")]);
         }
-        const sheetName = `${acc.accountCode}`.slice(0, 31);
+        // Build unique sheet name (max 31 chars, no duplicates)
+        const base = `${acc.accountCode} ${acc.accountName}`.replace(/[\\/?*\[\]:]/g, "").trim().slice(0, 28) || `Acct_${acc.id}`;
+        let sheetName = base;
+        let counter = 2;
+        while (usedSheetNames.has(sheetName)) {
+          const suffix = `_${counter++}`;
+          sheetName = base.slice(0, 31 - suffix.length) + suffix;
+        }
+        usedSheetNames.add(sheetName);
         const ws = XLSX.utils.aoa_to_sheet(wsData);
         XLSX.utils.book_append_sheet(wb, ws, sheetName);
       }

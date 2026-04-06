@@ -113,6 +113,8 @@ export default function WorkingPapers() {
   const [changeLog, setChangeLog] = useState<any[]>([]);
   const [heads, setHeads] = useState<any[]>([]);
   const [exceptions, setExceptions] = useState<any[]>([]);
+  const [downloadingHeads, setDownloadingHeads] = useState<Set<number>>(new Set());
+  const [downloadedHeads, setDownloadedHeads] = useState<Set<number>>(new Set());
   const [activeTab, setActiveTab] = useState("");
   const [editingVar, setEditingVar] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -889,6 +891,7 @@ export default function WorkingPapers() {
 
   const exportHead = async (headIndex: number) => {
     if (!activeSession) return;
+    setDownloadingHeads(prev => new Set(prev).add(headIndex));
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/heads/${headIndex}/export`, {
         method: "POST", headers,
@@ -899,17 +902,22 @@ export default function WorkingPapers() {
         const a = document.createElement("a");
         const disp = res.headers.get("content-disposition") || "";
         const match = disp.match(/filename="?([^"]+)"?/);
-        a.download = match?.[1] || `head_${headIndex}.xlsx`;
+        const filename = match?.[1] || `head_${headIndex}.xlsx`;
+        a.download = filename;
         a.href = url;
+        document.body.appendChild(a);
         a.click();
-        URL.revokeObjectURL(url);
-        toast({ title: "Export downloaded" });
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+        setDownloadedHeads(prev => new Set(prev).add(headIndex));
+        const headName = heads.find(h => h.headIndex === headIndex)?.headName || `Head ${headIndex + 1}`;
+        toast({ title: `Downloaded: ${headName}`, description: filename });
         await fetchSession(activeSession.id);
       } else {
         const err = await res.json().catch(() => ({ error: "Export failed" }));
         toast({ title: "Export failed", description: err.error, variant: "destructive" });
       }
     } catch { toast({ title: "Export failed", variant: "destructive" }); }
+    finally { setDownloadingHeads(prev => { const s = new Set(prev); s.delete(headIndex); return s; }); }
   };
 
   const autoProcessAll = async () => {
@@ -1531,6 +1539,8 @@ export default function WorkingPapers() {
           onResolveException={resolveException}
           onRefresh={() => { fetchSession(activeSession.id); fetchExceptions(); }}
           loading={loading}
+          downloadingHeads={downloadingHeads}
+          downloadedHeads={downloadedHeads}
         />
       )}
 
@@ -5137,11 +5147,22 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onGenerateTbG
   );
 }
 
-function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle, onResolveException, onRefresh, loading }: any) {
+function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle, onResolveException, onRefresh, loading, downloadingHeads, downloadedHeads }: any) {
+  const dlSet: Set<number> = downloadingHeads || new Set();
+  const dledSet: Set<number> = downloadedHeads || new Set();
   const completedHeads = (heads || []).filter((h: any) => ["approved", "exported", "completed"].includes(h.status));
   const openExceptions = (exceptions || []).filter((e: any) => e.status === "open");
   const totalHeads = (heads || []).length;
   const exportPct = totalHeads > 0 ? Math.round((completedHeads.length / totalHeads) * 100) : 0;
+  const [exportingAll, setExportingAll] = useState(false);
+
+  const exportAll = async () => {
+    setExportingAll(true);
+    for (const h of completedHeads) {
+      await onExportHead(h.headIndex);
+    }
+    setExportingAll(false);
+  };
 
   return (
     <div className="space-y-5">
@@ -5196,33 +5217,79 @@ function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle,
           </div>
 
           <div>
-            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Export by Head</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Export by Head</h3>
+              {completedHeads.length > 0 && (
+                <button
+                  onClick={exportAll}
+                  disabled={exportingAll || dlSet.size > 0}
+                  className={cn(
+                    "flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-all",
+                    exportingAll || dlSet.size > 0
+                      ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                      : "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
+                  )}
+                >
+                  {exportingAll ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                  {exportingAll ? "Downloading…" : `Download All (${completedHeads.length})`}
+                </button>
+              )}
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {(heads || []).map((head: any) => {
                 const canExport = ["approved", "exported", "completed"].includes(head.status);
+                const isDownloading = dlSet.has(head.headIndex);
+                const isDownloaded = dledSet.has(head.headIndex);
                 const isExported = head.status === "exported" || head.status === "completed";
                 return (
                   <div key={head.id} className={cn(
                     "flex items-center gap-3 p-3.5 rounded-xl border transition-all",
-                    isExported ? "bg-emerald-50/30 border-emerald-200" : canExport ? "bg-white border-slate-200 hover:border-blue-200 hover:shadow-sm" : "bg-slate-50/50 border-slate-100 opacity-70"
+                    isDownloaded ? "bg-emerald-50 border-emerald-300 shadow-sm shadow-emerald-100" :
+                    isExported ? "bg-emerald-50/30 border-emerald-200" :
+                    canExport ? "bg-white border-slate-200 hover:border-blue-200 hover:shadow-sm" :
+                    "bg-slate-50/50 border-slate-100 opacity-60"
                   )}>
                     <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                      isExported ? "bg-emerald-100" : canExport ? "bg-blue-50" : "bg-slate-100"
+                      isDownloaded ? "bg-emerald-500" :
+                      isExported ? "bg-emerald-100" :
+                      canExport ? "bg-blue-50" : "bg-slate-100"
                     )}>
-                      {isExported ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : canExport ? <FileText className="w-4 h-4 text-blue-600" /> : <Lock className="w-4 h-4 text-slate-400" />}
+                      {isDownloading ? <Loader2 className="w-4 h-4 text-white animate-spin" /> :
+                       isDownloaded ? <CheckCircle2 className="w-4 h-4 text-white" /> :
+                       isExported ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> :
+                       canExport ? <FileText className="w-4 h-4 text-blue-600" /> :
+                       <Lock className="w-4 h-4 text-slate-400" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-900 truncate">{head.headName}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium capitalize",
-                          isExported ? "bg-emerald-100 text-emerald-700" : canExport ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"
-                        )}>{head.status?.replace(/_/g, " ")}</span>
+                          isDownloaded ? "bg-emerald-500 text-white" :
+                          isExported ? "bg-emerald-100 text-emerald-700" :
+                          canExport ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"
+                        )}>
+                          {isDownloaded ? "downloaded" : head.status?.replace(/_/g, " ")}
+                        </span>
                         <span className="text-[10px] text-slate-400 uppercase">{head.outputType}</span>
                       </div>
                     </div>
-                    <Button size="sm" variant={canExport ? "default" : "outline"} disabled={!canExport} onClick={() => onExportHead(head.headIndex)}
-                      className={cn("h-8 shrink-0", canExport && "bg-emerald-600 hover:bg-emerald-700")}>
-                      <Download className="w-3.5 h-3.5 mr-1" /> Export
+                    <Button
+                      size="sm"
+                      variant={canExport ? "default" : "outline"}
+                      disabled={!canExport || isDownloading}
+                      onClick={() => onExportHead(head.headIndex)}
+                      className={cn(
+                        "h-8 shrink-0 min-w-[80px]",
+                        isDownloaded ? "bg-emerald-500 hover:bg-emerald-600" :
+                        canExport ? "bg-emerald-600 hover:bg-emerald-700" : ""
+                      )}
+                    >
+                      {isDownloading
+                        ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> Saving…</>
+                        : isDownloaded
+                        ? <><CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Again</>
+                        : <><Download className="w-3.5 h-3.5 mr-1" /> Download</>
+                      }
                     </Button>
                   </div>
                 );
@@ -5230,11 +5297,17 @@ function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle,
             </div>
           </div>
 
-          <div className="border-t border-slate-200 pt-5">
-            <Button size="lg" onClick={onExportBundle} disabled={loading} className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 shadow-lg shadow-emerald-200/50 h-12 text-base">
+          <div className="border-t border-slate-200 pt-5 space-y-3">
+            {dledSet.size > 0 && (
+              <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <p className="text-sm text-emerald-800 font-medium">{dledSet.size} file{dledSet.size !== 1 ? "s" : ""} downloaded this session</p>
+              </div>
+            )}
+            <Button size="lg" onClick={onExportBundle} disabled={loading || exportingAll} className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 shadow-lg shadow-emerald-200/50 h-12 text-base">
               {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Download className="w-5 h-5 mr-2" />}
               Export Full Bundle
-              <span className="text-emerald-200 text-sm ml-2 font-normal hidden sm:inline">(Index + TB + Exceptions + Trail)</span>
+              <span className="text-emerald-200 text-sm ml-2 font-normal hidden sm:inline">(Index + TB + Exceptions + Audit Trail)</span>
             </Button>
           </div>
         </div>
