@@ -6742,6 +6742,148 @@ router.get("/download-template", async (_req: Request, res: Response) => {
       "High","Medium","Low"
     ], "GL_Generation_Priority", "Select the priority order for GL transaction generation");
 
+    // ── Hidden "Lists" sheet for long-list dropdowns (E, F, G) ───────────────
+    // Excel inline formula is capped at 255 chars; use a sheet range instead.
+    const wsList = wb.addWorksheet("Lists");
+    wsList.state = "veryHidden";
+
+    const lineItems = [
+      "Property, plant and equipment","Intangible assets","Long-term investments",
+      "Long-term loans and advances","Capital work in progress",
+      "Inventories","Trade debts","Advances and deposits","Other receivables",
+      "Short-term investments","Cash and bank balances",
+      "Share capital","Reserves","Retained earnings","Surplus on revaluation",
+      "Long-term loans","Lease liabilities","Deferred tax","Staff retirement benefits",
+      "Trade and other payables","Accrued liabilities","Taxation",
+      "Short-term borrowings","Current portion of long-term loans",
+      "Sales","Export sales","Scrap sales","Other income","Dividend income",
+      "Direct material","Direct labour","Manufacturing overhead",
+      "Salaries and benefits","Utilities","Rent and rates","Depreciation",
+      "Amortisation","Repair and maintenance","Printing and stationery",
+      "Communication expenses","Advertisement and marketing",
+      "Freight outward","Traveling and conveyance",
+      "Markup on borrowings","Bank charges","Exchange loss",
+      "Current tax","Deferred tax expense",
+    ];
+
+    const subLineItems = [
+      "Land","Building","Plant and machinery","Furniture and fixtures",
+      "Office equipment","IT equipment","Vehicles","Machinery under installation",
+      "Capital work in progress",
+      "ERP software","Patents and trademarks","Licenses and franchises",
+      "Raw materials","Work in progress","Finished goods","Stores and spares",
+      "Packing materials",
+      "Local customers","Export customers","Government receivables",
+      "Security deposits","Prepayments","Advances to suppliers",
+      "Current account","Savings account","Cash in hand","Foreign currency account",
+      "Ordinary shares","Preference shares",
+      "General reserve","Capital reserve","Revenue reserve",
+      "Accumulated profit","Accumulated loss",
+      "Surplus on revaluation of fixed assets",
+      "Term finance","Diminishing musharaka","Loan from directors",
+      "Deferred tax liability","Deferred tax asset",
+      "Gratuity","Provident fund",
+      "Suppliers","Accrued expenses","Other payables","Advance from customers",
+      "Income tax payable","Sales tax payable","Withholding tax payable",
+      "Running finance","Short-term loan","Cash credit",
+      "Current maturity of long-term loan",
+      "Local sales","Export sales","Service revenue","Contract revenue",
+      "Scrap sales","By-product sales",
+      "Interest income","Gain on disposal","Rental income",
+      "Raw material consumed","Purchases","Freight inward",
+      "Factory wages","Factory salaries",
+      "Factory utilities","Factory rent","Factory insurance",
+      "Admin salaries","Admin wages",
+      "Office utilities","Office rent","Office insurance",
+      "Depreciation expense","Amortisation expense",
+      "Delivery expense","Forwarding expense",
+      "Bank markup","Mark-up on running finance",
+      "Current tax expense","Prior year tax adjustment",
+      "Deferred tax income","Deferred tax charge",
+    ];
+
+    const accountNames = [
+      "Freehold land","Leasehold land","Factory building","Office building",
+      "Production machinery","Manufacturing equipment","Testing equipment",
+      "Office furniture","Computer equipment","Servers and networking",
+      "Motor vehicles","Fork lifts","Capital work in progress",
+      "ERP software","Accounting software",
+      "Raw material inventory","WIP inventory","Finished goods inventory",
+      "Stores inventory","Packing material stock",
+      "Trade receivables","Export receivables",
+      "Security deposits","Prepaid insurance","Prepaid rent",
+      "Advances to suppliers","Staff advances",
+      "Current bank account","Savings bank account",
+      "Petty cash","Foreign currency account",
+      "Issued and paid-up share capital","Ordinary share capital",
+      "General reserve","Capital reserve",
+      "Retained earnings","Accumulated losses",
+      "Revaluation surplus",
+      "Term finance from bank","Diminishing musharaka","Directors loan",
+      "Deferred tax liability","Deferred tax asset",
+      "Gratuity payable","Provident fund payable",
+      "Trade payables","Accrued expenses","Customer advances",
+      "Income tax payable","Sales tax payable","WHT payable",
+      "Running finance facility","Cash credit facility",
+      "Sales revenue","Export revenue","Service fee revenue",
+      "Scrap and by-product income","Miscellaneous income",
+      "Profit on disposal of assets","Interest income",
+      "Cost of raw material consumed","Material purchases",
+      "Direct labour cost","Factory wages","Factory salaries",
+      "Factory overhead — utilities","Factory overhead — rent",
+      "Factory overhead — insurance","Factory overhead — repairs",
+      "Administrative salaries","Staff benefits",
+      "Office expenses","Printing and stationery",
+      "Depreciation — buildings","Depreciation — plant and machinery",
+      "Depreciation — vehicles","Amortisation — intangibles",
+      "Freight and forwarding","Distribution expenses",
+      "Mark-up on term finance","Mark-up on running finance",
+      "Bank charges and commission",
+      "Current tax provision","Deferred tax charge","Deferred tax income",
+    ];
+
+    // Write lists to hidden sheet (A = Line_Item, B = Sub_Line_Item, C = Account_Name)
+    const maxRows = Math.max(lineItems.length, subLineItems.length, accountNames.length);
+    for (let r = 0; r < maxRows; r++) {
+      const row = wsList.getRow(r + 1);
+      if (lineItems[r])    row.getCell(1).value = lineItems[r];
+      if (subLineItems[r]) row.getCell(2).value = subLineItems[r];
+      if (accountNames[r]) row.getCell(3).value = accountNames[r];
+    }
+
+    const D0 = DATA_ROWS.split(":")[0];
+    const D1 = DATA_ROWS.split(":")[1];
+
+    // Col E — Line_Item  (range reference to Lists!$A$1:$A$N)
+    ws.dataValidations.add(`E${D0}:E${D1}`, {
+      type: "list", allowBlank: true,
+      formulae: [`Lists!$A$1:$A${lineItems.length}`],
+      showErrorMessage: true, errorStyle: "warning",
+      errorTitle: "Invalid Line_Item", error: "Please select or type a valid line item",
+      showInputMessage: true, promptTitle: "Line_Item",
+      prompt: "Select from the list or type a custom value",
+    });
+
+    // Col F — Sub_Line_Item
+    ws.dataValidations.add(`F${D0}:F${D1}`, {
+      type: "list", allowBlank: true,
+      formulae: [`Lists!$B$1:$B${subLineItems.length}`],
+      showErrorMessage: true, errorStyle: "warning",
+      errorTitle: "Invalid Sub_Line_Item", error: "Please select or type a valid sub-line",
+      showInputMessage: true, promptTitle: "Sub_Line_Item",
+      prompt: "Select from the list or type a custom value",
+    });
+
+    // Col G — Account_Name
+    ws.dataValidations.add(`G${D0}:G${D1}`, {
+      type: "list", allowBlank: true,
+      formulae: [`Lists!$C$1:$C${accountNames.length}`],
+      showErrorMessage: true, errorStyle: "warning",
+      errorTitle: "Invalid Account_Name", error: "Please select or type a valid account name",
+      showInputMessage: true, promptTitle: "Account_Name",
+      prompt: "Select from the list or type a custom account name",
+    });
+
     // ── Row 39: Totals ────────────────────────────────────────────────────────
     const totRow = 39;
     ws.getRow(totRow).height = 20;
