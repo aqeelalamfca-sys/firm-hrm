@@ -6633,6 +6633,99 @@ router.get("/download-template", async (_req: Request, res: Response) => {
       for (let c = 13; c <= 19; c++) cellPlain(r.getCell(c + 1), row[c]);
     }
 
+    // ── DATA VALIDATIONS (dropdowns) ─────────────────────────────────────────
+    // Helper to apply a dropdown list to a cell address
+    function addDropdown(addr: string, values: string[], title: string, msg: string) {
+      (ws as any).dataValidations.add(addr, {
+        type: "list",
+        allowBlank: true,
+        formulae: [`"${values.join(",")}"`],
+        showErrorMessage: true,
+        errorStyle: "warning",
+        errorTitle: `Invalid ${title}`,
+        error: `Please select a valid value: ${values.join(", ")}`,
+        showInputMessage: true,
+        promptTitle: title,
+        prompt: msg,
+      });
+    }
+
+    // ── Engagement profile dropdowns ──────────────────────────────────────────
+
+    // Row 5 E: Company_Type
+    addDropdown("E5", [
+      "Private Company","Public Company","Listed Company",
+      "Sole Proprietorship","Partnership","Trust","NGO","Other"
+    ], "Company_Type", "Select the legal type of the entity");
+
+    // Row 5 H: Industry
+    addDropdown("H5", [
+      "Manufacturing","Trading","Services","Financial Services",
+      "Real Estate","Healthcare","Technology","Education","Agriculture","Energy","Other"
+    ], "Industry", "Select the primary industry sector");
+
+    // Row 5 K: Reporting_Framework
+    addDropdown("K5", [
+      "IFRS","IFRS for SMEs","GAAP","IFAS","Companies Act 2017","Other"
+    ], "Reporting_Framework", "Select the applicable financial reporting framework");
+
+    // Row 6 B: Audit_Type
+    addDropdown("B6", [
+      "Statutory Audit","Tax Audit","Internal Audit",
+      "Special Purpose Audit","Review Engagement",
+      "Agreed Upon Procedures","Compilation"
+    ], "Audit_Type", "Select the type of engagement");
+
+    // Row 6 E: Currency
+    addDropdown("E6", [
+      "PKR","USD","EUR","GBP","AED","SAR","JPY","CNY","Other"
+    ], "Currency", "Select the functional currency of the entity");
+
+    // Row 6 H: Engagement_Size
+    addDropdown("H6", [
+      "Small","Medium","Large","Very Large"
+    ], "Engagement_Size", "Select the engagement size classification");
+
+    // ── Data row dropdowns (rows 9 to 38) ────────────────────────────────────
+    const DATA_ROWS = "9:38";
+
+    // Col B — Statement_Type
+    addDropdown(`B${DATA_ROWS.split(":")[0]}:B${DATA_ROWS.split(":")[1]}`, [
+      "BS","P&L","OCI","EQ","CF"
+    ], "Statement_Type", "BS=Balance Sheet, P&L=Profit & Loss, OCI=Other Comprehensive Income, EQ=Equity, CF=Cash Flow");
+
+    // Col N — Normal_Balance
+    addDropdown(`N${DATA_ROWS.split(":")[0]}:N${DATA_ROWS.split(":")[1]}`, [
+      "Debit","Credit"
+    ], "Normal_Balance", "Select the normal balance side for this account");
+
+    // Col O — WP_Area
+    addDropdown(`O${DATA_ROWS.split(":")[0]}:O${DATA_ROWS.split(":")[1]}`, [
+      "PPE","Intangibles","Inventory","Receivables","Cash and Bank",
+      "Other Assets","Equity","Borrowings","Payables","Taxation",
+      "Revenue","Cost of Sales","Operating Expenses","Other Income","Provisions"
+    ], "WP_Area", "Select the audit working paper area this line maps to");
+
+    // Col P — Risk_Level
+    addDropdown(`P${DATA_ROWS.split(":")[0]}:P${DATA_ROWS.split(":")[1]}`, [
+      "High","Medium","Low"
+    ], "Risk_Level", "Select the assessed risk level for this account");
+
+    // Col Q — Procedure_Scale
+    addDropdown(`Q${DATA_ROWS.split(":")[0]}:Q${DATA_ROWS.split(":")[1]}`, [
+      "Expanded","Standard","Basic"
+    ], "Procedure_Scale", "Select the extent of audit procedures to be applied");
+
+    // Col R — AI_GL_Flag
+    addDropdown(`R${DATA_ROWS.split(":")[0]}:R${DATA_ROWS.split(":")[1]}`, [
+      "Yes","No"
+    ], "AI_GL_Flag", "Yes = AI should generate detailed GL transactions for this account");
+
+    // Col S — GL_Generation_Priority
+    addDropdown(`S${DATA_ROWS.split(":")[0]}:S${DATA_ROWS.split(":")[1]}`, [
+      "High","Medium","Low"
+    ], "GL_Generation_Priority", "Select the priority order for GL transaction generation");
+
     // ── Row 39: Totals ────────────────────────────────────────────────────────
     const totRow = 39;
     ws.getRow(totRow).height = 20;
