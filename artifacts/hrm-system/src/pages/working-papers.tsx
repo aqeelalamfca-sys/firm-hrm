@@ -21,7 +21,7 @@ const API_BASE = import.meta.env.VITE_API_URL || "/api";
 const STAGES = [
   { key: "upload",        label: "Upload",          icon: Upload,         phase: "facts",    desc: "Template & Supporting Documents" },
   { key: "extraction",    label: "Data Extraction", icon: Sparkles,       phase: "facts",    desc: "Extract 100% Template Data (Category A)" },
-  { key: "arranged_data", label: "AI Completion",   icon: Bot,            phase: "facts",    desc: "AI Fills All Category B Variables" },
+  { key: "arranged_data", label: "AI Data Sheet",    icon: Bot,            phase: "facts",    desc: "AI-Completed Variable Sheet — All Fields Populated" },
   { key: "variables",     label: "Validation",      icon: CheckCheck,     phase: "facts",    desc: "Editable Variables + Reconciliation + Audit Trail" },
   { key: "tb_generation", label: "Trial Balance",   icon: BarChart2,      phase: "judgment", desc: "Fully Balanced TB – Zero Difference" },
   { key: "gl_generation", label: "General Ledger",  icon: GitMerge,       phase: "judgment", desc: "Transaction-wise GL – Reconciled with TB" },
@@ -1508,7 +1508,7 @@ export default function WorkingPapers() {
           {[
             { step: "Upload",          phase: "facts",    active: stage === "upload" },
             { step: "Data Extraction", phase: "facts",    active: stage === "extraction" },
-            { step: "AI Completion",   phase: "facts",    active: stage === "arranged_data" },
+            { step: "AI Data Sheet",   phase: "facts",    active: stage === "arranged_data" },
             { step: "Validation",      phase: "facts",    active: stage === "variables" },
             { step: "Trial Balance",   phase: "judgment", active: stage === "tb_generation" },
             { step: "GL Generation",   phase: "judgment", active: stage === "gl_generation" },
@@ -1650,7 +1650,7 @@ export default function WorkingPapers() {
         />
       )}
 
-      {/* TAB 3 — AI Completion */}
+      {/* TAB 3 — AI Data Sheet */}
       {stage === "arranged_data" && (
         <ArrangedDataStage
           data={arrangedData}
