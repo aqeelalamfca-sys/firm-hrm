@@ -320,6 +320,28 @@ export async function runTBEngine(sessionId: number, ai: { client: OpenAI; model
     return buildTBResult(lines, exceptions, auditLog);
   }
 
+  // ── Layer 0.5: Template-sourced TB lines (from parse-one-sheet-template)
+  const allExistingTb = await db.select().from(wpTrialBalanceLinesTable)
+    .where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+  const templateTbLines = allExistingTb.filter((l: any) => l.source === "template");
+  if (templateTbLines.length > 0) {
+    auditLog.push(`Layer 0.5: Using ${templateTbLines.length} template-sourced TB lines (Financial_Data_Upload template)`);
+    const raw = templateTbLines.map((l: any) => ({
+      accountCode:   l.accountCode,
+      accountName:   l.accountName,
+      classification:l.classification,
+      debit:         String(l.debit || "0"),
+      credit:        String(l.credit || "0"),
+      balance:       String(l.balance || "0"),
+      source:        "template",
+      confidence:    String(l.confidence || "100"),
+      fsLineMapping: l.fsLineMapping || "",
+    }));
+    const { lines, correction } = intelligentBalance(raw);
+    if (correction) { exceptions.push(correction); auditLog.push(`Auto-balance: ${correction}`); }
+    return buildTBResult(lines, exceptions, auditLog);
+  }
+
   // ── Layer 1: Try existing extracted TB lines
   const extractedTB = await db.select().from(wpExtractedFieldsTable)
     .where(and(eq(wpExtractedFieldsTable.sessionId, sessionId), eq(wpExtractedFieldsTable.category, "TB Lines")));
@@ -403,7 +425,7 @@ Return JSON: {"tb_lines":[{"account_code":"XXXX","account_name":"...","classific
     ],
     max_tokens: 5000, temperature: 0.1,
     response_format: { type: "json_object" },
-  });
+  }, { signal: AbortSignal.timeout(25000) });
 
   const raw2 = JSON.parse(resp.choices[0]?.message?.content || "{}");
   const aiLines = (raw2.tb_lines || raw2.lines || []).map((l: any) => ({
@@ -458,6 +480,40 @@ export async function runGLEngine(
   const yearStart = String(parseInt(yearEnd) - 1);
   const clientName = session?.clientName || "the entity";
   const sector = session?.entityType || "General";
+
+  // ── Early return: skip AI GL generation when accounts already exist and are reconciled
+  const existingGlAccounts = await db.select().from(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, sessionId));
+  const hasReconciledGl = existingGlAccounts.length > 0 &&
+    existingGlAccounts.every((g: any) => g.isReconciled === true);
+  const hasTemplateGl = existingGlAccounts.length > 0 &&
+    existingGlAccounts.some((g: any) => String(g.generationRationale || "").startsWith("WP:"));
+  if (hasReconciledGl || hasTemplateGl) {
+    auditLog.push(`Layer 0: Using ${existingGlAccounts.length} existing reconciled GL accounts (skipping AI generation)`);
+    let reconciledCount = 0;
+    for (const glAcc of existingGlAccounts) {
+      const tbLine = tbLines.find((l: any) => l.accountCode === glAcc.accountCode);
+      if (tbLine) {
+        const tbBalance = Number(tbLine.debit || 0) - Number(tbLine.credit || 0);
+        const glBalance = Number(glAcc.closingBalance || 0);
+        if (Math.abs(tbBalance - glBalance) > 0.01) {
+          await db.update(wpGlAccountsTable).set({
+            closingBalance: tbBalance.toFixed(2),
+            tbDebit: String(tbLine.debit || "0"),
+            tbCredit: String(tbLine.credit || "0"),
+            isReconciled: true,
+          }).where(eq(wpGlAccountsTable.id, glAcc.id));
+        } else {
+          await db.update(wpGlAccountsTable).set({ isReconciled: true }).where(eq(wpGlAccountsTable.id, glAcc.id));
+        }
+        reconciledCount++;
+      }
+    }
+    const missingGl = tbLines.filter((l: any) => !existingGlAccounts.some((g: any) => g.accountCode === l.accountCode));
+    if (missingGl.length > 0) {
+      exceptions.push(`${missingGl.length} TB accounts have no GL entries — template GL data used as-is. Consider running AI GL generation for full coverage.`);
+    }
+    return { accountsProcessed: reconciledCount, entriesGenerated: 0, reconciledCount, exceptions, auditLog };
+  }
 
   await db.delete(wpGlEntriesTable).where(eq(wpGlEntriesTable.sessionId, sessionId));
   await db.delete(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, sessionId));
@@ -538,7 +594,7 @@ Return JSON: {
         ],
         max_tokens: 7000, temperature: 0.2,
         response_format: { type: "json_object" },
-      });
+      }, { signal: AbortSignal.timeout(25000) });
 
       const raw = JSON.parse(resp.choices[0]?.message?.content || "{}");
       const glAccounts = raw.accounts || [];

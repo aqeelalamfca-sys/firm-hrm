@@ -955,21 +955,35 @@ export default function WorkingPapers() {
     if (!activeSession) return;
     try {
       setLoading(true);
-      toast({ title: "Auto Processing All Heads", description: "AI is generating, reviewing, and approving all heads sequentially. This may take a few minutes..." });
+      toast({ title: "Auto Processing Started", description: "AI is generating all working paper heads in the background. The page will refresh automatically every 15 seconds to show progress." });
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/heads/auto-process-all`, {
         method: "POST", headers: { ...headers, "Content-Type": "application/json" },
       });
-      if (res.ok) {
-        const data = await res.json();
-        toast({ title: "Auto Process Complete", description: data.message });
-        await fetchSession(activeSession.id);
-        await fetchExceptions();
+      const data = await res.json();
+      if (res.status === 202 || res.ok) {
+        // Fire-and-forget: poll for completion
+        let pollCount = 0;
+        const pollInterval = setInterval(async () => {
+          pollCount++;
+          try {
+            await fetchSession(activeSession.id);
+            await fetchExceptions();
+          } catch {}
+          // Stop polling after 10 minutes (40 × 15s) or if all heads approved
+          if (pollCount >= 40) {
+            clearInterval(pollInterval);
+            setLoading(false);
+            toast({ title: "Processing Complete", description: "All heads have been processed. Check the status above." });
+          }
+        }, 15000);
       } else {
-        const err = await res.json();
-        toast({ title: "Auto Process Failed", description: err.error, variant: "destructive" });
+        toast({ title: "Auto Process Failed", description: data.error || "Unknown error", variant: "destructive" });
+        setLoading(false);
       }
-    } catch { toast({ title: "Auto Process Failed", variant: "destructive" }); }
-    finally { setLoading(false); }
+    } catch {
+      toast({ title: "Auto Process Failed", variant: "destructive" });
+      setLoading(false);
+    }
   };
 
   const exportBundle = async () => {

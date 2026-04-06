@@ -736,7 +736,7 @@ router.post("/sessions/:id/coa/populate", async (req: Request, res: Response) =>
         max_tokens: 4000,
         temperature: 0.1,
         response_format: { type: "json_object" },
-      });
+      }, { signal: AbortSignal.timeout(25000) });
       const parsed = JSON.parse(resp.choices[0]?.message?.content || "{}");
       const accounts = parsed.accounts || [];
       rows = accounts.map((a: any, idx: number) => ({
@@ -2332,6 +2332,31 @@ router.post("/sessions/:id/generate-tb-gl", async (req: Request, res: Response) 
     if (!session) return res.status(404).json({ error: "Session not found" });
     const ai = await getAIClient();
 
+    // ── Fast-path: if TB is balanced and GL is fully reconciled, skip re-generation
+    const forceRegenerate = req.body?.force === true;
+    if (!forceRegenerate) {
+      const existingTb = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+      const existingGl = await db.select().from(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, sessionId));
+      if (existingTb.length > 0 && existingGl.length > 0) {
+        const totalDr = existingTb.reduce((s: number, r: any) => s + parseFloat(r.debit || "0"), 0);
+        const totalCr = existingTb.reduce((s: number, r: any) => s + parseFloat(r.credit || "0"), 0);
+        const tbBalanced = Math.abs(totalDr - totalCr) < 1;
+        const glFullyReconciled = existingGl.every((g: any) => g.isReconciled === true);
+        if (tbBalanced && glFullyReconciled) {
+          const tbHead = (await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, 0))))[0];
+          if (tbHead) await db.update(wpHeadsTable).set({ status: "validating", updatedAt: new Date() }).where(eq(wpHeadsTable.id, tbHead.id));
+          return res.json({
+            message: "TB and GL already generated and balanced — skipped re-generation",
+            stages: [
+              { stage: "Trial Balance", status: "ok", detail: `${existingTb.length} accounts | Dr=${totalDr.toFixed(2)} Cr=${totalCr.toFixed(2)} | Balanced ✓ (cached)` },
+              { stage: "General Ledger", status: "ok", detail: `${existingGl.length} accounts fully reconciled (cached)` },
+            ],
+            cached: true,
+          });
+        }
+      }
+    }
+
     // Clean previous exceptions for heads 0 and 1
     await db.delete(wpExceptionLogTable).where(and(eq(wpExceptionLogTable.sessionId, sessionId), eq(wpExceptionLogTable.headIndex, 0)));
     await db.delete(wpExceptionLogTable).where(and(eq(wpExceptionLogTable.sessionId, sessionId), eq(wpExceptionLogTable.headIndex, 1)));
@@ -2577,7 +2602,7 @@ Return JSON:
           ],
           max_tokens: 4000, temperature: 0.3,
           response_format: { type: "json_object" },
-        });
+        }, { signal: AbortSignal.timeout(30000) });
 
         const raw = JSON.parse(resp.choices[0]?.message?.content || "{}");
 
@@ -2624,6 +2649,9 @@ Return JSON:
   }
 });
 
+// Track in-progress auto-process jobs to prevent duplicate runs
+const autoProcessInProgress = new Set<number>();
+
 router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(req.params.id);
@@ -2635,6 +2663,18 @@ router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Re
     const ai = await getAIClient();
     if (!ai) return res.status(503).json({ error: "AI service not configured" });
 
+    // Prevent duplicate background runs
+    if (autoProcessInProgress.has(sessionId)) {
+      return res.status(202).json({ processing: true, message: "Auto-processing already in progress — refresh the page to check status." });
+    }
+    autoProcessInProgress.add(sessionId);
+
+    // Return 202 immediately — processing happens in background
+    res.status(202).json({ processing: true, message: "Auto-processing started. Refresh the page every 30 seconds to check progress." });
+
+    // ── Background processing (fire-and-forget) ──────────────────────────────
+    setImmediate(async () => {
+      try {
     const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
     const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
     const varSummary = variables.map(v => `${v.variableName}: ${v.finalValue}`).join("\n");
@@ -2673,7 +2713,7 @@ router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Re
             ],
             max_tokens: 4000, temperature: 0.2,
             response_format: { type: "json_object" },
-          });
+          }, { signal: AbortSignal.timeout(25000) });
           const tbData = JSON.parse(tbResp.choices[0]?.message?.content || "{}");
           if (tbData.lines && tbData.lines.length > 0) {
             for (const line of tbData.lines) {
@@ -2697,7 +2737,7 @@ router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Re
             ],
             max_tokens: 4000, temperature: 0.3,
             response_format: { type: "json_object" },
-          });
+          }, { signal: AbortSignal.timeout(25000) });
           const glData = JSON.parse(glResp.choices[0]?.message?.content || "{}");
           const docs = glData.documents || [{ paper_code: "GL", paper_name: "General Ledger", content: glData.content || "General Ledger generated" }];
           for (const doc of docs) {
@@ -2723,7 +2763,7 @@ router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Re
                 ],
                 max_tokens: 4000, temperature: 0.3,
                 response_format: { type: "json_object" },
-              });
+              }, { signal: AbortSignal.timeout(30000) });
               const raw = JSON.parse(resp.choices[0]?.message?.content || "{}");
               await db.insert(wpHeadDocumentsTable).values({
                 sessionId, headId: head.id,
@@ -2780,16 +2820,19 @@ router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Re
     const failed = results.filter(r => r.action === "failed").length;
 
     await db.update(wpSessionsTable).set({ status: "generation", updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
+    logger.info(`Auto-process-all complete for session ${sessionId}: ${completed} done, ${skipped} skipped, ${failed} failed`);
 
-    res.json({
-      success: true,
-      message: `Auto-processed: ${completed} completed, ${skipped} skipped, ${failed} failed`,
-      results,
-      summary: { completed, skipped, failed, total: allHeads.length },
-    });
+      } catch (bgErr: any) {
+        logger.error({ err: bgErr }, `Auto-process-all background job failed for session ${sessionId}`);
+      } finally {
+        autoProcessInProgress.delete(sessionId);
+      }
+    }); // end setImmediate
+
   } catch (err: any) {
-    logger.error({ err }, "Auto-process-all failed");
-    res.status(500).json({ error: "Auto-process failed: " + (err.message || "Unknown error") });
+    autoProcessInProgress.delete(sessionId);
+    logger.error({ err }, "Auto-process-all route error");
+    if (!res.headersSent) res.status(500).json({ error: "Auto-process failed: " + (err.message || "Unknown error") });
   }
 });
 
