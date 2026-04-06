@@ -302,6 +302,24 @@ export default function WorkingPapers() {
     finally { setLoading(false); }
   };
 
+  const handleDeleteFile = async (fileId: number) => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/files/${fileId}`, {
+        method: "DELETE", headers,
+      });
+      if (res.ok) {
+        toast({ title: "File removed" });
+        await fetchSession(activeSession.id);
+      } else {
+        const err = await res.json();
+        toast({ title: "Remove failed", description: err.error, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Remove failed", variant: "destructive" });
+    }
+  };
+
   const handleParseTemplate = async () => {
     if (!activeSession) return;
     try {
@@ -1559,11 +1577,10 @@ export default function WorkingPapers() {
           setFiles={setUploadFiles}
           uploadedFiles={activeSession.files || []}
           fileInputRef={fileInputRef}
-          onFileAdd={handleFileAdd}
           onUpload={handleUpload}
           onExtractData={handleExtractData}
+          onDeleteFile={handleDeleteFile}
           loading={parseLoading || loading}
-          validateFile={validateFile}
         />
       )}
 
@@ -1959,7 +1976,7 @@ function WorkbookPipelinePanel({ onExtract, extracting, report, onClose }: any) 
   );
 }
 
-function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onUpload, onExtractData, loading }: any) {
+function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onUpload, onExtractData, onDeleteFile, loading }: any) {
   const [tplDrag, setTplDrag] = useState(false);
   const [supDrag, setSupDrag] = useState(false);
   const supFileInputRef = useRef<HTMLInputElement>(null);
@@ -2122,13 +2139,22 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onUpload, o
                 {tplUploaded.map((f: any) => {
                   const ext = (f.originalName || "").split(".").pop()?.toLowerCase();
                   return (
-                    <div key={f.id} className="flex items-center gap-2.5 p-2.5 rounded-xl border bg-emerald-50/50 border-emerald-100 text-xs">
+                    <div key={f.id} className="flex items-center gap-2.5 p-2.5 rounded-xl border bg-emerald-50/50 border-emerald-100 text-xs group">
                       <FileChip ext={ext} />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-slate-800 truncate">{f.originalName}</p>
                         <p className="text-[10px] text-blue-600 font-medium mt-0.5">Primary template</p>
                       </div>
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 group-hover:hidden" />
+                        <button
+                          onClick={() => onDeleteFile(f.id)}
+                          className="hidden group-hover:flex items-center justify-center w-6 h-6 rounded-full bg-red-50 hover:bg-red-100 transition-colors"
+                          title="Remove file"
+                        >
+                          <X className="w-3 h-3 text-red-500" />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -2232,13 +2258,22 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onUpload, o
                   const ext = (f.originalName || "").split(".").pop()?.toLowerCase();
                   const catLabel = supCategories.find(c => c.value === f.category)?.label || "Document";
                   return (
-                    <div key={f.id} className="flex items-center gap-2.5 p-2.5 rounded-xl border bg-slate-50 border-slate-100 text-xs">
+                    <div key={f.id} className="flex items-center gap-2.5 p-2.5 rounded-xl border bg-slate-50 border-slate-100 text-xs group">
                       <FileChip ext={ext} />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-slate-800 truncate">{f.originalName}</p>
                         <p className="text-[10px] text-slate-500 mt-0.5">{catLabel}</p>
                       </div>
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 group-hover:hidden" />
+                        <button
+                          onClick={() => onDeleteFile(f.id)}
+                          className="hidden group-hover:flex items-center justify-center w-6 h-6 rounded-full bg-red-50 hover:bg-red-100 transition-colors"
+                          title="Remove file"
+                        >
+                          <X className="w-3 h-3 text-red-500" />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}

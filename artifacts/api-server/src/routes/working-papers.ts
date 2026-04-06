@@ -383,6 +383,22 @@ router.post("/sessions/:id/upload", upload.array("files", 20), async (req: Reque
   }
 });
 
+router.delete("/sessions/:id/files/:fileId", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id);
+    const fileId    = parseInt(req.params.fileId);
+    if (isNaN(sessionId) || isNaN(fileId)) return res.status(400).json({ error: "Invalid id" });
+    const [deleted] = await db
+      .delete(wpUploadedFilesTable)
+      .where(and(eq(wpUploadedFilesTable.id, fileId), eq(wpUploadedFilesTable.sessionId, sessionId)))
+      .returning();
+    if (!deleted) return res.status(404).json({ error: "File not found" });
+    res.json({ ok: true, id: fileId });
+  } catch (err: any) {
+    res.status(500).json({ error: "Delete failed" });
+  }
+});
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // EXTRACTION — OCR + PARSING
