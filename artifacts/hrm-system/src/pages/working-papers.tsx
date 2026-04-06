@@ -18,14 +18,14 @@ import {
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 const STAGES = [
-  { key: "upload", label: "Upload", icon: Upload },
-  { key: "extraction", label: "AI Extraction", icon: Eye },
-  { key: "data_sheet", label: "Data Sheet", icon: Database },
-  { key: "arranged_data", label: "Arranged Data", icon: Layers },
-  { key: "variables", label: "Variables", icon: Settings2 },
-  { key: "audit_engine", label: "Audit Engine", icon: Shield },
-  { key: "generation", label: "Generation", icon: Play },
-  { key: "export", label: "Export", icon: Download },
+  { key: "upload",        label: "Upload",          icon: Upload,     phase: "facts",    desc: "Template & Documents"    },
+  { key: "extraction",    label: "Extraction",      icon: Sparkles,   phase: "facts",    desc: "Data Extraction from Upload" },
+  { key: "data_sheet",    label: "Data Sheet",      icon: Database,   phase: "facts",    desc: "Editable Master Sheet"   },
+  { key: "arranged_data", label: "Validation",      icon: CheckCheck, phase: "facts",    desc: "Reconciliation & Review" },
+  { key: "variables",     label: "AI Completion",   icon: Bot,        phase: "judgment", desc: "AI Variable Completion"  },
+  { key: "audit_engine",  label: "TB / GL",         icon: BarChart2,  phase: "judgment", desc: "TB & GL Generation"      },
+  { key: "generation",    label: "Working Papers",  icon: FileCheck,  phase: "output",   desc: "AI Generated WPs"        },
+  { key: "export",        label: "Final Output",    icon: Download,   phase: "output",   desc: "Review & Export"         },
 ] as const;
 
 const FILE_CATEGORIES = [
@@ -1377,14 +1377,45 @@ export default function WorkingPapers() {
             </div>
           </div>
 
-          <div className="flex items-center gap-0.5 sm:gap-1 pb-0 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+          {/* Phase strip */}
+          <div className="hidden sm:flex items-center gap-0 pt-2 pb-0 text-[9px] font-bold uppercase tracking-widest">
+            {([ 
+              { label: "Facts", keys: ["upload","extraction","data_sheet","arranged_data"], color: "blue" },
+              { label: "Audit Judgment", keys: ["variables","audit_engine"], color: "violet" },
+              { label: "Defensible Output", keys: ["generation","export"], color: "emerald" },
+            ] as const).map((ph, pi) => {
+              const phaseStages = STAGES.filter(s => ph.keys.includes(s.key as any));
+              const isCurrentPhase = ph.keys.includes(stage as any);
+              const lastKeyInPhase = ph.keys[ph.keys.length - 1];
+              const lastIdxInPhase = STAGES.findIndex(s => s.key === lastKeyInPhase);
+              const isPastPhase = lastIdxInPhase < stageIndex;
+              return (
+                <div key={ph.label} className="flex items-center" style={{ flex: phaseStages.length }}>
+                  {pi > 0 && <span className="text-white/20 mr-1">→</span>}
+                  <span className={cn(
+                    "px-1",
+                    isCurrentPhase
+                      ? ph.color === "blue" ? "text-blue-300" : ph.color === "violet" ? "text-violet-300" : "text-emerald-300"
+                      : isPastPhase ? "text-slate-500" : "text-slate-600"
+                  )}>{ph.label}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Stage tabs */}
+          <div className="flex items-center gap-0 pb-0 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 border-t border-white/10 mt-1">
             {STAGES.map((s, i) => {
               const Icon = s.icon;
               const isActive = s.key === stage;
               const isPast = i < stageIndex;
+              const underlineColor =
+                s.phase === "facts" ? "bg-blue-400" :
+                s.phase === "judgment" ? "bg-violet-400" : "bg-emerald-400";
               return (
                 <button
                   key={s.key}
+                  title={s.desc}
                   className={cn(
                     "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-t-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all relative",
                     isActive
@@ -1402,14 +1433,50 @@ export default function WorkingPapers() {
                     if (s.key === "generation" || s.key === "export") { fetchSession(activeSession.id); fetchExceptions(); }
                   }}
                 >
-                  {isPast ? <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                  {isPast ? <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" /> : <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                   <span className="hidden sm:inline">{s.label}</span>
-                  <span className="sm:hidden">{s.label.replace("AI ", "").split(" ")[0]}</span>
-                  {isActive && <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-600 rounded-t" />}
+                  <span className="sm:hidden">{s.label.split(" ")[0]}</span>
+                  {isActive && <div className={cn("absolute bottom-0 left-1.5 right-1.5 h-[3px] rounded-t", underlineColor)} />}
                 </button>
               );
             })}
           </div>
+        </div>
+      </div>
+
+      {/* Process flow principle banner */}
+      <div className="bg-slate-900/95 border-b border-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-1.5 flex items-center gap-2 overflow-x-auto scrollbar-hide">
+          <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest shrink-0">Engine</span>
+          <span className="text-white/10">|</span>
+          {[
+            { step: "Upload",        phase: "facts",    active: stage === "upload" },
+            { step: "Extraction",    phase: "facts",    active: stage === "extraction" },
+            { step: "AI Completion", phase: "facts",    active: stage === "data_sheet" || stage === "arranged_data" },
+            { step: "Validation",    phase: "facts",    active: false },
+            { step: "TB Generation", phase: "judgment", active: stage === "variables" },
+            { step: "GL Generation", phase: "judgment", active: stage === "audit_engine" },
+            { step: "WP Generation", phase: "output",   active: stage === "generation" },
+            { step: "Review",        phase: "output",   active: false },
+            { step: "Final Output",  phase: "output",   active: stage === "export" },
+          ].map((item, idx) => {
+            const stageOrder = ["upload","extraction","data_sheet","arranged_data","variables","audit_engine","generation","export"];
+            const pastIdx = stageOrder.indexOf(stage);
+            const isPast = pastIdx > idx;
+            return (
+              <div key={item.step} className="flex items-center gap-1.5 shrink-0">
+                {idx > 0 && <ArrowRight className="w-2.5 h-2.5 text-white/15 shrink-0" />}
+                <span className={cn(
+                  "text-[10px] font-medium whitespace-nowrap transition-colors",
+                  item.active
+                    ? item.phase === "facts" ? "text-blue-400" : item.phase === "judgment" ? "text-violet-400" : "text-emerald-400"
+                    : isPast ? "text-slate-500 line-through decoration-slate-600" : "text-slate-600"
+                )}>{item.step}</span>
+              </div>
+            );
+          })}
+          <span className="text-white/10 ml-1">|</span>
+          <span className="text-[10px] text-slate-600 italic shrink-0 hidden lg:block">Template provides FACTS → AI converts FACTS into AUDIT JUDGMENT → System produces DEFENSIBLE WORKING PAPERS</span>
         </div>
       </div>
 

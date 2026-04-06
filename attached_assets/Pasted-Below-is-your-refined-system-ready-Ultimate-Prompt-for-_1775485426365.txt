@@ -1,0 +1,175 @@
+Below is your refined, system-ready “Ultimate Prompt” for the Working Paper Generator.
+It is structured for direct implementation in Replit (frontend + backend) and aligned with ISA / ISQM / IFRS compliance and your AuditWise architecture.
+
+✅ ULTIMATE MASTER PROMPT — WORKING PAPER GENERATOR
+🔷 CORE OBJECTIVE
+
+Build an end-to-end AI-powered Audit Working Paper Generator that:
+
+Accepts structured Excel template + supporting documents (e.g., Sales Tax Returns PDFs)
+Extracts and validates all financial and entity data
+Auto-completes missing variables using AI
+Generates fully reconciled Trial Balance, General Ledger, and complete audit working papers
+Ensures zero inconsistency between Financial Statements, TB, and GL
+Follows ISA, ISQM, IFRS, and Pakistan regulatory framework
+🔶 MANDATORY TAB STRUCTURE (STRICT FLOW)
+TAB 1 — “Upload”
+Functions
+Provide Download Template (Excel – single sheet)
+Upload:
+Completed Excel template (.xlsx/.xls)
+Supporting files:
+Sales Tax Returns (PDF)
+Financial documents (PDF/Image)
+System Rules
+Accept multiple files
+Perform OCR for non-Excel files
+Validate structure before proceeding
+Store raw upload as immutable source
+TAB 2 — “Data Extraction from Upload”
+Auto Extraction
+Extract Category A variables (Template-driven)
+Display extracted data in structured format
+AI Button — “Complete with AI”
+
+On click:
+
+AI shall:
+Read all uploaded files (Excel + PDFs via OCR)
+Fill Category B variables (AI-driven)
+Complete missing fields where possible
+Flag:
+Missing data
+Low confidence extraction
+Inconsistencies
+Rules
+No variable should remain blank unless:
+Not available in input
+AI confidence is low → mark as “Review Required”
+TAB 3 — “Data (Editable Master Sheet)”
+Content
+Combined dataset:
+Template-extracted data (Category A)
+AI-generated data (Category B)
+Features
+Fully editable
+Change tracking (audit trail)
+Validation checks:
+Mandatory fields
+Logical consistency
+Cross-field reconciliation
+TAB 4 — “Trial Balance Generation”
+AI Task
+Generate fully balanced Trial Balance
+Rules
+Must:
+Match Financial Statements exactly
+Have zero difference
+Ensure:
+Debit = Credit
+Opening + Movement = Closing
+Output
+Downloadable Excel
+System validation status:
+✅ Balanced
+❌ Error (show mismatch)
+TAB 5 — “General Ledger Generation”
+AI Task
+
+Generate transaction-wise General Ledger for each account:
+
+Requirements
+Logical transaction generation based on:
+Industry
+Entity profile
+Financial data
+Include:
+Opening balance
+Multiple realistic transactions
+Narrations
+Dates
+Debit/Credit entries
+Closing balance
+Critical Rule
+GL must perfectly reconcile with Trial Balance
+Output
+Multi-sheet Excel (one sheet per account)
+Summary sheet
+TAB 6 — “Working Papers (AI Generated)”
+AI Task
+
+Generate complete audit working papers sequentially, covering:
+
+PHASE-WISE GENERATION (STRICT ORDER)
+
+AI must complete one phase before moving to next:
+
+Pre-Engagement & Acceptance
+Planning
+Risk Assessment
+Analytical Review
+Internal Controls
+Substantive Procedures (Head-wise)
+Audit Evidence & Confirmations
+Completion
+Reporting
+Quality Control (EQCR)
+Archiving
+Working Paper Rules
+Each working paper must include:
+Objective
+Procedure
+Data reference (linked to variables)
+Result
+Conclusion
+Auto-map:
+Assertions
+Risks
+Materiality
+Apply:
+ISA references (mandatory)
+Maintain:
+Logical flow
+Cross-referencing
+Outputs
+Word / Excel / PDF downloadable files
+Structured folder system:
+A → Planning
+B → Risk
+C → Execution
+D → Completion
+🔴 CRITICAL SYSTEM CONTROLS
+1. Reconciliation Rule (NON-NEGOTIABLE)
+
+Financial Statements = Trial Balance = General Ledger
+→ No differences allowed
+
+2. AI Completion Rule
+AI must populate all possible variables
+If not possible:
+Mark clearly: “User Input Required”
+3. Audit Compliance Rule
+Enforce:
+ISA 200–720
+ISQM 1 & 2
+IFRS / IFRS for SMEs
+Companies Act 2017
+FBR / SECP requirements
+4. Materiality Logic
+Apply realistic thresholds:
+Significant transactions: ~1%–50%
+Use:
+PBT / Revenue / Assets as base
+5. AI Governance Rule
+AI outputs = Draft only
+Require:
+User review
+Editable interface
+Audit trail
+🧠 PROCESS FLOW (ENGINE LOGIC)
+UPLOAD → EXTRACTION → AI COMPLETION → VALIDATION
+→ TB GENERATION → GL GENERATION → WP GENERATION
+→ REVIEW → FINAL OUTPUT
+⭐ FINAL IMPLEMENTATION PRINCIPLE
+
+Template provides FACTS → AI converts FACTS into AUDIT JUDGMENT → System produces DEFENSIBLE WORKING PAPERS
