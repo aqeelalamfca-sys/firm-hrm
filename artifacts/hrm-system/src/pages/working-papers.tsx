@@ -18,14 +18,15 @@ import {
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 const STAGES = [
-  { key: "upload",        label: "Upload",          icon: Upload,     phase: "facts",    desc: "Template & Documents"    },
-  { key: "extraction",    label: "Extraction",      icon: Sparkles,   phase: "facts",    desc: "Data Extraction from Upload" },
-  { key: "data_sheet",    label: "Data Sheet",      icon: Database,   phase: "facts",    desc: "Editable Master Sheet"   },
-  { key: "arranged_data", label: "Validation",      icon: CheckCheck, phase: "facts",    desc: "Reconciliation & Review" },
-  { key: "variables",     label: "AI Completion",   icon: Bot,        phase: "judgment", desc: "AI Variable Completion"  },
-  { key: "audit_engine",  label: "TB / GL",         icon: BarChart2,  phase: "judgment", desc: "TB & GL Generation"      },
-  { key: "generation",    label: "Working Papers",  icon: FileCheck,  phase: "output",   desc: "AI Generated WPs"        },
-  { key: "export",        label: "Final Output",    icon: Download,   phase: "output",   desc: "Review & Export"         },
+  { key: "upload",        label: "Upload",          icon: Upload,         phase: "facts",    desc: "Template & Supporting Documents" },
+  { key: "extraction",    label: "Data Extraction", icon: Sparkles,       phase: "facts",    desc: "Extract 100% Template Data (Category A)" },
+  { key: "arranged_data", label: "AI Completion",   icon: Bot,            phase: "facts",    desc: "AI Fills All Category B Variables" },
+  { key: "variables",     label: "Validation",      icon: CheckCheck,     phase: "facts",    desc: "Editable Variables + Reconciliation + Audit Trail" },
+  { key: "tb_generation", label: "Trial Balance",   icon: BarChart2,      phase: "judgment", desc: "Fully Balanced TB – Zero Difference" },
+  { key: "gl_generation", label: "General Ledger",  icon: GitMerge,       phase: "judgment", desc: "Transaction-wise GL – Reconciled with TB" },
+  { key: "generation",    label: "Working Papers",  icon: FileCheck,      phase: "output",   desc: "AI Generated Complete WPs (ISA Compliant)" },
+  { key: "review",        label: "Review",          icon: ClipboardCheck, phase: "output",   desc: "Review, Comments & Approvals" },
+  { key: "export",        label: "Final Output",    icon: Download,       phase: "output",   desc: "Reconciled Downloadable Outputs" },
 ] as const;
 
 const FILE_CATEGORIES = [
@@ -1380,9 +1381,9 @@ export default function WorkingPapers() {
           {/* Phase strip */}
           <div className="hidden sm:flex items-center gap-0 pt-2 pb-0 text-[9px] font-bold uppercase tracking-widest">
             {([ 
-              { label: "Facts", keys: ["upload","extraction","data_sheet","arranged_data"], color: "blue" },
-              { label: "Audit Judgment", keys: ["variables","audit_engine"], color: "violet" },
-              { label: "Defensible Output", keys: ["generation","export"], color: "emerald" },
+              { label: "Facts", keys: ["upload","extraction","arranged_data","variables"], color: "blue" },
+              { label: "Audit Judgment", keys: ["tb_generation","gl_generation"], color: "violet" },
+              { label: "Defensible Output", keys: ["generation","review","export"], color: "emerald" },
             ] as const).map((ph, pi) => {
               const phaseStages = STAGES.filter(s => ph.keys.includes(s.key as any));
               const isCurrentPhase = ph.keys.includes(stage as any);
@@ -1426,11 +1427,13 @@ export default function WorkingPapers() {
                   )}
                   onClick={() => {
                     setStage(s.key);
-                    if (s.key === "variables" && variables.length === 0) fetchVariables();
+                    if (s.key === "variables" && variables.length === 0) { fetchVariables(); fetchCoaData(); }
                     if (s.key === "arranged_data" && !arrangedData) fetchArrangedData();
-                    if (s.key === "data_sheet" && coaData.length === 0) fetchCoaData();
-                    if (s.key === "audit_engine" && !auditMaster) { fetchAuditMaster(); fetchWpTriggers(); fetchSampling(); fetchAnalytics(); fetchControlMatrix(); fetchEvidence(); }
-                    if (s.key === "generation" || s.key === "export") { fetchSession(activeSession.id); fetchExceptions(); }
+                    if (s.key === "tb_generation" || s.key === "gl_generation") {
+                      fetchCoaData();
+                      if (!auditMaster) { fetchAuditMaster(); fetchWpTriggers(); fetchSampling(); fetchAnalytics(); fetchControlMatrix(); fetchEvidence(); }
+                    }
+                    if (s.key === "generation" || s.key === "export" || s.key === "review") { fetchSession(activeSession.id); fetchExceptions(); }
                   }}
                 >
                   {isPast ? <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" /> : <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
@@ -1450,17 +1453,17 @@ export default function WorkingPapers() {
           <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest shrink-0">Engine</span>
           <span className="text-white/10">|</span>
           {[
-            { step: "Upload",        phase: "facts",    active: stage === "upload" },
-            { step: "Extraction",    phase: "facts",    active: stage === "extraction" },
-            { step: "AI Completion", phase: "facts",    active: stage === "data_sheet" || stage === "arranged_data" },
-            { step: "Validation",    phase: "facts",    active: false },
-            { step: "TB Generation", phase: "judgment", active: stage === "variables" },
-            { step: "GL Generation", phase: "judgment", active: stage === "audit_engine" },
-            { step: "WP Generation", phase: "output",   active: stage === "generation" },
-            { step: "Review",        phase: "output",   active: false },
-            { step: "Final Output",  phase: "output",   active: stage === "export" },
+            { step: "Upload",          phase: "facts",    active: stage === "upload" },
+            { step: "Data Extraction", phase: "facts",    active: stage === "extraction" },
+            { step: "AI Completion",   phase: "facts",    active: stage === "arranged_data" },
+            { step: "Validation",      phase: "facts",    active: stage === "variables" },
+            { step: "Trial Balance",   phase: "judgment", active: stage === "tb_generation" },
+            { step: "GL Generation",   phase: "judgment", active: stage === "gl_generation" },
+            { step: "WP Generation",   phase: "output",   active: stage === "generation" },
+            { step: "Review",          phase: "output",   active: stage === "review" },
+            { step: "Final Output",    phase: "output",   active: stage === "export" },
           ].map((item, idx) => {
-            const stageOrder = ["upload","extraction","data_sheet","arranged_data","variables","audit_engine","generation","export"];
+            const stageOrder = ["upload","extraction","arranged_data","variables","tb_generation","gl_generation","generation","review","export"];
             const pastIdx = stageOrder.indexOf(stage);
             const isPast = pastIdx > idx;
             return (
@@ -1541,7 +1544,9 @@ export default function WorkingPapers() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-5">
 
-      {/* Stage Content */}
+      {/* ─── Stage Content — 9-Tab Flow ────────────────────────────────────── */}
+
+      {/* TAB 1 — Upload */}
       {stage === "upload" && (
         <UploadStage
           files={uploadFiles}
@@ -1565,17 +1570,142 @@ export default function WorkingPapers() {
         />
       )}
 
+      {/* TAB 2 — Data Extraction */}
       {stage === "extraction" && (
         <ExtractionStage
           data={extractionData}
           session={activeSession}
-          onFetchArranged={() => { fetchCoaData(); setStage("data_sheet"); }}
+          onFetchArranged={() => { fetchArrangedData(); setStage("arranged_data"); }}
           onRerun={runExtraction}
           loading={loading}
           confidenceBadge={confidenceBadge}
         />
       )}
 
+      {/* TAB 3 — AI Completion */}
+      {stage === "arranged_data" && (
+        <ArrangedDataStage
+          data={arrangedData}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onFetch={fetchArrangedData}
+          onApproveAll={approveAllFields}
+          onNext={() => { autoFillVariables(); setStage("variables"); }}
+          loading={loading}
+          confidenceBadge={confidenceBadge}
+        />
+      )}
+
+      {/* TAB 4 — Validation (Editable Variables) */}
+      {stage === "variables" && (
+        <VariablesStage
+          variables={variables}
+          grouped={variableGroups}
+          stats={variableStats}
+          changeLog={changeLog}
+          editingVar={editingVar}
+          editValue={editValue}
+          editReason={editReason}
+          setEditingVar={setEditingVar}
+          setEditValue={setEditValue}
+          setEditReason={setEditReason}
+          onSave={saveVariableEdit}
+          onReview={markVariableReviewed}
+          onReviewAll={reviewAllVariables}
+          onFetch={fetchVariables}
+          onLockAll={lockAllVariables}
+          onLockSection={lockSection}
+          onValidate={validateVariables}
+          loading={loading}
+          confidenceBadge={confidenceBadge}
+        />
+      )}
+
+      {/* TAB 5 — Trial Balance */}
+      {stage === "tb_generation" && (
+        <TbGenerationStage
+          coaData={coaData}
+          tbGlProgress={tbGlProgress}
+          onGenerateTbGl={generateTbGl}
+          onPopulate={populateCoa}
+          onUpdate={updateCoaRow}
+          onValidate={validateCoa}
+          onApprove={approveCoa}
+          onRefresh={fetchCoaData}
+          onRunRecon={runRecon}
+          reconResults={reconResults}
+          loading={coaLoading || loading}
+          session={activeSession}
+          onNext={() => setStage("gl_generation")}
+        />
+      )}
+
+      {/* TAB 6 — General Ledger */}
+      {stage === "gl_generation" && (
+        <GlGenerationStage
+          auditMaster={auditMaster}
+          tbGlProgress={tbGlProgress}
+          onGenerateTbGl={generateTbGl}
+          reconResults={reconResults}
+          onRunRecon={runRecon}
+          loading={auditMasterLoading || loading}
+          session={activeSession}
+          onNext={() => { fetchSession(activeSession.id); setStage("generation"); }}
+        />
+      )}
+
+      {/* TAB 7 — Working Papers */}
+      {stage === "generation" && (
+        <GenerationStage
+          heads={heads}
+          session={activeSession}
+          exceptions={exceptions}
+          onGenerate={generateHead}
+          onGenerateTbGl={generateTbGl}
+          tbGlProgress={tbGlProgress}
+          onApprove={approveHead}
+          onExport={exportHead}
+          onAutoProcessAll={autoProcessAll}
+          onResolveException={resolveException}
+          loading={loading}
+          onRefresh={() => { fetchSession(activeSession.id); fetchExceptions(); }}
+          autoChainRunning={autoChainRunning}
+          autoChainCurrentHead={autoChainCurrentHead}
+          onStopChain={stopChain}
+        />
+      )}
+
+      {/* TAB 8 — Review */}
+      {stage === "review" && (
+        <ReviewStage
+          heads={heads}
+          session={activeSession}
+          exceptions={exceptions}
+          onApprove={approveHead}
+          onResolveException={resolveException}
+          onRefresh={() => { fetchSession(activeSession.id); fetchExceptions(); }}
+          onNext={() => setStage("export")}
+          loading={loading}
+        />
+      )}
+
+      {/* TAB 9 — Final Output */}
+      {stage === "export" && (
+        <ExportStage
+          heads={heads}
+          session={activeSession}
+          exceptions={exceptions}
+          onExportHead={exportHead}
+          onExportBundle={exportBundle}
+          onResolveException={resolveException}
+          onRefresh={() => { fetchSession(activeSession.id); fetchExceptions(); }}
+          loading={loading}
+          downloadingHeads={downloadingHeads}
+          downloadedHeads={downloadedHeads}
+        />
+      )}
+
+      {/* Legacy: data_sheet and audit_engine accessible if session.status points here */}
       {stage === "data_sheet" && (
         <DataSheetStage
           coaData={coaData}
@@ -1590,7 +1720,6 @@ export default function WorkingPapers() {
           session={activeSession}
         />
       )}
-
       {stage === "audit_engine" && (
         <AuditEngineStage
           auditMaster={auditMaster}
@@ -1616,78 +1745,6 @@ export default function WorkingPapers() {
           onUpdateEvidence={updateEvidence}
           onDeleteEvidence={deleteEvidence}
           onRunRecon={runRecon}
-        />
-      )}
-
-      {stage === "arranged_data" && (
-        <ArrangedDataStage
-          data={arrangedData}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          onFetch={fetchArrangedData}
-          onApproveAll={approveAllFields}
-          onNext={() => { autoFillVariables(); }}
-          loading={loading}
-          confidenceBadge={confidenceBadge}
-        />
-      )}
-
-      {stage === "variables" && (
-        <VariablesStage
-          variables={variables}
-          grouped={variableGroups}
-          stats={variableStats}
-          changeLog={changeLog}
-          editingVar={editingVar}
-          editValue={editValue}
-          editReason={editReason}
-          setEditingVar={setEditingVar}
-          setEditValue={setEditValue}
-          setEditReason={setEditReason}
-          onSave={saveVariableEdit}
-          onReview={markVariableReviewed}
-          onReviewAll={reviewAllVariables}
-          onFetch={fetchVariables}
-          onLockAll={lockAllVariables}
-          onLockSection={lockSection}
-          onValidate={validateVariables}
-          loading={loading}
-          confidenceBadge={confidenceBadge}
-        />
-      )}
-
-      {stage === "generation" && (
-        <GenerationStage
-          heads={heads}
-          session={activeSession}
-          exceptions={exceptions}
-          onGenerate={generateHead}
-          onGenerateTbGl={generateTbGl}
-          tbGlProgress={tbGlProgress}
-          onApprove={approveHead}
-          onExport={exportHead}
-          onAutoProcessAll={autoProcessAll}
-          onResolveException={resolveException}
-          loading={loading}
-          onRefresh={() => { fetchSession(activeSession.id); fetchExceptions(); }}
-          autoChainRunning={autoChainRunning}
-          autoChainCurrentHead={autoChainCurrentHead}
-          onStopChain={stopChain}
-        />
-      )}
-
-      {stage === "export" && (
-        <ExportStage
-          heads={heads}
-          session={activeSession}
-          exceptions={exceptions}
-          onExportHead={exportHead}
-          onExportBundle={exportBundle}
-          onResolveException={resolveException}
-          onRefresh={() => { fetchSession(activeSession.id); fetchExceptions(); }}
-          loading={loading}
-          downloadingHeads={downloadingHeads}
-          downloadedHeads={downloadedHeads}
         />
       )}
 
@@ -5876,6 +5933,465 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onGenerateTbG
 
         </div>{/* end main content */}
       </div>{/* end two-column flex */}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TAB 5 — Trial Balance Stage
+// ─────────────────────────────────────────────────────────────────────────────
+function TbGenerationStage({ coaData, tbGlProgress, onGenerateTbGl, onPopulate, onUpdate, onValidate, onApprove, onRefresh, onRunRecon, reconResults, loading, session, onNext }: any) {
+  const tb = tbGlProgress?.result?.tb;
+  const tbStages: any[] = tbGlProgress?.stages || [];
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-700 to-indigo-800 rounded-2xl p-5 text-white shadow-md">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+            <BarChart2 className="w-6 h-6 text-blue-200" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-lg font-bold">Trial Balance Generation</h2>
+            <p className="text-sm text-blue-100 mt-0.5">
+              Generates a fully balanced Trial Balance with <span className="font-semibold text-white">zero difference</span>, 
+              perfectly matching the Financial Statements. Debit = Credit enforced.
+            </p>
+            <div className="flex flex-wrap gap-2 mt-2.5">
+              {["Zero Difference Rule","FS Reconciliation","Debit = Credit","Opening + Movement = Closing"].map(t => (
+                <span key={t} className="text-[11px] px-2 py-0.5 bg-white/10 border border-white/20 rounded-full text-blue-100">{t}</span>
+              ))}
+            </div>
+          </div>
+          <Button
+            onClick={onGenerateTbGl}
+            disabled={loading || tbGlProgress?.running}
+            className="bg-white text-blue-800 hover:bg-blue-50 font-bold shrink-0 shadow"
+          >
+            {tbGlProgress?.running
+              ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Generating…</>
+              : tb ? <><RefreshCw className="w-4 h-4 mr-2" /> Re-generate</>
+              : <><Play className="w-4 h-4 mr-2" /> Generate TB</>
+            }
+          </Button>
+        </div>
+      </div>
+
+      {/* TB Engine Progress */}
+      {(tbGlProgress?.running || tbStages.length > 0) && (
+        <div className="bg-white border border-blue-200 rounded-2xl p-4 shadow-sm">
+          <p className="text-xs font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <Loader2 className={cn("w-3.5 h-3.5", tbGlProgress?.running ? "animate-spin text-blue-500" : "text-emerald-500")} />
+            Engine Pipeline
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            {(tbStages.length > 0
+              ? tbStages
+              : ["Input Extraction","Trial Balance","General Ledger","Reconciliation","Enforcement Check"].map(s => ({ stage: s, status: "pending", detail: "Waiting…" }))
+            ).map((s: any, i: number) => (
+              <div key={i} className="flex items-center gap-2 flex-1 min-w-0">
+                {s.status === "ok" ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  : s.status === "fail" ? <X className="w-4 h-4 text-red-500 shrink-0" />
+                  : tbGlProgress?.running ? <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+                  : <div className="w-4 h-4 rounded-full border-2 border-slate-200 shrink-0" />}
+                <div className="flex-1 min-w-0">
+                  <p className={cn("text-xs font-medium truncate",
+                    s.status === "ok" ? "text-emerald-700" : s.status === "fail" ? "text-red-600" : "text-slate-500"
+                  )}>{s.stage}</p>
+                  {s.detail && s.detail !== "Waiting…" && <p className="text-[10px] text-slate-400 truncate">{s.detail}</p>}
+                </div>
+                {i < 4 && <div className="hidden sm:block w-5 h-px bg-slate-200 shrink-0" />}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* TB Results */}
+      {tb && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: "TB Accounts",      value: tb.lineCount ?? "—",  color: "blue",   icon: Database },
+            { label: "TB Status",        value: tb.balanced ? "Balanced ✓" : "Imbalanced ✗",  color: tb.balanced ? "emerald" : "red", icon: CheckCircle2 },
+            { label: "Difference",       value: tb.difference != null ? (tb.difference === 0 ? "0.00 ✓" : tb.difference.toLocaleString()) : "—", color: tb.difference === 0 ? "emerald" : "red", icon: Calculator },
+            { label: "Last Generated",   value: tbGlProgress?.result?.generatedAt ? new Date(tbGlProgress.result.generatedAt).toLocaleTimeString() : "—", color: "slate", icon: Clock },
+          ].map(stat => (
+            <div key={stat.label} className={cn(
+              "bg-white border rounded-2xl p-4 text-center shadow-sm",
+              stat.color === "emerald" ? "border-emerald-200" : stat.color === "red" ? "border-red-200" : "border-slate-200"
+            )}>
+              <p className={cn("text-xl font-bold",
+                stat.color === "emerald" ? "text-emerald-700" : stat.color === "red" ? "text-red-600" : stat.color === "blue" ? "text-blue-700" : "text-slate-800"
+              )}>{stat.value}</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* COA Preview */}
+      {coaData && coaData.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-gradient-to-r from-slate-50 to-blue-50/30 px-5 py-3 border-b border-slate-200/60 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Database className="w-4 h-4 text-blue-600" />
+              <span className="font-semibold text-slate-900 text-sm">Chart of Accounts</span>
+              <span className="text-xs text-slate-500">({coaData.length} accounts)</span>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={onRefresh} disabled={loading} className="h-7 text-xs">
+                <RefreshCw className="w-3 h-3 mr-1" /> Refresh
+              </Button>
+              <Button size="sm" onClick={onValidate} disabled={loading} className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white">
+                <CheckCircle2 className="w-3 h-3 mr-1" /> Validate
+              </Button>
+            </div>
+          </div>
+          <div className="overflow-x-auto max-h-64 overflow-y-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-slate-50/80 sticky top-0">
+                <tr>
+                  {["Code","Account Name","Type","Opening","Debit","Credit","Closing"].map(h => (
+                    <th key={h} className="px-3 py-2 text-left font-semibold text-slate-600 whitespace-nowrap border-b border-slate-100">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {coaData.slice(0, 50).map((row: any) => (
+                  <tr key={row.id} className="hover:bg-blue-50/20 transition-colors">
+                    <td className="px-3 py-1.5 font-mono text-slate-700">{row.accountCode}</td>
+                    <td className="px-3 py-1.5 text-slate-800 max-w-[180px] truncate">{row.accountName}</td>
+                    <td className="px-3 py-1.5"><span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 font-medium">{row.accountType || "—"}</span></td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{row.openingBalance?.toLocaleString() ?? "—"}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-blue-700">{row.debit?.toLocaleString() ?? "—"}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-red-600">{row.credit?.toLocaleString() ?? "—"}</td>
+                    <td className={cn("px-3 py-1.5 text-right tabular-nums font-semibold", (row.closingBalance ?? 0) >= 0 ? "text-slate-900" : "text-red-600")}>
+                      {row.closingBalance?.toLocaleString() ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {coaData.length > 50 && <p className="text-center text-xs text-slate-400 py-2">Showing 50 of {coaData.length} accounts</p>}
+          </div>
+        </div>
+      )}
+
+      {!tb && !tbGlProgress?.running && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-8 text-center">
+          <BarChart2 className="w-10 h-10 text-blue-300 mx-auto mb-3" />
+          <p className="font-semibold text-slate-700">Trial Balance Not Yet Generated</p>
+          <p className="text-sm text-slate-500 mt-1">Click "Generate TB" above to produce a fully balanced Trial Balance.</p>
+        </div>
+      )}
+
+      {/* Next step */}
+      {tb?.balanced && (
+        <div className="bg-white border border-emerald-200 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+            <div>
+              <p className="font-semibold text-slate-900">Trial Balance is balanced ✓</p>
+              <p className="text-sm text-slate-500">Proceed to generate the General Ledger.</p>
+            </div>
+          </div>
+          <Button onClick={onNext} className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow font-bold">
+            <ArrowRight className="w-4 h-4 mr-2" /> General Ledger
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TAB 6 — General Ledger Stage
+// ─────────────────────────────────────────────────────────────────────────────
+function GlGenerationStage({ auditMaster, tbGlProgress, onGenerateTbGl, reconResults, onRunRecon, loading, session, onNext }: any) {
+  const gl = tbGlProgress?.result?.gl;
+  const tbBalanced = tbGlProgress?.result?.tb?.balanced;
+
+  const reconSummary = (reconResults || []).filter((r: any) => r.type !== "info");
+  const fullyReconciled = reconSummary.length === 0 || reconSummary.every((r: any) => r.status === "ok");
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-violet-700 to-purple-800 rounded-2xl p-5 text-white shadow-md">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+            <GitMerge className="w-6 h-6 text-violet-200" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-lg font-bold">General Ledger Generation</h2>
+            <p className="text-sm text-violet-100 mt-0.5">
+              Generates transaction-wise ledgers for every account with realistic narrations and dates. 
+              GL must <span className="font-semibold text-white">fully reconcile</span> with the Trial Balance.
+            </p>
+            <div className="flex flex-wrap gap-2 mt-2.5">
+              {["Opening → Movements → Closing","Realistic Transactions","Date & Narration","Full TB Reconciliation"].map(t => (
+                <span key={t} className="text-[11px] px-2 py-0.5 bg-white/10 border border-white/20 rounded-full text-violet-100">{t}</span>
+              ))}
+            </div>
+          </div>
+          <Button
+            onClick={onGenerateTbGl}
+            disabled={loading || tbGlProgress?.running}
+            className="bg-white text-violet-800 hover:bg-violet-50 font-bold shrink-0 shadow"
+          >
+            {tbGlProgress?.running
+              ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Generating…</>
+              : gl ? <><RefreshCw className="w-4 h-4 mr-2" /> Re-generate</>
+              : <><Play className="w-4 h-4 mr-2" /> Generate GL</>
+            }
+          </Button>
+        </div>
+      </div>
+
+      {/* GL Stats */}
+      {gl && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: "GL Accounts",      value: gl.accounts ?? "—",  color: "violet" },
+            { label: "Total Entries",    value: gl.entries ?? "—",   color: "violet" },
+            { label: "TB Reconciled",    value: tbBalanced ? "Yes ✓" : "Pending",  color: tbBalanced ? "emerald" : "amber" },
+            { label: "Recon Status",     value: fullyReconciled ? "Clean ✓" : `${reconSummary.length} issues`, color: fullyReconciled ? "emerald" : "red" },
+          ].map(stat => (
+            <div key={stat.label} className={cn(
+              "bg-white border rounded-2xl p-4 text-center shadow-sm",
+              stat.color === "emerald" ? "border-emerald-200" : stat.color === "red" ? "border-red-200" : stat.color === "amber" ? "border-amber-200" : "border-violet-200"
+            )}>
+              <p className={cn("text-xl font-bold",
+                stat.color === "emerald" ? "text-emerald-700" : stat.color === "red" ? "text-red-600" : stat.color === "amber" ? "text-amber-600" : "text-violet-700"
+              )}>{stat.value}</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Reconciliation Results */}
+      {reconResults && reconResults.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-gradient-to-r from-slate-50 to-violet-50/30 px-5 py-3 border-b border-slate-200/60 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <GitMerge className="w-4 h-4 text-violet-600" />
+              <span className="font-semibold text-slate-900 text-sm">3-Way Reconciliation</span>
+              <span className={cn("text-[11px] px-2 py-0.5 rounded-full font-semibold",
+                fullyReconciled ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+              )}>{fullyReconciled ? "All Reconciled" : `${reconSummary.length} Issues`}</span>
+            </div>
+            <Button size="sm" onClick={onRunRecon} disabled={loading} variant="outline" className="h-7 text-xs">
+              <RefreshCw className="w-3 h-3 mr-1" /> Re-run
+            </Button>
+          </div>
+          <div className="divide-y divide-slate-50 max-h-60 overflow-y-auto">
+            {reconResults.map((r: any, i: number) => (
+              <div key={i} className="px-5 py-2.5 flex items-start gap-3">
+                {r.status === "ok" ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+                  : r.status === "fail" ? <X className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                  : <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-slate-800">{r.check || r.label}</p>
+                  {r.detail && <p className="text-[11px] text-slate-500">{r.detail}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!gl && !tbGlProgress?.running && (
+        <div className="bg-violet-50 border border-violet-200 rounded-2xl p-8 text-center">
+          <GitMerge className="w-10 h-10 text-violet-300 mx-auto mb-3" />
+          <p className="font-semibold text-slate-700">General Ledger Not Yet Generated</p>
+          <p className="text-sm text-slate-500 mt-1">
+            {tbBalanced
+              ? "Trial Balance is balanced. Click \"Generate GL\" to produce the full General Ledger."
+              : "Generate the Trial Balance first (Tab 5), then return here to generate the GL."}
+          </p>
+        </div>
+      )}
+
+      {gl && fullyReconciled && (
+        <div className="bg-white border border-emerald-200 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+            <div>
+              <p className="font-semibold text-slate-900">General Ledger is fully reconciled ✓</p>
+              <p className="text-sm text-slate-500">{gl.accounts} accounts · {gl.entries} entries — all balanced and reconciled with TB.</p>
+            </div>
+          </div>
+          <Button onClick={onNext} className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow font-bold">
+            <ArrowRight className="w-4 h-4 mr-2" /> Working Papers
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TAB 8 — Review Stage
+// ─────────────────────────────────────────────────────────────────────────────
+function ReviewStage({ heads, session, exceptions, onApprove, onResolveException, onRefresh, onNext, loading }: any) {
+  const allHeads = heads || [];
+  const generated = allHeads.filter((h: any) => ["generated","approved","exported","completed"].includes(h.status));
+  const approved = allHeads.filter((h: any) => ["approved","exported","completed"].includes(h.status));
+  const pending = allHeads.filter((h: any) => !["approved","exported","completed"].includes(h.status));
+  const openExc = (exceptions || []).filter((e: any) => e.status === "open");
+  const reviewPct = allHeads.length > 0 ? Math.round((approved.length / allHeads.length) * 100) : 0;
+
+  const WP_HEADS = [
+    "Pre-Engagement & Acceptance","Planning & Strategy","Risk Assessment (ISA 315/240)","Analytical Review (ISA 520)",
+    "Internal Controls (ISA 315)","Substantive Procedures","Audit Evidence (ISA 500 Series)",
+    "Misstatements (ISA 450)","Completion (ISA 560/570/580)","Reporting (ISA 700 Series)",
+    "Quality Control (ISQM 1)","Archiving & Closure",
+  ];
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-teal-700 to-emerald-800 rounded-2xl p-5 text-white shadow-md">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+            <ClipboardCheck className="w-6 h-6 text-teal-200" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-lg font-bold">Review & Approval</h2>
+            <p className="text-sm text-teal-100 mt-0.5">
+              Review all generated working papers, apply comments, and approve for final output. 
+              All WPs must be approved before proceeding to Final Output.
+            </p>
+          </div>
+          <Button onClick={onRefresh} disabled={loading} variant="outline" className="border-white/30 text-white hover:bg-white/10 shrink-0">
+            <RefreshCw className="w-4 h-4 mr-2" /> Refresh
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: "Total WPs",        value: allHeads.length || 12,  color: "slate" },
+          { label: "Generated",        value: generated.length,        color: "blue" },
+          { label: "Approved",         value: approved.length,         color: "emerald" },
+          { label: "Review Progress",  value: `${reviewPct}%`,         color: reviewPct === 100 ? "emerald" : "amber" },
+        ].map(s => (
+          <div key={s.label} className={cn(
+            "bg-white border rounded-2xl p-4 text-center shadow-sm",
+            s.color === "emerald" ? "border-emerald-200" : s.color === "amber" ? "border-amber-200" : s.color === "blue" ? "border-blue-200" : "border-slate-200"
+          )}>
+            <p className={cn("text-2xl font-bold",
+              s.color === "emerald" ? "text-emerald-700" : s.color === "amber" ? "text-amber-600" : s.color === "blue" ? "text-blue-700" : "text-slate-800"
+            )}>{s.value}</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* WP Review Table */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-slate-50 to-teal-50/20 px-5 py-3 border-b border-slate-200/60">
+          <span className="font-semibold text-slate-900 text-sm">Working Papers — Review Status</span>
+        </div>
+        <div className="divide-y divide-slate-50">
+          {WP_HEADS.map((label, idx) => {
+            const head = allHeads.find((h: any) => h.headIndex === idx);
+            const statusMap: Record<string, { label: string; color: string }> = {
+              generated:  { label: "Generated — Pending Review", color: "blue" },
+              approved:   { label: "Approved ✓",                  color: "emerald" },
+              exported:   { label: "Exported ✓",                  color: "emerald" },
+              completed:  { label: "Completed ✓",                 color: "emerald" },
+              error:      { label: "Error — Needs Attention",      color: "red" },
+              pending:    { label: "Not Yet Generated",            color: "slate" },
+            };
+            const status = head?.status || "pending";
+            const statusInfo = statusMap[status] || statusMap.pending;
+            const canApprove = head && head.status === "generated";
+
+            return (
+              <div key={idx} className="px-5 py-3 flex items-center gap-4">
+                <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                  <span className="text-[10px] font-bold text-slate-500">{String(idx + 1).padStart(2, "0")}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-800 truncate">{label}</p>
+                  <span className={cn(
+                    "inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded mt-0.5",
+                    statusInfo.color === "emerald" ? "bg-emerald-100 text-emerald-700" :
+                    statusInfo.color === "blue" ? "bg-blue-100 text-blue-700" :
+                    statusInfo.color === "red" ? "bg-red-100 text-red-700" :
+                    "bg-slate-100 text-slate-500"
+                  )}>{statusInfo.label}</span>
+                </div>
+                {head?.wordCount && <span className="text-[11px] text-slate-400 shrink-0">{head.wordCount.toLocaleString()} words</span>}
+                {canApprove && (
+                  <Button size="sm" onClick={() => onApprove(idx)} disabled={loading}
+                    className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shrink-0">
+                    <CheckCircle2 className="w-3 h-3 mr-1" /> Approve
+                  </Button>
+                )}
+                {!canApprove && head?.status === "approved" && (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Open Exceptions */}
+      {openExc.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+            <span className="font-semibold text-amber-900 text-sm">{openExc.length} Open Exception{openExc.length !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="space-y-1.5">
+            {openExc.slice(0, 5).map((e: any) => (
+              <div key={e.id} className="flex items-center gap-2.5 text-xs">
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                <span className="text-amber-900 flex-1 truncate">{e.title}</span>
+                <button onClick={() => onResolveException(e.id, "cleared")}
+                  className="text-[10px] px-2 py-0.5 rounded bg-amber-200 text-amber-800 hover:bg-amber-300 font-medium">Clear</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Proceed button */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-3">
+          {reviewPct === 100 && openExc.length === 0
+            ? <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+            : <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0" />}
+          <div>
+            <p className="font-semibold text-slate-900">
+              {reviewPct === 100 && openExc.length === 0
+                ? "All working papers approved — ready for Final Output"
+                : `${approved.length}/${allHeads.length || 12} approved · ${openExc.length} open exception${openExc.length !== 1 ? "s" : ""}`}
+            </p>
+            <p className="text-sm text-slate-500">
+              {reviewPct < 100 ? "Approve all working papers before proceeding." : "Proceed to generate final reconciled outputs."}
+            </p>
+          </div>
+        </div>
+        <Button
+          onClick={onNext}
+          disabled={loading}
+          className={cn(
+            "font-bold shadow shrink-0",
+            reviewPct === 100 && openExc.length === 0
+              ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
+              : "bg-gradient-to-r from-slate-600 to-slate-700 text-white"
+          )}
+        >
+          <Download className="w-4 h-4 mr-2" /> Final Output
+        </Button>
+      </div>
     </div>
   );
 }

@@ -1,0 +1,97 @@
+**ULTIMATE SELF-CORRECTING PROMPT — WORKING PAPER GENERATOR ENGINE**
+
+Continuously scan, validate, and update the entire Working Paper Generator system to ensure that the workflow strictly and completely follows the exact sequence below, with no omission, no duplication, and no deviation:
+
+**Upload → Extraction → AI Completion → Validation (all variables editable) → Trial Balance Generation → General Ledger Generation → Working Papers Generation → Review → Final Output**
+
+Apply the following rules:
+
+1. **Full System Audit & Update**
+
+   * Scan all frontend, backend, database schemas, APIs, and processing logic.
+   * Identify any missing steps, broken links, inconsistencies, redundant logic, or incomplete mappings.
+   * Automatically fix and update all identified gaps.
+
+2. **Strict Workflow Enforcement**
+
+   * Ensure each stage is completed fully before the next begins.
+   * Do not allow skipping, merging, or reordering of steps.
+   * Ensure exact alignment with the defined sequence — no more, no less.
+
+3. **Upload Stage**
+
+   * Validate template structure and file formats.
+   * Ensure OCR integration for non-Excel files.
+   * Store uploaded data as immutable source.
+
+4. **Extraction Stage**
+
+   * Extract 100% of structured data from uploaded template and documents.
+   * Map all fields to predefined Category A variables.
+   * Ensure zero data loss.
+
+5. **AI Completion Stage**
+
+   * Populate all remaining variables (Category B) using AI.
+   * Derive values strictly from extracted data and audit logic.
+   * Flag only those fields where data is genuinely unavailable.
+
+6. **Validation Stage (Editable Layer)**
+
+   * Present all variables (Category A + B) in editable format.
+   * Apply validation rules:
+
+     * Mandatory fields completion
+     * Logical consistency
+     * Cross-field reconciliation
+   * Maintain audit trail for all edits.
+
+7. **Trial Balance Generation**
+
+   * Generate a fully balanced Trial Balance.
+   * Ensure exact match with Financial Statements.
+   * Enforce zero difference rule.
+
+8. **General Ledger Generation**
+
+   * Generate transaction-wise ledgers with logical, realistic entries.
+   * Include opening, movements, and closing balances.
+   * Ensure full reconciliation with Trial Balance.
+
+9. **Working Papers Generation**
+
+   * Generate complete working papers sequentially from pre-planning to archiving.
+   * Apply ISA, ISQM, and IFRS logic.
+   * Ensure proper linkage with variables, risks, and assertions.
+
+10. **Review Stage**
+
+    * Enable user review, comments, and adjustments.
+    * Enforce review hierarchy and tracking.
+
+11. **Final Output**
+
+    * Generate downloadable, structured outputs (Excel, Word, PDF).
+    * Ensure all outputs are fully reconciled and audit-compliant.
+
+12. **Self-Correction Loop (CRITICAL)**
+
+    * After completing the full workflow, re-scan the entire system.
+    * Identify any missing variables, inconsistencies, or logical gaps.
+    * Automatically fix and update.
+    * Repeat this process continuously until:
+
+      **The system perfectly and exactly follows:
+      Upload → Extraction → AI Completion → Validation → TB Generation → GL Generation → WP Generation → Review → Final Output
+      (no more, no less, nothing missing, nothing extra).**
+
+13. **Final Condition**
+
+    * Stop only when the system is:
+
+      * Fully complete
+      * Fully reconciled
+      * Fully compliant
+      * Fully aligned with the defined workflow
+
+**This is a mandatory, continuous, self-correcting execution instruction for the entire Working Paper Generator system.**
