@@ -353,7 +353,6 @@ export default function WorkingPapers() {
     if (!activeSession) return;
     await handleParseTemplate();
     await autoFillVariables();
-    await fetchVariables();
     setStage("extraction");
   };
 
@@ -714,11 +713,10 @@ export default function WorkingPapers() {
       if (res.ok) {
         const result = await res.json();
         toast({
-          title: `100% Variables Populated`,
-          description: result.message || `${result.created} created, ${result.updated} updated. ${result.formulaCount || 0} calculated, ${result.assumptionCount || 0} assumed (flagged for review).`
+          title: `Variables Populated`,
+          description: result.message || `${result.created} created, ${result.updated} updated from template data.`
         });
         await fetchVariables();
-        setStage("variables");
       }
     } catch {} finally { setLoading(false); }
   };
@@ -1594,8 +1592,8 @@ export default function WorkingPapers() {
           data={extractionData}
           session={activeSession}
           onFetchArranged={() => { fetchArrangedData(); setStage("arranged_data"); }}
-          onRerun={runExtraction}
-          loading={loading}
+          onRerun={handleExtractData}
+          loading={loading || parseLoading}
           confidenceBadge={confidenceBadge}
           variablesPanel={
             <VariablesStage
@@ -2314,21 +2312,27 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onUpload, o
         </div>
       </div>
 
-      {/* ── 4. Extract Data (shown after any upload) ── */}
+      {/* ── 4. Extract Data (shown after template is uploaded) ── */}
       {hasAnyUploaded && (
-        <div className="bg-white border border-emerald-200 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-center gap-4">
+        <div className={cn(
+          "rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-center gap-4 border",
+          hasTemplate ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-slate-200"
+        )}>
           <div className="flex items-start gap-3 flex-1">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
-              <Sparkles className="w-5 h-5 text-emerald-600" />
+            <div className={cn(
+              "w-10 h-10 rounded-xl border flex items-center justify-center shrink-0",
+              hasTemplate ? "bg-white border-emerald-200" : "bg-white border-slate-200"
+            )}>
+              <FileCheck className={cn("w-5 h-5", hasTemplate ? "text-emerald-600" : "text-slate-400")} />
             </div>
             <div>
               <p className="text-sm font-bold text-slate-900">
-                {hasTemplate ? "Template ready — extract audit variables" : "Files uploaded — add the template to extract"}
+                {hasTemplate ? "Template ready — extract audit variables" : "Upload the Excel template to extract variables"}
               </p>
               <p className="text-xs text-slate-500 mt-0.5">
                 {hasTemplate
-                  ? "Parses the template and auto-populates all audit variables — materiality, risk, sampling, and more."
-                  : "Upload the completed Excel template above to proceed with AI extraction."}
+                  ? "Reads all rows from your template and maps them directly to audit variables — no AI, 100% from your file."
+                  : "The primary template (.xlsx) is required. Supporting documents are optional."}
               </p>
             </div>
           </div>
@@ -2337,11 +2341,11 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onUpload, o
               onClick={onExtractData}
               disabled={loading}
               size="lg"
-              className="px-7 shadow-md shrink-0 font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-200/50"
+              className="px-7 shadow-sm shrink-0 font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               {loading
                 ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Extracting…</>
-                : <><Sparkles className="w-4 h-4 mr-2" /> Extract Data <ArrowRight className="w-4 h-4 ml-2" /></>
+                : <><FileCheck className="w-4 h-4 mr-2" /> Extract Data <ArrowRight className="w-4 h-4 ml-2" /></>
               }
             </Button>
           )}
@@ -2665,7 +2669,7 @@ function ExtractionStage({ data, session, onFetchArranged, onRerun, loading, con
             </Button>
           )}
           <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onRerun} disabled={loading}>
-            <RefreshCw className={cn("w-3 h-3 mr-1", loading && "animate-spin")} /> Re-run Extraction
+            <RefreshCw className={cn("w-3 h-3 mr-1", loading && "animate-spin")} /> Re-extract from Template
           </Button>
           <Button size="sm" className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700" onClick={onFetchArranged}>
             <Database className="w-3 h-3 mr-1" /> Data Sheet <ArrowRight className="w-3 h-3 ml-1" />
