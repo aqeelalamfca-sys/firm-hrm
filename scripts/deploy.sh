@@ -114,75 +114,79 @@ push_to_github() {
 
 # ── 3. Deploy on VPS ──────────────────────────────────────────────────────────
 deploy_on_vps() {
-  log "Connecting to VPS ($VPS_IP)..."
+  log "Connecting to VPS ($VPS_IP) — Step 1: pull latest code..."
 
+  # Step 1: Pull code and kick off background build (exits SSH immediately)
   $SSH_CMD "${VPS_USER}@${VPS_IP}" << 'REMOTE'
-set -e
 APP_DIR=~/firm-hrm
 DEPLOY_DIR="$APP_DIR/deploy"
+LOG=/tmp/vps_deploy.log
 
 if [ ! -d "$APP_DIR/.git" ]; then
   echo "[VPS] First deploy — cloning repository..."
   git clone https://github.com/aqeelalamfca-sys/firm-hrm.git "$APP_DIR"
 else
-  echo "[VPS] Pulling latest code..."
+  echo "[VPS] Pulling latest code from origin/main..."
   cd "$APP_DIR"
   git fetch origin main
-  git reset --hard origin/main
+  git checkout main 2>/dev/null || true
+  git merge --ff-only origin/main 2>/dev/null || git pull origin main
 fi
 
 cd "$APP_DIR"
-echo "[VPS] Commit: $(git log --oneline -1)"
+echo "[VPS] Code is at: $(git log --oneline -1)"
 
-[ ! -f "$DEPLOY_DIR/.env" ] && cp "$DEPLOY_DIR/.env.example" "$DEPLOY_DIR/.env" \
-  && echo "[VPS] .env created — update with real credentials"
+[ ! -f "$DEPLOY_DIR/.env" ] && [ -f "$DEPLOY_DIR/.env.example" ] && \
+  cp "$DEPLOY_DIR/.env.example" "$DEPLOY_DIR/.env" && echo "[VPS] .env created"
 
 docker network create auditwise_auditwise 2>/dev/null || true
 
-cd "$DEPLOY_DIR"
-echo "[VPS] Stopping existing containers..."
-docker compose --env-file .env down --remove-orphans 2>/dev/null || true
-docker stop ana-backend 2>/dev/null || true
-docker rm -f ana-backend 2>/dev/null || true
-sleep 2
-
-echo "[VPS] Building ana-backend..."
-docker compose --env-file .env build --no-cache ana-backend
-docker compose --env-file .env up -d --force-recreate --no-deps ana-backend
-
-echo "[VPS] Waiting for backend to be healthy..."
-for i in 1 2 3 4 5 6 7 8; do
-  if curl -sf http://localhost:5002/api/health > /dev/null 2>&1; then
-    echo "[VPS] ✓ Backend healthy after ${i}x5s!"
-    break
-  fi
-  [ $i -eq 8 ] && echo "[VPS] ⚠ Health check timed out — check: docker logs ana-backend" && break
-  echo "[VPS] Attempt $i/8, waiting 5s..."
-  sleep 5
-done
-
-echo "[VPS] Seeding admin user..."
-docker exec ana-db psql -U ana_user -d ana_hrm -c "
-INSERT INTO users (email, password_hash, name, role, user_status, created_at, updated_at)
-VALUES (
-  'admin@calfirm.com',
-  '961c2b43f4d675b76fad6a74cb9797ca0c8e697254304c57b47e3b3adc13e66c',
-  'Admin',
-  'super_admin',
-  'active',
-  NOW(),
-  NOW()
-)
-ON CONFLICT (email) DO UPDATE
-  SET password_hash = EXCLUDED.password_hash,
-      role = EXCLUDED.role,
-      user_status = EXCLUDED.user_status,
-      updated_at = NOW();
-" 2>/dev/null && echo "[VPS] ✓ Admin user ensured" || echo "[VPS] ⚠ Admin seed skipped (db may not be ready)"
-
-echo "[VPS] Container status:"
-docker ps --filter "name=ana-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+# Launch build in background — writes to log, exits SSH session quickly
+echo "[VPS] Launching background build → $LOG"
+echo "" > "$LOG"
+nohup bash -c '
+  LOG=/tmp/vps_deploy.log
+  DEPLOY_DIR=~/firm-hrm/deploy
+  cd "$DEPLOY_DIR"
+  echo "[$(date -u)] Stopping old containers..." | tee -a "$LOG"
+  docker compose --env-file .env down --remove-orphans >> "$LOG" 2>&1 || true
+  docker stop ana-backend ana-frontend >> "$LOG" 2>&1 || true
+  docker rm -f ana-backend ana-frontend >> "$LOG" 2>&1 || true
+  sleep 2
+  echo "[$(date -u)] Building ana-backend..." | tee -a "$LOG"
+  docker compose --env-file .env build ana-backend >> "$LOG" 2>&1
+  echo "[$(date -u)] Starting ana-backend..." | tee -a "$LOG"
+  docker compose --env-file .env up -d --force-recreate --no-deps ana-backend >> "$LOG" 2>&1
+  echo "[$(date -u)] Building ana-frontend..." | tee -a "$LOG"
+  docker compose --env-file .env build ana-frontend >> "$LOG" 2>&1
+  echo "[$(date -u)] Starting ana-frontend..." | tee -a "$LOG"
+  docker compose --env-file .env up -d --force-recreate --no-deps ana-frontend >> "$LOG" 2>&1
+  echo "[$(date -u)] Seeding admin..." | tee -a "$LOG"
+  docker exec ana-db psql -U ana_user -d ana_hrm -c "INSERT INTO users (email,password_hash,name,role,user_status,created_at,updated_at) VALUES ('"'"'admin@calfirm.com'"'"','"'"'961c2b43f4d675b76fad6a74cb9797ca0c8e697254304c57b47e3b3adc13e66c'"'"','"'"'Admin'"'"','"'"'super_admin'"'"','"'"'active'"'"',NOW(),NOW()) ON CONFLICT (email) DO UPDATE SET password_hash=EXCLUDED.password_hash,role=EXCLUDED.role,updated_at=NOW();" >> "$LOG" 2>&1 || true
+  echo "[$(date -u)] DEPLOY COMPLETE!" | tee -a "$LOG"
+' >> "$LOG" 2>&1 &
+echo "[VPS] Background build started (PID $!). Monitor: tail -f /tmp/vps_deploy.log"
 REMOTE
+
+  log "Background build running on VPS. Waiting 3 min for build to complete..."
+
+  # Step 2: Wait then check
+  for WAIT in 60 60 60 30; do
+    sleep "$WAIT"
+    log "Checking build status..."
+    DONE=$($SSH_CMD "${VPS_USER}@${VPS_IP}" "tail -5 /tmp/vps_deploy.log 2>/dev/null" 2>/dev/null || echo "ssh_error")
+    echo "$DONE"
+    if echo "$DONE" | grep -q "DEPLOY COMPLETE"; then
+      break
+    fi
+  done
+
+  # Step 3: Show final container status
+  log "Final container status:"
+  $SSH_CMD "${VPS_USER}@${VPS_IP}" \
+    "docker ps --filter 'name=ana-' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null; \
+     echo; echo 'Last 10 lines of build log:'; tail -10 /tmp/vps_deploy.log 2>/dev/null" 2>/dev/null || true
+
   ok "VPS deployment complete"
 }
 
