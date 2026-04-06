@@ -1,8 +1,10 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedMCQQuestions } from "./mcq-seed";
+import { seedAdminUser } from "./seed-admin";
 import { startAutoGenScheduler } from "./scheduler/auto-regulatory";
 
+seedAdminUser().catch((err) => logger.error({ err }, "Failed to seed admin user"));
 seedMCQQuestions().catch((err) => logger.error({ err }, "Failed to seed MCQ questions"));
 
 const rawPort = process.env["PORT"];
