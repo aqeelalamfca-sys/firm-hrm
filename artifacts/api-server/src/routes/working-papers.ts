@@ -6694,6 +6694,22 @@ router.get("/download-template", async (_req: Request, res: Response) => {
       "BS","P&L","OCI","EQ","CF"
     ], "Statement_Type", "BS=Balance Sheet, P&L=Profit & Loss, OCI=Other Comprehensive Income, EQ=Equity, CF=Cash Flow");
 
+    // Col C — FS_Section
+    addDropdown(`C${DATA_ROWS.split(":")[0]}:C${DATA_ROWS.split(":")[1]}`, [
+      "Assets","Equity","Liabilities","Income","Expenses","OCI","Notes"
+    ], "FS_Section", "Select the financial statement section this line belongs to");
+
+    // Col D — Major_Head
+    addDropdown(`D${DATA_ROWS.split(":")[0]}:D${DATA_ROWS.split(":")[1]}`, [
+      "Non-Current Assets","Current Assets",
+      "Equity",
+      "Non-Current Liabilities","Current Liabilities",
+      "Revenue","Other income",
+      "Cost of Sales","Gross Profit",
+      "Administrative Expenses","Selling and Distribution",
+      "Finance Cost","Taxation","Other Expenses"
+    ], "Major_Head", "Select the major classification head for this line item");
+
     // Col N — Normal_Balance
     addDropdown(`N${DATA_ROWS.split(":")[0]}:N${DATA_ROWS.split(":")[1]}`, [
       "Debit","Credit"
