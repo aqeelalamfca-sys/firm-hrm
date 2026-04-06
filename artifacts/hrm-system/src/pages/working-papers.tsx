@@ -18,16 +18,15 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
-// NOTE: "Validation" tab has been removed; all variable review/editing lives in "Data Extraction".
+// Pipeline: Upload → Data Extraction → Trial Balance → General Ledger → WP Listing → WP Generation → Export
 const STAGES = [
-  { key: "upload",        label: "Upload",          icon: Upload,         phase: "facts",    desc: "Template & Supporting Documents" },
-  { key: "extraction",    label: "Data Extraction", icon: Sparkles,       phase: "facts",    desc: "Extract 100% Template Data + Variable Review, Exceptions & Confirmation" },
-  { key: "arranged_data", label: "AI Data Sheet",    icon: Bot,            phase: "facts",    desc: "AI-Completed Variable Sheet — All Fields Populated" },
-  { key: "tb_generation", label: "Trial Balance",   icon: BarChart2,      phase: "judgment", desc: "Fully Balanced TB – Zero Difference" },
-  { key: "gl_generation", label: "General Ledger",  icon: GitMerge,       phase: "judgment", desc: "Transaction-wise GL – Reconciled with TB" },
-  { key: "generation",    label: "Working Papers",  icon: FileCheck,      phase: "output",   desc: "AI Generated Complete WPs (ISA Compliant)" },
-  { key: "review",        label: "Review",          icon: ClipboardCheck, phase: "output",   desc: "Review, Comments & Approvals" },
-  { key: "export",        label: "Final Output",    icon: Download,       phase: "output",   desc: "Reconciled Downloadable Outputs" },
+  { key: "upload",        label: "Upload",         icon: Upload,        phase: "facts",    desc: "Template & Supporting Documents" },
+  { key: "extraction",    label: "Data Extraction",icon: Sparkles,      phase: "facts",    desc: "Template Filled + AI Filled variables — inline review, exceptions & confirmation" },
+  { key: "tb_generation", label: "Trial Balance",  icon: BarChart2,     phase: "judgment", desc: "AI-generated fully balanced Trial Balance – Zero Difference" },
+  { key: "gl_generation", label: "General Ledger", icon: GitMerge,      phase: "judgment", desc: "Transaction-wise GL – Fully reconciled with TB" },
+  { key: "wp_listing",    label: "WP Listing",     icon: ClipboardList, phase: "output",   desc: "AI-recommended WP selection — choose which papers to generate" },
+  { key: "generation",    label: "WP Generation",  icon: FileCheck,     phase: "output",   desc: "Sequential AI generation of all WP sections (ISA Compliant)" },
+  { key: "export",        label: "Export",         icon: Download,      phase: "output",   desc: "TB Excel · GL Excel · WP Excel · WP Word" },
 ] as const;
 
 const FILE_CATEGORIES = [
@@ -510,8 +509,8 @@ export default function WorkingPapers() {
       if (res.ok) {
         toast({ title: "Data Sheet Approved", description: data.message });
         await fetchSession(activeSession.id);
-        fetchArrangedData();
-        setStage("arranged_data");
+        fetchVariables();
+        setStage("extraction");
       } else {
         toast({ title: "Approval failed", description: data.error, variant: "destructive" });
       }
@@ -698,7 +697,8 @@ export default function WorkingPapers() {
       if (res.ok) {
         toast({ title: "All fields approved" });
         await fetchSession(activeSession.id);
-        setStage("arranged_data");
+        fetchVariables();
+        setStage("extraction");
       }
     } catch {} finally { setLoading(false); }
   };
@@ -1058,6 +1058,37 @@ export default function WorkingPapers() {
     } catch {}
   };
 
+  const [exportingQuick, setExportingQuick] = useState<string | null>(null);
+  const exportQuick = async (jobType: "tb_excel" | "gl_excel" | "wp_excel" | "wp_word") => {
+    if (!activeSession || exportingQuick) return;
+    setExportingQuick(jobType);
+    try {
+      const ext = jobType === "wp_word" ? "docx" : "xlsx";
+      const label = { tb_excel: "TB", gl_excel: "GL", wp_excel: "WP_Index", wp_word: "WP_Index" }[jobType];
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/generate-output`, {
+        method: "POST", headers,
+        body: JSON.stringify({ jobType, triggeredBy: "User" }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.download = `${label}_${activeSession.clientName || "Client"}_${activeSession.engagementYear}.${ext}`;
+        a.href = url;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast({ title: `${label} exported`, description: `.${ext} file downloaded` });
+      } else {
+        const e = await res.json().catch(() => ({}));
+        toast({ title: "Export failed", description: e.error || "Unknown error", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+    } finally {
+      setExportingQuick(null);
+    }
+  };
+
   const fetchExceptions = async () => {
     if (!activeSession) return;
     try {
@@ -1323,7 +1354,7 @@ export default function WorkingPapers() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {sessions.map((s: any) => {
-                  const stageOrder = ["upload", "extraction", "data_sheet", "arranged_data", "audit_engine", "generation", "export"];
+                  const stageOrder = ["upload","extraction","tb_generation","gl_generation","wp_listing","generation","export"];
                   const stageIdx = stageOrder.indexOf(s.status);
                   const progressPct = stageIdx < 0 ? 0 : Math.round(((stageIdx + 1) / stageOrder.length) * 100);
                   const isDone = s.status === "completed" || s.status === "exported";
@@ -1433,9 +1464,9 @@ export default function WorkingPapers() {
           {/* Phase strip */}
           <div className="hidden sm:flex items-center gap-0 pt-2 pb-0 text-[9px] font-bold uppercase tracking-widest">
             {([ 
-              { label: "Facts", keys: ["upload","extraction","arranged_data"], color: "blue" },
+              { label: "Facts", keys: ["upload","extraction"], color: "blue" },
               { label: "Audit Judgment", keys: ["tb_generation","gl_generation"], color: "violet" },
-              { label: "Defensible Output", keys: ["generation","review","export"], color: "emerald" },
+              { label: "Defensible Output", keys: ["wp_listing","generation","export"], color: "emerald" },
             ] as const).map((ph, pi) => {
               const phaseStages = STAGES.filter(s => ph.keys.includes(s.key as any));
               const isCurrentPhase = ph.keys.includes(stage as any);
@@ -1480,12 +1511,12 @@ export default function WorkingPapers() {
                   onClick={() => {
                     setStage(s.key);
                     if (s.key === "extraction" && variables.length === 0) { fetchVariables(); fetchCoaData(); }
-                    if (s.key === "arranged_data" && !arrangedData) fetchArrangedData();
                     if (s.key === "tb_generation" || s.key === "gl_generation") {
                       fetchCoaData();
-                      if (!auditMaster) { fetchAuditMaster(); fetchWpTriggers(); fetchSampling(); fetchAnalytics(); fetchControlMatrix(); fetchEvidence(); }
+                      if (!auditMaster) { fetchAuditMaster(); fetchSampling(); fetchAnalytics(); fetchControlMatrix(); fetchEvidence(); }
                     }
-                    if (s.key === "generation" || s.key === "export" || s.key === "review") { fetchSession(activeSession.id); fetchExceptions(); }
+                    if (s.key === "wp_listing") { fetchWpTriggers(); fetchSession(activeSession.id); }
+                    if (s.key === "generation" || s.key === "export") { fetchSession(activeSession.id); fetchExceptions(); }
                   }}
                 >
                   {isPast ? <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" /> : <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
@@ -1507,14 +1538,13 @@ export default function WorkingPapers() {
           {[
             { step: "Upload",          phase: "facts",    active: stage === "upload" },
             { step: "Data Extraction", phase: "facts",    active: stage === "extraction" },
-            { step: "AI Data Sheet",   phase: "facts",    active: stage === "arranged_data" },
             { step: "Trial Balance",   phase: "judgment", active: stage === "tb_generation" },
-            { step: "GL Generation",   phase: "judgment", active: stage === "gl_generation" },
+            { step: "General Ledger",  phase: "judgment", active: stage === "gl_generation" },
+            { step: "WP Listing",      phase: "output",   active: stage === "wp_listing" },
             { step: "WP Generation",   phase: "output",   active: stage === "generation" },
-            { step: "Review",          phase: "output",   active: stage === "review" },
-            { step: "Final Output",    phase: "output",   active: stage === "export" },
+            { step: "Export",          phase: "output",   active: stage === "export" },
           ].map((item, idx) => {
-            const stageOrder = ["upload","extraction","arranged_data","tb_generation","gl_generation","generation","review","export"];
+            const stageOrder = ["upload","extraction","tb_generation","gl_generation","wp_listing","generation","export"];
             const pastIdx = stageOrder.indexOf(stage);
             const isPast = pastIdx > idx;
             return (
@@ -1616,7 +1646,7 @@ export default function WorkingPapers() {
         <ExtractionStage
           data={extractionData}
           session={activeSession}
-          onFetchArranged={() => { fetchArrangedData(); setStage("arranged_data"); }}
+          onRefreshVariables={() => { fetchVariables(); fetchCoaData(); }}
           onRerun={handleExtractData}
           onAiFill={handleAiFill}
           loading={loading || parseLoading}
@@ -1648,21 +1678,7 @@ export default function WorkingPapers() {
         />
       )}
 
-      {/* TAB 3 — AI Data Sheet */}
-      {stage === "arranged_data" && (
-        <ArrangedDataStage
-          data={arrangedData}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          onFetch={fetchArrangedData}
-          onApproveAll={approveAllFields}
-          onNext={() => { autoFillVariables(); setStage("tb_generation"); }}
-          loading={loading}
-          confidenceBadge={confidenceBadge}
-        />
-      )}
-
-      {/* TAB 4 — Trial Balance (Validation tab removed; variables now live in Data Extraction) */}
+      {/* TAB 3 — Trial Balance */}
       {stage === "tb_generation" && (
         <TbGenerationStage
           coaData={coaData}
@@ -1691,11 +1707,24 @@ export default function WorkingPapers() {
           onRunRecon={runRecon}
           loading={auditMasterLoading || loading}
           session={activeSession}
-          onNext={() => { fetchSession(activeSession.id); setStage("generation"); }}
+          onNext={() => { fetchWpTriggers(); fetchSession(activeSession.id); setStage("wp_listing"); }}
         />
       )}
 
-      {/* TAB 7 — Working Papers */}
+      {/* TAB 5 — WP Listing */}
+      {stage === "wp_listing" && (
+        <WpListingStage
+          heads={heads}
+          wpTriggers={wpTriggers}
+          session={activeSession}
+          loading={loading}
+          onEvaluateTriggers={evaluateWpTriggers}
+          onRefresh={() => { fetchWpTriggers(); fetchSession(activeSession.id); }}
+          onNext={() => { fetchSession(activeSession.id); fetchExceptions(); setStage("generation"); }}
+        />
+      )}
+
+      {/* TAB 6 — WP Generation */}
       {stage === "generation" && (
         <GenerationStage
           heads={heads}
@@ -1716,21 +1745,7 @@ export default function WorkingPapers() {
         />
       )}
 
-      {/* TAB 8 — Review */}
-      {stage === "review" && (
-        <ReviewStage
-          heads={heads}
-          session={activeSession}
-          exceptions={exceptions}
-          onApprove={approveHead}
-          onResolveException={resolveException}
-          onRefresh={() => { fetchSession(activeSession.id); fetchExceptions(); }}
-          onNext={() => setStage("export")}
-          loading={loading}
-        />
-      )}
-
-      {/* TAB 9 — Final Output */}
+      {/* TAB 7 — Export */}
       {stage === "export" && (
         <ExportStage
           heads={heads}
@@ -1738,6 +1753,8 @@ export default function WorkingPapers() {
           exceptions={exceptions}
           onExportHead={exportHead}
           onExportBundle={exportBundle}
+          onExportQuick={exportQuick}
+          exportingQuick={exportingQuick}
           onResolveException={resolveException}
           onRefresh={() => { fetchSession(activeSession.id); fetchExceptions(); }}
           loading={loading}
@@ -1789,7 +1806,7 @@ export default function WorkingPapers() {
         />
       )}
 
-      {exceptions.filter((e: any) => e.status === "open").length > 0 && !showExceptionsPanel && stage !== "generation" && stage !== "export" && (
+      {exceptions.filter((e: any) => e.status === "open").length > 0 && !showExceptionsPanel && !["generation","export","wp_listing"].includes(stage) && (
         <div className="fixed bottom-4 right-4 z-50 cursor-pointer" onClick={() => { fetchExceptions(); setShowExceptionsPanel(true); }}>
           <div className="bg-white border border-amber-200 rounded-xl p-3.5 shadow-xl shadow-amber-100/50 max-w-xs backdrop-blur-sm hover:shadow-amber-200/70 transition-shadow">
             <div className="flex items-center gap-2.5 text-amber-800 text-sm font-medium">
@@ -2637,7 +2654,7 @@ function TemplateParsedPanel({ result, onClear }: { result: any; onClear: () => 
   );
 }
 
-function ExtractionStage({ data, session, onFetchArranged, onRerun, onAiFill, loading, confidenceBadge, variablesPanel }: any) {
+function ExtractionStage({ data, session, onRefreshVariables, onRerun, onAiFill, loading, confidenceBadge, variablesPanel }: any) {
   const extractionData = data?.data || session?.extractionData;
   const stats = data?.stats;
   const [showRawResults, setShowRawResults] = useState(false);
@@ -6208,7 +6225,239 @@ function GlGenerationStage({ auditMaster, tbGlProgress, onGenerateTbGl, reconRes
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TAB 8 — Review Stage
+// TAB 5 — Working Paper Listing Stage
+// ─────────────────────────────────────────────────────────────────────────────
+const WP_CATEGORY_LABELS: Record<string, string> = {
+  pre_planning:  "Pre-Planning & Engagement Acceptance",
+  planning:      "Planning & Strategy",
+  risk:          "Risk Assessment (ISA 315/240)",
+  analytical:    "Analytical Procedures (ISA 520)",
+  controls:      "Internal Controls (ISA 315)",
+  substantive:   "Substantive Procedures",
+  evidence:      "Audit Evidence (ISA 500 Series)",
+  misstatements: "Misstatements & Communication (ISA 450/260)",
+  completion:    "Completion Procedures (ISA 560/570/580)",
+  reporting:     "Reporting (ISA 700 Series)",
+  quality:       "Quality Control (ISQM 1)",
+  archiving:     "Archiving & File Closure",
+};
+
+const DEFAULT_WP_ITEMS = [
+  { code:"A1", label:"Engagement Acceptance & Continuance",       category:"pre_planning",  mandatory:true  },
+  { code:"A2", label:"Client Background & Entity Profile",        category:"pre_planning",  mandatory:true  },
+  { code:"A3", label:"Independence & Ethics Confirmation",        category:"pre_planning",  mandatory:true  },
+  { code:"B1", label:"Audit Strategy & Planning Memorandum",     category:"planning",      mandatory:true  },
+  { code:"B2", label:"Materiality Computation",                  category:"planning",      mandatory:true  },
+  { code:"B3", label:"Overall Risk Assessment",                  category:"risk",          mandatory:true  },
+  { code:"B4", label:"Fraud Risk Assessment (ISA 240)",          category:"risk",          mandatory:true  },
+  { code:"C1", label:"Analytical Review — Ratios & Variance",    category:"analytical",    mandatory:false },
+  { code:"C2", label:"Trend Analysis — Revenue & Costs",         category:"analytical",    mandatory:false },
+  { code:"D1", label:"Internal Controls Walkthrough",            category:"controls",      mandatory:false },
+  { code:"D2", label:"Control Deficiency Documentation",         category:"controls",      mandatory:false },
+  { code:"E1", label:"Cash & Bank — Substantive Testing",        category:"substantive",   mandatory:false },
+  { code:"E2", label:"Trade Receivables — Confirmation",         category:"substantive",   mandatory:false },
+  { code:"E3", label:"Inventory — Observation & Valuation",      category:"substantive",   mandatory:false },
+  { code:"E4", label:"Property, Plant & Equipment",              category:"substantive",   mandatory:false },
+  { code:"E5", label:"Trade Payables & Accruals",                category:"substantive",   mandatory:false },
+  { code:"E6", label:"Revenue Testing & Cut-off",                category:"substantive",   mandatory:false },
+  { code:"E7", label:"Borrowings & Finance Costs",               category:"substantive",   mandatory:false },
+  { code:"E8", label:"Taxation — Current & Deferred",            category:"substantive",   mandatory:false },
+  { code:"F1", label:"Audit Evidence Summary",                   category:"evidence",      mandatory:true  },
+  { code:"G1", label:"Misstatement Schedule (ISA 450)",          category:"misstatements", mandatory:false },
+  { code:"H1", label:"Subsequent Events Review (ISA 560)",       category:"completion",    mandatory:true  },
+  { code:"H2", label:"Going Concern Assessment (ISA 570)",       category:"completion",    mandatory:true  },
+  { code:"H3", label:"Management Representation Letter (ISA 580)", category:"completion",  mandatory:true  },
+  { code:"I1", label:"Audit Opinion & Report Drafting (ISA 700)", category:"reporting",   mandatory:true  },
+  { code:"J1", label:"EQCR Review (ISQM 1)",                    category:"quality",       mandatory:false },
+  { code:"K1", label:"File Closure & Archiving Checklist",       category:"archiving",     mandatory:true  },
+];
+
+function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTriggers, onRefresh, onNext }: any) {
+  const allTriggers: any[]  = wpTriggers || [];
+  const allHeads: any[]     = heads || [];
+  const mandatoryCodes      = new Set(DEFAULT_WP_ITEMS.filter(w => w.mandatory).map(w => w.code));
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(DEFAULT_WP_ITEMS.filter(w => w.mandatory).map(w => w.code)));
+  const [evaluated, setEvaluated] = useState(allTriggers.some((t: any) => t.triggered));
+  const [evaluating, setEvaluating] = useState(false);
+  const triggeredCodes = new Set(allTriggers.filter((t: any) => t.triggered).map((t: any) => t.wpCode));
+
+  const handleEvaluate = async () => {
+    setEvaluating(true);
+    await onEvaluateTriggers?.();
+    await onRefresh?.();
+    // After refresh, auto-apply AI recommendation (triggers will update from parent)
+    const newSel = new Set<string>(mandatoryCodes);
+    for (const t of allTriggers) { if (t.triggered && t.wpCode) newSel.add(t.wpCode); }
+    setSelected(newSel);
+    setEvaluated(true);
+    setEvaluating(false);
+  };
+
+  // Sync selected when triggers update from parent
+  useEffect(() => {
+    if (allTriggers.some((t: any) => t.triggered)) {
+      setEvaluated(true);
+      setSelected(prev => {
+        const n = new Set(prev);
+        allTriggers.filter((t: any) => t.triggered && t.wpCode).forEach((t: any) => n.add(t.wpCode));
+        return n;
+      });
+    }
+  }, [allTriggers.length]);
+
+  const toggle = (code: string, isMandatory: boolean) => {
+    if (isMandatory) return;
+    setSelected(prev => { const n = new Set(prev); n.has(code) ? n.delete(code) : n.add(code); return n; });
+  };
+
+  const grouped = Object.keys(WP_CATEGORY_LABELS).map(cat => ({
+    cat, label: WP_CATEGORY_LABELS[cat],
+    items: DEFAULT_WP_ITEMS.filter(w => w.category === cat),
+  })).filter(g => g.items.length > 0);
+
+  const selectedCount  = selected.size;
+  const mandatoryCount = DEFAULT_WP_ITEMS.filter(w => w.mandatory).length;
+  const triggeredCount = DEFAULT_WP_ITEMS.filter(w => triggeredCodes.has(w.code) && !w.mandatory).length;
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-indigo-700 to-violet-800 rounded-2xl p-5 text-white shadow-md">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+            <ClipboardList className="w-6 h-6 text-indigo-200" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-lg font-bold">Working Paper Listing</h2>
+            <p className="text-sm text-indigo-100 mt-0.5">
+              AI evaluates your TB, GL, risk indicators, materiality, and account areas to recommend which working papers are required for this engagement.
+              Mandatory papers are always included. Review the AI recommendation, then confirm selection before generation begins.
+            </p>
+            <div className="flex flex-wrap gap-2 mt-2.5">
+              {["ISA/ISQM Compliant","Materiality-Driven","Risk-Based Selection","Account-Area Mapped"].map(t => (
+                <span key={t} className="text-[11px] px-2 py-0.5 bg-white/10 border border-white/20 rounded-full text-indigo-100">{t}</span>
+              ))}
+            </div>
+          </div>
+          <Button onClick={handleEvaluate} disabled={evaluating || loading} className="shrink-0 bg-white text-indigo-800 hover:bg-indigo-50 font-semibold shadow-sm">
+            {evaluating
+              ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Evaluating…</>
+              : <><Sparkles className="w-4 h-4 mr-2" />AI Recommend</>}
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label:"Total in Library", value:DEFAULT_WP_ITEMS.length, color:"slate",   sub:"working papers" },
+          { label:"Mandatory",        value:mandatoryCount,           color:"blue",    sub:"always included" },
+          { label:"AI Triggered",     value:triggeredCount,           color:"violet",  sub:evaluated ? "AI recommended" : "click AI Recommend" },
+          { label:"Selected",         value:selectedCount,            color:"emerald", sub:"will be generated" },
+        ].map(s => (
+          <div key={s.label} className={cn("bg-white border rounded-xl p-3.5 text-center shadow-sm",
+            s.color==="blue"?"border-blue-200":s.color==="violet"?"border-violet-200":s.color==="emerald"?"border-emerald-200":"border-slate-200"
+          )}>
+            <p className={cn("text-2xl font-bold",
+              s.color==="blue"?"text-blue-700":s.color==="violet"?"text-violet-700":s.color==="emerald"?"text-emerald-700":"text-slate-800"
+            )}>{s.value}</p>
+            <p className="text-[11px] text-slate-600 font-semibold mt-0.5">{s.label}</p>
+            <p className="text-[10px] text-slate-400">{s.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Selection controls */}
+      <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 justify-between">
+        <div className="flex items-center gap-2 text-sm text-slate-600">
+          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+          <span><strong>{selectedCount}</strong> of <strong>{DEFAULT_WP_ITEMS.length}</strong> working papers selected</span>
+          {evaluated && <span className="text-xs text-violet-600 font-semibold ml-2">· AI recommendations applied</span>}
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSelected(new Set(mandatoryCodes))}>Mandatory Only</Button>
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSelected(new Set(DEFAULT_WP_ITEMS.map(w => w.code)))}>Select All</Button>
+        </div>
+      </div>
+
+      {/* WP List grouped by ISA category */}
+      <div className="space-y-3">
+        {grouped.map(({ cat, label: catLabel, items }) => {
+          const catSelected = items.filter(w => selected.has(w.code)).length;
+          return (
+            <div key={cat} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+              <div className="bg-gradient-to-r from-slate-50 to-indigo-50/20 px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+                <span className="text-[12px] font-semibold text-slate-700">{catLabel}</span>
+                <span className="text-[11px] text-slate-400">{catSelected}/{items.length} selected</span>
+              </div>
+              <div className="divide-y divide-slate-50">
+                {items.map(wp => {
+                  const isSelected  = selected.has(wp.code);
+                  const isTriggered = triggeredCodes.has(wp.code);
+                  const hasHead     = allHeads.some((h: any) => {
+                    const idx = DEFAULT_WP_ITEMS.findIndex(d => d.code === wp.code);
+                    return h.headIndex === idx && ["generated","approved","completed"].includes(h.status);
+                  });
+                  return (
+                    <div
+                      key={wp.code}
+                      onClick={() => toggle(wp.code, wp.mandatory)}
+                      className={cn(
+                        "flex items-center gap-3 px-4 py-3 transition-colors",
+                        wp.mandatory ? "cursor-default" : "cursor-pointer hover:bg-slate-50/80",
+                        isSelected ? "bg-emerald-50/25" : ""
+                      )}
+                    >
+                      <div className={cn(
+                        "w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all",
+                        isSelected ? "bg-emerald-500 border-emerald-500" : "border-slate-300 bg-white",
+                        wp.mandatory ? "opacity-70" : ""
+                      )}>
+                        {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded w-7 text-center shrink-0">{wp.code}</span>
+                      <span className="flex-1 text-[13px] font-medium text-slate-800 min-w-0">{wp.label}</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {wp.mandatory && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 uppercase">Required</span>}
+                        {isTriggered && !wp.mandatory && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200 flex items-center gap-1 uppercase">
+                            <Sparkles className="w-2.5 h-2.5" /> AI
+                          </span>
+                        )}
+                        {hasHead && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 uppercase">✓ Done</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Proceed bar */}
+      <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-start gap-2 text-sm text-slate-500">
+          <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+          <span>Required papers cannot be deselected. All {selectedCount} selected papers will be generated sequentially, one complete section before the next.</span>
+        </div>
+        <Button
+          onClick={onNext}
+          disabled={loading || selectedCount === 0}
+          size="lg"
+          className="shrink-0 px-6 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-md shadow-indigo-200/40"
+        >
+          <FileCheck className="w-4 h-4 mr-2" />
+          Generate {selectedCount} WPs
+          <ArrowRight className="w-4 h-4 ml-2" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Review Stage (no longer in pipeline — kept for reference)
 // ─────────────────────────────────────────────────────────────────────────────
 function ReviewStage({ heads, session, exceptions, onApprove, onResolveException, onRefresh, onNext, loading }: any) {
   const allHeads = heads || [];
@@ -6371,7 +6620,7 @@ function ReviewStage({ heads, session, exceptions, onApprove, onResolveException
   );
 }
 
-function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle, onResolveException, onRefresh, loading, downloadingHeads, downloadedHeads }: any) {
+function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle, onExportQuick, exportingQuick, onResolveException, onRefresh, loading, downloadingHeads, downloadedHeads }: any) {
   const dlSet: Set<number> = downloadingHeads || new Set();
   const dledSet: Set<number> = downloadedHeads || new Set();
   const completedHeads = (heads || []).filter((h: any) => ["approved", "exported", "completed"].includes(h.status));
@@ -6388,8 +6637,29 @@ function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle,
     setExportingAll(false);
   };
 
+  const QUICK_EXPORTS = [
+    { key: "tb_excel",  label: "Trial Balance",     ext: ".xlsx", icon: FileText,  color: "blue",   desc: "All TB lines with classifications, debit/credit, confidence" },
+    { key: "gl_excel",  label: "General Ledger",    ext: ".xlsx", icon: Layers,    color: "violet", desc: "Source GL entries with narrations, vouchers, running balances" },
+    { key: "wp_excel",  label: "WP Index (Excel)",  ext: ".xlsx", icon: FileCheck, color: "emerald",desc: "Working paper listing — phases, status, prepared/approved by" },
+    { key: "wp_word",   label: "WP Index (Word)",   ext: ".docx", icon: FileText,  color: "indigo", desc: "ISA-formatted Word document suitable for physical audit file" },
+  ] as const;
+
+  const colorMap: Record<string, string> = {
+    blue:   "border-blue-200 bg-blue-50/40",
+    violet: "border-violet-200 bg-violet-50/40",
+    emerald:"border-emerald-200 bg-emerald-50/40",
+    indigo: "border-indigo-200 bg-indigo-50/40",
+  };
+  const iconColorMap: Record<string, string> = {
+    blue:   "bg-blue-100 text-blue-700",
+    violet: "bg-violet-100 text-violet-700",
+    emerald:"bg-emerald-100 text-emerald-700",
+    indigo: "bg-indigo-100 text-indigo-700",
+  };
+
   return (
     <div className="space-y-5">
+      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
@@ -6397,7 +6667,7 @@ function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle,
           </div>
           <div>
             <p className="text-2xl font-bold text-slate-900">{completedHeads.length}/{totalHeads}</p>
-            <p className="text-xs text-slate-500">Ready to Export</p>
+            <p className="text-xs text-slate-500">Working Papers Ready</p>
           </div>
         </div>
         <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
@@ -6420,13 +6690,55 @@ function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle,
         </div>
       </div>
 
+      {/* ── 4 Quick Export Cards ── */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-5 py-4 flex items-center gap-3">
+          <Download className="w-5 h-5 text-slate-300 shrink-0" />
+          <div>
+            <h2 className="font-semibold text-white text-sm">Quick Document Export</h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">Download individual output files — TB Excel · GL Excel · WP Excel · WP Word</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4">
+          {QUICK_EXPORTS.map(({ key, label, ext, icon: Icon, color, desc }) => {
+            const busy = exportingQuick === key;
+            return (
+              <button
+                key={key}
+                onClick={() => onExportQuick?.(key)}
+                disabled={!!exportingQuick || loading}
+                className={cn(
+                  "text-left flex items-start gap-3 p-4 rounded-xl border transition-all shadow-sm",
+                  colorMap[color],
+                  !exportingQuick && !loading ? "hover:shadow-md cursor-pointer" : "opacity-70 cursor-not-allowed"
+                )}
+              >
+                <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5", iconColorMap[color])}>
+                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon className="w-4 h-4" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-slate-800">{label}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200/80 text-slate-500 font-mono">{ext}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{desc}</p>
+                  {busy && <p className="text-[11px] text-violet-600 font-medium mt-1 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Generating...</p>}
+                </div>
+                <Download className={cn("w-4 h-4 shrink-0 mt-1", busy ? "text-violet-400" : "text-slate-400")} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Per-Head Export & Full Bundle ── */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="bg-gradient-to-r from-emerald-50 to-green-50/50 px-5 py-4 border-b border-slate-200/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-              <Download className="w-5 h-5 text-emerald-600" /> Export Center
+              <Download className="w-5 h-5 text-emerald-600" /> Export by Working Paper Head
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">Download completed working papers individually or as a full bundle</p>
+            <p className="text-xs text-slate-500 mt-0.5">Download completed WP sections individually or export the full audit bundle</p>
           </div>
           {onRefresh && (
             <Button variant="outline" size="sm" onClick={onRefresh} className="self-start h-8">

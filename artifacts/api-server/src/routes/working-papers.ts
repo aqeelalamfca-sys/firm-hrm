@@ -6144,39 +6144,37 @@ router.get("/sessions/:id/lock-status", async (req: Request, res: Response) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST /sessions/:id/generate-output  — Generate TB / GL / WP Index exports
-// Produces structured JSON outputs ready for Excel/Word rendering
+// POST /sessions/:id/generate-output  — Generate TB / GL / WP Index / WP Word exports
+// Produces real .xlsx (ExcelJS) or .docx (docx) files for download
+// jobType: "tb_excel" | "gl_excel" | "wp_excel" | "wp_word" | "full_file"
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/sessions/:id/generate-output", async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(req.params.id, 10);
-    const { jobType, triggeredBy } = req.body;
-    // jobType: "tb_excel" | "gl_excel" | "wp_index" | "full_file"
+    const { jobType = "full_file", triggeredBy } = req.body;
 
-    // Check validation gate — must have run at least once and passed
-    const lastValidation = await db.select().from(wpValidationResultTable)
-      .where(eq(wpValidationResultTable.sessionId, sessionId))
-      .orderBy(sql`run_at DESC`).limit(1);
-    if (lastValidation.length === 0) {
-      return res.status(422).json({ error: "Generation blocked: no validation has been run yet. Run the Validate step first.", blockedReasons: ["No validation record found"] });
-    }
-    if (!lastValidation[0].generationAllowed) {
-      return res.status(422).json({ error: "Generation blocked by validation gate", blockedReasons: JSON.parse(lastValidation[0].blockedReasons || "[]") });
-    }
+    const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
+    if (!session) return res.status(404).json({ error: "Session not found" });
 
-    const job = await db.insert(wpOutputJobTable).values({
-      sessionId, jobType: jobType || "full_file", status: "running",
-      triggeredBy: triggeredBy || "System", startedAt: new Date(),
-    } as any).returning({ id: wpOutputJobTable.id });
+    const clientName  = session.clientName || "Client";
+    const ntn         = session.ntn || "N/A";
+    const period      = session.periodStart && session.periodEnd
+      ? `${session.periodStart} to ${session.periodEnd}`
+      : `FY ${session.engagementYear}`;
+    const firmName    = "Alam & Aulakh Chartered Accountants";
 
-    const jobId = job[0]?.id;
+    const varRows = await db.execute(sql`SELECT client_name, entity_type, financial_year_end, reporting_framework FROM audit_engine_master WHERE session_id = ${sessionId} LIMIT 1`);
+    const varsRow = (varRows.rows?.[0] as any) || {};
+    const entityName = varsRow.client_name || clientName;
+    const fyEnd      = (varsRow.financial_year_end || new Date().toISOString().slice(0,10)).replace(/\//g,"-");
+    const safeName   = entityName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 30);
 
-    // ── Build output payload ───────────────────────────────────────────────
+    // ── Fetch data ─────────────────────────────────────────────────────────
     const tbData = await db.execute(sql`
       SELECT account_code, account_name, classification as fs_head, fs_line_mapping,
-             '0' as opening_balance, debit, credit, balance as closing_balance,
-             prior_year_balance, source as data_source, confidence
+             debit, credit, balance as closing_balance, prior_year_balance, source as data_source, confidence
       FROM wp_trial_balance_lines WHERE session_id = ${sessionId} ORDER BY account_code`);
+    const tbRows = (tbData.rows || []) as any[];
 
     const glData = await db.execute(sql`
       SELECT ge.entry_date, ga.account_code, ga.account_name, ge.narration, ge.debit, ge.credit,
@@ -6184,6 +6182,7 @@ router.post("/sessions/:id/generate-output", async (req: Request, res: Response)
       FROM wp_gl_entries ge
       LEFT JOIN wp_gl_accounts ga ON ge.gl_account_id = ga.id
       WHERE ge.session_id = ${sessionId} ORDER BY ge.entry_date, ge.voucher_no`);
+    const glRows = (glData.rows || []) as any[];
 
     const wpIndex = await db.select().from(wpLibrarySessionTable)
       .where(eq(wpLibrarySessionTable.sessionId, sessionId))
@@ -6192,90 +6191,337 @@ router.post("/sessions/:id/generate-output", async (req: Request, res: Response)
         return (phaseOrder[a.wpPhase || ""] || 9) - (phaseOrder[b.wpPhase || ""] || 9);
       }));
 
-    const varRows = await db.execute(sql`SELECT client_name, entity_type, financial_year_end, reporting_framework, performance_materiality FROM audit_engine_master WHERE session_id = ${sessionId} LIMIT 1`);
-    const varsRow = (varRows.rows?.[0] as any) || {};
-    const vars = { entityName: varsRow.client_name, entityType: varsRow.entity_type, financialYearEnd: varsRow.financial_year_end, reportingFramework: varsRow.reporting_framework, currency: "PKR" };
+    // ── Shared ExcelJS helper ──────────────────────────────────────────────
+    const buildXlsxHdr = (ws: ExcelJS.Worksheet, colSpan: number, title: string, subtitle: string) => {
+      ws.mergeCells(1, 1, 1, colSpan);
+      const r1 = ws.getRow(1); r1.height = 28;
+      const c1 = r1.getCell(1);
+      c1.value = firmName; c1.alignment = { horizontal: "center", vertical: "middle" };
+      c1.font = { bold: true, size: 13, color: { argb: "FFFFFFFF" } };
+      c1.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
 
-    // Phase summary for WP index
+      ws.mergeCells(2, 1, 2, colSpan);
+      const r2 = ws.getRow(2); r2.height = 22;
+      const c2 = r2.getCell(1);
+      c2.value = `${clientName} | ${title} | ${period} | NTN: ${ntn}`;
+      c2.alignment = { horizontal: "center", vertical: "middle" };
+      c2.font = { bold: true, size: 11, color: { argb: "FF1E3A5F" } };
+      c2.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8EFF8" } };
+
+      if (subtitle) {
+        ws.mergeCells(3, 1, 3, colSpan);
+        const r3 = ws.getRow(3); r3.height = 16;
+        const c3 = r3.getCell(1);
+        c3.value = subtitle;
+        c3.alignment = { horizontal: "center", vertical: "middle" };
+        c3.font = { size: 9, color: { argb: "FF64748B" } };
+      }
+
+      ws.getRow(subtitle ? 4 : 3).height = 4;
+    };
+
+    const styleHdrRow = (row: ExcelJS.Row, rightAlignFrom = 999) => {
+      row.height = 22;
+      row.eachCell((c, i) => {
+        c.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
+        c.font   = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
+        c.alignment = { horizontal: i >= rightAlignFrom ? "right" : "left", vertical: "middle" };
+        c.border = { bottom: { style: "thin", color: { argb: "FF93C5FD" } } };
+      });
+    };
+
+    const numFmt = (c: ExcelJS.Cell, v: number | null, row: number) => {
+      if (v === null || v === undefined || v === 0) { c.value = null; } else { c.value = v; }
+      c.numFmt = "#,##0.00;[Red](#,##0.00)";
+      c.alignment = { horizontal: "right", vertical: "middle" };
+      c.fill = row % 2 === 0 ? { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } } : { type: "pattern", pattern: "none" };
+    };
+
+    const strCell = (c: ExcelJS.Cell, v: any, row: number) => {
+      c.value = v ?? "";
+      c.alignment = { horizontal: "left", vertical: "middle", wrapText: false };
+      c.fill = row % 2 === 0 ? { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } } : { type: "pattern", pattern: "none" };
+    };
+
+    const recordCount = tbRows.length + glRows.length + wpIndex.length;
+    const job = await db.insert(wpOutputJobTable).values({
+      sessionId, jobType, status: "running",
+      triggeredBy: triggeredBy || "User", startedAt: new Date(),
+    } as any).returning({ id: wpOutputJobTable.id });
+    const jobId = job[0]?.id;
+
+    // ── TB Excel ────────────────────────────────────────────────────────────
+    if (jobType === "tb_excel") {
+      const wb = new ExcelJS.Workbook();
+      wb.creator = firmName; wb.created = new Date();
+      const ws = wb.addWorksheet("Trial Balance", { properties: { tabColor: { argb: "FF2563EB" } } });
+      ws.columns = [
+        { key:"code",  width:16 }, { key:"name",  width:44 }, { key:"head",  width:22 },
+        { key:"debit", width:18 }, { key:"credit", width:18 }, { key:"bal",   width:18 },
+        { key:"prior", width:18 }, { key:"src",    width:14 }, { key:"conf",  width:10 },
+      ];
+      buildXlsxHdr(ws, 9, "Trial Balance", "ISA 500 — Source: Template / AI Extraction");
+      ws.views = [{ state: "frozen", ySplit: 5 }];
+      const hdrRow = ws.getRow(5);
+      ["Account Code","Account Name","Classification","Debit (PKR)","Credit (PKR)","Balance (PKR)","Prior Year (PKR)","Source","Confidence"].forEach((h, i) => { hdrRow.getCell(i+1).value = h; });
+      styleHdrRow(hdrRow, 4);
+
+      let dr = 0, cr = 0, bal = 0;
+      tbRows.forEach((l, idx) => {
+        const r = ws.getRow(6 + idx); r.height = 17;
+        const dv = parseFloat(String(l.debit)) || 0;
+        const cv = parseFloat(String(l.credit)) || 0;
+        const bv = parseFloat(String(l.closing_balance)) || 0;
+        strCell(r.getCell(1), l.account_code, idx);
+        strCell(r.getCell(2), l.account_name, idx);
+        strCell(r.getCell(3), l.fs_head, idx);
+        numFmt(r.getCell(4), dv || null, idx);
+        numFmt(r.getCell(5), cv || null, idx);
+        numFmt(r.getCell(6), bv || null, idx);
+        numFmt(r.getCell(7), parseFloat(String(l.prior_year_balance)) || null, idx);
+        strCell(r.getCell(8), l.data_source, idx);
+        strCell(r.getCell(9), l.confidence, idx);
+        if (bv < 0) r.getCell(6).font = { color: { argb: "FFDC2626" }, bold: true };
+        dr += dv; cr += cv; bal += bv;
+      });
+
+      // Totals row
+      const totRow = ws.getRow(6 + tbRows.length); totRow.height = 20;
+      totRow.getCell(1).value = "TOTAL"; totRow.getCell(1).font = { bold: true };
+      numFmt(totRow.getCell(4), dr, -1); totRow.getCell(4).font = { bold: true };
+      numFmt(totRow.getCell(5), cr, -1); totRow.getCell(5).font = { bold: true };
+      numFmt(totRow.getCell(6), bal, -1); totRow.getCell(6).font = { bold: true };
+      [4,5,6].forEach(i => totRow.getCell(i).border = { top: { style: "medium", color: { argb: "FF1E3A5F" } } });
+
+      const buf = await wb.xlsx.writeBuffer();
+      const fileName = `TB_${safeName}_${fyEnd}.xlsx`;
+      await db.update(wpOutputJobTable).set({ status: "complete", completedAt: new Date(), recordCount: tbRows.length, outputPath: fileName } as any).where(eq(wpOutputJobTable.id, jobId));
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      res.setHeader("X-Job-Id", String(jobId));
+      return res.end(Buffer.from(buf));
+    }
+
+    // ── GL Excel ────────────────────────────────────────────────────────────
+    if (jobType === "gl_excel") {
+      const wb = new ExcelJS.Workbook();
+      wb.creator = firmName; wb.created = new Date();
+      const ws = wb.addWorksheet("General Ledger", { properties: { tabColor: { argb: "FF7C3AED" } } });
+      ws.columns = [
+        { key:"date",    width:14 }, { key:"voucher", width:14 }, { key:"code",    width:16 },
+        { key:"name",    width:38 }, { key:"narr",    width:44 }, { key:"debit",   width:18 },
+        { key:"credit",  width:18 }, { key:"runbal",  width:18 },
+      ];
+      buildXlsxHdr(ws, 8, "General Ledger", "ISA 230 — Audit Evidence: Source Transactions");
+      ws.views = [{ state: "frozen", ySplit: 5 }];
+      const hdrRow = ws.getRow(5);
+      ["Date","Voucher No","Account Code","Account Name","Narration","Debit (PKR)","Credit (PKR)","Running Balance (PKR)"].forEach((h, i) => { hdrRow.getCell(i+1).value = h; });
+      styleHdrRow(hdrRow, 6);
+
+      glRows.forEach((g, idx) => {
+        const r = ws.getRow(6 + idx); r.height = 17;
+        strCell(r.getCell(1), g.entry_date ? String(g.entry_date).slice(0,10) : "", idx);
+        strCell(r.getCell(2), g.voucher_no, idx);
+        strCell(r.getCell(3), g.account_code, idx);
+        strCell(r.getCell(4), g.account_name, idx);
+        strCell(r.getCell(5), g.narration, idx);
+        numFmt(r.getCell(6), parseFloat(String(g.debit)) || null, idx);
+        numFmt(r.getCell(7), parseFloat(String(g.credit)) || null, idx);
+        numFmt(r.getCell(8), parseFloat(String(g.running_balance)) || null, idx);
+      });
+
+      const buf = await wb.xlsx.writeBuffer();
+      const fileName = `GL_${safeName}_${fyEnd}.xlsx`;
+      await db.update(wpOutputJobTable).set({ status: "complete", completedAt: new Date(), recordCount: glRows.length, outputPath: fileName } as any).where(eq(wpOutputJobTable.id, jobId));
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      res.setHeader("X-Job-Id", String(jobId));
+      return res.end(Buffer.from(buf));
+    }
+
+    // ── WP Excel (Index) ────────────────────────────────────────────────────
+    if (jobType === "wp_excel") {
+      const wb = new ExcelJS.Workbook();
+      wb.creator = firmName; wb.created = new Date();
+      const ws = wb.addWorksheet("WP Index", { properties: { tabColor: { argb: "FF059669" } } });
+      ws.columns = [
+        { key:"code",   width:12 }, { key:"title",  width:52 }, { key:"phase",  width:20 },
+        { key:"cat",    width:22 }, { key:"status", width:16 }, { key:"mand",   width:12 },
+        { key:"prep",   width:18 }, { key:"rev",    width:18 }, { key:"appr",   width:18 },
+        { key:"concl",  width:40 },
+      ];
+      buildXlsxHdr(ws, 10, "Working Paper Index", "ISA/ISQM — Audit File Reference Index");
+      ws.views = [{ state: "frozen", ySplit: 5 }];
+      const hdrRow = ws.getRow(5);
+      ["WP Code","Title","Phase","Category","Status","Mandatory","Prepared By","Reviewed By","Approved By","Conclusion"].forEach((h, i) => { hdrRow.getCell(i+1).value = h; });
+      styleHdrRow(hdrRow);
+
+      const statusColors: Record<string, string> = {
+        Approved: "FF16A34A", Prepared: "FF2563EB", Reviewed: "FF7C3AED",
+        "In Progress": "FFF59E0B", Pending: "FF94A3B8",
+      };
+
+      wpIndex.forEach((wp, idx) => {
+        const r = ws.getRow(6 + idx); r.height = 18;
+        strCell(r.getCell(1), wp.wpCode, idx);
+        strCell(r.getCell(2), wp.wpTitle, idx);
+        strCell(r.getCell(3), wp.wpPhase, idx);
+        strCell(r.getCell(4), wp.wpCategory, idx);
+        const sc = r.getCell(5);
+        sc.value = wp.status || "Pending";
+        sc.alignment = { horizontal: "center", vertical: "middle" };
+        sc.font = { bold: true, color: { argb: statusColors[wp.status || ""] || "FF64748B" }, size: 10 };
+        sc.fill = idx % 2 === 0 ? { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } } : { type: "pattern", pattern: "none" };
+        strCell(r.getCell(6), wp.mandatoryFlag ? "Required" : "Optional", idx);
+        strCell(r.getCell(7), wp.preparedBy || "", idx);
+        strCell(r.getCell(8), wp.reviewedBy || "", idx);
+        strCell(r.getCell(9), wp.approvedBy || "", idx);
+        strCell(r.getCell(10), wp.conclusion || "", idx);
+      });
+
+      const buf = await wb.xlsx.writeBuffer();
+      const fileName = `WP_Index_${safeName}_${fyEnd}.xlsx`;
+      await db.update(wpOutputJobTable).set({ status: "complete", completedAt: new Date(), recordCount: wpIndex.length, outputPath: fileName } as any).where(eq(wpOutputJobTable.id, jobId));
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      res.setHeader("X-Job-Id", String(jobId));
+      return res.end(Buffer.from(buf));
+    }
+
+    // ── WP Word ─────────────────────────────────────────────────────────────
+    if (jobType === "wp_word") {
+      const {
+        Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+        HeadingLevel, AlignmentType, WidthType, ShadingType, BorderStyle,
+      } = await import("docx");
+
+      const docChildren: any[] = [
+        new Paragraph({
+          children: [new TextRun({ text: firmName, bold: true, size: 28, color: "1E3A5F" })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 80 },
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: `Audit Working Papers — ${clientName}`, bold: true, size: 22, color: "1E3A5F" })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 40 },
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: `Period: ${period}  |  NTN: ${ntn}  |  Framework: ${varsRow.reporting_framework || "IFRS"}`, size: 18, color: "475569" })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 },
+        }),
+        new Paragraph({
+          text: "Working Paper Index",
+          heading: HeadingLevel.HEADING_1,
+          spacing: { before: 200, after: 120 },
+        }),
+      ];
+
+      // Group by phase
+      const phases: Record<string, typeof wpIndex> = {};
+      for (const wp of wpIndex) {
+        const ph = wp.wpPhase || "Other";
+        if (!phases[ph]) phases[ph] = [];
+        phases[ph].push(wp);
+      }
+      const phaseOrder = ["Pre-engagement","Planning","Execution","Completion","Reporting","Quality Control","Other"];
+
+      const tblHdrCell = (text: string, w: number) => new TableCell({
+        width: { size: w, type: WidthType.DXA },
+        shading: { type: ShadingType.SOLID, color: "1E3A5F", fill: "1E3A5F" },
+        margins: { top: 60, bottom: 60, left: 80, right: 80 },
+        children: [new Paragraph({ children: [new TextRun({ text, bold: true, size: 18, color: "FFFFFF" })] })],
+      });
+
+      const tblDataCell = (text: string, w: number, bold = false, color = "1E293B") => new TableCell({
+        width: { size: w, type: WidthType.DXA },
+        margins: { top: 50, bottom: 50, left: 80, right: 80 },
+        children: [new Paragraph({ children: [new TextRun({ text: String(text || ""), size: 17, bold, color })] })],
+      });
+
+      for (const ph of phaseOrder) {
+        if (!phases[ph]) continue;
+        docChildren.push(new Paragraph({ text: ph, heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 80 } }));
+
+        const tableRows: any[] = [
+          new TableRow({
+            tableHeader: true,
+            children: [
+              tblHdrCell("WP Code", 900), tblHdrCell("Title", 3600), tblHdrCell("Status", 1100),
+              tblHdrCell("Mandatory", 1100), tblHdrCell("Prepared By", 1500), tblHdrCell("Conclusion", 2200),
+            ],
+          }),
+        ];
+
+        for (const wp of phases[ph]) {
+          const statusColor = wp.status === "Approved" ? "15803D" : wp.status === "Prepared" || wp.status === "Reviewed" ? "1D4ED8" : "94A3B8";
+          tableRows.push(new TableRow({
+            children: [
+              tblDataCell(wp.wpCode || "", 900, true, "1E293B"),
+              tblDataCell(wp.wpTitle || "", 3600),
+              tblDataCell(wp.status || "Pending", 1100, true, statusColor),
+              tblDataCell(wp.mandatoryFlag ? "Required" : "Optional", 1100),
+              tblDataCell(wp.preparedBy || "—", 1500),
+              tblDataCell(wp.conclusion || "—", 2200),
+            ],
+          }));
+        }
+
+        docChildren.push(new Table({
+          rows: tableRows,
+          width: { size: 10400, type: WidthType.DXA },
+        }));
+        docChildren.push(new Paragraph({ spacing: { after: 80 } }));
+      }
+
+      // Footer
+      docChildren.push(new Paragraph({
+        children: [
+          new TextRun({ text: `\nGenerated by: ${firmName}  |  Date: ${new Date().toLocaleDateString("en-GB")}  |  ISA / ISQM Compliant`, size: 16, color: "94A3B8" }),
+        ],
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 300 },
+      }));
+
+      const doc = new Document({
+        creator: firmName,
+        title: `Working Paper Index — ${clientName}`,
+        description: `Audit Working Papers for ${clientName}, ${period}`,
+        sections: [{ children: docChildren }],
+      });
+
+      const buf = await Packer.toBuffer(doc);
+      const fileName = `WP_Index_${safeName}_${fyEnd}.docx`;
+      await db.update(wpOutputJobTable).set({ status: "complete", completedAt: new Date(), recordCount: wpIndex.length, outputPath: fileName } as any).where(eq(wpOutputJobTable.id, jobId));
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      res.setHeader("X-Job-Id", String(jobId));
+      return res.end(buf);
+    }
+
+    // ── Full file (JSON fallback) ────────────────────────────────────────────
     const phaseSummary: Record<string, any> = {};
     for (const wp of wpIndex) {
       const ph = wp.wpPhase || "Other";
       if (!phaseSummary[ph]) phaseSummary[ph] = { total: 0, prepared: 0, approved: 0, pending: 0 };
       phaseSummary[ph].total++;
       if (wp.status === "Approved") phaseSummary[ph].approved++;
-      else if (wp.status === "Prepared" || wp.status === "Reviewed") phaseSummary[ph].prepared++;
-      else if (wp.status === "Pending" || wp.status === "In Progress") phaseSummary[ph].pending++;
+      else if (["Prepared","Reviewed"].includes(wp.status || "")) phaseSummary[ph].prepared++;
+      else phaseSummary[ph].pending++;
     }
-
-    // ── CSV helper ──────────────────────────────────────────────────────────
-    const toCSV = (cols: string[], rows: any[]): string => {
-      const esc = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-      const header = cols.map(esc).join(",");
-      const body = rows.map(r => {
-        const keys = Object.keys(r);
-        return cols.map((_, i) => esc(r[keys[i]] ?? "")).join(",");
-      }).join("\n");
-      return `${header}\n${body}`;
-    };
-
-    const tbCols  = ["account_code","account_name","fs_head","fs_line_mapping","opening_balance","debit","credit","closing_balance","prior_year_balance","data_source","confidence"];
-    const glCols  = ["entry_date","account_code","account_name","narration","debit","credit","voucher_no","running_balance"];
-    const wpCols  = ["WP Code","Title","Phase","Category","Status","Mandatory","Prepared By","Reviewed By","Approved By","Conclusion"];
-
-    const tbRows  = (tbData.rows || []) as any[];
-    const glRows  = (glData.rows || []) as any[];
-    const wpRows  = wpIndex.map(wp => ({
-      "WP Code": wp.wpCode, "Title": wp.wpTitle, "Phase": wp.wpPhase, "Category": wp.wpCategory,
-      "Status": wp.status, "Mandatory": wp.mandatoryFlag ? "Yes" : "No",
-      "Prepared By": wp.preparedBy || "", "Reviewed By": wp.reviewedBy || "",
-      "Approved By": wp.approvedBy || "", "Conclusion": wp.conclusion || "",
-    }));
-
-    const entityName = vars.entityName || `Session-${sessionId}`;
-    const fyEnd = (vars.financialYearEnd || new Date().toISOString().slice(0,10)).replace(/\//g,"-");
-    const safeName = entityName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 30);
-    const recordCount = tbRows.length + glRows.length + wpIndex.length;
-
-    // Determine what to return based on jobType
-    let fileContent: string;
-    let fileName: string;
-    let contentType: string;
-
-    if (jobType === "tb_excel") {
-      fileContent = toCSV(tbCols, tbRows);
-      fileName = `TB_${safeName}_${fyEnd}.csv`;
-      contentType = "text/csv";
-    } else if (jobType === "gl_excel") {
-      fileContent = toCSV(glCols, glRows);
-      fileName = `GL_${safeName}_${fyEnd}.csv`;
-      contentType = "text/csv";
-    } else if (jobType === "wp_index") {
-      fileContent = toCSV(wpCols, wpRows);
-      fileName = `WP_Index_${safeName}_${fyEnd}.csv`;
-      contentType = "text/csv";
-    } else {
-      // full_file — pack all three as a JSON file download
-      fileContent = JSON.stringify({
-        generatedAt: new Date().toISOString(), sessionId, entityName,
-        financialYearEnd: vars.financialYearEnd, reportingFramework: vars.reportingFramework,
-        tb: { totalAccounts: tbRows.length, data: tbRows },
-        gl: { totalTransactions: glRows.length, data: glRows },
-        wpIndex: { totalWps: wpIndex.length, phaseSummary, papers: wpRows },
-      }, null, 2);
-      fileName = `AuditFile_${safeName}_${fyEnd}.json`;
-      contentType = "application/json";
-    }
-
-    // Complete the job record
-    await db.update(wpOutputJobTable)
-      .set({ status: "complete", completedAt: new Date(), recordCount, outputPath: fileName, metadata: JSON.stringify({ phases: Object.keys(phaseSummary), tbAccounts: tbRows.length, glTxns: glRows.length }) } as any)
-      .where(eq(wpOutputJobTable.id, jobId));
-
-    // Return as downloadable file
-    res.setHeader("Content-Type", contentType);
+    const fileContent = JSON.stringify({
+      generatedAt: new Date().toISOString(), sessionId, entityName,
+      financialYearEnd: varsRow.financial_year_end,
+      tb: { totalAccounts: tbRows.length, data: tbRows },
+      gl: { totalTransactions: glRows.length, data: glRows },
+      wpIndex: { totalWps: wpIndex.length, phaseSummary, papers: wpIndex },
+    }, null, 2);
+    const fileName = `AuditFile_${safeName}_${fyEnd}.json`;
+    await db.update(wpOutputJobTable).set({ status: "complete", completedAt: new Date(), recordCount, outputPath: fileName } as any).where(eq(wpOutputJobTable.id, jobId));
+    res.setHeader("Content-Type", "application/json");
     res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
     res.setHeader("X-Job-Id", String(jobId));
-    res.setHeader("X-Record-Count", String(recordCount));
     return res.send(fileContent);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
