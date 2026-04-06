@@ -1616,6 +1616,7 @@ export default function WorkingPapers() {
               onValidate={validateVariables}
               loading={loading}
               confidenceBadge={confidenceBadge}
+              hideControls={true}
             />
           }
         />
@@ -5029,7 +5030,7 @@ function RenderDisplayValue({ def, value, sourceType }: { def: any; value: strin
   }
 }
 
-function VariablesStage({ variables, grouped, stats, changeLog, editingVar, editValue, editReason, setEditingVar, setEditValue, setEditReason, onSave, onReview, onReviewAll, onFetch, onLockAll, onLockSection, onValidate, loading, confidenceBadge }: any) {
+function VariablesStage({ variables, grouped, stats, changeLog, editingVar, editValue, editReason, setEditingVar, setEditValue, setEditReason, onSave, onReview, onReviewAll, onFetch, onLockAll, onLockSection, onValidate, loading, confidenceBadge, hideControls }: any) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("all");
   const [validationIssues, setValidationIssues] = useState<any[]>([]);
@@ -5107,25 +5108,31 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
                 Audit Variables — Working Paper Data Sheet
                 {stats && <span className="text-xs font-normal text-slate-400 ml-1">({stats.filled}/{stats.total} filled)</span>}
               </h2>
-              <p className="text-[11px] text-slate-400 mt-0.5">All variables pre-filled from template &amp; AI. Edit any field, then lock &amp; proceed to generation.</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {hideControls
+                  ? "Variables extracted from your template. Edit any field and save, then proceed to the Variables tab to validate and lock."
+                  : "All variables pre-filled from template upload. Edit any field, then lock & proceed to generation."}
+              </p>
             </div>
-            <div className="flex gap-1.5 flex-wrap shrink-0">
-              <Button variant="outline" size="sm" onClick={onFetch} className="h-7 text-xs">
-                <RefreshCw className="w-3 h-3 mr-1" /> Refresh
-              </Button>
-              <Button variant="outline" size="sm" onClick={runValidation} className="h-7 text-xs">
-                <Shield className="w-3 h-3 mr-1" /> Validate
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowAuditTrail(!showAuditTrail)} className="h-7 text-xs">
-                <ClipboardCheck className="w-3 h-3 mr-1" /> Trail ({changeLog.length})
-              </Button>
-              <Button size="sm" onClick={onReviewAll} disabled={loading} className="h-7 text-xs bg-purple-600 hover:bg-purple-700 shadow-none">
-                <CheckCircle2 className="w-3 h-3 mr-1" /> Review All
-              </Button>
-              <Button size="sm" onClick={onLockAll} disabled={loading} className="h-7 text-xs bg-amber-500 hover:bg-amber-600 shadow-none">
-                <Lock className="w-3 h-3 mr-1" /> Lock All
-              </Button>
-            </div>
+            {!hideControls && (
+              <div className="flex gap-1.5 flex-wrap shrink-0">
+                <Button variant="outline" size="sm" onClick={onFetch} className="h-7 text-xs">
+                  <RefreshCw className="w-3 h-3 mr-1" /> Refresh
+                </Button>
+                <Button variant="outline" size="sm" onClick={runValidation} className="h-7 text-xs">
+                  <Shield className="w-3 h-3 mr-1" /> Validate
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowAuditTrail(!showAuditTrail)} className="h-7 text-xs">
+                  <ClipboardCheck className="w-3 h-3 mr-1" /> Trail ({changeLog.length})
+                </Button>
+                <Button size="sm" onClick={onReviewAll} disabled={loading} className="h-7 text-xs bg-purple-600 hover:bg-purple-700 shadow-none">
+                  <CheckCircle2 className="w-3 h-3 mr-1" /> Review All
+                </Button>
+                <Button size="sm" onClick={onLockAll} disabled={loading} className="h-7 text-xs bg-amber-500 hover:bg-amber-600 shadow-none">
+                  <Lock className="w-3 h-3 mr-1" /> Lock All
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Search + filter row */}
@@ -5191,7 +5198,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
                 <ClipboardList className="w-7 h-7 text-slate-300" />
               </div>
               <p className="text-slate-500 font-medium text-sm">No variables yet</p>
-              <p className="text-xs text-slate-400 mt-1">Go back to Upload and run AI Extraction first</p>
+              <p className="text-xs text-slate-400 mt-1">Go to the Upload tab and click "Extract Data" to populate variables from your template</p>
             </div>
           ) : groupEntries.length === 0 ? (
             <div className="text-center py-10">
@@ -5357,7 +5364,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, editingVar, edit
         </div>
 
         {/* Audit trail */}
-        {showAuditTrail && changeLog.length > 0 && (
+        {!hideControls && showAuditTrail && changeLog.length > 0 && (
           <div className="m-5 mt-0 bg-slate-50 border border-slate-200 rounded-xl p-4">
             <h3 className="text-xs font-semibold text-slate-700 mb-3 flex items-center gap-2 uppercase tracking-wider">
               <ClipboardCheck className="w-4 h-4 text-slate-500" /> Audit Trail ({changeLog.length} changes)
