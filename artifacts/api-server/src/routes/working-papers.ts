@@ -6842,13 +6842,64 @@ router.get("/download-template", async (_req: Request, res: Response) => {
       "Current tax provision","Deferred tax charge","Deferred tax income",
     ];
 
-    // Write lists to hidden sheet (A = Line_Item, B = Sub_Line_Item, C = Account_Name)
-    const maxRows = Math.max(lineItems.length, subLineItems.length, accountNames.length);
+    // Account codes — standard chart of accounts (Pakistani CA firm)
+    const accountCodes = [
+      // Cash & Bank (11xx)
+      "1101","1102","1103","1104","1105",
+      // Trade Receivables (12xx)
+      "1201","1202","1203","1210","1211","1215","1220","1230","1240",
+      // Inventories (13xx)
+      "1301","1302","1303","1304","1305","1310","1320",
+      // Advances & Deposits (14xx)
+      "1401","1402","1410","1420","1430",
+      // PPE (15xx)
+      "1501","1502","1510","1511","1520","1521","1530","1540","1550","1560","1570","1580","1590",
+      // Intangibles (16xx)
+      "1601","1602","1610","1620",
+      // Long-term Investments (17xx)
+      "1701","1710",
+      // Long-term Loans & Deposits (18xx)
+      "1801","1810",
+      // Long-term Liabilities (21xx)
+      "2101","2102","2110","2120",
+      // Deferred Tax & Provisions (22xx)
+      "2201","2202","2210","2220",
+      // Trade & Other Payables (23xx)
+      "2301","2302","2310","2320","2330","2340","2350",
+      // Short-term Borrowings (24xx)
+      "2401","2410","2420",
+      // Current Tax (25xx)
+      "2501","2510",
+      // Share Capital (31xx)
+      "3101","3102","3110",
+      // Reserves (32xx)
+      "3201","3202","3210","3220","3230",
+      // Retained Earnings (33xx)
+      "3301","3310",
+      // Revenue (51xx)
+      "5101","5102","5103","5110","5120",
+      // Other Income (52xx)
+      "5201","5202","5210","5220","5230",
+      // Cost of Sales (61xx)
+      "6101","6102","6103","6104","6110","6120","6130",
+      // Admin & Gen Expenses (62xx)
+      "6201","6202","6203","6204","6210","6220","6230","6240","6250","6260",
+      // Selling & Distribution (63xx)
+      "6301","6302","6310","6320",
+      // Finance Cost (64xx)
+      "6401","6402","6410","6420",
+      // Taxation (65xx)
+      "6501","6502","6510",
+    ];
+
+    // Write lists to hidden sheet (A=Line_Item, B=Sub_Line_Item, C=Account_Name, D=Account_Code)
+    const maxRows = Math.max(lineItems.length, subLineItems.length, accountNames.length, accountCodes.length);
     for (let r = 0; r < maxRows; r++) {
       const row = wsList.getRow(r + 1);
       if (lineItems[r])    row.getCell(1).value = lineItems[r];
       if (subLineItems[r]) row.getCell(2).value = subLineItems[r];
       if (accountNames[r]) row.getCell(3).value = accountNames[r];
+      if (accountCodes[r]) row.getCell(4).value = accountCodes[r];
     }
 
     const D0 = DATA_ROWS.split(":")[0];
@@ -6882,6 +6933,26 @@ router.get("/download-template", async (_req: Request, res: Response) => {
       errorTitle: "Invalid Account_Name", error: "Please select or type a valid account name",
       showInputMessage: true, promptTitle: "Account_Name",
       prompt: "Select from the list or type a custom account name",
+    });
+
+    // Col H — Account_Code
+    ws.dataValidations.add(`H${D0}:H${D1}`, {
+      type: "list", allowBlank: true,
+      formulae: [`Lists!$D$1:$D${accountCodes.length}`],
+      showErrorMessage: true, errorStyle: "warning",
+      errorTitle: "Invalid Account_Code", error: "Please select a valid account code",
+      showInputMessage: true, promptTitle: "Account_Code",
+      prompt: "Select from the standard chart of accounts or enter a custom code",
+    });
+
+    // Col I — Note_No (inline list 1–35)
+    ws.dataValidations.add(`I${D0}:I${D1}`, {
+      type: "list", allowBlank: true,
+      formulae: ['"1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35"'],
+      showErrorMessage: true, errorStyle: "warning",
+      errorTitle: "Invalid Note_No", error: "Please select a note number between 1 and 35",
+      showInputMessage: true, promptTitle: "Note_No",
+      prompt: "Select the financial statement note number (1–35)",
     });
 
     // ── Row 39: Totals ────────────────────────────────────────────────────────
