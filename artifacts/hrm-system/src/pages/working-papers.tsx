@@ -142,13 +142,30 @@ export default function WorkingPapers() {
     } catch {}
   };
 
+  const statusToStageMap: Record<string, string> = {
+    completed:    "generation",
+    variables:    "extraction",
+    generation:   "generation",
+    wp_listing:   "wp_listing",
+    gl_generation:"gl_generation",
+    tb_generation:"tb_generation",
+    extraction:   "extraction",
+    upload:       "upload",
+    export:       "export",
+  };
+  const stageInitialisedRef = useRef(false);
+
   useEffect(() => {
     if (activeSession) {
-      const validStages = STAGES.map(s => s.key) as string[];
-      const sessionStage = activeSession.status || "upload";
-      setStage(validStages.includes(sessionStage) ? sessionStage : "upload");
       if (activeSession.heads) setHeads(activeSession.heads);
       if (activeSession.exceptions) setExceptions(activeSession.exceptions);
+      if (!stageInitialisedRef.current) {
+        const validStages = STAGES.map(s => s.key) as string[];
+        const sessionStage = activeSession.status || "upload";
+        const mapped = statusToStageMap[sessionStage] ?? (validStages.includes(sessionStage) ? sessionStage : "upload");
+        setStage(mapped);
+        stageInitialisedRef.current = true;
+      }
     }
   }, [activeSession]);
 
@@ -1444,7 +1461,7 @@ export default function WorkingPapers() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="py-4 sm:py-5">
             <div className="flex items-start gap-3 sm:gap-4">
-              <button onClick={() => { setActiveSession(null); setStage("upload"); }} className="mt-0.5 p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors shrink-0">
+              <button onClick={() => { stageInitialisedRef.current = false; setActiveSession(null); setStage("upload"); }} className="mt-0.5 p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors shrink-0">
                 <ArrowLeft className="w-4 h-4" />
               </button>
               <div className="flex-1 min-w-0">
