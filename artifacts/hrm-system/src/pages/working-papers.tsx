@@ -3158,6 +3158,9 @@ function AuditEngineStage({
   onAddEvidence, onUpdateEvidence, onDeleteEvidence, onRunRecon
 }: any) {
   const { toast } = useToast();
+  const _aeToken = localStorage.getItem("hrm_token");
+  const authHdr = (extra: Record<string,string> = {}): Record<string,string> =>
+    _aeToken ? { Authorization: `Bearer ${_aeToken}`, ...extra } : extra;
   const [activeEngineTab, setActiveEngineTab] = useState("engagement");
   const [masterForm, setMasterForm] = useState<any>(null);
   const [saving, setSaving] = useState(false);
@@ -3184,7 +3187,7 @@ function AuditEngineStage({
       const params = new URLSearchParams();
       if (libSearch) params.set("search", libSearch);
       if (libFamily) params.set("family", libFamily);
-      const r = await fetch(`/api/working-papers/wp-library?${params}`);
+      const r = await fetch(`/api/working-papers/wp-library?${params}`, { headers: authHdr() });
       const d = await r.json();
       setWpLibrary(d.papers || []);
     } catch { /* ignore */ } finally { setLibLoading(false); }
@@ -3194,7 +3197,7 @@ function AuditEngineStage({
     if (!session?.id) return;
     setLibLoading(true);
     try {
-      const r = await fetch(`/api/working-papers/sessions/${session.id}/wp-library-session`);
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/wp-library-session`, { headers: authHdr() });
       const d = await r.json();
       setSessionLibrary(d.papers || []);
     } catch { /* ignore */ } finally { setLibLoading(false); }
@@ -3203,7 +3206,7 @@ function AuditEngineStage({
   const seedLibrary = async () => {
     setLibSeeding(true);
     try {
-      const r = await fetch("/api/working-papers/seed-wp-library", { method: "POST" });
+      const r = await fetch("/api/working-papers/seed-wp-library", { method: "POST", headers: authHdr() });
       const d = await r.json();
       setLibSeedResult(d);
       await fetchWpLibrary();
@@ -3214,7 +3217,7 @@ function AuditEngineStage({
     if (!session?.id) return;
     setLibActivating(true);
     try {
-      const r = await fetch(`/api/working-papers/sessions/${session.id}/activate-wp-library`, { method: "POST" });
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/activate-wp-library`, { method: "POST", headers: authHdr() });
       const d = await r.json();
       setLibActivationResult(d);
       await fetchSessionLibrary();
@@ -3225,7 +3228,7 @@ function AuditEngineStage({
     if (!session?.id) return;
     await fetch(`/api/working-papers/sessions/${session.id}/wp-library-session/${wpCode}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: authHdr({ "Content-Type": "application/json" }),
       body: JSON.stringify(payload),
     });
     await fetchSessionLibrary();
@@ -3235,17 +3238,17 @@ function AuditEngineStage({
     if (!session?.id) return;
     setLibLoading(true);
     try {
-      const r = await fetch(`/api/working-papers/sessions/${session.id}/wp-library-session`);
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/wp-library-session`, { headers: authHdr() });
       const d = await r.json();
       const papers = d.papers || [];
       setSessionLibrary(papers);
       if (papers.length === 0 && !libActivating) {
         setLibActivating(true);
         try {
-          const ar = await fetch(`/api/working-papers/sessions/${session.id}/activate-wp-library`, { method: "POST" });
+          const ar = await fetch(`/api/working-papers/sessions/${session.id}/activate-wp-library`, { method: "POST", headers: authHdr() });
           const ad = await ar.json();
           setLibActivationResult(ad);
-          const r2 = await fetch(`/api/working-papers/sessions/${session.id}/wp-library-session`);
+          const r2 = await fetch(`/api/working-papers/sessions/${session.id}/wp-library-session`, { headers: authHdr() });
           const d2 = await r2.json();
           setSessionLibrary(d2.papers || []);
         } finally { setLibActivating(false); }
@@ -3277,7 +3280,7 @@ function AuditEngineStage({
     setExcLoading(true);
     try {
       const params = excFilter === "unresolved" ? "?resolved=false" : excFilter === "critical" ? "?severity=Critical" : "";
-      const r = await fetch(`/api/working-papers/sessions/${session.id}/isa-exceptions${params}`);
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/isa-exceptions${params}`, { headers: authHdr() });
       const d = await r.json();
       setExceptions(d.exceptions || []);
       setExcCounts(d.counts || {});
@@ -3288,7 +3291,7 @@ function AuditEngineStage({
     if (!session?.id) return;
     setExcScanning(true);
     try {
-      const r = await fetch(`/api/working-papers/sessions/${session.id}/auto-flag-exceptions`, { method: "POST" });
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/auto-flag-exceptions`, { method: "POST", headers: authHdr() });
       const d = await r.json();
       setExcScanResult(d);
       await fetchExceptions();
@@ -3299,7 +3302,7 @@ function AuditEngineStage({
     if (!session?.id) return;
     await fetch(`/api/working-papers/sessions/${session.id}/isa-exceptions/${exId}/resolve`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: authHdr({ "Content-Type": "application/json" }),
       body: JSON.stringify({ resolvedBy: "Audit Team", resolutionNote: note }),
     });
     setResolvingId(null);
@@ -3323,7 +3326,7 @@ function AuditEngineStage({
     try {
       const r = await fetch(`/api/working-papers/sessions/${session.id}/validate-for-generation`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHdr({ "Content-Type": "application/json" }),
         body: JSON.stringify({ validatedBy: "Audit Team" }),
       });
       const d = await r.json();
@@ -3337,7 +3340,7 @@ function AuditEngineStage({
     try {
       const r = await fetch(`/api/working-papers/sessions/${session.id}/generate-output`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHdr({ "Content-Type": "application/json" }),
         body: JSON.stringify({ jobType: genJobType, triggeredBy: "Audit Team" }),
       });
       if (!r.ok) {
@@ -3368,7 +3371,7 @@ function AuditEngineStage({
   const fetchOutputJobs = async () => {
     if (!session?.id) return;
     try {
-      const r = await fetch(`/api/working-papers/sessions/${session.id}/output-jobs`);
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/output-jobs`, { headers: authHdr() });
       const d = await r.json();
       setOutputJobs(d.jobs || []);
     } catch { /* ignore */ }
@@ -3389,7 +3392,7 @@ function AuditEngineStage({
     if (!session?.id) return;
     setLockLoading(true);
     try {
-      const r = await fetch(`/api/working-papers/sessions/${session.id}/lock-status`);
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/lock-status`, { headers: authHdr() });
       const d = await r.json();
       setLockStatus(d);
     } catch { /* ignore */ } finally { setLockLoading(false); }
@@ -3401,7 +3404,7 @@ function AuditEngineStage({
     try {
       const r = await fetch(`/api/working-papers/sessions/${session.id}/lock`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHdr({ "Content-Type": "application/json" }),
         body: JSON.stringify({ ...lockForm, eqcrCompleted: !!lockForm.eqcrCompleted }),
       });
       const d = await r.json();
@@ -3414,7 +3417,7 @@ function AuditEngineStage({
     if (!session?.id) return;
     setTrailLoading(true);
     try {
-      const r = await fetch(`/api/working-papers/sessions/${session.id}/wp-audit-trail`);
+      const r = await fetch(`/api/working-papers/sessions/${session.id}/wp-audit-trail`, { headers: authHdr() });
       const d = await r.json();
       setAuditTrail(d.trail || []);
     } catch { /* ignore */ } finally { setTrailLoading(false); }
