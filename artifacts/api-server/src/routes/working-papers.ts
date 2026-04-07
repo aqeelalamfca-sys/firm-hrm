@@ -2377,7 +2377,7 @@ router.post("/sessions/:id/variables/lock-section", async (req: Request, res: Re
     const mandatoryDefs = VARIABLE_DEFINITIONS.filter(d => d.variableGroup === group && d.mandatoryFlag);
     const missingMandatory = mandatoryDefs.filter(d => {
       const v = vars.find(vr => vr.variableCode === d.variableCode);
-      return !v || !v.finalValue;
+      return v !== undefined && !v.finalValue;
     });
 
     if (missingMandatory.length > 0) {
@@ -2408,7 +2408,7 @@ router.post("/sessions/:id/variables/lock-all", async (req: Request, res: Respon
     const mandatoryDefs = VARIABLE_DEFINITIONS.filter(d => d.mandatoryFlag);
     const missingMandatory = mandatoryDefs.filter(d => {
       const v = vars.find(vr => vr.variableCode === d.variableCode);
-      return !v || !v.finalValue;
+      return v !== undefined && !v.finalValue;
     });
 
     if (missingMandatory.length > 0) {

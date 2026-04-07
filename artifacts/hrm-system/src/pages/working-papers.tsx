@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useLocation } from "wouter";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -60,6 +61,7 @@ const HEAD_COLORS: Record<string, string> = {
 export default function WorkingPapers() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const token = typeof window !== "undefined" ? localStorage.getItem("hrm_token") : null;
   const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -769,8 +771,8 @@ export default function WorkingPapers() {
         const err = await res.json().catch(() => ({}));
         const errMsg: string = err.error || "Could not fill variables.";
         if (res.status === 503 || errMsg.toLowerCase().includes("not configured") || errMsg.toLowerCase().includes("no api key")) {
-          toast({ title: "AI not configured", description: "Open AI Settings to add your API key.", variant: "destructive" });
-          setShowAiSettings(true);
+          toast({ title: "AI not configured", description: "Go to Settings → AI Integration to add your API key.", variant: "destructive" });
+          navigate("/settings");
         } else {
           toast({ title: "AI Fill failed", description: errMsg, variant: "destructive" });
         }
@@ -844,7 +846,13 @@ export default function WorkingPapers() {
         setStage("generation");
       } else {
         const err = await res.json();
-        toast({ title: "Cannot lock", description: err.error || `${err.missing?.length || 0} mandatory variables missing`, variant: "destructive" });
+        if (err.missing?.length > 0) {
+          const names = err.missing.slice(0, 5).map((m: any) => m.label || m).join(", ");
+          const extra = err.missing.length > 5 ? ` +${err.missing.length - 5} more` : "";
+          toast({ title: "Cannot lock — fill mandatory variables", description: `Missing: ${names}${extra}. Search and fill these fields, then try again.`, variant: "destructive" });
+        } else {
+          toast({ title: "Cannot lock", description: err.error || "Mandatory variables missing", variant: "destructive" });
+        }
       }
     } catch {} finally { setLoading(false); }
   };
@@ -928,7 +936,13 @@ export default function WorkingPapers() {
         const genRes = await fetch(url, { method: "POST", headers: { ...headers, "Content-Type": "application/json" } });
         if (!genRes.ok) {
           const err = await genRes.json().catch(() => ({ error: "Failed" }));
-          toast({ title: `Head ${hi + 1} generation failed`, description: err.error, variant: "destructive" });
+          const errMsg: string = err.error || "Failed";
+          if (genRes.status === 503 || errMsg.toLowerCase().includes("not configured") || errMsg.toLowerCase().includes("ai service")) {
+            toast({ title: "AI not configured", description: "Go to Settings → AI Integration to add your API key.", variant: "destructive" });
+            navigate("/settings");
+          } else {
+            toast({ title: `Head ${hi + 1} generation failed`, description: errMsg, variant: "destructive" });
+          }
           break;
         }
         const appRes = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/heads/${hi}/approve`, {
@@ -996,7 +1010,13 @@ export default function WorkingPapers() {
           ),
           result: null,
         }));
-        toast({ title: "Generation failed", description: data.error, variant: "destructive" });
+        const errMsg: string = data.error || "Generation failed";
+        if (res.status === 503 || errMsg.toLowerCase().includes("not configured") || errMsg.toLowerCase().includes("ai service")) {
+          toast({ title: "AI not configured", description: "Go to Settings → AI Integration to add your API key.", variant: "destructive" });
+          navigate("/settings");
+        } else {
+          toast({ title: "Generation failed", description: errMsg, variant: "destructive" });
+        }
       }
     } catch (e: any) {
       setTbGlProgress(prev => ({ ...prev, running: false }));
