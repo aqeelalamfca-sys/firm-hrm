@@ -7201,6 +7201,7 @@ function isSmartDefault(wp: WpItem): boolean {
 const SMART_DEFAULT_CODES = new Set(DEFAULT_WP_ITEMS.filter(isSmartDefault).map(w => w.code));
 
 function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTriggers, onRefresh, onNext }: any) {
+  const { toast } = useToast();
   const allTriggers: any[]  = wpTriggers || [];
   const allHeads: any[]     = heads || [];
   const mandatoryCodes      = new Set(DEFAULT_WP_ITEMS.filter(w => w.mandatory).map(w => w.code));
