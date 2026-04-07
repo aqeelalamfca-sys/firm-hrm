@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -7304,6 +7305,128 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
   const resetToSmartDefault = () => setSelected(new Set(SMART_DEFAULT_CODES));
   const selectAll = () => setSelected(new Set(DEFAULT_WP_ITEMS.map(w => w.code)));
 
+  // ── Download All Templates as Excel Workbook ────────────────────────────────
+  const [downloadingTemplates, setDownloadingTemplates] = useState(false);
+  const downloadAllTemplates = () => {
+    setDownloadingTemplates(true);
+    try {
+      const wb = XLSX.utils.book_new();
+
+      // ── Cover Sheet ─────────────────────────────────────────────────────────
+      const coverData = [
+        ["AuditWise — Working Paper Template Pack"],
+        ["Pakistan ISA / ISQM / ICAP / Companies Act 2017 Compliant"],
+        [""],
+        ["Generated on", new Date().toLocaleDateString("en-PK", { day:"2-digit", month:"long", year:"numeric" })],
+        ["Total Templates", DEFAULT_WP_ITEMS.length.toString()],
+        ["Sections", "A through Q (17 sections)"],
+        ["Standards", "ISAs as adopted by ICAP, ISQM 1, IFRS, ITO 2001, Sales Tax Act 1990, Companies Act 2017"],
+        [""],
+        ["SECTION", "LABEL", "TEMPLATES"],
+        ...Object.entries(WP_CATEGORY_LABELS).map(([cat, label]) => {
+          const count = DEFAULT_WP_ITEMS.filter(w => w.category === cat).length;
+          const sampleCode = DEFAULT_WP_ITEMS.find(w => w.category === cat)?.code ?? "";
+          return [sampleCode.replace(/\d+/, ""), label, count.toString()];
+        }),
+      ];
+      const wsCover = XLSX.utils.aoa_to_sheet(coverData);
+      wsCover["!cols"] = [{ wch: 10 }, { wch: 52 }, { wch: 12 }];
+      XLSX.utils.book_append_sheet(wb, wsCover, "Cover");
+
+      // ── One sheet per section ────────────────────────────────────────────────
+      const headers = [
+        "Code", "Working Paper Title", "ISA / Standard Reference",
+        "Phase", "Risk", "Output Type", "Complexity", "Mandatory",
+        "Assertions Covered",
+        "Audit Objective",
+        "Pakistan Legal & Standards Framework",
+        "Audit Procedures",
+        "Conclusion Template",
+        "Sign-Off Hierarchy",
+      ];
+
+      const sectionLetters: Record<string, string> = {
+        pre_planning:       "A",  planning:           "B",
+        risk:               "C",  analytical:         "D",
+        controls:           "E",  substantive_assets: "F",
+        substantive_liab:   "G",  substantive_pl:     "H",
+        tax:                "I",  estimates:          "J",
+        related_party:      "K",  evidence:           "L",
+        completion:         "M",  reporting:          "N",
+        quality:            "O",  archiving:          "P",
+        specialized:        "Q",
+      };
+
+      Object.entries(WP_CATEGORY_LABELS).forEach(([cat, catLabel]) => {
+        const items = DEFAULT_WP_ITEMS.filter(w => w.category === cat);
+        if (!items.length) return;
+        const sec = sectionLetters[cat] ?? cat;
+        const rows: (string | number)[][] = [headers];
+        items.forEach(wp => {
+          const pc = getWpProcedures(wp);
+          rows.push([
+            wp.code,
+            wp.label,
+            wp.isa,
+            wp.phase,
+            wp.risk ?? "low",
+            wp.outputType,
+            wp.complexity,
+            wp.mandatory ? "Yes" : "No",
+            wp.assertions.join(", "),
+            pc.objective,
+            pc.legalRef,
+            pc.procedures.join("\n"),
+            pc.conclusionTemplate,
+            pc.reviewers.join(" → "),
+          ]);
+        });
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        ws["!cols"] = [
+          { wch: 7 }, { wch: 45 }, { wch: 30 }, { wch: 18 }, { wch: 8 },
+          { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 38 },
+          { wch: 55 }, { wch: 55 }, { wch: 80 }, { wch: 60 }, { wch: 45 },
+        ];
+        // Style header row bold
+        headers.forEach((_h, ci) => {
+          const cellRef = XLSX.utils.encode_cell({ r: 0, c: ci });
+          if (ws[cellRef]) ws[cellRef].s = { font: { bold: true } };
+        });
+        const sheetName = `${sec} - ${catLabel.split("—")[0].trim()}`.slice(0, 31);
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      });
+
+      // ── All Templates flat sheet ─────────────────────────────────────────────
+      const allRows: (string | number)[][] = [headers];
+      DEFAULT_WP_ITEMS.forEach(wp => {
+        const pc = getWpProcedures(wp);
+        allRows.push([
+          wp.code, wp.label, wp.isa, wp.phase, wp.risk ?? "low",
+          wp.outputType, wp.complexity, wp.mandatory ? "Yes" : "No",
+          wp.assertions.join(", "),
+          pc.objective, pc.legalRef,
+          pc.procedures.join("\n"),
+          pc.conclusionTemplate, pc.reviewers.join(" → "),
+        ]);
+      });
+      const wsAll = XLSX.utils.aoa_to_sheet(allRows);
+      wsAll["!cols"] = [
+        { wch: 7 }, { wch: 45 }, { wch: 30 }, { wch: 18 }, { wch: 8 },
+        { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 38 },
+        { wch: 55 }, { wch: 55 }, { wch: 80 }, { wch: 60 }, { wch: 45 },
+      ];
+      XLSX.utils.book_append_sheet(wb, wsAll, "All Templates");
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `AuditWise_WP_Templates_${dateStr}.xlsx`);
+      toast({ title: "Templates downloaded", description: `${DEFAULT_WP_ITEMS.length} templates across 17 sections exported to Excel.` });
+    } catch (e) {
+      toast({ title: "Download failed", description: String(e), variant: "destructive" });
+    } finally {
+      setDownloadingTemplates(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
 
@@ -7745,16 +7868,30 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
           </div>
           <p className="text-[11px] text-slate-400">Required templates cannot be deselected. Templates generate sequentially, section by section, with full sign-off hierarchy.</p>
         </div>
-        <Button
-          onClick={onNext}
-          disabled={loading || selectedCount === 0}
-          size="lg"
-          className="shrink-0 px-6 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-md shadow-indigo-200/40"
-        >
-          <FileCheck className="w-4 h-4 mr-2" />
-          Generate {selectedCount} Working Papers
-          <ArrowRight className="w-4 h-4 ml-2" />
-        </Button>
+        <div className="flex items-center gap-3 shrink-0 flex-wrap">
+          {/* Download All Templates button */}
+          <Button
+            onClick={downloadAllTemplates}
+            disabled={downloadingTemplates}
+            size="lg"
+            variant="outline"
+            className="px-5 border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-indigo-400 hover:text-indigo-700 gap-2"
+          >
+            {downloadingTemplates
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Preparing…</>
+              : <><Download className="w-4 h-4" /> Download All Templates</>}
+          </Button>
+          <Button
+            onClick={onNext}
+            disabled={loading || selectedCount === 0}
+            size="lg"
+            className="px-6 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-md shadow-indigo-200/40"
+          >
+            <FileCheck className="w-4 h-4 mr-2" />
+            Generate {selectedCount} Working Papers
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
+        </div>
       </div>
     </div>
   );
