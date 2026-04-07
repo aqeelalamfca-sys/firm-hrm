@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -7704,11 +7705,11 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
         )}
       </div>
 
-      {/* ── WP Preview Modal ── */}
+      {/* ── WP Preview Modal (portal → always above sidebar) ── */}
       {preview && (() => {
         const pc = getWpProcedures(preview);
-        return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{background:"rgba(15,23,42,0.65)"}}>
+        return createPortal(
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{background:"rgba(15,23,42,0.72)"}}>
           {/* Backdrop */}
           <div className="absolute inset-0" onClick={() => setPreview(null)} />
           {/* Modal Card */}
@@ -7853,7 +7854,7 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
           </div>
           </div>
         </div>
-        );
+        , document.body);
       })()}
 
       {/* ── Proceed Bar ── */}
