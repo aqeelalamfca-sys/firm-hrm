@@ -17,6 +17,7 @@ import {
   wpLibraryMasterTable, wpLibrarySessionTable,
   wpTriggerRulesTable, wpValidationResultTable, wpExceptionsTable,
   wpSessionLockTable, wpOutputJobTable,
+  wpExecutionTable,
 } from "@workspace/db";
 import { WP_LIBRARY, type WpLibraryEntry } from "../data/wp-library-seed";
 import { VARIABLE_DEFINITIONS, EXTRACTION_FIELD_TO_VARIABLE_MAP, VARIABLE_GROUPS, DEPENDENCY_RULES, PRIMARY_VARIABLE_CODES, SECONDARY_VARIABLE_CODES } from "../data/variable-definitions";
@@ -8790,6 +8791,230 @@ router.get("/download-template-OLD_DO_NOT_USE", async (_req: Request, res: Respo
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// WP EXECUTION ENDPOINTS — Full ISA-compliant per-WP audit execution lifecycle
+// ══════════════════════════════════════════════════════════════════════════
+
+// GET  /sessions/:sessionId/wp-execution            — list all execution records for session
+router.get("/sessions/:sessionId/wp-execution", async (req: Request, res: Response) => {
+  try {
+    const sid = parseInt(p(req.params.sessionId));
+    const rows = await db.select().from(wpExecutionTable)
+      .where(eq(wpExecutionTable.sessionId, sid))
+      .orderBy(asc(wpExecutionTable.wpCode));
+    res.json(rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// GET  /sessions/:sessionId/wp-execution/:wpCode    — get single execution record
+router.get("/sessions/:sessionId/wp-execution/:wpCode", async (req: Request, res: Response) => {
+  try {
+    const sid = parseInt(p(req.params.sessionId));
+    const wpCode = p(req.params.wpCode);
+    const [row] = await db.select().from(wpExecutionTable)
+      .where(and(eq(wpExecutionTable.sessionId, sid), eq(wpExecutionTable.wpCode, wpCode)));
+    if (!row) return void res.status(404).json({ error: "Not found" });
+    res.json(row);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT  /sessions/:sessionId/wp-execution/:wpCode    — create or update execution record
+router.put("/sessions/:sessionId/wp-execution/:wpCode", async (req: Request, res: Response) => {
+  try {
+    const sid = parseInt(p(req.params.sessionId));
+    const wpCode = p(req.params.wpCode);
+    const [existing] = await db.select({ id: wpExecutionTable.id, isLocked: wpExecutionTable.isLocked })
+      .from(wpExecutionTable)
+      .where(and(eq(wpExecutionTable.sessionId, sid), eq(wpExecutionTable.wpCode, wpCode)));
+    if (existing?.isLocked) return void res.status(403).json({ error: "Working paper is locked. Unlock requires partner-level authority." });
+
+    const body = req.body || {};
+    const payload: any = {
+      sessionId: sid,
+      wpCode,
+      updatedAt: new Date(),
+    };
+    // Whitelist all updatable fields
+    const textFields = [
+      "wpTitle","wpPhase","wpCategory","isaReference","secondaryReference","objective",
+      "riskLevel","riskDescription","samplingMethod","samplingCriteria","professionalJudgment",
+      "staffConclusion","staffConclusionDate","staffName",
+      "seniorConclusion","seniorConclusionDate","seniorName",
+      "managerConclusion","managerConclusionDate","managerName",
+      "partnerConclusion","partnerConclusionDate","partnerName",
+      "status","createdBy","lockedBy",
+    ];
+    const jsonFields = [
+      "assertions","linkedRisks","procedures","samplingItems","workPerformed",
+      "evidenceItems","findings","misstatements","analyticalData",
+      "reviewNotes","isaChecklist","tbGlCrossRefs","signOffs","validationErrors","linkedRisks",
+    ];
+    const numFields = ["populationSize","sampleSize"];
+    const boolFields = ["proceduresComplete","evidenceComplete","conclusionsComplete","isLocked"];
+    const decFields = ["totalMisstatementAmount"];
+
+    for (const f of textFields) if (body[f] !== undefined) payload[f] = body[f];
+    for (const f of jsonFields) if (body[f] !== undefined) payload[f] = body[f];
+    for (const f of numFields) if (body[f] !== undefined) payload[f] = parseInt(body[f]);
+    for (const f of boolFields) if (body[f] !== undefined) payload[f] = Boolean(body[f]);
+    for (const f of decFields) if (body[f] !== undefined) payload[f] = String(body[f]);
+
+    // Derive proceduresComplete / evidenceComplete / conclusionsComplete automatically
+    if (payload.procedures) {
+      const procs: any[] = payload.procedures;
+      payload.proceduresComplete = procs.length > 0 && procs.every((p: any) => p.status === "performed" || p.status === "n_a");
+    }
+    if (payload.evidenceItems) {
+      const ev: any[] = payload.evidenceItems;
+      payload.evidenceComplete = ev.length > 0;
+    }
+    if (payload.partnerConclusion) {
+      payload.conclusionsComplete = true;
+    }
+
+    // Derive status
+    if (!body.status) {
+      if (payload.isLocked) payload.status = "locked";
+      else if (payload.conclusionsComplete) payload.status = "concluded";
+      else if (payload.evidenceComplete) payload.status = "evidenced";
+      else if (payload.proceduresComplete) payload.status = "procedures_done";
+      else if (existing || payload.procedures) payload.status = "in_progress";
+    }
+
+    let result;
+    if (existing) {
+      [result] = await db.update(wpExecutionTable).set(payload)
+        .where(and(eq(wpExecutionTable.sessionId, sid), eq(wpExecutionTable.wpCode, wpCode)))
+        .returning();
+    } else {
+      payload.createdAt = new Date();
+      [result] = await db.insert(wpExecutionTable).values(payload).returning();
+    }
+    res.json(result);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /sessions/:sessionId/wp-execution/:wpCode/sign-off — apply a reviewer sign-off
+router.post("/sessions/:sessionId/wp-execution/:wpCode/sign-off", async (req: Request, res: Response) => {
+  try {
+    const sid = parseInt(p(req.params.sessionId));
+    const wpCode = p(req.params.wpCode);
+    const { level, name, date, conclusion } = req.body || {};
+    if (!level || !name) return void res.status(400).json({ error: "level and name required" });
+    const allowed = ["staff","senior","manager","partner"];
+    if (!allowed.includes(level)) return void res.status(400).json({ error: "Invalid level" });
+
+    const [row] = await db.select().from(wpExecutionTable)
+      .where(and(eq(wpExecutionTable.sessionId, sid), eq(wpExecutionTable.wpCode, wpCode)));
+    if (!row) return void res.status(404).json({ error: "Execution record not found" });
+    if (row.isLocked) return void res.status(403).json({ error: "WP is locked" });
+
+    const signDate = date || new Date().toISOString().split("T")[0];
+    const update: any = { updatedAt: new Date() };
+    const nameKey = `${level}Name` as any;
+    const dateKey = `${level}ConclusionDate` as any;
+    const conclusionKey = `${level}Conclusion` as any;
+    update[nameKey] = name;
+    update[dateKey] = signDate;
+    if (conclusion) update[conclusionKey] = conclusion;
+
+    // Update signOffs JSONB
+    const currentSignOffs: any = (row.signOffs as any) || {};
+    currentSignOffs[level] = { name, date: signDate, signedAt: new Date().toISOString() };
+    update.signOffs = currentSignOffs;
+
+    // If partner signs off, mark conclusionsComplete
+    if (level === "partner") {
+      update.conclusionsComplete = true;
+      update.status = "concluded";
+    }
+
+    const [updated] = await db.update(wpExecutionTable).set(update)
+      .where(and(eq(wpExecutionTable.sessionId, sid), eq(wpExecutionTable.wpCode, wpCode)))
+      .returning();
+    res.json(updated);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /sessions/:sessionId/wp-execution/:wpCode/lock — lock a WP (ISA 230)
+router.post("/sessions/:sessionId/wp-execution/:wpCode/lock", async (req: Request, res: Response) => {
+  try {
+    const sid = parseInt(p(req.params.sessionId));
+    const wpCode = p(req.params.wpCode);
+    const { lockedBy, unlock } = req.body || {};
+    const [row] = await db.select().from(wpExecutionTable)
+      .where(and(eq(wpExecutionTable.sessionId, sid), eq(wpExecutionTable.wpCode, wpCode)));
+    if (!row) return void res.status(404).json({ error: "Not found" });
+
+    if (unlock) {
+      const [updated] = await db.update(wpExecutionTable)
+        .set({ isLocked: false, status: "concluded", updatedAt: new Date() })
+        .where(and(eq(wpExecutionTable.sessionId, sid), eq(wpExecutionTable.wpCode, wpCode)))
+        .returning();
+      return void res.json(updated);
+    }
+
+    // Validate before locking
+    const errors: string[] = [];
+    if (!row.proceduresComplete) errors.push("Not all procedures are marked as performed");
+    if (!row.evidenceComplete) errors.push("No evidence items recorded");
+    if (!row.partnerConclusion) errors.push("Partner conclusion is required before locking");
+    if (errors.length > 0) return void res.status(422).json({ error: "Cannot lock", validationErrors: errors });
+
+    const [updated] = await db.update(wpExecutionTable)
+      .set({ isLocked: true, lockedAt: new Date(), lockedBy: lockedBy || "System", status: "locked", updatedAt: new Date() })
+      .where(and(eq(wpExecutionTable.sessionId, sid), eq(wpExecutionTable.wpCode, wpCode)))
+      .returning();
+    res.json(updated);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /sessions/:sessionId/wp-execution/:wpCode/validate — validate completeness
+router.get("/sessions/:sessionId/wp-execution/:wpCode/validate", async (req: Request, res: Response) => {
+  try {
+    const sid = parseInt(p(req.params.sessionId));
+    const wpCode = p(req.params.wpCode);
+    const [row] = await db.select().from(wpExecutionTable)
+      .where(and(eq(wpExecutionTable.sessionId, sid), eq(wpExecutionTable.wpCode, wpCode)));
+
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    if (!row) { return void res.json({ pass: false, errors: ["Execution record not started"], warnings: [] }); }
+
+    const procs: any[] = (row.procedures as any) || [];
+    const ev: any[] = (row.evidenceItems as any) || [];
+    const findings: any[] = (row.findings as any) || [];
+
+    if (procs.length === 0) errors.push("No procedures defined");
+    else {
+      const notDone = procs.filter((p: any) => p.status === "not_started" || p.status === "in_progress");
+      if (notDone.length > 0) errors.push(`${notDone.length} procedure(s) not yet performed`);
+    }
+    if (ev.length === 0) errors.push("No evidence items recorded");
+    if (!row.staffConclusion) warnings.push("Staff conclusion not recorded");
+    if (!row.seniorConclusion) warnings.push("Senior conclusion not recorded");
+    if (!row.managerConclusion) warnings.push("Manager conclusion not recorded");
+    if (!row.partnerConclusion) errors.push("Partner conclusion is required");
+    if (!row.professionalJudgment) warnings.push("Professional judgment narrative not documented");
+
+    // Check each finding has an ISA reference
+    const findingsWithoutIsa = findings.filter((f: any) => !f.isaRef);
+    if (findingsWithoutIsa.length > 0) warnings.push(`${findingsWithoutIsa.length} finding(s) missing ISA reference`);
+
+    res.json({
+      pass: errors.length === 0,
+      errors,
+      warnings,
+      proceduresComplete: row.proceduresComplete,
+      evidenceComplete: row.evidenceComplete,
+      conclusionsComplete: row.conclusionsComplete,
+      isLocked: row.isLocked,
+      status: row.status,
+    });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
 export default router;

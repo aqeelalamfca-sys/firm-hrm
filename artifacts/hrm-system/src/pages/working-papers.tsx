@@ -7200,6 +7200,1129 @@ function isSmartDefault(wp: WpItem): boolean {
 }
 const SMART_DEFAULT_CODES = new Set(DEFAULT_WP_ITEMS.filter(isSmartDefault).map(w => w.code));
 
+// ── ISA Assertions default by WP category ─────────────────────────────────
+function getDefaultAssertions(category: string) {
+  const ALL = ["Existence","Completeness","Accuracy","Cut-off","Valuation","Rights & Obligations","Presentation & Disclosure"];
+  const MAP: Record<string,string[]> = {
+    substantive_assets:  ["Existence","Completeness","Valuation","Rights & Obligations","Presentation & Disclosure"],
+    substantive_liab:    ["Completeness","Accuracy","Cut-off","Valuation","Presentation & Disclosure"],
+    substantive_pl:      ["Completeness","Accuracy","Cut-off","Presentation & Disclosure"],
+    tax:                 ["Accuracy","Completeness","Presentation & Disclosure"],
+    related_party:       ["Existence","Completeness","Disclosure","Accuracy"],
+    controls:            ["Existence","Operating Effectiveness"],
+    analytical:          ["Accuracy","Completeness","Valuation"],
+    risk:                ["Completeness","Accuracy"],
+    pre_planning:        ["Documentation","Independence"],
+    completion:          ["Completeness","Accuracy","Presentation & Disclosure"],
+    reporting:           ["Accuracy","Presentation & Disclosure"],
+    quality:             ["Completeness","Accuracy"],
+  };
+  return (MAP[category] || ALL).map((a: string) => ({ assertion: a, relevant: true, rationale: "" }));
+}
+
+// ── ISA Compliance Checklist by ISA reference ─────────────────────────────
+function getIsaChecklist(isaRef: string) {
+  const base = [
+    { checkCode: "DOC-1", description: "Working paper heading completed (client, period, WP code, preparer, date)", status: "pending" },
+    { checkCode: "DOC-2", description: "Audit objective clearly stated and linked to assertions", status: "pending" },
+    { checkCode: "DOC-3", description: "All procedures listed and marked performed or N/A", status: "pending" },
+    { checkCode: "DOC-4", description: "Evidence items referenced and cross-indexed", status: "pending" },
+    { checkCode: "DOC-5", description: "Exceptions and deviations noted with resolution", status: "pending" },
+    { checkCode: "DOC-6", description: "Conclusion documented with ISA reference", status: "pending" },
+    { checkCode: "DOC-7", description: "Preparer sign-off completed", status: "pending" },
+    { checkCode: "DOC-8", description: "Reviewer sign-off completed", status: "pending" },
+    { checkCode: "ISA230-1", description: "ISA 230: Sufficient detail to enable experienced auditor to understand work", status: "pending" },
+    { checkCode: "ISA230-2", description: "ISA 230: WP completed on timely basis", status: "pending" },
+  ];
+  const extra: Record<string, { checkCode: string; description: string; status: string }[]> = {
+    "ISA 315": [
+      { checkCode: "ISA315-1", description: "Risk assessment procedures documented", status: "pending" },
+      { checkCode: "ISA315-2", description: "Understanding of entity and environment obtained", status: "pending" },
+    ],
+    "ISA 530": [
+      { checkCode: "ISA530-1", description: "Sampling objective defined", status: "pending" },
+      { checkCode: "ISA530-2", description: "Population defined and complete", status: "pending" },
+      { checkCode: "ISA530-3", description: "Sample selection documented (MUS/Random/Judgmental)", status: "pending" },
+      { checkCode: "ISA530-4", description: "Each sampled item tested and result recorded", status: "pending" },
+      { checkCode: "ISA530-5", description: "Deviations/misstatements evaluated and projected", status: "pending" },
+    ],
+    "ISA 500": [
+      { checkCode: "ISA500-1", description: "Evidence is relevant, reliable, and sufficient", status: "pending" },
+      { checkCode: "ISA500-2", description: "External confirmations sent and responses received (if applicable)", status: "pending" },
+    ],
+    "ISA 450": [
+      { checkCode: "ISA450-1", description: "All misstatements accumulated and evaluated", status: "pending" },
+      { checkCode: "ISA450-2", description: "Aggregate effect vs materiality assessed", status: "pending" },
+      { checkCode: "ISA450-3", description: "Management informed and response documented", status: "pending" },
+    ],
+  };
+  const key = Object.keys(extra).find(k => (isaRef || "").includes(k.replace("ISA ", ""))) || "";
+  return [...base, ...(extra[key] || [])];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  WP EXECUTION MODAL — Full ISA-compliant audit documentation lifecycle
+// ═══════════════════════════════════════════════════════════════════════════
+function WpExecutionModal({ wp, session, onClose }: { wp: any; session: any; onClose: () => void }) {
+  const { toast } = useToast();
+  const token = typeof window !== "undefined" ? localStorage.getItem("hrm_token") : null;
+  const hdr = (extra: Record<string,string> = {}): Record<string,string> =>
+    token ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...extra }
+           : { "Content-Type": "application/json", ...extra };
+
+  const [tab, setTab] = useState<"overview"|"procedures"|"sampling"|"work"|"evidence"|"findings"|"conclusions"|"signoff">("overview");
+  const [exec, setExec] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [validation, setValidation] = useState<any>(null);
+  const [validating, setValidating] = useState(false);
+  const [locking, setLocking] = useState(false);
+
+  // helpers
+  const sid = session?.id;
+  const apiBase = `${API_BASE}/working-papers/sessions/${sid}/wp-execution/${wp.code}`;
+
+  // ── Load / init ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    setLoading(true);
+    fetch(apiBase, { headers: hdr() })
+      .then(async r => {
+        if (r.ok) { setExec(await r.json()); }
+        else {
+          // Bootstrap from template procedures
+          const pc = getWpProcedures(wp);
+          setExec({
+            wpCode: wp.code, wpTitle: wp.label, wpPhase: wp.phase,
+            wpCategory: wp.type, isaReference: wp.isa || "",
+            secondaryReference: "", objective: pc.objective,
+            riskLevel: wp.risk === "high" ? "High" : wp.risk === "low" ? "Low" : "Medium",
+            riskDescription: "",
+            assertions: getDefaultAssertions(wp.category),
+            procedures: pc.procedures.map((desc: string, i: number) => ({
+              stepNo: i + 1, description: desc, type: "standard",
+              status: "not_started", notes: "", evidenceRefs: [], finding: "",
+            })),
+            samplingMethod: "MUS", populationSize: null, sampleSize: null,
+            samplingCriteria: "", samplingItems: [],
+            workPerformed: [], evidenceItems: [], findings: [], misstatements: [],
+            analyticalData: { calculations: [] },
+            professionalJudgment: "", staffConclusion: "", seniorConclusion: "",
+            managerConclusion: "", partnerConclusion: "",
+            reviewNotes: [], signOffs: {},
+            isaChecklist: getIsaChecklist(wp.isa || ""),
+            tbGlCrossRefs: [], isLocked: false, status: "not_started",
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wp.code, sid]);
+
+  // ── Save ────────────────────────────────────────────────────────────────
+  const save = async (data?: any, silent = false) => {
+    const payload = data !== undefined ? data : exec;
+    if (!payload) return;
+    setSaving(true);
+    try {
+      const r = await fetch(apiBase, { method: "PUT", headers: hdr(), body: JSON.stringify(payload) });
+      if (r.ok) {
+        const updated = await r.json();
+        setExec(updated);
+        if (!silent) toast({ title: "Saved", description: `${wp.code} updated` });
+      } else {
+        const err = await r.json().catch(() => ({}));
+        if (!silent) toast({ title: "Save failed", description: err.error || "Unknown error", variant: "destructive" });
+      }
+    } catch { if (!silent) toast({ title: "Save failed", variant: "destructive" }); }
+    setSaving(false);
+  };
+
+  // ── Validate ────────────────────────────────────────────────────────────
+  const validate = async () => {
+    setValidating(true);
+    try {
+      const r = await fetch(`${apiBase}/validate`, { headers: hdr() });
+      if (r.ok) setValidation(await r.json());
+    } catch {}
+    setValidating(false);
+  };
+
+  // ── Lock ────────────────────────────────────────────────────────────────
+  const lockWp = async () => {
+    setLocking(true);
+    try {
+      const r = await fetch(`${apiBase}/lock`, { method: "POST", headers: hdr(),
+        body: JSON.stringify({ lockedBy: session?.preparerName || "Auditor" }) });
+      const body = await r.json();
+      if (r.ok) { setExec(body); toast({ title: "WP Locked (ISA 230)", description: "This working paper is now locked." }); }
+      else toast({ title: "Cannot lock", description: body.validationErrors?.join("; ") || body.error, variant: "destructive" });
+    } catch {}
+    setLocking(false);
+  };
+
+  // ── Field updater (shallow merge) ───────────────────────────────────────
+  const upd = (patch: any) => setExec((prev: any) => ({ ...prev, ...patch }));
+
+  // ── TABS ────────────────────────────────────────────────────────────────
+  const TABS = [
+    { key: "overview",    label: "Overview",    icon: Info },
+    { key: "procedures",  label: "Procedures",  icon: ClipboardList },
+    { key: "sampling",    label: "Sampling",    icon: CircleDot },
+    { key: "work",        label: "Work Done",   icon: CheckCheck },
+    { key: "evidence",    label: "Evidence",    icon: FileText },
+    { key: "findings",    label: "Findings",    icon: AlertOctagon },
+    { key: "conclusions", label: "Conclusions", icon: Shield },
+    { key: "signoff",     label: "Sign-off",    icon: Lock },
+  ] as const;
+
+  const statusColor = exec?.status === "locked" ? "bg-slate-800 text-white"
+    : exec?.status === "concluded" ? "bg-emerald-600 text-white"
+    : exec?.status === "evidenced" ? "bg-blue-600 text-white"
+    : exec?.status === "procedures_done" ? "bg-violet-600 text-white"
+    : exec?.status === "in_progress" ? "bg-amber-500 text-white"
+    : "bg-slate-200 text-slate-600";
+
+  if (!createPortal) return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-stretch" style={{background:"rgba(15,23,42,0.78)"}}>
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative m-auto flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden w-full max-w-5xl max-h-[96vh]">
+
+        {/* ── Header ─────────────────────────────────────────────────── */}
+        <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-5 py-4 flex items-start gap-3 shrink-0">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-white/80 uppercase">{wp.code}</span>
+              {exec && <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full capitalize", statusColor)}>{exec.status?.replace(/_/g," ") || "Not Started"}</span>}
+              {exec?.isLocked && <span className="flex items-center gap-1 text-[10px] text-amber-300"><Lock className="w-3 h-3" /> Locked</span>}
+            </div>
+            <h2 className="text-base font-semibold text-white mt-1 leading-tight">{wp.label}</h2>
+            <p className="text-[11px] text-white/60 mt-0.5">{wp.isa} · {wp.phase} · {wp.type}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {saving && <Loader2 className="w-4 h-4 text-white/50 animate-spin" />}
+            {!exec?.isLocked && (
+              <button onClick={() => save()} disabled={saving}
+                className="text-[11px] px-3 py-1.5 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors flex items-center gap-1.5">
+                <Save className="w-3.5 h-3.5" /> Save
+              </button>
+            )}
+            <button onClick={onClose} className="text-white/60 hover:text-white transition-colors ml-1">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Tab bar ─────────────────────────────────────────────────── */}
+        <div className="flex items-center gap-0 px-4 border-b border-slate-200 bg-slate-50 overflow-x-auto shrink-0">
+          {TABS.map(({ key, label, icon: Icon }) => (
+            <button key={key} onClick={() => setTab(key as any)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 whitespace-nowrap transition-colors",
+                tab === key ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-500 hover:text-slate-700"
+              )}>
+              <Icon className="w-3.5 h-3.5" /> {label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Body ────────────────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+          {loading ? (
+            <div className="flex items-center justify-center h-48 gap-2 text-slate-400">
+              <Loader2 className="w-5 h-5 animate-spin" /> Loading execution record…
+            </div>
+          ) : !exec ? (
+            <div className="text-center text-slate-400 py-20">Failed to load</div>
+          ) : (
+
+            /* ── OVERVIEW ── */
+            tab === "overview" ? (
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide block mb-1">ISA Reference</label>
+                      <input value={exec.isaReference || ""} disabled={exec.isLocked}
+                        onChange={e => upd({ isaReference: e.target.value })}
+                        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide block mb-1">Secondary Reference (Local Law)</label>
+                      <input value={exec.secondaryReference || ""} disabled={exec.isLocked}
+                        onChange={e => upd({ secondaryReference: e.target.value })}
+                        placeholder="e.g. ITO 2001 s.177 / Companies Act 2017"
+                        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide block mb-1">Risk Level</label>
+                      <select value={exec.riskLevel || "Medium"} disabled={exec.isLocked}
+                        onChange={e => upd({ riskLevel: e.target.value })}
+                        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                        {["Low","Medium","High","Critical"].map(r => <option key={r}>{r}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide block mb-1">Audit Objective</label>
+                    <textarea value={exec.objective || ""} disabled={exec.isLocked} rows={5}
+                      onChange={e => upd({ objective: e.target.value })}
+                      className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide block mb-2">Risk Description / Linkage</label>
+                  <textarea value={exec.riskDescription || ""} disabled={exec.isLocked} rows={2}
+                    onChange={e => upd({ riskDescription: e.target.value })}
+                    placeholder="Describe identified risks and how procedures address them…"
+                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none" />
+                </div>
+                {/* Assertions */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Assertions Mapping (ISA 315)</label>
+                    {!exec.isLocked && (
+                      <button onClick={() => upd({ assertions: [...(exec.assertions||[]), { assertion: "Custom", relevant: true, rationale: "" }] })}
+                        className="text-[10px] text-indigo-600 hover:underline flex items-center gap-1">
+                        <Plus className="w-3 h-3" /> Add
+                      </button>
+                    )}
+                  </div>
+                  <div className="rounded-xl border border-slate-200 overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 text-[10px] font-semibold text-slate-400 uppercase">
+                        <tr>
+                          <th className="px-3 py-2 text-left w-8">#</th>
+                          <th className="px-3 py-2 text-left">Assertion</th>
+                          <th className="px-3 py-2 text-center w-20">Relevant?</th>
+                          <th className="px-3 py-2 text-left">Rationale</th>
+                          {!exec.isLocked && <th className="px-2 py-2 w-8" />}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {(exec.assertions || []).map((a: any, ai: number) => (
+                          <tr key={ai} className="hover:bg-slate-50/50">
+                            <td className="px-3 py-2 text-slate-400">{ai+1}</td>
+                            <td className="px-3 py-2">
+                              <input value={a.assertion} disabled={exec.isLocked}
+                                onChange={e => { const arr = [...exec.assertions]; arr[ai] = { ...a, assertion: e.target.value }; upd({ assertions: arr }); }}
+                                className="w-full border-0 bg-transparent focus:outline-none text-slate-700 font-medium" />
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <input type="checkbox" checked={a.relevant} disabled={exec.isLocked}
+                                onChange={e => { const arr = [...exec.assertions]; arr[ai] = { ...a, relevant: e.target.checked }; upd({ assertions: arr }); }}
+                                className="w-4 h-4 rounded text-indigo-600" />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input value={a.rationale || ""} disabled={exec.isLocked}
+                                onChange={e => { const arr = [...exec.assertions]; arr[ai] = { ...a, rationale: e.target.value }; upd({ assertions: arr }); }}
+                                placeholder="Why relevant…"
+                                className="w-full border-0 bg-transparent focus:outline-none text-slate-500" />
+                            </td>
+                            {!exec.isLocked && (
+                              <td className="px-2 py-2">
+                                <button onClick={() => upd({ assertions: exec.assertions.filter((_: any, i: number) => i !== ai) })}
+                                  className="text-slate-300 hover:text-red-400"><X className="w-3.5 h-3.5" /></button>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )
+
+            /* ── PROCEDURES ── */
+            : tab === "procedures" ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-slate-700">Audit Procedures <span className="text-slate-400 font-normal text-xs ml-1">— Each must be performed or marked N/A before sign-off</span></p>
+                  {!exec.isLocked && (
+                    <button onClick={() => upd({ procedures: [...(exec.procedures||[]), { stepNo: (exec.procedures||[]).length+1, description: "", type: "custom", status: "not_started", notes: "", evidenceRefs: [], finding: "" }] })}
+                      className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg hover:bg-indigo-50 transition-colors">
+                      <Plus className="w-3.5 h-3.5" /> Add Custom
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  {(exec.procedures || []).map((proc: any, pi: number) => (
+                    <div key={pi} className={cn("border rounded-xl p-4 space-y-3 transition-colors",
+                      proc.status === "performed" ? "border-emerald-200 bg-emerald-50/30" :
+                      proc.status === "n_a" ? "border-slate-200 bg-slate-50/50 opacity-60" :
+                      proc.status === "in_progress" ? "border-amber-200 bg-amber-50/20" :
+                      "border-slate-200"
+                    )}>
+                      <div className="flex items-start gap-3">
+                        <span className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{proc.stepNo}</span>
+                        <div className="flex-1 space-y-2">
+                          {exec.isLocked ? (
+                            <p className="text-sm text-slate-700">{proc.description}</p>
+                          ) : (
+                            <textarea value={proc.description} rows={2}
+                              onChange={e => { const arr = [...exec.procedures]; arr[pi] = { ...proc, description: e.target.value }; upd({ procedures: arr }); }}
+                              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none" />
+                          )}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={cn("text-[9px] px-2 py-0.5 rounded-full font-semibold uppercase",
+                              proc.type === "standard" ? "bg-blue-100 text-blue-700" :
+                              proc.type === "ai" ? "bg-violet-100 text-violet-700" : "bg-orange-100 text-orange-700"
+                            )}>{proc.type}</span>
+                            <select value={proc.status} disabled={exec.isLocked}
+                              onChange={e => { const arr = [...exec.procedures]; arr[pi] = { ...proc, status: e.target.value }; upd({ procedures: arr }); }}
+                              className={cn("text-xs border rounded-lg px-2 py-0.5 focus:outline-none",
+                                proc.status === "performed" ? "border-emerald-300 text-emerald-700 bg-emerald-50" :
+                                proc.status === "n_a" ? "border-slate-300 text-slate-500 bg-slate-50" :
+                                proc.status === "in_progress" ? "border-amber-300 text-amber-700 bg-amber-50" :
+                                "border-slate-300 text-slate-600"
+                              )}>
+                              <option value="not_started">Not Started</option>
+                              <option value="in_progress">In Progress</option>
+                              <option value="performed">Performed ✓</option>
+                              <option value="n_a">N/A</option>
+                            </select>
+                            {proc.status === "performed" && (
+                              <>
+                                <input value={proc.performedBy || ""} disabled={exec.isLocked}
+                                  onChange={e => { const arr = [...exec.procedures]; arr[pi] = { ...proc, performedBy: e.target.value }; upd({ procedures: arr }); }}
+                                  placeholder="Performed by" className="text-xs border border-slate-200 rounded-lg px-2 py-0.5 focus:outline-none w-28" />
+                                <input type="date" value={proc.performedDate || ""} disabled={exec.isLocked}
+                                  onChange={e => { const arr = [...exec.procedures]; arr[pi] = { ...proc, performedDate: e.target.value }; upd({ procedures: arr }); }}
+                                  className="text-xs border border-slate-200 rounded-lg px-2 py-0.5 focus:outline-none w-32" />
+                              </>
+                            )}
+                            {!exec.isLocked && (
+                              <button onClick={() => upd({ procedures: exec.procedures.filter((_: any, i: number) => i !== pi) })}
+                                className="ml-auto text-slate-300 hover:text-red-400"><X className="w-3.5 h-3.5" /></button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      {(proc.status === "performed" || proc.status === "in_progress") && (
+                        <div className="pl-10 space-y-2">
+                          <div>
+                            <label className="text-[10px] font-semibold text-slate-400 uppercase">Work Notes / Observations</label>
+                            <textarea value={proc.notes || ""} disabled={exec.isLocked} rows={2}
+                              onChange={e => { const arr = [...exec.procedures]; arr[pi] = { ...proc, notes: e.target.value }; upd({ procedures: arr }); }}
+                              placeholder="Document work performed, items examined, results…"
+                              className="w-full mt-1 text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-semibold text-slate-400 uppercase">Finding (if any)</label>
+                            <input value={proc.finding || ""} disabled={exec.isLocked}
+                              onChange={e => { const arr = [...exec.procedures]; arr[pi] = { ...proc, finding: e.target.value }; upd({ procedures: arr }); }}
+                              placeholder="No exception / Describe exception found…"
+                              className="w-full mt-1 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl text-xs text-slate-600">
+                  <CheckCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                  {(exec.procedures||[]).filter((p: any) => p.status === "performed" || p.status === "n_a").length} / {(exec.procedures||[]).length} procedures complete
+                </div>
+              </div>
+            )
+
+            /* ── SAMPLING ── */
+            : tab === "sampling" ? (
+              <div className="space-y-5">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-800">
+                  <strong className="font-semibold">ISA 530</strong> — Audit Sampling. Define population, select method, determine sample size, and document each selected item below.
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block mb-1">Method</label>
+                    <select value={exec.samplingMethod || "MUS"} disabled={exec.isLocked}
+                      onChange={e => upd({ samplingMethod: e.target.value })}
+                      className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none">
+                      {["MUS","Random","Systematic","Judgmental","None"].map(m => <option key={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block mb-1">Population Size</label>
+                    <input type="number" value={exec.populationSize || ""} disabled={exec.isLocked}
+                      onChange={e => upd({ populationSize: parseInt(e.target.value) || null })}
+                      className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block mb-1">Sample Size</label>
+                    <input type="number" value={exec.sampleSize || ""} disabled={exec.isLocked}
+                      onChange={e => upd({ sampleSize: parseInt(e.target.value) || null })}
+                      className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block mb-1">Coverage %</label>
+                    <div className="text-sm border border-slate-100 rounded-lg px-2 py-1.5 bg-slate-50 text-slate-500">
+                      {exec.populationSize && exec.sampleSize ? `${((exec.sampleSize / exec.populationSize) * 100).toFixed(1)}%` : "—"}
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block mb-1">Selection Criteria / Justification</label>
+                  <textarea value={exec.samplingCriteria || ""} disabled={exec.isLocked} rows={2}
+                    onChange={e => upd({ samplingCriteria: e.target.value })}
+                    placeholder="Describe how items were selected and why the method is appropriate…"
+                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none resize-none" />
+                </div>
+                {/* Sampling items table */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Selected Sample Items</label>
+                    {!exec.isLocked && (
+                      <button onClick={() => upd({ samplingItems: [...(exec.samplingItems||[]), { itemNo: (exec.samplingItems||[]).length+1, description: "", accountCode: "", accountName: "", amount: "", period: "" }] })}
+                        className="flex items-center gap-1 text-xs text-indigo-600 hover:underline">
+                        <Plus className="w-3.5 h-3.5" /> Add Item
+                      </button>
+                    )}
+                  </div>
+                  <div className="rounded-xl border border-slate-200 overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 text-[10px] font-semibold text-slate-400 uppercase">
+                        <tr>
+                          <th className="px-2 py-2 text-left w-8">#</th>
+                          <th className="px-2 py-2 text-left">Description</th>
+                          <th className="px-2 py-2 text-left w-24">Account</th>
+                          <th className="px-2 py-2 text-right w-28">Amount (PKR)</th>
+                          <th className="px-2 py-2 text-left w-20">Period</th>
+                          {!exec.isLocked && <th className="px-2 py-2 w-8" />}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {(exec.samplingItems || []).length === 0 && (
+                          <tr><td colSpan={6} className="px-3 py-4 text-center text-slate-400 italic">No items added yet</td></tr>
+                        )}
+                        {(exec.samplingItems || []).map((item: any, idx: number) => (
+                          <tr key={idx}>
+                            <td className="px-2 py-2 text-slate-400">{item.itemNo}</td>
+                            <td className="px-2 py-2">
+                              <input value={item.description || ""} disabled={exec.isLocked}
+                                onChange={e => { const arr = [...exec.samplingItems]; arr[idx] = { ...item, description: e.target.value }; upd({ samplingItems: arr }); }}
+                                className="w-full border-0 bg-transparent focus:outline-none" />
+                            </td>
+                            <td className="px-2 py-2">
+                              <input value={item.accountCode || ""} disabled={exec.isLocked}
+                                onChange={e => { const arr = [...exec.samplingItems]; arr[idx] = { ...item, accountCode: e.target.value }; upd({ samplingItems: arr }); }}
+                                className="w-full border-0 bg-transparent focus:outline-none text-slate-500" />
+                            </td>
+                            <td className="px-2 py-2 text-right">
+                              <input value={item.amount || ""} disabled={exec.isLocked} type="number"
+                                onChange={e => { const arr = [...exec.samplingItems]; arr[idx] = { ...item, amount: e.target.value }; upd({ samplingItems: arr }); }}
+                                className="w-full border-0 bg-transparent focus:outline-none text-right text-slate-700" />
+                            </td>
+                            <td className="px-2 py-2">
+                              <input value={item.period || ""} disabled={exec.isLocked}
+                                onChange={e => { const arr = [...exec.samplingItems]; arr[idx] = { ...item, period: e.target.value }; upd({ samplingItems: arr }); }}
+                                className="w-full border-0 bg-transparent focus:outline-none text-slate-500" />
+                            </td>
+                            {!exec.isLocked && (
+                              <td className="px-2 py-2">
+                                <button onClick={() => upd({ samplingItems: exec.samplingItems.filter((_: any, i: number) => i !== idx) })}
+                                  className="text-slate-300 hover:text-red-400"><X className="w-3.5 h-3.5" /></button>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )
+
+            /* ── WORK PERFORMED ── */
+            : tab === "work" ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-slate-700">Sample-wise Execution Table</p>
+                  {!exec.isLocked && (
+                    <button onClick={() => upd({ workPerformed: [...(exec.workPerformed||[]), { sampleRef: "", procedureRef: "", workDone: "", result: "satisfactory", amount: "", exceptionNote: "" }] })}
+                      className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg hover:bg-indigo-50">
+                      <Plus className="w-3.5 h-3.5" /> Add Row
+                    </button>
+                  )}
+                </div>
+                <div className="rounded-xl border border-slate-200 overflow-x-auto">
+                  <table className="w-full text-xs min-w-[700px]">
+                    <thead className="bg-slate-50 text-[10px] font-semibold text-slate-400 uppercase">
+                      <tr>
+                        <th className="px-3 py-2 text-left w-20">Sample Ref</th>
+                        <th className="px-3 py-2 text-left w-20">Proc. Ref</th>
+                        <th className="px-3 py-2 text-left">Work Done</th>
+                        <th className="px-3 py-2 text-center w-28">Result</th>
+                        <th className="px-3 py-2 text-right w-24">Amount</th>
+                        <th className="px-3 py-2 text-left">Exception Note</th>
+                        {!exec.isLocked && <th className="px-2 py-2 w-8" />}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(exec.workPerformed || []).length === 0 && (
+                        <tr><td colSpan={7} className="px-3 py-5 text-center text-slate-400 italic">No work performed items yet</td></tr>
+                      )}
+                      {(exec.workPerformed || []).map((w: any, wi: number) => (
+                        <tr key={wi} className={cn("hover:bg-slate-50/50", w.result === "exception" && "bg-red-50/30")}>
+                          <td className="px-3 py-2">
+                            <input value={w.sampleRef || ""} disabled={exec.isLocked}
+                              onChange={e => { const arr = [...exec.workPerformed]; arr[wi] = { ...w, sampleRef: e.target.value }; upd({ workPerformed: arr }); }}
+                              className="w-full border-0 bg-transparent focus:outline-none text-slate-600" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input value={w.procedureRef || ""} disabled={exec.isLocked}
+                              onChange={e => { const arr = [...exec.workPerformed]; arr[wi] = { ...w, procedureRef: e.target.value }; upd({ workPerformed: arr }); }}
+                              className="w-full border-0 bg-transparent focus:outline-none text-slate-600" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input value={w.workDone || ""} disabled={exec.isLocked}
+                              onChange={e => { const arr = [...exec.workPerformed]; arr[wi] = { ...w, workDone: e.target.value }; upd({ workPerformed: arr }); }}
+                              className="w-full border-0 bg-transparent focus:outline-none" />
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <select value={w.result || "satisfactory"} disabled={exec.isLocked}
+                              onChange={e => { const arr = [...exec.workPerformed]; arr[wi] = { ...w, result: e.target.value }; upd({ workPerformed: arr }); }}
+                              className={cn("text-[10px] border rounded-full px-2 py-0.5 font-semibold",
+                                w.result === "satisfactory" ? "border-emerald-200 text-emerald-700 bg-emerald-50" :
+                                w.result === "exception" ? "border-red-200 text-red-700 bg-red-50" :
+                                "border-amber-200 text-amber-700 bg-amber-50"
+                              )}>
+                              <option value="satisfactory">Satisfactory</option>
+                              <option value="partial">Partial</option>
+                              <option value="exception">Exception</option>
+                            </select>
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <input value={w.amount || ""} disabled={exec.isLocked} type="number"
+                              onChange={e => { const arr = [...exec.workPerformed]; arr[wi] = { ...w, amount: e.target.value }; upd({ workPerformed: arr }); }}
+                              className="w-full border-0 bg-transparent focus:outline-none text-right" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input value={w.exceptionNote || ""} disabled={exec.isLocked}
+                              onChange={e => { const arr = [...exec.workPerformed]; arr[wi] = { ...w, exceptionNote: e.target.value }; upd({ workPerformed: arr }); }}
+                              className="w-full border-0 bg-transparent focus:outline-none text-red-600" />
+                          </td>
+                          {!exec.isLocked && (
+                            <td className="px-2 py-2">
+                              <button onClick={() => upd({ workPerformed: exec.workPerformed.filter((_: any, i: number) => i !== wi) })}
+                                className="text-slate-300 hover:text-red-400"><X className="w-3.5 h-3.5" /></button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+
+            /* ── EVIDENCE ── */
+            : tab === "evidence" ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">Evidence Register</p>
+                    <p className="text-xs text-slate-400 mt-0.5">ISA 500 — Evidence must be relevant, reliable, and sufficient</p>
+                  </div>
+                  {!exec.isLocked && (
+                    <button onClick={() => upd({ evidenceItems: [...(exec.evidenceItems||[]), { evidenceRef: `E${String((exec.evidenceItems||[]).length+1).padStart(2,"0")}`, documentType: "Invoice", documentRef: "", source: "Client", obtainedDate: "", crossRefWp: "", crossRefTb: "", verifiedBy: "" }] })}
+                      className="flex items-center gap-1 text-xs text-indigo-600 border border-indigo-200 px-2.5 py-1 rounded-lg hover:bg-indigo-50">
+                      <Plus className="w-3.5 h-3.5" /> Add Evidence
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  {(exec.evidenceItems || []).length === 0 && (
+                    <div className="border-2 border-dashed border-slate-200 rounded-xl py-8 text-center text-slate-400">
+                      <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">No evidence items recorded yet</p>
+                      <p className="text-xs mt-1">Add evidence to link procedures to supporting documentation</p>
+                    </div>
+                  )}
+                  {(exec.evidenceItems || []).map((ev: any, ei: number) => (
+                    <div key={ei} className="border border-slate-200 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">{ev.evidenceRef}</span>
+                        {!exec.isLocked && (
+                          <button onClick={() => upd({ evidenceItems: exec.evidenceItems.filter((_: any, i: number) => i !== ei) })}
+                            className="ml-auto text-slate-300 hover:text-red-400"><X className="w-3.5 h-3.5" /></button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                        <div>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Document Type</label>
+                          <select value={ev.documentType || "Invoice"} disabled={exec.isLocked}
+                            onChange={e => { const arr = [...exec.evidenceItems]; arr[ei] = { ...ev, documentType: e.target.value }; upd({ evidenceItems: arr }); }}
+                            className="w-full border border-slate-200 rounded-lg px-2 py-1 focus:outline-none">
+                            {["Invoice","Contract","Bank Statement","Board Minutes","Confirmation","Tax Return","GRN","Agreement","Correspondence","Calculation","Reconciliation","Other"].map(t => <option key={t}>{t}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Document Reference</label>
+                          <input value={ev.documentRef || ""} disabled={exec.isLocked}
+                            onChange={e => { const arr = [...exec.evidenceItems]; arr[ei] = { ...ev, documentRef: e.target.value }; upd({ evidenceItems: arr }); }}
+                            placeholder="Invoice #, Agreement ref…"
+                            className="w-full border border-slate-200 rounded-lg px-2 py-1 focus:outline-none" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Source</label>
+                          <select value={ev.source || "Client"} disabled={exec.isLocked}
+                            onChange={e => { const arr = [...exec.evidenceItems]; arr[ei] = { ...ev, source: e.target.value }; upd({ evidenceItems: arr }); }}
+                            className="w-full border border-slate-200 rounded-lg px-2 py-1 focus:outline-none">
+                            {["Client","External","Self-generated","Third-party","SECP","FBR"].map(s => <option key={s}>{s}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Obtained Date</label>
+                          <input type="date" value={ev.obtainedDate || ""} disabled={exec.isLocked}
+                            onChange={e => { const arr = [...exec.evidenceItems]; arr[ei] = { ...ev, obtainedDate: e.target.value }; upd({ evidenceItems: arr }); }}
+                            className="w-full border border-slate-200 rounded-lg px-2 py-1 focus:outline-none" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Cross-ref WP</label>
+                          <input value={ev.crossRefWp || ""} disabled={exec.isLocked}
+                            onChange={e => { const arr = [...exec.evidenceItems]; arr[ei] = { ...ev, crossRefWp: e.target.value }; upd({ evidenceItems: arr }); }}
+                            placeholder="e.g. F1, B1"
+                            className="w-full border border-slate-200 rounded-lg px-2 py-1 focus:outline-none" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Verified By</label>
+                          <input value={ev.verifiedBy || ""} disabled={exec.isLocked}
+                            onChange={e => { const arr = [...exec.evidenceItems]; arr[ei] = { ...ev, verifiedBy: e.target.value }; upd({ evidenceItems: arr }); }}
+                            className="w-full border border-slate-200 rounded-lg px-2 py-1 focus:outline-none" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+
+            /* ── FINDINGS & MISSTATEMENTS ── */
+            : tab === "findings" ? (
+              <div className="space-y-6">
+                {/* Findings */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700">Results & Findings</p>
+                      <p className="text-xs text-slate-400">Document exceptions, errors, and observations from procedures</p>
+                    </div>
+                    {!exec.isLocked && (
+                      <button onClick={() => upd({ findings: [...(exec.findings||[]), { findingNo: `F${String((exec.findings||[]).length+1).padStart(2,"0")}`, procedureRef: "", description: "", findingType: "error", amount: "", isaRef: "" }] })}
+                        className="flex items-center gap-1 text-xs text-indigo-600 border border-indigo-200 px-2.5 py-1 rounded-lg hover:bg-indigo-50">
+                        <Plus className="w-3.5 h-3.5" /> Add Finding
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    {(exec.findings || []).length === 0 && (
+                      <p className="text-sm text-slate-400 italic text-center py-4">No findings recorded — if no exceptions were identified, document "No exceptions noted"</p>
+                    )}
+                    {(exec.findings || []).map((f: any, fi: number) => (
+                      <div key={fi} className={cn("border rounded-xl p-4 space-y-2",
+                        f.findingType === "fraud" ? "border-red-300 bg-red-50/30" :
+                        f.findingType === "error" ? "border-orange-200 bg-orange-50/20" :
+                        "border-slate-200"
+                      )}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-orange-700 bg-orange-50 px-2 py-0.5 rounded-full">{f.findingNo}</span>
+                          <select value={f.findingType || "error"} disabled={exec.isLocked}
+                            onChange={e => { const arr = [...exec.findings]; arr[fi] = { ...f, findingType: e.target.value }; upd({ findings: arr }); }}
+                            className="text-xs border border-slate-200 rounded-lg px-2 py-0.5 focus:outline-none">
+                            <option value="error">Error</option>
+                            <option value="omission">Omission</option>
+                            <option value="estimate">Estimation Difference</option>
+                            <option value="fraud">Fraud Indicator</option>
+                            <option value="observation">Observation</option>
+                          </select>
+                          {!exec.isLocked && (
+                            <button onClick={() => upd({ findings: exec.findings.filter((_: any, i: number) => i !== fi) })}
+                              className="ml-auto text-slate-300 hover:text-red-400"><X className="w-3.5 h-3.5" /></button>
+                          )}
+                        </div>
+                        <textarea value={f.description || ""} disabled={exec.isLocked} rows={2}
+                          onChange={e => { const arr = [...exec.findings]; arr[fi] = { ...f, description: e.target.value }; upd({ findings: arr }); }}
+                          placeholder="Describe the finding in detail…"
+                          className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none resize-none" />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Amount (PKR)</label>
+                            <input value={f.amount || ""} disabled={exec.isLocked} type="number"
+                              onChange={e => { const arr = [...exec.findings]; arr[fi] = { ...f, amount: e.target.value }; upd({ findings: arr }); }}
+                              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">ISA / Law Reference</label>
+                            <input value={f.isaRef || ""} disabled={exec.isLocked}
+                              onChange={e => { const arr = [...exec.findings]; arr[fi] = { ...f, isaRef: e.target.value }; upd({ findings: arr }); }}
+                              placeholder="ISA 315.28 / IAS 16"
+                              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Misstatements ISA 450 */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700">Misstatements (ISA 450)</p>
+                      <p className="text-xs text-slate-400">Accumulate and classify all identified misstatements</p>
+                    </div>
+                    {!exec.isLocked && (
+                      <button onClick={() => upd({ misstatements: [...(exec.misstatements||[]), { type: "factual", amount: "", nature: "", classification: "immaterial", decision: "" }] })}
+                        className="flex items-center gap-1 text-xs text-red-600 border border-red-200 px-2.5 py-1 rounded-lg hover:bg-red-50">
+                        <Plus className="w-3.5 h-3.5" /> Add Misstatement
+                      </button>
+                    )}
+                  </div>
+                  <div className="rounded-xl border border-slate-200 overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 text-[10px] font-semibold text-slate-400 uppercase">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Type</th>
+                          <th className="px-3 py-2 text-right w-28">Amount (PKR)</th>
+                          <th className="px-3 py-2 text-left">Nature</th>
+                          <th className="px-3 py-2 text-center w-28">Classification</th>
+                          <th className="px-3 py-2 text-left">Decision</th>
+                          {!exec.isLocked && <th className="px-2 py-2 w-8" />}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {(exec.misstatements || []).length === 0 && (
+                          <tr><td colSpan={6} className="px-3 py-4 text-center text-slate-400 italic">No misstatements recorded</td></tr>
+                        )}
+                        {(exec.misstatements || []).map((m: any, mi: number) => (
+                          <tr key={mi} className={cn(m.classification === "material" && "bg-red-50/30")}>
+                            <td className="px-3 py-2">
+                              <select value={m.type || "factual"} disabled={exec.isLocked}
+                                onChange={e => { const arr = [...exec.misstatements]; arr[mi] = { ...m, type: e.target.value }; upd({ misstatements: arr }); }}
+                                className="border-0 bg-transparent focus:outline-none text-slate-600">
+                                <option value="factual">Factual</option>
+                                <option value="judgmental">Judgmental</option>
+                                <option value="projected">Projected</option>
+                              </select>
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              <input value={m.amount || ""} disabled={exec.isLocked} type="number"
+                                onChange={e => { const arr = [...exec.misstatements]; arr[mi] = { ...m, amount: e.target.value }; upd({ misstatements: arr }); }}
+                                className="w-full border-0 bg-transparent focus:outline-none text-right font-mono" />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input value={m.nature || ""} disabled={exec.isLocked}
+                                onChange={e => { const arr = [...exec.misstatements]; arr[mi] = { ...m, nature: e.target.value }; upd({ misstatements: arr }); }}
+                                className="w-full border-0 bg-transparent focus:outline-none" />
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <select value={m.classification || "immaterial"} disabled={exec.isLocked}
+                                onChange={e => { const arr = [...exec.misstatements]; arr[mi] = { ...m, classification: e.target.value }; upd({ misstatements: arr }); }}
+                                className={cn("text-[10px] border rounded-full px-2 py-0.5 font-semibold",
+                                  m.classification === "material" ? "border-red-200 text-red-700 bg-red-50" :
+                                  m.classification === "waived" ? "border-slate-200 text-slate-500 bg-slate-50" :
+                                  "border-amber-200 text-amber-700 bg-amber-50"
+                                )}>
+                                <option value="material">Material</option>
+                                <option value="immaterial">Immaterial</option>
+                                <option value="waived">Waived</option>
+                              </select>
+                            </td>
+                            <td className="px-3 py-2">
+                              <input value={m.decision || ""} disabled={exec.isLocked}
+                                onChange={e => { const arr = [...exec.misstatements]; arr[mi] = { ...m, decision: e.target.value }; upd({ misstatements: arr }); }}
+                                placeholder="Adjust / Waive / Disclose…"
+                                className="w-full border-0 bg-transparent focus:outline-none text-slate-600" />
+                            </td>
+                            {!exec.isLocked && (
+                              <td className="px-2 py-2">
+                                <button onClick={() => upd({ misstatements: exec.misstatements.filter((_: any, i: number) => i !== mi) })}
+                                  className="text-slate-300 hover:text-red-400"><X className="w-3.5 h-3.5" /></button>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )
+
+            /* ── CONCLUSIONS ── */
+            : tab === "conclusions" ? (
+              <div className="space-y-5">
+                {/* Analytical */}
+                <div>
+                  <p className="text-sm font-semibold text-slate-700 mb-2">Analytical / Calculation Block</p>
+                  <div className="space-y-2">
+                    {((exec.analyticalData?.calculations || [])).map((calc: any, ci: number) => (
+                      <div key={ci} className="grid grid-cols-4 sm:grid-cols-7 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+                        <input value={calc.label || ""} disabled={exec.isLocked}
+                          onChange={e => { const calcs = [...(exec.analyticalData?.calculations||[])]; calcs[ci] = { ...calc, label: e.target.value }; upd({ analyticalData: { ...exec.analyticalData, calculations: calcs } }); }}
+                          placeholder="Label" className="col-span-2 border border-slate-200 rounded-lg px-2 py-1 focus:outline-none bg-white" />
+                        <input value={calc.formula || ""} disabled={exec.isLocked}
+                          onChange={e => { const calcs = [...(exec.analyticalData?.calculations||[])]; calcs[ci] = { ...calc, formula: e.target.value }; upd({ analyticalData: { ...exec.analyticalData, calculations: calcs } }); }}
+                          placeholder="Formula" className="border border-slate-200 rounded-lg px-2 py-1 focus:outline-none bg-white" />
+                        <input value={calc.value || ""} disabled={exec.isLocked} type="number"
+                          onChange={e => { const calcs = [...(exec.analyticalData?.calculations||[])]; calcs[ci] = { ...calc, value: e.target.value }; upd({ analyticalData: { ...exec.analyticalData, calculations: calcs } }); }}
+                          placeholder="Actual" className="border border-slate-200 rounded-lg px-2 py-1 focus:outline-none bg-white text-right" />
+                        <input value={calc.expected || ""} disabled={exec.isLocked}
+                          onChange={e => { const calcs = [...(exec.analyticalData?.calculations||[])]; calcs[ci] = { ...calc, expected: e.target.value }; upd({ analyticalData: { ...exec.analyticalData, calculations: calcs } }); }}
+                          placeholder="Expected" className="border border-slate-200 rounded-lg px-2 py-1 focus:outline-none bg-white text-right" />
+                        <input value={calc.conclusion || ""} disabled={exec.isLocked}
+                          onChange={e => { const calcs = [...(exec.analyticalData?.calculations||[])]; calcs[ci] = { ...calc, conclusion: e.target.value }; upd({ analyticalData: { ...exec.analyticalData, calculations: calcs } }); }}
+                          placeholder="Conclusion" className="border border-slate-200 rounded-lg px-2 py-1 focus:outline-none bg-white" />
+                        {!exec.isLocked && (
+                          <button onClick={() => { const calcs = (exec.analyticalData?.calculations||[]).filter((_: any, i: number) => i !== ci); upd({ analyticalData: { ...exec.analyticalData, calculations: calcs } }); }}
+                            className="text-slate-300 hover:text-red-400 flex items-center justify-center"><X className="w-3.5 h-3.5" /></button>
+                        )}
+                      </div>
+                    ))}
+                    {!exec.isLocked && (
+                      <button onClick={() => upd({ analyticalData: { ...exec.analyticalData, calculations: [...(exec.analyticalData?.calculations||[]), { label: "", formula: "", value: "", expected: "", conclusion: "" }] } })}
+                        className="flex items-center gap-1 text-xs text-indigo-600 hover:underline">
+                        <Plus className="w-3.5 h-3.5" /> Add Calculation
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {/* Professional Judgment */}
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide block mb-1">Professional Judgment Documentation</label>
+                  <textarea value={exec.professionalJudgment || ""} disabled={exec.isLocked} rows={3}
+                    onChange={e => upd({ professionalJudgment: e.target.value })}
+                    placeholder="Document the basis for professional judgments made during this working paper, including any significant estimates or assumptions reviewed…"
+                    className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none resize-none" />
+                </div>
+                {/* Multi-level conclusions */}
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold text-slate-700">Multi-level Audit Conclusions</p>
+                  {[
+                    { level: "staff", label: "Staff / Preparer Conclusion", color: "blue" },
+                    { level: "senior", label: "Senior Auditor Conclusion", color: "violet" },
+                    { level: "manager", label: "Manager Conclusion", color: "orange" },
+                    { level: "partner", label: "Partner Conclusion", color: "emerald" },
+                  ].map(({ level, label, color }) => {
+                    const conclusionKey = `${level}Conclusion` as any;
+                    const nameKey = `${level}Name` as any;
+                    const dateKey = `${level}ConclusionDate` as any;
+                    const isSigned = !!(exec.signOffs as any)?.[level]?.signedAt;
+                    return (
+                      <div key={level} className={cn("border rounded-xl p-4 space-y-2",
+                        isSigned ? "border-emerald-200 bg-emerald-50/30" :
+                        exec[conclusionKey] ? `border-${color}-200 bg-${color}-50/20` : "border-slate-200"
+                      )}>
+                        <div className="flex items-center gap-2">
+                          <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full uppercase",
+                            `bg-${color}-100 text-${color}-700`
+                          )}>{label}</span>
+                          {isSigned && <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-semibold"><CheckCircle2 className="w-3 h-3" /> Signed</span>}
+                        </div>
+                        <select value={exec[conclusionKey] || ""} disabled={exec.isLocked || isSigned}
+                          onChange={e => upd({ [conclusionKey]: e.target.value })}
+                          className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none">
+                          <option value="">— Select conclusion —</option>
+                          <option value="Satisfactory — no exceptions noted. Objectives of this WP have been achieved.">Satisfactory — no exceptions noted</option>
+                          <option value="Satisfactory with minor observation — see findings section.">Satisfactory with minor observation</option>
+                          <option value="Exceptions noted — misstatement raised. See ISA 450 misstatement schedule.">Exceptions noted — misstatement raised</option>
+                          <option value="Not applicable — WP not relevant for this engagement.">Not applicable — WP not relevant</option>
+                          <option value="Refer to partner — material matter requires partner attention.">Refer to partner — material matter</option>
+                        </select>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input value={exec[nameKey] || ""} disabled={exec.isLocked || isSigned}
+                            onChange={e => upd({ [nameKey]: e.target.value })}
+                            placeholder={`${label.split(" ")[0]} name`}
+                            className="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none" />
+                          <input type="date" value={exec[dateKey] || ""} disabled={exec.isLocked || isSigned}
+                            onChange={e => upd({ [dateKey]: e.target.value })}
+                            className="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )
+
+            /* ── SIGN-OFF & CHECKLIST ── */
+            : tab === "signoff" ? (
+              <div className="space-y-6">
+                {/* Validation */}
+                <div className="flex items-center gap-3">
+                  <button onClick={validate} disabled={validating}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                    {validating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Shield className="w-3.5 h-3.5" />}
+                    Validate WP
+                  </button>
+                  {validation && (
+                    <span className={cn("text-xs font-semibold px-3 py-1 rounded-full",
+                      validation.pass ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                    )}>
+                      {validation.pass ? "✓ All checks passed" : `✗ ${validation.errors?.length} error(s)`}
+                    </span>
+                  )}
+                </div>
+                {validation && (
+                  <div className="space-y-2">
+                    {(validation.errors || []).map((e: string, i: number) => (
+                      <div key={i} className="flex items-start gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                        <X className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {e}
+                      </div>
+                    ))}
+                    {(validation.warnings || []).map((w: string, i: number) => (
+                      <div key={i} className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {w}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* ISA Compliance Checklist */}
+                <div>
+                  <p className="text-sm font-semibold text-slate-700 mb-2">ISA Compliance Checklist</p>
+                  <div className="rounded-xl border border-slate-200 overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 text-[10px] font-semibold text-slate-400 uppercase">
+                        <tr>
+                          <th className="px-3 py-2 text-left w-20">Code</th>
+                          <th className="px-3 py-2 text-left">Requirement</th>
+                          <th className="px-3 py-2 text-center w-28">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {(exec.isaChecklist || []).map((item: any, ci: number) => (
+                          <tr key={ci} className={cn("hover:bg-slate-50/50",
+                            item.status === "pass" && "bg-emerald-50/30",
+                            item.status === "fail" && "bg-red-50/30"
+                          )}>
+                            <td className="px-3 py-2 font-mono text-slate-500">{item.checkCode}</td>
+                            <td className="px-3 py-2 text-slate-700">{item.description}</td>
+                            <td className="px-3 py-2 text-center">
+                              <select value={item.status || "pending"} disabled={exec.isLocked}
+                                onChange={e => { const arr = [...exec.isaChecklist]; arr[ci] = { ...item, status: e.target.value }; upd({ isaChecklist: arr }); }}
+                                className={cn("text-[10px] border rounded-full px-2 py-0.5 font-semibold",
+                                  item.status === "pass" ? "border-emerald-200 text-emerald-700 bg-emerald-50" :
+                                  item.status === "fail" ? "border-red-200 text-red-700 bg-red-50" :
+                                  item.status === "n_a" ? "border-slate-200 text-slate-400 bg-slate-50" :
+                                  "border-slate-200 text-slate-600"
+                                )}>
+                                <option value="pending">Pending</option>
+                                <option value="pass">Pass ✓</option>
+                                <option value="fail">Fail ✗</option>
+                                <option value="n_a">N/A</option>
+                              </select>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Review Notes */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-semibold text-slate-700">Review Notes</p>
+                    {!exec.isLocked && (
+                      <button onClick={() => upd({ reviewNotes: [...(exec.reviewNotes||[]), { level: "senior", reviewer: "", note: "", date: new Date().toISOString().split("T")[0], resolved: false, resolvedNote: "" }] })}
+                        className="flex items-center gap-1 text-xs text-indigo-600 hover:underline">
+                        <Plus className="w-3.5 h-3.5" /> Add Note
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {(exec.reviewNotes || []).map((n: any, ni: number) => (
+                      <div key={ni} className={cn("border rounded-xl p-3 space-y-2", n.resolved ? "border-emerald-200 bg-emerald-50/20" : "border-amber-200 bg-amber-50/20")}>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <select value={n.level || "senior"} disabled={exec.isLocked}
+                            onChange={e => { const arr = [...exec.reviewNotes]; arr[ni] = { ...n, level: e.target.value }; upd({ reviewNotes: arr }); }}
+                            className="text-[10px] border border-slate-200 rounded-lg px-2 py-0.5 font-semibold focus:outline-none bg-white">
+                            {["staff","senior","manager","partner"].map(l => <option key={l} value={l}>{l.charAt(0).toUpperCase()+l.slice(1)}</option>)}
+                          </select>
+                          <input value={n.reviewer || ""} disabled={exec.isLocked}
+                            onChange={e => { const arr = [...exec.reviewNotes]; arr[ni] = { ...n, reviewer: e.target.value }; upd({ reviewNotes: arr }); }}
+                            placeholder="Reviewer name" className="text-xs border border-slate-200 rounded-lg px-2 py-0.5 focus:outline-none w-28" />
+                          <input type="date" value={n.date || ""} disabled={exec.isLocked}
+                            onChange={e => { const arr = [...exec.reviewNotes]; arr[ni] = { ...n, date: e.target.value }; upd({ reviewNotes: arr }); }}
+                            className="text-xs border border-slate-200 rounded-lg px-2 py-0.5 focus:outline-none w-32" />
+                          <label className="flex items-center gap-1 text-xs cursor-pointer">
+                            <input type="checkbox" checked={n.resolved || false} disabled={exec.isLocked}
+                              onChange={e => { const arr = [...exec.reviewNotes]; arr[ni] = { ...n, resolved: e.target.checked }; upd({ reviewNotes: arr }); }}
+                              className="w-3 h-3 rounded text-emerald-600" />
+                            Resolved
+                          </label>
+                          {!exec.isLocked && (
+                            <button onClick={() => upd({ reviewNotes: exec.reviewNotes.filter((_: any, i: number) => i !== ni) })}
+                              className="ml-auto text-slate-300 hover:text-red-400"><X className="w-3.5 h-3.5" /></button>
+                          )}
+                        </div>
+                        <textarea value={n.note || ""} disabled={exec.isLocked} rows={2}
+                          onChange={e => { const arr = [...exec.reviewNotes]; arr[ni] = { ...n, note: e.target.value }; upd({ reviewNotes: arr }); }}
+                          placeholder="Review note / query / instruction…"
+                          className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none resize-none" />
+                        {n.resolved && (
+                          <input value={n.resolvedNote || ""} disabled={exec.isLocked}
+                            onChange={e => { const arr = [...exec.reviewNotes]; arr[ni] = { ...n, resolvedNote: e.target.value }; upd({ reviewNotes: arr }); }}
+                            placeholder="Resolution note…"
+                            className="w-full text-xs border border-emerald-200 rounded-lg px-2 py-1 focus:outline-none bg-white" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Lock */}
+                <div className={cn("border-2 rounded-2xl p-5 space-y-4", exec.isLocked ? "border-slate-800 bg-slate-900" : "border-dashed border-slate-300")}>
+                  {exec.isLocked ? (
+                    <div className="text-center space-y-2">
+                      <Lock className="w-8 h-8 text-white mx-auto" />
+                      <p className="text-white font-semibold">Working Paper Locked</p>
+                      <p className="text-slate-400 text-xs">Locked by {exec.lockedBy} on {exec.lockedAt ? new Date(exec.lockedAt).toLocaleDateString() : "—"}</p>
+                      <p className="text-slate-500 text-[10px]">ISA 230 — Audit documentation assembled and locked within 60 days of report date</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="text-center">
+                        <Lock className="w-6 h-6 text-slate-400 mx-auto mb-2" />
+                        <p className="text-sm font-semibold text-slate-700">Digital Sign-off & Lock (ISA 230)</p>
+                        <p className="text-xs text-slate-400 mt-1">Once locked, this WP cannot be modified. Requires: all procedures performed, evidence recorded, partner conclusion documented.</p>
+                      </div>
+                      <button onClick={lockWp} disabled={locking}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-colors text-sm font-semibold">
+                        {locking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                        Lock Working Paper
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )
+
+            : null
+          )}
+        </div>
+
+        {/* ── Footer ─────────────────────────────────────────────────── */}
+        {!exec?.isLocked && !loading && exec && (
+          <div className="border-t border-slate-200 px-5 py-3 flex items-center justify-between gap-3 bg-slate-50 shrink-0">
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              {exec.proceduresComplete && <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="w-3.5 h-3.5" /> Procedures</span>}
+              {exec.evidenceComplete && <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="w-3.5 h-3.5" /> Evidence</span>}
+              {exec.conclusionsComplete && <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="w-3.5 h-3.5" /> Conclusions</span>}
+            </div>
+            <button onClick={() => save()} disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium transition-colors">
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  , document.body);
+}
+
 function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTriggers, onRefresh, onNext }: any) {
   const { toast } = useToast();
   const allTriggers: any[]  = wpTriggers || [];
@@ -7216,6 +8339,7 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
   const [fComplexity, setFComplexity] = useState("all");
   const [fStatus, setFStatus]         = useState("all"); // all | mandatory | ai_recommended | optional | selected | unselected
   const [preview, setPreview]         = useState<WpItem | null>(null);
+  const [executionWp, setExecutionWp] = useState<WpItem | null>(null);
   const [collapsed, setCollapsed]     = useState<Set<string>>(new Set());
 
   const triggeredCodes = new Set(allTriggers.filter((t: any) => t.triggered).map((t: any) => t.wpCode));
@@ -7687,6 +8811,13 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
                           >
                             {preview?.code === wp.code ? "Hide" : "Preview"}
                           </button>
+                          {/* Execute WP button — opens full ISA execution form */}
+                          <button
+                            onClick={e => { e.stopPropagation(); setExecutionWp(wp); }}
+                            className="text-[9px] font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-full border border-indigo-200 flex items-center gap-1 mt-0.5 transition-colors"
+                          >
+                            <ClipboardCheck className="w-2.5 h-2.5" /> Execute WP
+                          </button>
                         </div>
                       </div>
                     );
@@ -7857,6 +8988,15 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
         </div>
         , document.body);
       })()}
+
+      {/* ── WP Execution Modal ── */}
+      {executionWp && session && (
+        <WpExecutionModal
+          wp={executionWp}
+          session={session}
+          onClose={() => setExecutionWp(null)}
+        />
+      )}
 
       {/* ── Proceed Bar ── */}
       <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">

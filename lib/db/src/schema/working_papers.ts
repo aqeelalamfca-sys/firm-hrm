@@ -823,6 +823,115 @@ export const wpSessionLockTable = pgTable("wp_session_lock", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ── WP Execution (full ISA-compliant audit execution record per WP per session) ──────────
+// One row per selected WP per session. Covers the full lifecycle:
+// procedures → sampling → work performed → evidence → findings → conclusions → sign-off → lock
+export const wpExecutionTable = pgTable("wp_execution", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  wpCode: varchar("wp_code", { length: 20 }).notNull(),
+
+  // Header (auto-filled from session + library)
+  wpTitle: text("wp_title"),
+  wpPhase: text("wp_phase"),
+  wpCategory: text("wp_category"),
+  isaReference: text("isa_reference"),         // Primary ISA standard, e.g. "ISA 315"
+  secondaryReference: text("secondary_reference"), // e.g. "ITO 2001 s.177"
+  objective: text("objective"),                // Audit objective for this WP
+
+  // Assertions (ISA 315) — JSON array of {assertion, relevant: bool, rationale: string}
+  assertions: jsonb("assertions"),
+
+  // Risk linkage
+  riskLevel: text("risk_level").default("Medium"),   // Low | Medium | High | Critical
+  riskDescription: text("risk_description"),
+  linkedRisks: jsonb("linked_risks"),           // [{riskCode, description, assertionLink}]
+
+  // Procedures (standard + AI + editable)
+  // [{stepNo, description, type: standard|ai|custom, status: not_started|in_progress|performed|n_a,
+  //   performedBy, performedDate, notes, evidenceRefs: [evidenceId, ...], finding: string}]
+  procedures: jsonb("procedures"),
+
+  // Sampling (ISA 530)
+  samplingMethod: text("sampling_method"),     // MUS | Random | Judgmental | Systematic | None
+  populationSize: integer("population_size"),
+  sampleSize: integer("sample_size"),
+  samplingCriteria: text("sampling_criteria"), // Selection logic narrative
+  // [{itemNo, description, accountCode, accountName, amount, period}]
+  samplingItems: jsonb("sampling_items"),
+
+  // Work Performed (sample-wise execution table)
+  // [{sampleRef, procedureRef, workDone, result: satisfactory|exception|partial, amount, exceptionNote}]
+  workPerformed: jsonb("work_performed"),
+
+  // Evidence (cross-referenced to procedures + TB/GL)
+  // [{evidenceRef, documentType, documentRef, source, obtainedDate, crossRefWp, crossRefTb, verifiedBy, attachmentPath}]
+  evidenceItems: jsonb("evidence_items"),
+
+  // Results & Findings
+  // [{findingNo, procedureRef, description, findingType: error|omission|estimate|fraud, amount, isaRef}]
+  findings: jsonb("findings"),
+
+  // Misstatements (ISA 450)
+  // [{type: factual|judgmental|projected, amount, nature, classification: material|immaterial|waived, decision}]
+  misstatements: jsonb("misstatements"),
+  totalMisstatementAmount: decimal("total_misstatement_amount", { precision: 15, scale: 2 }),
+
+  // Analytical / calculation block
+  // {calculations: [{label, formula, value, expected, variance, thresholdPct, exceeded, conclusion}]}
+  analyticalData: jsonb("analytical_data"),
+
+  // Professional judgment narrative
+  professionalJudgment: text("professional_judgment"),
+
+  // Multi-level conclusions (Staff → Senior → Manager → Partner)
+  staffConclusion: text("staff_conclusion"),
+  staffConclusionDate: text("staff_conclusion_date"),
+  staffName: text("staff_name"),
+  seniorConclusion: text("senior_conclusion"),
+  seniorConclusionDate: text("senior_conclusion_date"),
+  seniorName: text("senior_name"),
+  managerConclusion: text("manager_conclusion"),
+  managerConclusionDate: text("manager_conclusion_date"),
+  managerName: text("manager_name"),
+  partnerConclusion: text("partner_conclusion"),
+  partnerConclusionDate: text("partner_conclusion_date"),
+  partnerName: text("partner_name"),
+
+  // Review notes tracking
+  // [{id, level: staff|senior|manager|partner, reviewer, note, date, resolved: bool, resolvedNote}]
+  reviewNotes: jsonb("review_notes"),
+
+  // ISA compliance checklist
+  // [{checkCode, description, status: pass|fail|n_a, reference}]
+  isaChecklist: jsonb("isa_checklist"),
+
+  // Cross-referencing to TB / GL / FS
+  // [{accountCode, accountName, tbAmount, glAmount, fsAmount, variance, crossRefNote}]
+  tbGlCrossRefs: jsonb("tb_gl_cross_refs"),
+
+  // Sign-off (per reviewer level)
+  // {staff: {name, date, locked}, senior: {...}, manager: {...}, partner: {...}}
+  signOffs: jsonb("sign_offs"),
+
+  // Validation flags (used by the finalization gate)
+  proceduresComplete: boolean("procedures_complete").default(false),
+  evidenceComplete: boolean("evidence_complete").default(false),
+  conclusionsComplete: boolean("conclusions_complete").default(false),
+  validationErrors: jsonb("validation_errors"),  // [{field, message}]
+
+  // Status & locking (ISA 230)
+  status: text("status").default("not_started"),
+  // not_started | in_progress | procedures_done | evidenced | concluded | review | approved | locked
+  isLocked: boolean("is_locked").default(false),
+  lockedAt: timestamp("locked_at"),
+  lockedBy: text("locked_by"),
+
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // ── WP Output Jobs (output generation tracking — TB/GL/WP document exports) ──────────────
 export const wpOutputJobTable = pgTable("wp_output_job", {
   id: serial("id").primaryKey(),
