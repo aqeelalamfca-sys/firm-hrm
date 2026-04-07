@@ -6570,6 +6570,621 @@ const COMPLEXITY_COLORS: Record<string, string> = {
 };
 const OUTPUT_ICONS: Record<string, string> = { word:"W", excel:"XLS", "word+excel":"W+XLS" };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// WP PROCEDURE CONTENT — Pakistan ISA/ISQM/ICAP/Companies Act 2017 Aligned
+// ─────────────────────────────────────────────────────────────────────────────
+interface WpProcedureContent {
+  objective: string;
+  legalRef: string;
+  procedures: string[];
+  conclusionTemplate: string;
+  reviewers: string[];
+}
+
+const WP_PROCEDURES_MAP: Record<string, WpProcedureContent> = {
+  "A1": {
+    objective: "Document the firm's decision to accept or continue the audit engagement, evaluating client integrity, firm competence, ethical compliance, and engagement risk per ISQM 1 and ISA 220.",
+    legalRef: "ISQM 1 (ICAP Adopted 2022) para. 30–46; ISA 220 para. 12–17; ICAP Code of Ethics Section 320; Companies Act 2017 s.252 (Auditor Appointment/Removal)",
+    procedures: [
+      "1. Obtain and review client's latest audited financial statements, Companies Act 2017 filings (SECP e-Services), and FBR taxpayer profile from IRIS portal.",
+      "2. Assess management integrity: review prior audit reports, regulatory filings (SECP, FBR, SBP), adverse media search, and litigation disclosures.",
+      "3. Evaluate firm competence: confirm availability of team with required sector expertise, IT audit skills, and tax knowledge relevant to the entity.",
+      "4. Identify and document all independence threats under IESBA Code and ICAP Ethics: financial interests, business relationships, family/personal relationships, prior services, and fees.",
+      "5. Perform conflict of interest check against firm's existing client list and any ICAP restriction notices.",
+      "6. Assess whether engagement fees are reasonable and not contingent on audit outcome per ICAP Code s.240.",
+      "7. Review predecessor auditor's reports (if applicable): identify any prior qualifications, emphasis of matter paragraphs, or regulatory concerns per ISA 510.",
+      "8. Evaluate client's AML/KYC risk profile per ICAP AML Guidelines and FATF Pakistan mutual evaluation report 2019 requirements.",
+      "9. Obtain partner approval and document conclusion in the engagement acceptance/continuance form.",
+      "10. Update client acceptance database and notify ICAP of new appointment (if required under Companies Act 2017 s.252).",
+    ],
+    conclusionTemplate: "Based on our acceptance procedures, we conclude that [CLIENT NAME] meets the firm's client acceptance criteria. Independence threats have been identified as [NIL/LOW/MEDIUM] and appropriate safeguards are in place. The engagement is approved to proceed.",
+    reviewers: ["Engagement Manager", "Engagement Partner", "EQCR Partner (if high-risk)"],
+  },
+  "A3": {
+    objective: "Confirm independence of all engagement team members and identify, evaluate, and document all independence threats and safeguards per IESBA Code and ICAP Code of Ethics.",
+    legalRef: "ISA 220 para. 18–23; IESBA Code Part 4A & 4B; ICAP Code of Ethics (2020 Edition) Part 3; ISQM 1 para. 30–34; Companies Act 2017 s.254 (Disqualification of Auditors)",
+    procedures: [
+      "1. Circulate independence questionnaires to all engagement team members (partners, managers, seniors, assistants) and obtain signed declarations.",
+      "2. Verify no engagement team member holds any financial interest (direct/indirect) in the client per IESBA Code Section 270.",
+      "3. Confirm no recent (past 2 years) employment relationship between team members and the client per IESBA Code Section 524.",
+      "4. Review all non-audit services provided to the client in the current and prior year; assess whether they create self-review or management participation threats.",
+      "5. Calculate fees receivable from the client as a percentage of total firm revenue; confirm compliance with ICAP fee dependence thresholds.",
+      "6. For listed entities, confirm engagement partner rotation compliance (maximum 5 years consecutive per ICAP Ethics for listed companies).",
+      "7. Assess familiarity threat for long-tenure relationships; document safeguards applied.",
+      "8. Complete ICAP-required independence self-assessment checklist for audit engagements.",
+      "9. Obtain partner-level sign-off confirming independence of the entire team.",
+    ],
+    conclusionTemplate: "All engagement team members have confirmed independence from [CLIENT NAME] for the period [PERIOD]. No independence threats requiring withdrawal have been identified. Safeguards applied: [LIST]. Independence declaration filed in permanent file.",
+    reviewers: ["Engagement Partner", "Ethics Partner / EQCR (listed entities)"],
+  },
+  "A4": {
+    objective: "Issue a formal engagement letter establishing the audit scope, management's responsibilities, auditor's responsibilities, and fee arrangements per ISA 210.",
+    legalRef: "ISA 210 para. 9–12; Companies Act 2017 s.246 (Auditor's Duties); ICAP Engagement Letter Guidance (Circular No. 01/2020); SECP Listed Company Audit Requirements",
+    procedures: [
+      "1. Draft engagement letter using ICAP's model engagement letter as base, customized for the entity type (private limited, listed, SMC, trust, NGO).",
+      "2. Include explicit statement of applicable financial reporting framework: IFRS (for listed/public entities) or AFRS for SSEs per ICAP/SECP Notification.",
+      "3. State the auditor's objective under ISA 700: expressing an opinion on whether the financial statements give a true and fair view.",
+      "4. Include management's responsibilities: preparation of FS per applicable framework, maintenance of adequate internal controls, and provision of all information.",
+      "5. Define scope explicitly: whether audit covers consolidated or standalone FS, branches, associated companies.",
+      "6. State audit fee, billing schedule, and arrangement for recovery of out-of-pocket expenses.",
+      "7. Include limitation on auditor's liability clause where applicable under Pakistani law.",
+      "8. Obtain management (Board/CEO) signature and file executed copy in permanent file.",
+      "9. If recurring engagement, issue new letter only if terms have changed; otherwise, send a reminder letter confirming unchanged terms.",
+    ],
+    conclusionTemplate: "Engagement letter dated [DATE] has been signed by [AUTHORIZED SIGNATORY, DESIGNATION] on behalf of [CLIENT NAME] and countersigned by [ENGAGEMENT PARTNER NAME], [FIRM NAME]. Terms of engagement are confirmed.",
+    reviewers: ["Engagement Partner"],
+  },
+  "B1": {
+    objective: "Document the overall audit strategy setting the scope, timing, and direction of the audit, and develop a detailed audit plan with responses to assessed risks per ISA 300.",
+    legalRef: "ISA 300 para. 7–12; ISA 315 (Revised 2019); ISA 330 para. 5–6; ICAP Auditing Standards Handbook; Companies Act 2017 s.246 (scope of audit duty)",
+    procedures: [
+      "1. Review entity's Articles of Association, Memorandum, statutory licenses (SECP, FBR, sector regulators), and latest board resolutions.",
+      "2. Document entity's significant locations, business units, and reporting structure; determine if group audit considerations apply (ISA 600).",
+      "3. Identify the applicable financial reporting framework (IFRS / IAS / AFRS for SSEs) as prescribed by SECP/ICAP notifications.",
+      "4. Set audit scope: standalone vs. consolidated; all significant account balances and transaction classes material to the FS.",
+      "5. Determine preliminary overall materiality using chosen benchmark (PBT, total assets, revenue as per ISA 320 guidelines).",
+      "6. Identify significant risks and document preliminary responses in the risk register.",
+      "7. Set the audit timetable: fieldwork dates, management representation date, reporting date, and archiving deadline (within 60 days of report).",
+      "8. Determine use of component auditors, expert, or internal audit work and plan coordination accordingly.",
+      "9. Assign team roles: engagement partner, manager, senior, assistant; document CPD compliance and sector expertise.",
+      "10. Document audit strategy in the Audit Strategy Memorandum and obtain partner approval before fieldwork commencement.",
+    ],
+    conclusionTemplate: "The audit strategy for [CLIENT NAME] for the year ended [DATE] has been documented and approved by [PARTNER]. Audit plan covers all material areas. Fieldwork to commence [DATE].",
+    reviewers: ["Engagement Manager", "Engagement Partner"],
+  },
+  "B2": {
+    objective: "Determine overall materiality, performance materiality, and the trivial threshold for the audit, with benchmark selection rationale per ISA 320.",
+    legalRef: "ISA 320 para. 10–14; ISA 450 para. 5; ICAP Technical Bulletin TB-09 (Materiality); SECP Listed Companies Regulations (for listed entities)",
+    procedures: [
+      "1. Identify the appropriate benchmark: PBT (profit-making entity), revenue (turnover-based), total assets (financial entities/holding companies), net assets (not-for-profit).",
+      "2. Apply the ICAP-recommended percentage to the chosen benchmark: 5% of PBT / 0.5–1% of revenue / 1–2% of total assets.",
+      "3. Compute overall materiality and document the rationale for benchmark and percentage selected.",
+      "4. Set performance materiality at 60–75% of overall materiality per ISA 320 para. 11 (adjust upward/downward based on risk assessment).",
+      "5. Set the trivial (clearly inconsequential) threshold at approximately 5% of overall materiality.",
+      "6. Identify specific materiality thresholds for sensitive disclosures: related parties, directors' remuneration, regulatory compliance items.",
+      "7. Document how materiality will be communicated to the engagement team and how it affects sampling and testing thresholds.",
+      "8. Reassess materiality at the completion stage (ISA 320 para. 13) if actual results differ materially from preliminary estimates.",
+    ],
+    conclusionTemplate: "Overall materiality: PKR [AMOUNT] ([BENCHMARK] × [%]). Performance materiality: PKR [AMOUNT] ([%] of OM). Trivial threshold: PKR [AMOUNT]. Materiality approved by [PARTNER].",
+    reviewers: ["Engagement Manager", "Engagement Partner"],
+  },
+  "B3": {
+    objective: "Document a comprehensive understanding of the entity, its environment, the applicable financial reporting framework, and the entity's internal control system per ISA 315 (Revised 2019).",
+    legalRef: "ISA 315 (Revised 2019) para. 19–32; Companies Act 2017 (entity structure, governance); SECP Listed Companies (Code of Corporate Governance) Regulations 2019; SBP Prudential Regulations (if financial entity)",
+    procedures: [
+      "1. Review entity's Memorandum and Articles, latest statutory filings with SECP (Form-A, Form-29, Annual Return), and corporate profile.",
+      "2. Document business model: products/services, markets, pricing policy, key customers (>10% revenue), key suppliers, and competitive environment.",
+      "3. Identify related parties per IAS 24: directors, shareholders (>10%), associated companies, key management personnel, and their close family members.",
+      "4. Understand the regulatory environment: SECP, FBR, SBP, EOBI, PESSI, sector-specific regulators (NEPRA, PEMRA, PNRA, etc.).",
+      "5. Review financial performance: last 3 years' FS, ratio analysis, and key industry benchmarks.",
+      "6. Document the applicable financial reporting framework: IFRS (full/IFRS for SMEs), AFRS for SSEs, or sector-specific GAAP.",
+      "7. Understand and document the five components of internal control per ISA 315: control environment, risk assessment process, information systems, control activities, monitoring.",
+      "8. Conduct walkthrough of key cycles: revenue, procurement, payroll, treasury, fixed assets, financial close.",
+      "9. Document IT environment: ERP systems, key applications, IT general controls, automated controls, and access rights.",
+      "10. Update understanding in subsequent years: review changes in business model, ownership, key personnel, and regulatory status.",
+    ],
+    conclusionTemplate: "Understanding of entity documented per ISA 315. Key risks identified: [LIST]. Internal control environment assessed as [STRONG/ADEQUATE/WEAK]. Updated understanding filed in permanent file.",
+    reviewers: ["Engagement Senior", "Engagement Manager", "Engagement Partner"],
+  },
+  "C1": {
+    objective: "Identify and assess the risks of material misstatement at the financial statement level and at the assertion level for classes of transactions, account balances, and disclosures per ISA 315.",
+    legalRef: "ISA 315 (Revised 2019) para. 26–33; ISA 330 para. 6–21; ICAP Auditing Standards Handbook; Companies Act 2017 s.246; IFRS applicable standards",
+    procedures: [
+      "1. Identify all significant account balances, transaction classes, and disclosures in the financial statements.",
+      "2. For each identified item, assess inherent risk at the assertion level using the Inherent Risk Factors per ISA 315 para. 31 (complexity, subjectivity, change, uncertainty, susceptibility).",
+      "3. Identify entity-level controls and assess whether they reduce the risk of material misstatement at the FS level.",
+      "4. Identify and document Significant Risks separately per ISA 315 para. 27: revenue recognition, management override, related-party transactions, estimates with high measurement uncertainty.",
+      "5. For each significant risk, document the specific audit response required per ISA 330 para. 21.",
+      "6. Assess control risk for each assertion: determine whether to rely on controls or perform purely substantive procedures.",
+      "7. Document the linkage between identified risks and planned audit procedures in the risk-procedure matrix.",
+      "8. Confirm that risk assessment is updated whenever new information emerges during fieldwork.",
+    ],
+    conclusionTemplate: "Risk assessment completed for [CLIENT NAME]. [N] significant risks identified. Risk-procedure matrix prepared and approved by [MANAGER]. Risks appropriately addressed in audit program.",
+    reviewers: ["Engagement Manager", "Engagement Partner"],
+  },
+  "C2": {
+    objective: "Assess the risk of material misstatement due to fraud at both the financial statement level and the assertion level, and design appropriate audit responses per ISA 240.",
+    legalRef: "ISA 240 para. 17–27; Companies Act 2017 s.247 (reporting fraud); FBR Benami Transactions Act 2017; FATF Mutual Evaluation 2019; ICAP Code of Ethics Section 350",
+    procedures: [
+      "1. Conduct mandatory fraud risk brainstorming with engagement team prior to fieldwork, documenting discussion and conclusions per ISA 240 para. 15.",
+      "2. Make fraud inquiries of management: knowledge of fraud/alleged fraud, management's assessment of risk, and internal controls against fraud.",
+      "3. Make fraud inquiries of those charged with governance (Board/Audit Committee) regarding management override and fraud oversight.",
+      "4. Assess fraud risk factors (incentives/pressures, opportunity, rationalization) per ISA 240 Appendix 1 and document.",
+      "5. Identify the two presumed significant risks per ISA 240: (i) revenue recognition fraud and (ii) management override of controls.",
+      "6. Design specific responses to fraud risks: journal entry testing plan, estimate bias review, unusual transactions investigation.",
+      "7. Perform unpredictable procedures to address management override: unexpected element selection, surprise procedures, different audit approaches.",
+      "8. Report fraud or suspected fraud to appropriate level per ISA 240 para. 40–42 and Companies Act 2017 s.247.",
+    ],
+    conclusionTemplate: "Fraud risk assessment completed. Revenue recognition and management override identified as presumed fraud risks. Specific responses designed. No evidence of actual fraud detected [or: suspected fraud reported to [PARTY] on [DATE]].",
+    reviewers: ["Engagement Manager", "Engagement Partner"],
+  },
+  "D1": {
+    objective: "Perform preliminary analytical procedures on the trial balance and financial data to identify unusual fluctuations, unexpected relationships, and areas requiring additional audit focus per ISA 520.",
+    legalRef: "ISA 520 para. 5–10; ISA 315 para. 6; ICAP Technical Guidance on Analytical Procedures",
+    procedures: [
+      "1. Obtain final or near-final trial balance and prior year comparative TB; verify mathematical accuracy and reconciliation to general ledger.",
+      "2. Compute year-on-year movement in all material account balances and transaction classes; flag movements >20% or >performance materiality.",
+      "3. Calculate key financial ratios: gross margin, net margin, current ratio, quick ratio, debtor days, creditor days, inventory days, asset turnover.",
+      "4. Compare current year ratios to: (i) prior 3 years trend, (ii) industry benchmarks (SBP Industry Report, PSX sector data), and (iii) budget/forecast.",
+      "5. Analyse revenue composition: breakdown by product/service, geography, customer concentration (any single customer >10% of revenue).",
+      "6. Identify any account balances that have moved contrary to business trends (e.g., revenue increased but receivables decreased).",
+      "7. Document all significant fluctuations and obtain management explanations; assess plausibility of explanations against audit knowledge.",
+      "8. Update risk assessment for any areas identified through analytical procedures as higher risk.",
+    ],
+    conclusionTemplate: "Preliminary analytical procedures completed on TB as at [DATE]. Key fluctuations: [LIST]. Management explanations obtained and assessed as [PLAUSIBLE/REQUIRING FURTHER INVESTIGATION]. Risk assessment updated.",
+    reviewers: ["Engagement Senior", "Engagement Manager"],
+  },
+  "D5": {
+    objective: "Perform final analytical procedures at the completion stage to confirm that the financial statements are consistent with the auditor's understanding and no previously unidentified risks remain per ISA 520.",
+    legalRef: "ISA 520 para. 6(b); ISA 520 para. 11–14; ISA 700 para. 15; ICAP Quality Control Standards",
+    procedures: [
+      "1. Obtain final audited financial statements and compare to the trial balance used for fieldwork; confirm no material differences.",
+      "2. Perform ratio analysis on final FS and compare to preliminary analytical review findings; investigate any unexplained changes.",
+      "3. Confirm that all significant fluctuations identified in preliminary analytical review have been satisfactorily resolved.",
+      "4. Assess whether the overall presentation of the financial statements is consistent with understanding of the entity.",
+      "5. Compare all quantitative disclosures in notes to supporting working papers; confirm consistency.",
+      "6. Confirm EPS (if applicable), ZIA deduction, and directors' remuneration disclosures are mathematically accurate.",
+      "7. Document conclusion and confirm no previously unidentified material risks remain.",
+    ],
+    conclusionTemplate: "Final analytical review completed on audited FS dated [DATE]. All significant fluctuations satisfactorily resolved. FS presentation consistent with audit understanding. No new risks identified at final stage.",
+    reviewers: ["Engagement Manager", "Engagement Partner"],
+  },
+  "F1": {
+    objective: "Obtain sufficient appropriate audit evidence over cash and bank balances — existence, completeness, accuracy, and cut-off — through bank confirmations, reconciliation testing, and petty cash procedures per ISA 505.",
+    legalRef: "ISA 505 para. 6–16; ISA 500 para. 7–11; SBP Banking Regulations; Companies Act 2017 s.246; IAS 7 (Cash and Cash Equivalents); ICAP Bank Confirmation Letter Format",
+    procedures: [
+      "1. Obtain list of all bank accounts: account numbers, bank names, branches, signatories, and balance sheet date balances per GL.",
+      "2. Send ICAP-formatted bank confirmation letters directly to all banks (positive confirmation required for material balances) as at year-end date.",
+      "3. Obtain bank statements for the last month of the financial year and first month of next year; perform cut-off testing.",
+      "4. Reconcile each bank account: trace reconciling items (outstanding cheques, deposits in transit) to subsequent bank statements.",
+      "5. Verify all outstanding cheques >30 days old: confirm legitimacy, stale cheque investigation, and proper accounting.",
+      "6. Test all inter-bank transfers in the 5 days before and after year-end: identify kiting and proper recording.",
+      "7. Perform physical petty cash count at year-end (surprise) or obtain certificates; agree to GL balance.",
+      "8. Verify that all bank accounts are properly disclosed per IAS 7: restricted cash separately presented, lien/pledge disclosed.",
+      "9. Confirm bank loan balances, security arrangements, and any set-off rights per confirmations.",
+      "10. Verify FX cash balances are translated at year-end closing rate per IAS 21.",
+    ],
+    conclusionTemplate: "Cash and bank balances as at [DATE] of PKR [AMOUNT] are fairly stated in all material respects. [N] bank confirmations received ([N] outstanding — alternative procedures performed). Cut-off is satisfactory. Reconciliations reviewed and cleared.",
+    reviewers: ["Engagement Senior", "Engagement Manager"],
+  },
+  "F2": {
+    objective: "Verify trade receivables for existence, valuation, completeness, and cut-off through debtor confirmations, aging analysis, and bad debt provision adequacy testing per ISA 505.",
+    legalRef: "ISA 505 para. 6–16; IFRS 9 (ECL — impairment); IAS 1 (presentation); Companies Act 2017 Fourth Schedule (disclosure); ICAP Guidance on Receivables Audit",
+    procedures: [
+      "1. Obtain complete debtor ledger at year-end; agree total to trial balance and financial statements.",
+      "2. Prepare aging analysis: current, 30–60 days, 61–90 days, 91–180 days, >180 days; compare to prior year.",
+      "3. Select debtors for positive/negative confirmation per sampling plan; send confirmations on firm letterhead directly to third parties.",
+      "4. Follow up on non-responses: perform alternative procedures (subsequent receipts, sales invoices, delivery notes, contracts).",
+      "5. Review post-year-end cash receipts in the 45–60 days following year-end; agree to debtor balances.",
+      "6. Assess adequacy of bad debt provision under IFRS 9 ECL model: obtain management's ECL computation; test stage classification criteria.",
+      "7. Review credit notes issued post-year-end: assess whether provision for returns/credit notes is adequate at year-end.",
+      "8. Identify any related-party receivables; confirm arm's length terms and proper disclosure per IAS 24.",
+      "9. Verify cut-off: last 10 sales invoices before year-end and first 10 after year-end; confirm correct accounting period.",
+      "10. Confirm receivables are presented net of provision; no right of set-off with payables unless legally enforceable.",
+    ],
+    conclusionTemplate: "Trade receivables as at [DATE] of PKR [AMOUNT] (net) are fairly stated. Confirmations [N] sent, [N] replied positively, [N] alternative procedures performed. ECL provision of PKR [AMOUNT] assessed as adequate. Cut-off satisfactory.",
+    reviewers: ["Engagement Senior", "Engagement Manager"],
+  },
+  "F3": {
+    objective: "Obtain sufficient audit evidence over inventory existence, condition, valuation, and completeness through physical observation, count verification, and NRV assessment per ISA 501.",
+    legalRef: "ISA 501 para. 4–8; IAS 2 (Inventories); Companies Act 2017 Fourth Schedule; SECP Reporting Regulations; ICAP Guidance on Inventory Observation",
+    procedures: [
+      "1. Attend physical inventory count at year-end (or at an interim date with roll-forward procedures): plan attendance at all material locations.",
+      "2. Evaluate management's count instructions: completeness of locations covered, cut-off controls, movement restrictions during count.",
+      "3. Perform independent test counts: select items from count sheets to floor and floor to count sheets (both directions).",
+      "4. Observe condition of inventory: identify damaged, slow-moving, or obsolete items; report to management.",
+      "5. Note the last dispatch note number and last goods receipt note before year-end for cut-off testing.",
+      "6. Trace test-counted items to final inventory listing; agree totals to trial balance.",
+      "7. Test inventory valuation: (i) raw materials — purchase invoices/import documents; (ii) WIP and FG — cost sheets, overhead absorption rate verification; (iii) confirm FIFO/AVCO method applied consistently.",
+      "8. Test NRV for slow-moving/obsolete items: sales price lists post year-end, selling costs deduction; confirm provision adequacy.",
+      "9. Confirm proper cut-off of goods in transit: CIF vs FOB terms, last import entry date, and GRN date.",
+      "10. For consignment stock: confirm stock held as agent not included in entity's inventory.",
+    ],
+    conclusionTemplate: "Inventory as at [DATE] of PKR [AMOUNT] is fairly stated at the lower of cost and NRV. Physical count attended at [LOCATION(S)]. Test counts satisfactory. Valuation method [FIFO/AVCO] applied consistently. NRV provision of PKR [AMOUNT] adequate.",
+    reviewers: ["Engagement Senior", "Engagement Manager"],
+  },
+  "F4": {
+    objective: "Verify PPE roll-forward, additions/disposals, depreciation computation, impairment indicators, and disclosure per IAS 16.",
+    legalRef: "IAS 16 (Property, Plant & Equipment); IAS 36 (Impairment); IAS 40 (Investment Property); Companies Act 2017 Fourth Schedule; FBR Initial Allowance / Depreciation Rules (ITO 2001 s.22–24)",
+    procedures: [
+      "1. Obtain fixed asset register reconciled to opening balance per prior year FS; trace to closing balance in current year FS.",
+      "2. Test additions: vouch significant additions (>performance materiality) to purchase invoices, import documents, GRNs, and Board/management approvals. Verify capital vs. revenue split.",
+      "3. Test disposals: vouch disposals to sale/scrapping documents; verify gain/loss calculation and approval. Confirm no disposed assets remain on register.",
+      "4. Recalculate depreciation for a sample of assets: verify rate, method (SLM/DWV), useful life assumptions, and consistency with prior year and IAS 16 para. 62.",
+      "5. Verify that useful lives and residual values have been reviewed at each year-end per IAS 16 para. 51.",
+      "6. Assess impairment indicators per IAS 36 para. 12: market value decline, technology changes, entity-specific decline. If indicators exist, obtain and review impairment test.",
+      "7. Inspect deeds/ownership documents for owned land and buildings; confirm no encumbrances not disclosed.",
+      "8. For revaluation model: verify date of last revaluation, confirm qualified valuer used, and mathematical accuracy of revaluation surplus.",
+      "9. Verify FBR tax depreciation schedules reconcile to deferred tax computation.",
+      "10. Confirm correct presentation: assets under construction separately disclosed; finance lease assets separately identified (pre-IFRS 16 if applicable).",
+    ],
+    conclusionTemplate: "PPE as at [DATE] of PKR [AMOUNT] (net) is fairly stated. Additions of PKR [AMOUNT] and disposals of PKR [AMOUNT] verified. Depreciation recalculated as [ACCURATE/IMMATERIAL DIFFERENCE OF PKR X]. No impairment indicators identified [or: impairment assessed as immaterial].",
+    reviewers: ["Engagement Senior", "Engagement Manager"],
+  },
+  "G1": {
+    objective: "Verify trade payables for completeness, accuracy, existence, and cut-off through supplier statement reconciliation, creditor confirmations, and GRN-invoice matching.",
+    legalRef: "ISA 500 para. 7–11; IAS 37 (accruals); Companies Act 2017 Fourth Schedule; IFRS 9 (financial liabilities); FBR WHT implications on payables",
+    procedures: [
+      "1. Obtain complete creditor ledger at year-end; agree total to trial balance and financial statements.",
+      "2. Reconcile major supplier statements (all suppliers >5% of total payables) to ledger balances; investigate reconciling items.",
+      "3. Send direct confirmation requests to major suppliers not providing statements; follow up on non-responses.",
+      "4. Review purchase cut-off: last 10 GRNs before year-end and first 10 after; confirm payable recorded in correct period.",
+      "5. Agree year-end payables to subsequent payments in first 45 days post year-end (most reliable evidence for existence and amount).",
+      "6. Search for unrecorded liabilities: review post-year-end invoices, board minutes, and expense accruals; confirm all period expenses are accrued.",
+      "7. Verify withholding tax deductible at source on payables per ITO 2001 Schedule II has been deducted and is payable to FBR.",
+      "8. Confirm proper classification: current vs. non-current; identify any balances with favourable/unfavourable payment terms.",
+      "9. Identify any related-party payables; confirm arm's length terms and proper disclosure per IAS 24.",
+    ],
+    conclusionTemplate: "Trade payables as at [DATE] of PKR [AMOUNT] are fairly stated. [N] supplier reconciliations performed. No material unrecorded liabilities identified. Cut-off satisfactory. WHT deductions verified.",
+    reviewers: ["Engagement Senior", "Engagement Manager"],
+  },
+  "G3": {
+    objective: "Verify completeness, accuracy, and measurement basis for all accruals, provisions, and contingent liabilities per IAS 37 and ISA 560.",
+    legalRef: "IAS 37 (Provisions, Contingent Liabilities and Assets); ISA 501 para. 13–17 (legal confirmations); Companies Act 2017 s.292 (WPPF); ITO 2001 (tax provisions); Fourth Schedule (disclosure requirements)",
+    procedures: [
+      "1. Obtain list of all provisions and accruals; agree totals to trial balance and notes to FS.",
+      "2. Verify each material provision meets IAS 37 para. 14 recognition criteria: present obligation, probable outflow, reliable estimate.",
+      "3. Assess reasonableness of accruals: review post-year-end invoices and payments; agree accruals to contractual commitments, vendor quotes, or historical run-rates.",
+      "4. For legal/litigation provisions: obtain direct confirmation from legal counsel (solicitor letter per ISA 501 para. 13–17); assess adequacy per management's estimate.",
+      "5. Verify Workers' Profit Participation Fund (WPPF) provision per s.87 of Companies Profit Act 1968: 5% of profit; review calculation.",
+      "6. Verify Workers' Welfare Fund (WWF) provision: 2% of assessable income per WWF Ordinance 1971.",
+      "7. Review EOBI (Employees' Old-Age Benefits Institution) contributions accrual: 5% of min wage per EOBI Act.",
+      "8. Confirm gratuity/leave encashment provision (if not actuarially valued): review HR policy, headcount, and average entitlement.",
+      "9. Review contingent liabilities: guarantees, letters of credit, bank charges, and disputed amounts — confirm adequate disclosure per IAS 37 para. 86.",
+      "10. Confirm no provisions are recognised for restructuring unless announcement made and binding obligation exists per IAS 37 para. 72.",
+    ],
+    conclusionTemplate: "Provisions and accruals as at [DATE] of PKR [AMOUNT] are fairly stated and meet IAS 37 recognition criteria. WPPF: PKR [X], WWF: PKR [X], EOBI: PKR [X] verified. Contingent liabilities adequately disclosed.",
+    reviewers: ["Engagement Senior", "Engagement Manager"],
+  },
+  "H1": {
+    objective: "Verify revenue recognition, completeness, occurrence, cut-off, and measurement per IFRS 15, with specific focus on the fraud risk of revenue overstatement per ISA 240.",
+    legalRef: "IFRS 15 (Revenue from Contracts with Customers); ISA 240 para. 26 (presumed revenue fraud risk); ITO 2001 (revenue-based taxes); Sales Tax Act 1990 (output tax timing); Companies Act 2017 Fourth Schedule",
+    procedures: [
+      "1. Obtain revenue listing by product/service/geography; agree to trial balance and FS revenue figure.",
+      "2. Apply IFRS 15 five-step model: identify contracts, performance obligations, transaction price, allocation, and satisfaction of obligations — document entity's revenue recognition policy and assess compliance.",
+      "3. Test revenue cut-off: last 10 sales invoices before year-end and first 10 after; verify goods delivered/services performed before year-end are recognised in correct period.",
+      "4. Vouch a sample of revenue transactions: invoice → contract/purchase order → delivery note → customer receipt/bank deposit.",
+      "5. Test journal entry fraud risk (ISA 240): identify unusual revenue journal entries — reversals, entries on non-business days, entries by senior officials, round-sum entries; vouch to supporting documents.",
+      "6. Confirm revenue is recognised at the amount of consideration to which the entity is entitled per IFRS 15 para. 46.",
+      "7. Verify GST/Sales Tax output tax is properly computed and reconciled to FBR annexure returns filed on IRIS portal.",
+      "8. Assess completeness: reconcile revenue to goods dispatched records, service completion reports, and sales tax returns.",
+      "9. For long-term contracts: verify percentage of completion method applied correctly per IFRS 15; no revenue recognised before performance obligations satisfied.",
+      "10. Test credit notes and returns post-year-end: confirm proper deduction from revenue; no improper reversal of prior-period revenue.",
+    ],
+    conclusionTemplate: "Revenue of PKR [AMOUNT] for the year ended [DATE] is fairly stated. IFRS 15 five-step model applied consistently. Revenue cut-off satisfactory. No evidence of revenue fraud identified. GST returns reconciled.",
+    reviewers: ["Engagement Senior", "Engagement Manager", "Engagement Partner (significant risk)"],
+  },
+  "H4": {
+    objective: "Verify payroll and staff costs for accuracy, completeness, occurrence, and compliance with EOBI, PESSI, income tax on salaries, and labour laws applicable in Pakistan.",
+    legalRef: "ITO 2001 s.12 (salary income), s.149 (tax deduction from salary); EOBI Act 1976; Employees Social Security Act (PESSI/SESSI); Minimum Wages Ordinance 1961 (provincial); Companies Act 2017 s.220 (directors' remuneration)",
+    procedures: [
+      "1. Obtain payroll summary for all 12 months; agree total payroll expense to trial balance and FS staff cost figure.",
+      "2. Vouch a sample of payroll payments: payroll register → bank transfer listing → bank statement.",
+      "3. Verify EOBI deductions: 5% employer + 1% employee contributions; reconcile to FBR/EOBI monthly filings.",
+      "4. Verify provincial social security (PESSI/SESSI/ESIC) contributions: applicable rates and reconciliation to provincial authority filings.",
+      "5. Verify income tax on salaries: recalculate for sample of employees per ITO 2001 s.149 and Fifth Schedule; confirm correct deduction and deposit with FBR via IRIS.",
+      "6. Compare monthly payroll headcount to HR records (employee register, joining/leaving dates); identify ghost employees.",
+      "7. Verify compliance with minimum wage: confirm no employee paid below provincial minimum wage applicable in the financial year.",
+      "8. Verify directors' remuneration: Board approval obtained per Companies Act 2017 s.220; disclosed correctly in notes.",
+      "9. Inspect final settlement computations for employees who left during the year: confirm correct gratuity, leave encashment, and tax calculations.",
+      "10. Reconcile accrued salaries and bonuses at year-end to payroll run performed in first month after year-end.",
+    ],
+    conclusionTemplate: "Payroll and staff costs of PKR [AMOUNT] for the year are fairly stated. Tax on salaries reconciled and deposited. EOBI/PESSI contributions verified. No ghost employees identified in sample. Directors' remuneration per Board approval.",
+    reviewers: ["Engagement Senior", "Engagement Manager"],
+  },
+  "I1": {
+    objective: "Verify current tax liability per ITO 2001, minimum tax, super tax, advance tax adjustments, and deferred tax computation per IAS 12 for completeness and accuracy.",
+    legalRef: "ITO 2001 (as amended); Finance Act 2023; Finance Act 2024; IAS 12 (Income Taxes); Companies Act 2017; SECP Reporting Requirements",
+    procedures: [
+      "1. Obtain management's tax computation for the year; agree taxable income to accounting profit with proper add-backs and deductions.",
+      "2. Verify add-backs: disallowed expenses per ITO 2001 (entertainment above limit, depreciation on non-tax assets, provisions not allowable).",
+      "3. Verify deductions: initial allowance (s.23), depreciation allowance (s.22 at SRB rates), WPPF deduction, and charitable donations per s.61.",
+      "4. Compute minimum turnover tax per ITO 2001 s.113: 1.25% of turnover (or applicable rate for the year). Compare to normal tax; apply higher amount.",
+      "5. Compute super tax per ITO 2001 s.4C: applicable for income >PKR 150 million (rate per Finance Act 2023/2024); verify calculation.",
+      "6. Verify advance tax adjustments: Section 147 advance tax paid; Section 149 WHT on salary; Section 153/154/155 WHT collected; Section 235 electricity duty.",
+      "7. Reconcile income tax provision to FBR IRIS portal: compare liability per computation to return filed or to be filed.",
+      "8. Prepare deferred tax computation per IAS 12: all temporary differences (accelerated tax depreciation vs. accounting depreciation, provision timing differences, lease IFRS 16 differences).",
+      "9. Verify rate used for DTA/DTL: enacted rate at balance sheet date per IAS 12 para. 47.",
+      "10. Review open tax assessments, FBR notices, and ATIR orders; assess adequacy of provision for disputed matters per IAS 37.",
+    ],
+    conclusionTemplate: "Income tax provision of PKR [AMOUNT] (current: [X], deferred: [X]) for the year ended [DATE] is fairly stated. Minimum tax applicable: PKR [X]. Super tax: PKR [X]. Advance tax adjustments verified. DTA/DTL of PKR [X] appropriately computed.",
+    reviewers: ["Tax Manager", "Engagement Manager", "Engagement Partner"],
+  },
+  "I2": {
+    objective: "Reconcile sales tax (GST) and Federal Excise Duty (FED) output and input tax returns with the accounting records and verify FBR annexure compliance.",
+    legalRef: "Sales Tax Act 1990 (as amended); Federal Excise Act 2005; FBR SRO notifications; Finance Acts; Provincial Sales Tax Acts (PRA/SRB/KPRA/BRA for services)",
+    procedures: [
+      "1. Obtain all monthly GST returns filed via FBR IRIS for the 12-month period; agree total output tax to sum of sales tax invoices issued.",
+      "2. Agree total input tax claimed to purchase invoices; verify all input tax claims are supported by valid sales tax invoices from registered suppliers.",
+      "3. Reconcile sales per GST returns to revenue per income tax return and financial statements (3-way reconciliation); investigate and clear all differences.",
+      "4. Verify Annexure-B (supplies) and Annexure-C (purchases) are complete and include all transactions per FBR IRIS records.",
+      "5. Check that zero-rated exports are properly supported by export documents: SBP Form E, bank credit advice, and customs clearance documents.",
+      "6. Verify exempt supplies are correctly identified and input tax apportionment is performed per Rule 58E of ST Rules 2006.",
+      "7. Confirm FED on applicable goods/services is computed at correct rates per First/Second Schedule of Federal Excise Act.",
+      "8. Reconcile sales tax payable/refundable at year-end per returns to balance sheet figure.",
+      "9. Identify any pending FBR sales tax notices or audit proceedings and assess adequacy of provision.",
+    ],
+    conclusionTemplate: "Sales tax/FED for the year ended [DATE] reconciled. Output tax: PKR [X], Input tax: PKR [X]. 3-way revenue reconciliation completed — difference of PKR [X] explained as [REASON]. GST payable/refundable of PKR [X] per balance sheet confirmed.",
+    reviewers: ["Tax Senior", "Tax Manager", "Engagement Manager"],
+  },
+  "I3": {
+    objective: "Verify withholding tax (WHT) deductions on payments, timely deposit with FBR, and compliance with all applicable WHT provisions under ITO 2001.",
+    legalRef: "ITO 2001 ss.149–156, Schedule II (WHT rates); FBR IRIS Monthly WHT Returns; Income Tax Rules 2002; FBR Income Tax Circular No. 3/2023",
+    procedures: [
+      "1. Obtain all 12 monthly WHT statements (Annex-C in monthly statements) filed via IRIS; agree to supporting payment vouchers.",
+      "2. Test WHT on contracts/services (s.153): verify 7.5%/12% (filer/non-filer) deducted on payments to suppliers; trace to IRIS filings.",
+      "3. Test WHT on imports (s.148): verify advance tax on imports at applicable rate; trace to import documents and IRIS.",
+      "4. Test WHT on exports (s.154): verify 1% deduction on export proceeds; trace to bank credit advice.",
+      "5. Test WHT on profit on debt/interest (s.151): verify 15% on bank interest; confirm bank has withheld and deposited.",
+      "6. Test WHT on rent (s.155): verify 15% withheld on rent payments; trace to rent agreements and payment vouchers.",
+      "7. Test WHT on dividends (s.150): verify applicable rate withheld on dividends declared; trace to Board resolution and bank records.",
+      "8. Verify timely deposit of WHT: all WHT must be deposited by 15th of following month per ITO 2001 s.160; check for late deposit penalties.",
+      "9. Confirm certificates issued to payees from whom WHT was deducted per ITO 2001 s.164.",
+      "10. Reconcile total WHT expense in accounts to total WHT deposited per IRIS records.",
+    ],
+    conclusionTemplate: "WHT compliance for year ended [DATE] reviewed. [N] monthly returns filed via IRIS. WHT deducted and deposited of PKR [AMOUNT] reconciled. [No material non-compliance identified / Non-compliance of PKR [X] identified — management notified].",
+    reviewers: ["Tax Senior", "Tax Manager"],
+  },
+  "L1": {
+    objective: "Evaluate the sufficiency and appropriateness of all audit evidence obtained across all audit areas and assert assertion coverage before drawing audit conclusions per ISA 500.",
+    legalRef: "ISA 500 para. 7–11; ISA 330 para. 26; ISA 220 para. 34; ISA 230 para. 7–8; ICAP Quality Assurance Framework",
+    procedures: [
+      "1. Prepare audit evidence summary: for each significant account balance and transaction class, confirm evidence obtained across all relevant assertions.",
+      "2. Confirm that sufficient appropriate evidence has been obtained for each significant risk identified in the planning stage.",
+      "3. Review all working papers for completeness: proper cross-referencing, sign-off by preparer and reviewer, conclusions documented.",
+      "4. Confirm all PBC (Prepared by Client) items have been received, reviewed, and cleared.",
+      "5. Verify all significant audit findings have been communicated to management and appropriate responses obtained.",
+      "6. Confirm all open exceptions and follow-up items from interim audit have been resolved.",
+      "7. Assess whether the evidence obtained is consistent with the overall audit conclusion; identify any contradictory evidence and document resolution per ISA 230.",
+      "8. Confirm audit team has applied appropriate professional scepticism throughout the audit per ISA 200 para. 15.",
+    ],
+    conclusionTemplate: "Audit evidence review completed for [CLIENT NAME] year ended [DATE]. All significant areas covered with sufficient appropriate evidence. All assertions addressed. No unresolved evidence gaps remain. File is complete for review.",
+    reviewers: ["Engagement Manager", "Engagement Partner"],
+  },
+  "M1": {
+    objective: "Identify and evaluate events occurring between the balance sheet date and the audit report date that may require adjustment or disclosure per ISA 560.",
+    legalRef: "ISA 560 para. 6–16; IAS 10 (Events After the Reporting Period); Companies Act 2017 s.235 (directors' report — subsequent events); IFRS 9 (post-period credit events)",
+    procedures: [
+      "1. Read board minutes from year-end date to audit report date; identify any significant decisions with FS impact.",
+      "2. Review management accounts and bank statements for the period from year-end to audit report date.",
+      "3. Review post-year-end legal correspondence, court orders, FBR notices, and SECP communications.",
+      "4. Make specific inquiries of management about subsequent events: new borrowings, commitments, litigation, significant contracts, restructuring decisions.",
+      "5. Confirm going concern indicators: new financing secured, major customer contracts, orders received, forward projections.",
+      "6. Review post-year-end sales invoices and credit notes; confirm no material reversal of year-end revenue.",
+      "7. Confirm completion of management representation letter covers subsequent events through to report date.",
+      "8. For adjusting events (per IAS 10 para. 3): confirm FS adjusted where material; for non-adjusting events: confirm disclosure is adequate.",
+      "9. Document conclusion on subsequent events and confirm no adjustment to FS is required [or: adjustment required — see WP XXX].",
+    ],
+    conclusionTemplate: "Subsequent events review performed through to [REPORT DATE]. [No material adjusting events identified. Non-adjusting events disclosed in Note [X]: [DESCRIPTION]. / Adjusting event of PKR [X] identified and adjusted in FS.]",
+    reviewers: ["Engagement Manager", "Engagement Partner"],
+  },
+  "M2": {
+    objective: "Evaluate management's assessment of the entity's ability to continue as a going concern and determine the appropriateness of the going concern basis of accounting per ISA 570.",
+    legalRef: "ISA 570 (Revised) para. 12–25; IAS 1 para. 25–26 (going concern); Companies Act 2017 s.236 (insolvency); SECP Listed Companies Regulations; SBP Prudential Regulations (financial entities)",
+    procedures: [
+      "1. Obtain management's going concern assessment (formal document) covering at least 12 months from the balance sheet date.",
+      "2. Review financial indicators: net loss position, current liabilities > current assets, negative cash flows from operations, breached loan covenants.",
+      "3. Review operating indicators: loss of key customers (>20% revenue), loss of key management, supply chain disruptions, regulatory sanctions.",
+      "4. Assess external factors: Pakistan economic conditions, sector-specific risks, FBR enforcement actions, SECP regulatory changes.",
+      "5. Review business plans, cash flow projections, and financing plans; assess achievability of projections against historical performance.",
+      "6. Verify availability of banking facilities: obtain bank confirmations of undrawn facilities; review renewal terms.",
+      "7. Confirm management's assessment period covers at least 12 months from balance sheet date per ISA 570 para. 13.",
+      "8. If going concern doubt exists: assess adequacy of disclosure per IAS 1 para. 25; consider modification to audit report.",
+      "9. Obtain management representation that going concern basis is appropriate.",
+    ],
+    conclusionTemplate: "Going concern assessment completed. The entity [HAS / DOES NOT HAVE] significant going concern indicators. Management's assessment is [APPROPRIATE / INAPPROPRIATE]. Going concern basis [IS / IS NOT] appropriate for the FS. [Disclosure in Note [X] is adequate / Modified opinion required].",
+    reviewers: ["Engagement Manager", "Engagement Partner"],
+  },
+  "M3": {
+    objective: "Obtain written representations from management confirming all significant matters, completeness of information provided, and specific representations required by ISA 580.",
+    legalRef: "ISA 580 para. 10–21; ISA 500 para. 9; Companies Act 2017 s.166 (directors' duties of disclosure); ICAP Guidance on Management Representation Letters",
+    procedures: [
+      "1. Prepare management representation letter covering the period from balance sheet date to representation letter date (same as audit report date).",
+      "2. Include mandatory general representations per ISA 580 para. 10: preparation of FS per applicable framework, information provided is complete, all transactions recorded.",
+      "3. Include specific representations required by other ISAs: going concern assessment (ISA 570), fraud (ISA 240 para. 39), related parties (ISA 550), subsequent events (ISA 560), litigation (ISA 501).",
+      "4. Include Pakistan-specific representations: WHT compliance, FBR filing status, SECP compliance, EOBI/PESSI contributions, WWF payment, WPPF payment.",
+      "5. Obtain signature of CEO/Managing Director and CFO (or Chief Accountant); Board Chairman signature required for listed entities per SECP regulations.",
+      "6. Date the representation letter same as the audit report date.",
+      "7. If management refuses to provide or modifies a representation: assess impact on reliance on other evidence; consider withdrawal from engagement.",
+    ],
+    conclusionTemplate: "Management representation letter dated [DATE] obtained, signed by [CEO/MD NAME] and [CFO NAME]. All required representations per ISA 580 and Pakistan-specific requirements obtained. Copy filed in permanent file.",
+    reviewers: ["Engagement Manager", "Engagement Partner"],
+  },
+  "M4": {
+    objective: "Prepare overall audit completion memorandum documenting the overall conclusion, significant judgments made, quality control compliance, and sign-off per ISA 220.",
+    legalRef: "ISA 220 para. 34–40; ISQM 1 para. 43–46; ISA 700 para. 12; ICAP Quality Assurance Department requirements; Companies Act 2017 (audit report requirements)",
+    procedures: [
+      "1. Confirm all areas of the audit have been completed and working papers signed off by appropriate levels.",
+      "2. Document overall conclusion: 'In our opinion, the financial statements give a true and fair view of the financial position of [CLIENT] as at [DATE] and its financial performance and cash flows for the year then ended, in accordance with [IFRS/AFRS/applicable framework] and the requirements of the Companies Act 2017.'",
+      "3. Summarise all significant audit judgments: materiality decisions, risk assessments, estimate evaluations, and going concern conclusions.",
+      "4. Confirm all misstatements identified (adjusted and unadjusted) are documented in the misstatements schedule and summary of audit differences.",
+      "5. Confirm management has adjusted all material misstatements or signed the unadjusted misstatements acknowledgement.",
+      "6. Confirm engagement quality control review (EQCR) has been completed where required (listed entities, high-risk engagements).",
+      "7. Confirm all team members have completed independence declarations and CPD requirements.",
+      "8. Document partner's overall conclusion on whether a modified opinion is required.",
+      "9. Confirm archiving will be completed within 60 days of audit report date per ISA 230 para. 14.",
+    ],
+    conclusionTemplate: "Audit of [CLIENT NAME] for year ended [DATE] is complete. Overall conclusion: [UNMODIFIED/MODIFIED] opinion. Significant judgments documented. File complete and approved for reporting. Partner sign-off obtained.",
+    reviewers: ["Engagement Partner"],
+  },
+  "N1": {
+    objective: "Draft the statutory audit report in compliance with ISA 700, ISA 701 (if listed), and the Companies Act 2017, expressing an appropriate opinion on the true and fair view of the financial statements.",
+    legalRef: "ISA 700 (Revised) para. 22–43; ISA 701 (Key Audit Matters — listed entities); Companies Act 2017 s.246 (auditor's report content); SECP Listed Companies (Code of Corporate Governance) Regulations 2019; ICAP Auditor's Report Format (2023)",
+    procedures: [
+      "1. Confirm the audit report format complies with the latest ICAP-prescribed format for the entity type (listed, unlisted, SMC, etc.).",
+      "2. Draft the Opinion paragraph: state the true and fair view opinion per ISA 700 para. 26; reference both IFRS/AFRS and Companies Act 2017.",
+      "3. Draft the Basis for Opinion paragraph: confirm audit conducted per ISAs as adopted by ICAP; independence confirmed per ICAP Code of Ethics.",
+      "4. For listed entities: draft Key Audit Matters section per ISA 701 — identify matters of most significance, describe audit response, reference relevant FS disclosures.",
+      "5. Draft the responsibilities section for Management and TCWG per ISA 700 para. 33–38.",
+      "6. Draft the Auditor's Responsibilities section per ISA 700 para. 40–43.",
+      "7. Include Other Reporting Requirements per Companies Act 2017 s.246: maintenance of proper books, physical verification of assets, related party transactions at arm's length, compliance with SECP requirements.",
+      "8. Include Reporting under Code of Corporate Governance (for listed entities): Internal audit effectiveness, audit committee, CFO certification.",
+      "9. Confirm report is signed by the engagement partner in their name and the firm's name per ICAP requirements.",
+      "10. Confirm report is dated the same date as the management representation letter and subsequent events review.",
+    ],
+    conclusionTemplate: "Audit report dated [DATE] prepared in compliance with ISA 700 and Companies Act 2017. Opinion: [UNMODIFIED]. KAMs (if listed): [LIST]. Report signed by [PARTNER NAME] (ICAP ACA/FCA No. [X]) on behalf of [FIRM NAME].",
+    reviewers: ["Engagement Partner", "EQCR Partner (listed entities)"],
+  },
+  "O1": {
+    objective: "Conduct Engagement Quality Control Review (EQCR) of significant judgments, audit opinion, and key working papers by an independent reviewer per ISQM 1 and ISA 220.",
+    legalRef: "ISQM 1 (ICAP Adopted 2022) para. 43–46; ISA 220 (Revised) para. 30–33; ICAP Quality Assurance Department (QAD) Regulations; SECP Listed Companies Regulations (mandatory EQCR for listed audits)",
+    procedures: [
+      "1. Confirm EQCR reviewer is independent: no involvement in the engagement during the audit period; qualified and experienced in the sector.",
+      "2. EQCR reviewer to read and evaluate significant judgments: materiality, significant risks, fraud assessment, going concern conclusion.",
+      "3. EQCR reviewer to review audit report and KAMs (if listed): confirm appropriateness of opinion and KAM description.",
+      "4. EQCR reviewer to review documentation of significant matters: estimates, related parties, subsequent events, management representations.",
+      "5. EQCR reviewer to confirm independence of engagement team and compliance with ethical requirements.",
+      "6. EQCR reviewer to assess whether the engagement partner has appropriately documented their conclusions.",
+      "7. Document all EQCR findings; confirm engagement partner has addressed all findings before report issuance.",
+      "8. EQCR reviewer to sign EQCR completion form before audit report is issued.",
+    ],
+    conclusionTemplate: "EQCR completed by [REVIEWER NAME] on [DATE]. EQCR findings: [NIL / LIST]. All findings addressed. EQCR sign-off obtained. Audit report cleared for issuance.",
+    reviewers: ["EQCR Partner / Designated EQCR Reviewer"],
+  },
+  "P1": {
+    objective: "Complete the assembly of the audit file within the required timeframe, ensure all documents are properly indexed and cross-referenced, and confirm the file is complete per ISA 230.",
+    legalRef: "ISA 230 para. 14–16; ISQM 1 para. 47–50; ICAP Quality Assurance Standards; ICAP Practice Monitoring Guide; Companies Act 2017 (record retention requirements)",
+    procedures: [
+      "1. Confirm file assembly is completed within 60 days of the audit report date per ISA 230 para. 14.",
+      "2. Verify all working papers are present: permanent file, planning section, execution section (all areas), completion section.",
+      "3. Confirm all documents are properly indexed per the firm's file indexing system.",
+      "4. Verify all cross-references are correct and all referenced documents are present in the file.",
+      "5. Confirm all working papers have preparer and reviewer sign-offs with dates.",
+      "6. Ensure management representation letter, audit report, and signed financial statements are in the file.",
+      "7. Confirm the final signed and stamped copy of financial statements (Companies Act 2017 compliant) is filed.",
+      "8. Restrict file access after assembly: only authorised personnel can access or modify the file during the 7-year retention period per ICAP/ISQM 1.",
+      "9. Record assembly completion date in audit log; confirm archiving is in secure location (physical or electronic).",
+    ],
+    conclusionTemplate: "Audit file for [CLIENT NAME] year ended [DATE] assembled and archived on [DATE] (within 60 days of report date [REPORT DATE]). File is complete, indexed, and access-restricted. Retention period: 7 years (until [YEAR]).",
+    reviewers: ["Engagement Manager", "Engagement Partner"],
+  },
+};
+
+// ─── Fallback procedure generator based on category/type ─────────────────────
+function getWpProcedures(wp: WpItem): WpProcedureContent {
+  if (WP_PROCEDURES_MAP[wp.code]) return WP_PROCEDURES_MAP[wp.code];
+  const cat = wp.category;
+  const type = wp.type;
+  const base = {
+    reviewers: ["Engagement Senior", "Engagement Manager", "Engagement Partner"],
+    conclusionTemplate: `${wp.label} procedures completed for [CLIENT NAME] year ended [DATE]. All procedures performed satisfactorily. Conclusion: [SATISFACTORY / EXCEPTIONS NOTED — see findings section].`,
+  };
+  if (cat === "pre_planning" || type === "planning") return { ...base,
+    objective: `Complete ${wp.label} to ensure the engagement is appropriately planned and documented per ${wp.isa} and ICAP Quality Assurance standards.`,
+    legalRef: `${wp.isa}; ISQM 1 (ICAP 2022); ISA 220; ICAP Code of Ethics (2020); Companies Act 2017`,
+    procedures: [
+      `1. Obtain and review all relevant documentation: entity registration, SECP filings, prior year audit file, and regulatory correspondence.`,
+      `2. Identify and document the scope of the engagement per ${wp.isa} requirements.`,
+      `3. Confirm team competency and availability; assign roles and responsibilities.`,
+      `4. Identify risks relevant to ${wp.label}: entity-specific, industry, and regulatory risks in Pakistan context.`,
+      `5. Document findings, obtain management/partner approval, and file in permanent/planning section.`,
+    ],
+  };
+  if (cat === "risk") return { ...base,
+    objective: `Identify, assess, and respond to risks of material misstatement relevant to ${wp.label} per ${wp.isa}.`,
+    legalRef: `${wp.isa}; ISA 315 (Revised 2019); ISA 330; Companies Act 2017; FBR Tax Laws; SECP Regulations`,
+    procedures: [
+      `1. Identify risk factors specific to ${wp.label} through inquiry, observation, and analytical procedures.`,
+      `2. Assess inherent risk at assertion level per ISA 315 (Revised 2019) Inherent Risk Factors.`,
+      `3. Evaluate relevant controls; assess control risk and determine audit response.`,
+      `4. Document identified significant risks with specific planned responses per ISA 330.`,
+      `5. Update risk assessment throughout the audit as new information emerges.`,
+      `6. Report significant findings to management and those charged with governance per ISA 260.`,
+    ],
+  };
+  if (cat === "analytical") return { ...base,
+    objective: `Perform analytical procedures for ${wp.label} to identify unusual relationships, fluctuations, and areas requiring audit attention per ${wp.isa}.`,
+    legalRef: `${wp.isa}; ISA 315; ISA 520; ICAP Technical Guidance; Pakistan industry benchmarks (SBP, PSX)`,
+    procedures: [
+      `1. Obtain relevant financial data: current year actuals, prior year comparatives, budget, and industry benchmarks.`,
+      `2. Compute key ratios and metrics relevant to ${wp.label}; compare to expectations.`,
+      `3. Identify all significant fluctuations (>20% or >performance materiality); obtain management explanations.`,
+      `4. Assess plausibility of management explanations against audit knowledge of the entity and Pakistan market conditions.`,
+      `5. Update audit response for areas where explanations are not satisfactory; perform additional procedures.`,
+      `6. Document analytical procedures performed and conclusions reached.`,
+    ],
+  };
+  if (cat === "controls") return { ...base,
+    objective: `Evaluate the design and implementation (and operating effectiveness where reliance planned) of controls relevant to ${wp.label} per ${wp.isa}.`,
+    legalRef: `${wp.isa}; ISA 315 (Revised 2019); ISA 330 para. 8–17; ISA 265; SECP Code of Corporate Governance (listed entities)`,
+    procedures: [
+      `1. Identify relevant controls for the ${wp.label} cycle through inquiry and observation.`,
+      `2. Perform walkthrough: trace 1–2 transactions through the entire cycle from initiation to reporting.`,
+      `3. Evaluate design effectiveness: assess whether the control, if operating effectively, would prevent or detect material misstatement.`,
+      `4. Assess implementation: confirm the control has been placed in operation.`,
+      `5. If reliance planned: test operating effectiveness — obtain sample (25–60 items depending on frequency) and test each item.`,
+      `6. Document control deficiencies, significant deficiencies, and material weaknesses; report per ISA 265.`,
+    ],
+  };
+  if (["substantive_assets","substantive_liab","substantive_pl"].includes(cat)) return { ...base,
+    objective: `Obtain sufficient appropriate audit evidence over ${wp.label} through substantive procedures per ${wp.isa} and applicable IFRS/IAS standards.`,
+    legalRef: `${wp.isa}; ISA 500; ISA 501; ISA 505; ISA 530; Companies Act 2017 (Fourth Schedule disclosure); Applicable IFRS/IAS`,
+    procedures: [
+      `1. Obtain schedule/listing from management; agree to trial balance and financial statements.`,
+      `2. Agree opening balance to prior year audited financial statements and audit file.`,
+      `3. Perform test of details on additions, movements, and closing balance per sampling plan.`,
+      `4. Vouch sample transactions to supporting documents: invoices, contracts, bank statements, approvals.`,
+      `5. Test relevant assertions: existence/occurrence, completeness, accuracy, valuation, cut-off, rights & obligations.`,
+      `6. Perform analytical review on the balance/transactions; investigate significant unexpected movements.`,
+      `7. Confirm proper disclosure in notes per applicable IFRS/IAS and Companies Act 2017 Fourth Schedule.`,
+      `8. Document all exceptions, findings, and management responses.`,
+    ],
+  };
+  if (cat === "tax") return { ...base,
+    objective: `Verify ${wp.label} compliance with applicable Pakistani tax laws and ensure accurate accounting and disclosure.`,
+    legalRef: `${wp.isa}; ITO 2001 (as amended by Finance Acts); Sales Tax Act 1990; WHT Rules; FBR IRIS Records; IAS 12; Companies Act 2017`,
+    procedures: [
+      `1. Obtain tax computations and reconcile to accounting profit; agree to financial statements.`,
+      `2. Verify applicable rates and computations per ITO 2001 and latest Finance Act provisions.`,
+      `3. Reconcile tax payments and deposits to FBR IRIS portal records.`,
+      `4. Review FBR notices, assessment orders, and pending matters; assess provision adequacy.`,
+      `5. Confirm proper disclosure in FS: current tax, deferred tax, tax contingencies per IAS 12 and IAS 37.`,
+    ],
+  };
+  if (["completion","reporting","quality"].includes(type)) return { ...base,
+    objective: `Complete ${wp.label} to ensure the audit is concluded appropriately and all reporting/quality requirements are met per ${wp.isa}.`,
+    legalRef: `${wp.isa}; ISA 220; ISA 700; ISQM 1; ISA 230; Companies Act 2017 (audit report and archiving requirements)`,
+    procedures: [
+      `1. Perform all required ${type} procedures per ${wp.isa}.`,
+      `2. Review documentation for completeness and accuracy of conclusions.`,
+      `3. Confirm sign-off hierarchy: preparer, reviewer, manager, partner as appropriate.`,
+      `4. Obtain required management confirmations or written representations.`,
+      `5. Document conclusion and ensure filed in correct section of audit file.`,
+    ],
+  };
+  return { ...base,
+    objective: `Perform ${wp.label} procedures per ${wp.isa} for the audit of [CLIENT NAME].`,
+    legalRef: `${wp.isa}; ISA 500; Companies Act 2017; ICAP Standards`,
+    procedures: [
+      `1. Plan and document the approach for ${wp.label}.`,
+      `2. Obtain relevant information from management and third parties.`,
+      `3. Perform required procedures per ${wp.isa}.`,
+      `4. Document findings, exceptions, and conclusions.`,
+      `5. Obtain sign-off from appropriate review level.`,
+    ],
+  };
+}
+
 // ─── Smart Auto-Selection Rules ────────────────────────────────────────────────
 // Selects: mandatory + high-risk + all material FS-head (F/G/H) +
 //          all compliance-critical (I/K) + all completion/reporting essentials
@@ -6967,72 +7582,151 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
       </div>
 
       {/* ── WP Preview Panel ── */}
-      {preview && (
-        <div className="bg-white border border-indigo-200 rounded-xl p-5 shadow-md">
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded font-mono">{preview.code}</span>
-                <h3 className="text-sm font-bold text-slate-900">{preview.label}</h3>
+      {preview && (() => {
+        const pc = getWpProcedures(preview);
+        return (
+        <div className="bg-white border border-indigo-200 rounded-2xl shadow-lg overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-indigo-700 to-violet-800 px-5 py-4 text-white">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="text-[11px] font-bold bg-white/20 border border-white/30 px-2 py-0.5 rounded font-mono">{preview.code}</span>
+                  {preview.mandatory && <span className="text-[10px] bg-red-500/80 border border-red-300/40 px-2 py-0.5 rounded font-semibold">MANDATORY</span>}
+                  <span className={cn("text-[10px] px-2 py-0.5 rounded font-semibold border border-white/20",
+                    preview.risk==="high" ? "bg-red-400/50" : preview.risk==="medium" ? "bg-amber-400/50" : "bg-emerald-400/50")}>
+                    {preview.risk?.toUpperCase()} RISK
+                  </span>
+                  <span className="text-[10px] bg-white/15 border border-white/20 px-2 py-0.5 rounded">{preview.outputType.toUpperCase()}</span>
+                </div>
+                <h3 className="text-sm font-bold leading-snug">{preview.label}</h3>
+                <p className="text-[11px] text-indigo-200 mt-0.5 line-clamp-2">{preview.description}</p>
               </div>
-              <p className="text-[11px] text-slate-500 mt-1">{preview.description}</p>
+              <button onClick={() => setPreview(null)} className="text-white/60 hover:text-white shrink-0 mt-0.5">
+                <XCircle className="w-5 h-5" />
+              </button>
             </div>
-            <button onClick={() => setPreview(null)} className="text-slate-400 hover:text-slate-700 shrink-0">
-              <XCircle className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-            {[
-              ["Phase", preview.phase],
-              ["Standard", preview.isa],
-              ["Output", preview.outputType.toUpperCase()],
-              ["Complexity", preview.complexity.charAt(0).toUpperCase() + preview.complexity.slice(1)],
-            ].map(([k,v]) => (
-              <div key={k} className="bg-slate-50 rounded-lg p-2">
-                <p className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide">{k}</p>
-                <p className="text-[11px] font-semibold text-slate-700 mt-0.5">{v}</p>
-              </div>
-            ))}
-          </div>
-          <div className="border-t border-slate-100 pt-3">
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-2">Assertions Covered</p>
-            <div className="flex flex-wrap gap-1">
-              {preview.assertions.map(a => (
-                <span key={a} className="text-[10px] px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full capitalize">{a}</span>
-              ))}
-            </div>
-          </div>
-          <div className="border-t border-slate-100 pt-3 mt-3">
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-2">Standard Template Structure</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[10px] text-slate-600">
+            {/* Meta row */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
               {[
-                "1. Cover Header (Auto-Filled)",
-                "2. Document Control & Indexing",
-                "3. Objective",
-                "4. Scope & Risk Context",
-                "5. Data Source & Population",
-                "6. Procedures Performed",
-                ...(preview.outputType.includes("excel") ? ["7. Sampling Details", "8. Evidence Obtained"] : ["7. Evidence Obtained"]),
-                "Findings / Exceptions",
-                "Conclusion (ISA-Referenced)",
-                "Review & Sign-Off Hierarchy",
-              ].map((s,i) => (
-                <div key={i} className="flex items-start gap-1.5 bg-slate-50 rounded px-2 py-1.5">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0 mt-0.5" />
-                  <span>{s}</span>
+                ["ISA Reference", preview.isa],
+                ["Phase", preview.phase],
+                ["Complexity", preview.complexity.charAt(0).toUpperCase() + preview.complexity.slice(1)],
+                ["Assertions", preview.assertions.slice(0,3).join(", ") + (preview.assertions.length > 3 ? "…" : "")],
+              ].map(([k,v]) => (
+                <div key={k} className="bg-white/10 rounded-lg p-2">
+                  <p className="text-[9px] text-indigo-300 font-semibold uppercase tracking-wide">{k}</p>
+                  <p className="text-[11px] font-semibold text-white mt-0.5 leading-tight">{v}</p>
                 </div>
               ))}
             </div>
           </div>
-          <div className="mt-3 flex gap-2">
-            <Button size="sm" onClick={() => toggle(preview.code, preview.mandatory)}
-              className={cn("h-7 text-xs", selected.has(preview.code) ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100" : "bg-emerald-600 hover:bg-emerald-700 text-white")}
-              variant={selected.has(preview.code) ? "outline" : "default"}>
-              {selected.has(preview.code) ? <><XCircle className="w-3 h-3 mr-1" /> Deselect</> : <><CheckCircle2 className="w-3 h-3 mr-1" /> Select</>}
-            </Button>
+
+          {/* Body */}
+          <div className="p-5 space-y-4">
+
+            {/* Legal Reference */}
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+              <div className="flex items-start gap-2">
+                <span className="text-amber-600 mt-0.5 shrink-0">⚖️</span>
+                <div>
+                  <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide mb-0.5">Pakistan Legal & Standards Framework</p>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">{pc.legalRef}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Audit Objective */}
+            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3">
+              <p className="text-[10px] font-bold text-indigo-700 uppercase tracking-wide mb-1">Audit Objective</p>
+              <p className="text-[12px] text-indigo-900 leading-relaxed">{pc.objective}</p>
+            </div>
+
+            {/* Audit Procedures */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-1 h-4 bg-indigo-600 rounded-full" />
+                <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">Audit Procedures</p>
+                <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{pc.procedures.length} steps</span>
+              </div>
+              <div className="space-y-1.5">
+                {pc.procedures.map((proc, i) => (
+                  <div key={i} className="flex items-start gap-2.5 bg-slate-50 hover:bg-slate-100 rounded-lg px-3 py-2 transition-colors group">
+                    <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-indigo-200">
+                      {i + 1}
+                    </div>
+                    <p className="text-[11px] text-slate-700 leading-relaxed">{proc.replace(/^\d+\.\s*/, "")}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Document Structure */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-1 h-4 bg-violet-500 rounded-full" />
+                <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">Working Paper Document Structure</p>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[10px] text-slate-600">
+                {[
+                  "Cover Header & Document Reference",
+                  "Engagement & Period Details",
+                  "Audit Objective",
+                  "Legal & Standards Reference",
+                  "Scope, Population & Sampling",
+                  "Procedures Performed",
+                  ...(preview.outputType.includes("excel") ? ["Sampling Schedule (Excel)", "Test Results Grid"] : ["Evidence Obtained"]),
+                  "Findings & Exceptions Log",
+                  "Conclusion (ISA-Referenced)",
+                  "Preparer Sign-Off & Date",
+                  "Reviewer / Manager Sign-Off",
+                  "Engagement Partner Approval",
+                ].map((s, i) => (
+                  <div key={i} className="flex items-start gap-1.5 bg-slate-50 border border-slate-100 rounded px-2 py-1.5">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0 mt-0.5" />
+                    <span className="leading-tight">{s}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Conclusion Template */}
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+              <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide mb-1">Conclusion Template</p>
+              <p className="text-[11px] text-emerald-900 italic leading-relaxed">"{pc.conclusionTemplate}"</p>
+            </div>
+
+            {/* Sign-off Hierarchy */}
+            <div className="flex items-start gap-2 bg-slate-50 border border-slate-200 rounded-xl p-3">
+              <span className="text-slate-500 mt-0.5 shrink-0 text-sm">✍️</span>
+              <div className="flex-1">
+                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wide mb-1.5">Sign-Off Hierarchy</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {pc.reviewers.map((r, i) => (
+                    <span key={i} className="text-[10px] px-2.5 py-1 bg-white border border-slate-200 rounded-full text-slate-700 font-medium flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+                      {r}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Action */}
+            <div className="flex gap-2 pt-1">
+              <Button size="sm" onClick={() => toggle(preview.code, preview.mandatory)}
+                className={cn("h-8 text-xs px-4", selected.has(preview.code) ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100" : "bg-emerald-600 hover:bg-emerald-700 text-white")}
+                variant={selected.has(preview.code) ? "outline" : "default"}>
+                {selected.has(preview.code) ? <><XCircle className="w-3 h-3 mr-1" /> Deselect from Pack</> : <><CheckCircle2 className="w-3 h-3 mr-1" /> Add to Audit Pack</>}
+              </Button>
+              <button onClick={() => setPreview(null)} className="text-[11px] text-slate-400 hover:text-slate-600 px-3 py-1">
+                Close
+              </button>
+            </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ── Proceed Bar ── */}
       <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
