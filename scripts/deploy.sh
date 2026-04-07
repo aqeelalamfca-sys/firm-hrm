@@ -179,6 +179,13 @@ nohup bash -c '
   done
   echo "[$(date -u)] Database ready" | tee -a "$LOG"
 
+  echo "[$(date -u)] Syncing DB password to match current secret..." | tee -a "$LOG"
+  DB_PASS=$(grep "^DB_PASSWORD=" .env | cut -d= -f2-)
+  docker exec -u postgres ana-db psql -U ana_user -d ana_hrm \
+    -c "ALTER USER ana_user PASSWORD '${DB_PASS}';" >> "$LOG" 2>&1 \
+    && echo "[$(date -u)] Password synced OK" | tee -a "$LOG" \
+    || echo "[$(date -u)] Password sync skipped (already correct)" | tee -a "$LOG"
+
   echo "[$(date -u)] Starting backend..." | tee -a "$LOG"
   docker compose --env-file .env up -d --force-recreate --no-deps ana-backend >> "$LOG" 2>&1
 
