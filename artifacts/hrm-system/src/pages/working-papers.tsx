@@ -7581,13 +7581,17 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
         )}
       </div>
 
-      {/* ── WP Preview Panel ── */}
+      {/* ── WP Preview Modal ── */}
       {preview && (() => {
         const pc = getWpProcedures(preview);
         return (
-        <div className="bg-white border border-indigo-200 rounded-2xl shadow-lg overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{background:"rgba(15,23,42,0.65)"}}>
+          {/* Backdrop */}
+          <div className="absolute inset-0" onClick={() => setPreview(null)} />
+          {/* Modal Card */}
+          <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col w-full max-w-2xl max-h-[90vh]">
           {/* Header */}
-          <div className="bg-gradient-to-r from-indigo-700 to-violet-800 px-5 py-4 text-white">
+          <div className="bg-gradient-to-r from-indigo-700 to-violet-800 px-5 py-4 text-white shrink-0">
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -7622,8 +7626,8 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
             </div>
           </div>
 
-          {/* Body */}
-          <div className="p-5 space-y-4">
+          {/* Body — scrollable */}
+          <div className="p-5 space-y-4 overflow-y-auto flex-1">
 
             {/* Legal Reference */}
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
@@ -7723,6 +7727,7 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
                 Close
               </button>
             </div>
+          </div>
           </div>
         </div>
         );
