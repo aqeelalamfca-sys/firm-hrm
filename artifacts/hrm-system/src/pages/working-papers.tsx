@@ -2677,15 +2677,68 @@ function TemplateParsedPanel({ result, onClear }: { result: any; onClear: () => 
           </div>
         )}
 
+        {/* Variable Mapping Summary */}
+        {result.variableMapping && (
+          <div>
+            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-violet-500" /> Variable Mapping Summary
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: "Variables Mapped",   value: result.variableMapping.mapped,                    color: "emerald" },
+                { label: "Skipped (no change)",value: result.variableMapping.skipped,                   color: "slate"   },
+                { label: "Conflicts",          value: result.variableMapping.conflicts?.length ?? 0,    color: result.variableMapping.conflicts?.length ? "amber" : "emerald" },
+                { label: "Missing Mandatory",  value: result.variableMapping.missingMandatory?.length ?? 0, color: result.variableMapping.missingMandatory?.length ? "red" : "emerald" },
+              ].map(s => (
+                <div key={s.label} className={cn("rounded-xl p-3 border text-center",
+                  s.color === "red"     ? "bg-red-50 border-red-100"       :
+                  s.color === "amber"   ? "bg-amber-50 border-amber-100"   :
+                  s.color === "emerald" ? "bg-emerald-50 border-emerald-100" :
+                  "bg-slate-50 border-slate-100"
+                )}>
+                  <p className="text-xl font-bold text-slate-900">{s.value}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{s.label}</p>
+                </div>
+              ))}
+            </div>
+            {result.variableMapping.conflicts?.length > 0 && (
+              <div className="mt-2.5 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <p className="text-xs font-semibold text-amber-700 mb-1.5">Conflicts (user values preserved):</p>
+                <ul className="space-y-0.5">
+                  {result.variableMapping.conflicts.slice(0, 5).map((c: string, i: number) => (
+                    <li key={i} className="text-[11px] text-amber-800 flex items-start gap-1.5">
+                      <span className="w-1 h-1 rounded-full bg-amber-500 mt-1.5 shrink-0" />{c}
+                    </li>
+                  ))}
+                  {result.variableMapping.conflicts.length > 5 && (
+                    <li className="text-[11px] text-amber-600 italic">…and {result.variableMapping.conflicts.length - 5} more</li>
+                  )}
+                </ul>
+              </div>
+            )}
+            {result.variableMapping.missingMandatory?.length > 0 && (
+              <div className="mt-2.5 bg-red-50 border border-red-200 rounded-xl p-3">
+                <p className="text-xs font-semibold text-red-700 mb-1.5">Missing mandatory variables (must be entered manually):</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {result.variableMapping.missingMandatory.map((code: string) => (
+                    <span key={code} className="inline-flex px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-[11px] font-medium">{code}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Success footer */}
         {!hasErrors && rows.length > 0 && result.persisted && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
             <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
             <div>
-              <p className="text-sm font-semibold text-emerald-800">Data successfully persisted to session</p>
+              <p className="text-sm font-semibold text-emerald-800">Data successfully wired to audit variables</p>
               <p className="text-xs text-emerald-700 mt-0.5">
-                Trial balance lines, GL accounts, variables, and audit engine profile have been auto-populated.
-                Proceed to the next stage or review variables before generating working papers.
+                Trial balance, GL accounts, financial variables, risk indicators, materiality, going concern flags,
+                and Audit Firm & Report variables have all been auto-populated from your template.
+                Review variables in the next stage, then generate working papers.
               </p>
             </div>
           </div>

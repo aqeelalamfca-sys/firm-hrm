@@ -7454,12 +7454,40 @@ async function autoFillVariablesFromTemplate(
                                           : rows.length > 0 ? "Custom" : "",
 
       // ── RISK ASSESSMENT (from template per-row Risk_Level and WP_Area) ─────
-      // Significant risk areas: unique WP areas where Risk_Level = "High"
-      "significant_risk_areas":            rows
-        .filter(r => nrm(r.riskLevel) === "high")
-        .map(r => r.wpArea)
-        .filter((v, i, arr) => v && arr.indexOf(v) === i)
-        .join(", "),
+      // Significant risk areas: WP areas with High risk → mapped to ISA standard labels
+      "significant_risk_areas":            (() => {
+        const WP_TO_ISA: Record<string, string> = {
+          "revenue": "Revenue Recognition (ISA 240)",
+          "cost of sales": "Revenue Recognition (ISA 240)",
+          "taxation": "Tax Liabilities & Contingencies",
+          "tax": "Tax Liabilities & Contingencies",
+          "receivables": "Trade Receivables — Recoverability",
+          "payables": "Related Party Transactions (ISA 550)",
+          "borrowings": "Loan Covenants / Compliance",
+          "ppe": "Fixed Assets — Impairment",
+          "property, plant": "Fixed Assets — Impairment",
+          "inventory": "Inventory Valuation",
+          "cash and bank": "Trade Receivables — Recoverability",
+          "provisions": "Estimates & Judgments (ISA 540)",
+          "estimates": "Estimates & Judgments (ISA 540)",
+          "equity": "Trade Receivables — Recoverability",
+          "other income": "Revenue Recognition (ISA 240)",
+          "operating expenses": "Completeness of Liabilities",
+        };
+        const seen = new Set<string>();
+        const labels: string[] = [];
+        rows.filter(r => nrm(r.riskLevel) === "high").forEach(r => {
+          const lower = nrm(r.wpArea);
+          for (const [key, label] of Object.entries(WP_TO_ISA)) {
+            if (lower.includes(key) && !seen.has(label)) {
+              seen.add(label); labels.push(label);
+            }
+          }
+        });
+        // Always include ISA 240 management override — presumed risk
+        if (!seen.has("Management Override (ISA 240)")) labels.push("Management Override (ISA 240)");
+        return labels.join(", ");
+      })(),
       "account_level_risk_mapping_done":   rows.length > 0 ? "true" : "false",
       // Fraud risk: revenue is standard ISA 240 presumed fraud risk area
       "fraud_risk_flag":                   rows.some(r => nrm(r.wpArea).includes("revenue")) ? "true" : "false",
@@ -7499,6 +7527,134 @@ async function autoFillVariablesFromTemplate(
       "high_priority_gl_count":            String(
         rows.filter(r => nrm(r.glGenerationPriority) === "high").length
       ),
+
+      // ── NEW GROUP 21: AUDIT FIRM & REPORT — derived from template ─────────
+      // audit_year and tax_year are the financial year derived from yearEnd
+      "audit_year":                        engagementYear || "",
+      "tax_year":                          engagementYear || "",
+
+      // ── ENTITY & CONSTITUTION — new fields derived from template ──────────
+      // Number of bank accounts = count of rows tagged as "Cash and Bank" WP area
+      "number_of_bank_accounts":           (() => {
+        const bankRows = rows.filter(r => nrm(r.wpArea).includes("cash") || nrm(r.accountName).includes("bank") || nrm(r.lineItem).includes("bank"));
+        return bankRows.length > 0 ? String(bankRows.length) : "";
+      })(),
+      // Inventory valuation method — infer from inventory presence; default AVCO for manufacturing
+      "inventory_valuation_method":        (() => {
+        const hasInv = rows.some(r => nrm(r.wpArea).includes("inventory") || nrm(r.lineItem).includes("inventor") || nrm(r.accountName).includes("inventor"));
+        if (!hasInv) return "N/A — No Inventory";
+        const ind = nrm(meta.industry || "");
+        if (ind.includes("manufactur")) return "AVCO (Weighted Average Cost)";
+        if (ind.includes("retail") || ind.includes("trade")) return "FIFO (First-In First-Out)";
+        return "AVCO (Weighted Average Cost)";
+      })(),
+      // Depreciation method — infer from PPE presence; default SLM
+      "depreciation_method":               (() => {
+        const hasPPE = rows.some(r => nrm(r.wpArea).includes("ppe") || nrm(r.lineItem).includes("depreciation") || nrm(r.accountName).includes("property"));
+        return hasPPE ? "Straight-Line Method (SLM)" : "";
+      })(),
+      // Revenue recognition — infer from audit/entity type
+      "revenue_recognition_policy":        (() => {
+        const auditT = nrm(meta.auditType || "");
+        const ind = nrm(meta.industry || "");
+        if (ind.includes("service") || ind.includes("consult")) return "IFRS 15 — 5-Step Model";
+        if (ind.includes("construct") || ind.includes("contract")) return "Percentage of Completion";
+        if (ind.includes("manufactur") || ind.includes("retail") || ind.includes("trade")) return "At Point of Delivery";
+        return "IFRS 15 — 5-Step Model";
+      })(),
+
+      // ── TAX & COMPLIANCE — new fields derived from template ───────────────
+      // Applicable tax rate — standard Pakistan corporate rate (infer from engagement size/type)
+      "applicable_tax_rate":               (() => {
+        const ind = nrm(meta.industry || "");
+        const size = nrm(meta.engagementSize || "");
+        // Banking: 39%, SME: 20%, standard corporate: 29%
+        if (ind.includes("bank") || ind.includes("financial")) return "39";
+        if (size === "small") return "20";
+        return "29";
+      })(),
+      // Super tax applicable for large companies (income > 150M PKR)
+      "super_tax_applicable":              (() => {
+        const sizeN = nrm(meta.engagementSize || "");
+        return (sizeN === "large" || cy_rev > 150000000) ? "true" : "false";
+      })(),
+      "super_tax_rate":                    (() => {
+        const sizeN = nrm(meta.engagementSize || "");
+        if (cy_rev > 500000000 || sizeN === "large") return "10";
+        if (cy_rev > 150000000) return "4";
+        return "";
+      })(),
+      // Reporting currency from template
+      "reporting_currency":                meta.currency || "PKR",
+
+      // ── GOING CONCERN — additional indicators from financial data ─────────
+      "going_concern_indicators_list":     (() => {
+        const indicators: string[] = [];
+        if (cy_pat < 0) indicators.push("Recurring Net Losses");
+        if (totalEquity < 0) indicators.push("Negative Equity");
+        if (cy_op_cf !== 0 && cy_op_cf < 0) indicators.push("Negative Operating Cash Flows");
+        if (cy_lt_borrow > totalAssets * 0.5) indicators.push("Loan Defaults / Covenant Breach");
+        if (py_pat < 0 && cy_pat < 0) indicators.push("Significant Accumulated Losses");
+        return indicators.join(", ");
+      })(),
+
+      // ── FRAUD RISK INDICATORS — derived from financial patterns ───────────
+      "fraud_risk_indicators":             (() => {
+        const indicators: string[] = [];
+        const revGrowth = py_rev > 0 ? (cy_rev - py_rev) / py_rev : 0;
+        if (revGrowth > 0.3) indicators.push("Rapid Growth Inconsistent with Sector");
+        if (cy_rev > 0 && cy_gp / cy_rev < 0.05) indicators.push("Revenue Manipulation Patterns");
+        if (rows.some(r => nrm(r.wpArea).includes("estimate") || nrm(r.wpArea).includes("provision"))) indicators.push("Excessive Management Estimates");
+        if (cy_trade_rec > cy_rev * 0.5) indicators.push("Unusual Related-Party Dealings");
+        indicators.push("Pressure to Meet Targets");
+        return indicators.join(", ");
+      })(),
+
+      // ── APPLICABLE ISA STANDARDS (always include core set) ────────────────
+      "applicable_isa_standards":          [
+        "ISA 200 — Overall Objectives",
+        "ISA 210 — Engagement Terms",
+        "ISA 230 — Documentation",
+        "ISA 240 — Fraud",
+        "ISA 300 — Planning",
+        "ISA 315 — Risk Assessment",
+        "ISA 320 — Materiality",
+        "ISA 330 — Responses to Risks",
+        "ISA 450 — Misstatements",
+        "ISA 500 — Audit Evidence",
+        "ISA 560 — Subsequent Events",
+        "ISA 570 — Going Concern",
+        "ISA 580 — Written Representations",
+        "ISA 700 — Forming Opinion",
+        ...(rows.some(r => nrm(r.wpArea).includes("revenue")) ? ["ISA 240 — Fraud"] : []),
+        ...(rows.some(r => nrm(r.wpArea).includes("receivable") || nrm(r.wpArea).includes("cash")) ? ["ISA 505 — Confirmations"] : []),
+        ...(rows.some(r => nrm(r.wpArea).includes("inventory")) ? ["ISA 501 — Specific Evidence"] : []),
+        ...(rows.some(r => nrm(r.wpArea).includes("ppe") || nrm(r.wpArea).includes("estimate")) ? ["ISA 540 — Estimates"] : []),
+        "ISA 701 — KAMs",
+        "ISQM 1 — Quality Management",
+      ].filter((v, i, arr) => arr.indexOf(v) === i).join(", "),
+
+      // ── APPLICABLE LAWS & REGULATIONS ─────────────────────────────────────
+      "applicable_company_laws_multi":     (() => {
+        const laws = ["Companies Act 2017", "Income Tax Ordinance 2001"];
+        const ct = nrm(meta.companyType || "");
+        if (ct.includes("llp")) laws.push("LLP Act 2017");
+        if (rows.some(r => nrm(r.wpArea).includes("taxation"))) laws.push("Sales Tax Act 1990");
+        laws.push("Companies (Audit) Rules 2017");
+        return laws.join(", ");
+      })(),
+
+      // ── KEY AUDIT MATTERS ─────────────────────────────────────────────────
+      "key_audit_matters_list":            (() => {
+        const kams: string[] = [];
+        if (rows.some(r => nrm(r.riskLevel) === "high" && nrm(r.wpArea).includes("revenue"))) kams.push("Revenue Recognition Complexity");
+        if (rows.some(r => nrm(r.wpArea).includes("ppe"))) kams.push("Significant Estimates (ISA 540)");
+        if (rows.some(r => nrm(r.wpArea).includes("inventory"))) kams.push("Inventory Valuation");
+        if (rows.some(r => nrm(r.wpArea).includes("taxation"))) kams.push("Tax Uncertainties");
+        if (gcLosses || gcNegEq || gcNegOpCF) kams.push("Going Concern Assessment");
+        if (cy_trade_rec > cy_rev * 0.3 && cy_rev > 0) kams.push("ECL / Provision for Credit Losses");
+        return kams.join(", ");
+      })(),
     };
 
     // ── 3. MANDATORY FIELD VALIDATION ─────────────────────────────────────
@@ -7548,6 +7704,42 @@ async function autoFillVariablesFromTemplate(
       }).where(eq(wpVariablesTable.id, ev.id));
 
       result.mapped++;
+    }
+
+    // ── 4b. INSERT — create rows for templateVars codes not yet in DB ──────
+    // This handles new variable groups (Group 21, new Entity & Constitution, etc.)
+    // that don't exist in the DB yet because auto-fill ran before this parse.
+    const existingCodeSet = new Set(existingVars.map(ev => (ev.variableCode || "").toLowerCase().trim()));
+
+    const toInsert: Array<{ code: string; val: string; def: any }> = [];
+    for (const [code, val] of Object.entries(templateVars)) {
+      if (!val || val.trim() === "") continue;
+      if (existingCodeSet.has(code)) continue;
+      // Only insert if a definition exists for this code
+      const def = VARIABLE_DEFINITIONS.find(d => d.variableCode === code);
+      if (!def) continue;
+      toInsert.push({ code, val, def });
+    }
+
+    // Bulk insert in batches of 50 to avoid large transactions
+    for (let i = 0; i < toInsert.length; i += 50) {
+      const batch = toInsert.slice(i, i + 50);
+      try {
+        await db.insert(wpVariablesTable).values(
+          batch.map(({ code, val, def }) => ({
+            sessionId,
+            variableCode: code,
+            category:     def.variableGroup,
+            variableName: def.variableLabel,
+            autoFilledValue: val,
+            finalValue:      val,
+            sourceType:      "template",
+            reviewStatus:    "template_filled",
+            confidence:      "100",
+          }))
+        );
+        result.mapped += batch.length;
+      } catch { /* non-fatal: some codes may conflict */ }
     }
 
     // ── 5. POST-FILL STATUS PASS ─────────────────────────────────────────
