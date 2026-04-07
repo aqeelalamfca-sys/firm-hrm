@@ -1,6 +1,6 @@
 export type VariableCategory = "primary" | "secondary" | "ai";
 
-// ── 116 PRIMARY variables — filled directly from template upload or session form ──
+// ── PRIMARY variables — filled directly from template upload or session form ──
 export const PRIMARY_VARIABLE_CODES = new Set<string>([
   // Entity & Constitution (15)
   "entity_name", "legal_name_as_per_secp", "short_name", "ntn", "strn",
@@ -16,6 +16,13 @@ export const PRIMARY_VARIABLE_CODES = new Set<string>([
   "tb_opening_balance_aggregate", "tb_closing_balance_aggregate", "audit_procedure_depth",
   // Materiality Input (1)
   "materiality_basis",
+  // Audit Firm & Report (14 new)
+  "audit_year", "tax_year", "firm_name", "firm_icap_registration",
+  "signing_partner_icap_no", "icap_membership_category", "signing_city",
+  "appointment_nature", "prior_year_audit_opinion", "engagement_letter_date",
+  "employee_count", "number_of_bank_accounts", "inventory_valuation_method", "depreciation_method",
+  // Operations & Structure (4 new)
+  "provinces_of_operation", "provincial_tax_authority", "applicable_tax_rate", "super_tax_rate",
   // Financial Statements — Current Year (47)
   "cy_total_assets", "cy_non_current_assets", "cy_current_assets", "cy_fixed_assets",
   "cy_right_of_use_assets", "cy_capital_work_in_progress", "cy_intangible_assets",
@@ -157,6 +164,12 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("associate_flag", "Entity & Constitution", "Group", "Has Associates", { dataType: "boolean", inputMode: "toggle", displayOrder: 31 }),
   v("joint_venture_flag", "Entity & Constitution", "Group", "Has Joint Ventures", { dataType: "boolean", inputMode: "toggle", displayOrder: 32 }),
   v("foreign_operations_flag", "Entity & Constitution", "Group", "Foreign Operations", { dataType: "boolean", inputMode: "toggle", displayOrder: 33 }),
+  v("provinces_of_operation", "Entity & Constitution", "Operations", "Provinces of Operation", { dataType: "text", inputMode: "multi_select", dropdownOptionsJson: dd(["Punjab","Sindh","KPK (Khyber Pakhtunkhwa)","Balochistan","Islamabad Capital Territory (ICT)","Azad Jammu & Kashmir (AJK)","Gilgit-Baltistan (GB)","FATA/Tribal Areas"]), mandatoryFlag: M, displayOrder: 34 }),
+  v("employee_count", "Entity & Constitution", "Operations", "Number of Employees", { dataType: "number", inputMode: "number", aiExtractableFlag: AI, displayOrder: 35 }),
+  v("number_of_bank_accounts", "Entity & Constitution", "Operations", "Number of Bank Accounts", { dataType: "number", inputMode: "number", displayOrder: 36 }),
+  v("inventory_valuation_method", "Entity & Constitution", "Accounting Policies", "Inventory Valuation Method", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["FIFO (First-In First-Out)","AVCO (Weighted Average Cost)","Specific Identification","NRV (Net Realisable Value)","N/A — No Inventory"]), aiExtractableFlag: AI, standardReference: "IAS 2", displayOrder: 37 }),
+  v("depreciation_method", "Entity & Constitution", "Accounting Policies", "Depreciation Method", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Straight-Line Method (SLM)","Written Down Value (WDV) / Diminishing Balance","Units of Production","Double Declining Balance","Sum-of-Years-Digits","No Fixed Assets"]), aiExtractableFlag: AI, standardReference: "IAS 16", displayOrder: 38 }),
+  v("revenue_recognition_policy", "Entity & Constitution", "Accounting Policies", "Revenue Recognition Policy", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["IFRS 15 — 5-Step Model","Completed Contract Method","Percentage of Completion","At Point of Delivery","Upon Invoice","Subscription / Time-based","Grant / Donor-based"]), aiExtractableFlag: AI, standardReference: "IFRS 15", displayOrder: 39 }),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GROUP 2 — Ownership and Governance
@@ -307,7 +320,7 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("trivial_threshold_percent", "Materiality", "Trivial", "Trivial Threshold %", { dataType: "number", inputMode: "percentage", standardReference: "ISA 450.A2", displayOrder: 8 }),
   v("trivial_threshold_amount", "Materiality", "Trivial", "Trivial Threshold Amount", { dataType: "number", inputMode: "currency", displayOrder: 9 }),
   v("specific_materiality_required", "Materiality", "Specific", "Specific Materiality Required", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 320.10", displayOrder: 10 }),
-  v("specific_materiality_areas", "Materiality", "Specific", "Specific Materiality Areas", { dataType: "textarea", inputMode: "textarea", displayOrder: 11 }),
+  v("specific_materiality_areas", "Materiality", "Specific", "Specific Materiality Areas", { dataType: "text", inputMode: "multi_select", dropdownOptionsJson: dd(["Related Party Transactions","Directors' Remuneration","Compliance with Regulations","Key Audit Matter — Going Concern","Share Capital & Reserves","Tax Disclosures","Segment Information","Capital Commitments","Contingent Liabilities","Post-Balance Sheet Events"]), standardReference: "ISA 320.10", displayOrder: 11 }),
   v("materiality_revision_flag", "Materiality", "Revision", "Materiality Revised", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 320.12", displayOrder: 12 }),
   v("revised_materiality_reason", "Materiality", "Revision", "Revised Materiality Reason", { dataType: "text", inputMode: "textarea", displayOrder: 13 }),
 
@@ -326,10 +339,12 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("tax_risk_flag", "Risk Assessment", "Business Risk", "Tax Risk", { dataType: "boolean", inputMode: "toggle", displayOrder: 10 }),
   v("compliance_risk_flag", "Risk Assessment", "Business Risk", "Compliance Risk", { dataType: "boolean", inputMode: "toggle", displayOrder: 11 }),
   v("going_concern_indicator_count", "Risk Assessment", "Going Concern", "Going Concern Indicator Count", { dataType: "number", inputMode: "number", displayOrder: 12 }),
-  v("significant_risk_areas", "Risk Assessment", "Significant Risks", "Significant Risk Areas", { dataType: "textarea", inputMode: "textarea", mandatoryFlag: M, standardReference: "ISA 315.28", displayOrder: 13 }),
-  v("risk_assessment_summary", "Risk Assessment", "Summary", "Risk Assessment Summary", { dataType: "textarea", inputMode: "textarea", displayOrder: 14 }),
-  v("assertion_level_risk_required", "Risk Assessment", "Assertion Level", "Assertion-Level Risk Required", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 315.26", displayOrder: 15 }),
-  v("account_level_risk_mapping_done", "Risk Assessment", "Assertion Level", "Account-Level Risk Mapping Done", { dataType: "boolean", inputMode: "toggle", displayOrder: 16 }),
+  v("significant_risk_areas", "Risk Assessment", "Significant Risks", "Significant Risk Areas", { dataType: "text", inputMode: "multi_select", dropdownOptionsJson: dd(["Revenue Recognition (ISA 240)","Management Override (ISA 240)","Fraud Risk","Related Party Transactions (ISA 550)","Going Concern (ISA 570)","Inventory Valuation","Trade Receivables — Recoverability","Fixed Assets — Impairment","Tax Liabilities & Contingencies","Loan Covenants / Compliance","Foreign Exchange Exposure","Estimates & Judgments (ISA 540)","Cut-off Risk","Completeness of Liabilities","Regulatory Non-Compliance","IT Systems / Cyber Risk","Consolidation / Group Risk","Litigation & Claims"]), mandatoryFlag: M, standardReference: "ISA 315.28", displayOrder: 13 }),
+  v("fraud_risk_indicators", "Risk Assessment", "Fraud Risk", "Fraud Risk Indicators", { dataType: "text", inputMode: "multi_select", dropdownOptionsJson: dd(["Pressure to Meet Targets","Complex Transactions Near Year-End","Override of Controls","Unusual Related-Party Dealings","Revenue Manipulation Patterns","Excessive Management Estimates","Rapid Growth Inconsistent with Sector","Frequent Restatements","Lack of Segregation of Duties","Cash-intensive Business","Undisclosed Related Parties","Significant Unexplained Variances"]), standardReference: "ISA 240", displayOrder: 14 }),
+  v("going_concern_indicators_list", "Risk Assessment", "Going Concern", "Going Concern Indicators Present", { dataType: "text", inputMode: "multi_select", dropdownOptionsJson: dd(["Recurring Net Losses","Negative Working Capital","Negative Equity","Negative Operating Cash Flows","Loan Defaults / Covenant Breach","Overdue Statutory Liabilities","Loss of Major Customer/Supplier","Regulatory Action / License Revoked","Inability to Raise Finance","Fixed-term Borrowings Due for Repayment","Significant Accumulated Losses","Dependence on Sponsor/Parent Guarantees"]), standardReference: "ISA 570", reviewRequiredFlag: RV, displayOrder: 15 }),
+  v("risk_assessment_summary", "Risk Assessment", "Summary", "Risk Assessment Summary", { dataType: "textarea", inputMode: "textarea", displayOrder: 16 }),
+  v("assertion_level_risk_required", "Risk Assessment", "Assertion Level", "Assertion-Level Risk Required", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 315.26", displayOrder: 17 }),
+  v("account_level_risk_mapping_done", "Risk Assessment", "Assertion Level", "Account-Level Risk Mapping Done", { dataType: "boolean", inputMode: "toggle", displayOrder: 18 }),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GROUP 9 — Internal Controls
@@ -412,6 +427,13 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("notices_received", "Tax & Compliance", "Disputes", "Notices Received", { dataType: "boolean", inputMode: "toggle", aiExtractableFlag: AI, displayOrder: 20 }),
   v("tax_exposure_estimated", "Tax & Compliance", "Disputes", "Tax Exposure Estimated", { dataType: "number", inputMode: "currency", displayOrder: 21 }),
   v("non_compliance_identified", "Tax & Compliance", "Disputes", "Non-Compliance Identified", { dataType: "boolean", inputMode: "toggle", reviewRequiredFlag: RV, displayOrder: 22 }),
+  v("provincial_tax_authority", "Tax & Compliance", "Provincial Tax", "Provincial Tax Authority", { dataType: "text", inputMode: "multi_select", dropdownOptionsJson: dd(["FBR (Federal Board of Revenue)","PRA (Punjab Revenue Authority)","SRB (Sindh Revenue Board)","KPRA (KP Revenue Authority)","BRA (Balochistan Revenue Authority)"]), mandatoryFlag: M, pakistanReference: "Provincial Tax Laws", displayOrder: 23 }),
+  v("applicable_tax_rate", "Tax & Compliance", "Income Tax", "Applicable Corporate Tax Rate (%)", { dataType: "number", inputMode: "percentage", aiExtractableFlag: AI, pakistanReference: "ITO 2001 s.2(b)", displayOrder: 24 }),
+  v("super_tax_applicable", "Tax & Compliance", "Super Tax", "Super Tax Applicable", { dataType: "boolean", inputMode: "toggle", pakistanReference: "ITO 2001 s.4C (Finance Act 2022)", displayOrder: 25 }),
+  v("super_tax_rate", "Tax & Compliance", "Super Tax", "Super Tax Rate (%)", { dataType: "number", inputMode: "percentage", pakistanReference: "ITO 2001 s.4C", displayOrder: 26 }),
+  v("active_taxpayer_status", "Tax & Compliance", "Compliance Status", "Active Taxpayer (ATL) Status", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Active — Income Tax","Active — Sales Tax","Active — Both","Inactive / Suspended","Not Registered"]), aiExtractableFlag: AI, pakistanReference: "FBR ATL", displayOrder: 27 }),
+  v("e_filing_status", "Tax & Compliance", "Compliance Status", "E-Filing Status (FBR)", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Fully E-Filed","Partially E-Filed","Manual Returns Only","Not Filed"]), pakistanReference: "FBR Iris Portal", displayOrder: 28 }),
+  v("audit_procedure_depth", "Tax & Compliance", "Procedure Depth", "Tax Audit Procedure Depth", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Full Substantive Testing","Risk-Based Substantive","Analytical Only","Limited Procedures"]), displayOrder: 29 }),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GROUP 13 — Related Parties
@@ -544,9 +566,31 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("reopen_reason", "Workflow & Sign-offs", "Status", "Reopen Reason", { dataType: "text", inputMode: "textarea", displayOrder: 13 }),
   v("current_stage", "Workflow & Sign-offs", "Progress", "Current Stage", { dataType: "text", inputMode: "status", dropdownOptionsJson: dd(["Upload","Extraction","Variables","Generation","Export","Completed"]), displayOrder: 14 }),
   v("current_substage", "Workflow & Sign-offs", "Progress", "Current Substage", { dataType: "text", inputMode: "text", displayOrder: 15 }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GROUP 21 — Audit Firm & Report Details  ← NEW
+  // ═══════════════════════════════════════════════════════════════════════════
+  v("audit_year", "Audit Firm & Report", "Audit Period", "Audit Year", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["2019","2020","2021","2022","2023","2024","2025","2026","2027"]), mandatoryFlag: M, aiExtractableFlag: AI, displayOrder: 1 }),
+  v("tax_year", "Audit Firm & Report", "Audit Period", "Tax Year (FBR)", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["2019","2020","2021","2022","2023","2024","2025","2026","2027"]), mandatoryFlag: M, pakistanReference: "ITO 2001 s.74", displayOrder: 2 }),
+  v("firm_name", "Audit Firm & Report", "Firm Details", "Audit Firm Name", { dataType: "text", inputMode: "text", mandatoryFlag: M, standardReference: "ISA 700", displayOrder: 3 }),
+  v("firm_icap_registration", "Audit Firm & Report", "Firm Details", "ICAP / ICMAP Registration No.", { dataType: "text", inputMode: "text", mandatoryFlag: M, pakistanReference: "CA Ordinance 1961", displayOrder: 4 }),
+  v("icap_membership_category", "Audit Firm & Report", "Firm Details", "Partner Membership Category", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["FCA (Fellow Chartered Accountant)","ACA (Associate Chartered Accountant)","FCMA (Fellow Cost & Management Accountant)","ACMA (Associate Cost & Management Accountant)"]), mandatoryFlag: M, pakistanReference: "CA Ordinance 1961", displayOrder: 5 }),
+  v("signing_partner_icap_no", "Audit Firm & Report", "Firm Details", "Signing Partner ICAP/ICMAP No.", { dataType: "text", inputMode: "text", mandatoryFlag: M, displayOrder: 6 }),
+  v("signing_city", "Audit Firm & Report", "Report Location", "Signing City", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Karachi","Lahore","Islamabad","Rawalpindi","Peshawar","Quetta","Multan","Faisalabad","Sialkot","Hyderabad","Gujranwala","Abbottabad","Sukkur","Other"]), mandatoryFlag: M, displayOrder: 7 }),
+  v("appointment_nature", "Audit Firm & Report", "Appointment", "Appointment Nature", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["First Appointment","Reappointment (Continuing)","Change of Auditor","Appointed by Court / Regulator"]), mandatoryFlag: M, standardReference: "ISA 510, Companies Act 2017 s.246", displayOrder: 8 }),
+  v("prior_year_audit_opinion", "Audit Firm & Report", "Prior Year", "Prior Year Audit Opinion", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Unmodified (Clean)","Qualified","Adverse","Disclaimer of Opinion","First Year — No Prior Opinion","N/A (Limited Review)"]), mandatoryFlag: M, standardReference: "ISA 510.6", displayOrder: 9 }),
+  v("engagement_letter_date", "Audit Firm & Report", "Appointment", "Engagement Letter Date", { dataType: "date", inputMode: "date", mandatoryFlag: M, standardReference: "ISA 210", displayOrder: 10 }),
+  v("audit_report_title", "Audit Firm & Report", "Report", "Audit Report Title", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Independent Auditor's Report","Independent Auditor's Review Report","Report of the Auditors to the Members","Auditor's Report to the Board of Directors","Special Purpose Audit Report"]), defaultValue: "Independent Auditor's Report", displayOrder: 11 }),
+  v("applicable_isa_standards", "Audit Firm & Report", "Standards", "Applicable Auditing Standards", { dataType: "text", inputMode: "multi_select", dropdownOptionsJson: dd(["ISA 200 — Overall Objectives","ISA 210 — Engagement Terms","ISA 220 — Quality Control","ISA 230 — Documentation","ISA 240 — Fraud","ISA 250 — Laws & Regulations","ISA 260 — Communication","ISA 265 — Deficiencies","ISA 300 — Planning","ISA 315 — Risk Assessment","ISA 320 — Materiality","ISA 330 — Responses to Risks","ISA 402 — Service Organizations","ISA 450 — Misstatements","ISA 500 — Audit Evidence","ISA 501 — Specific Evidence","ISA 505 — Confirmations","ISA 510 — Opening Balances","ISA 520 — Analytical Procedures","ISA 530 — Sampling","ISA 540 — Estimates","ISA 550 — Related Parties","ISA 560 — Subsequent Events","ISA 570 — Going Concern","ISA 580 — Written Representations","ISA 600 — Group Audits","ISA 610 — Internal Audit","ISA 620 — Expert","ISA 700 — Forming Opinion","ISA 701 — KAMs","ISA 705 — Modified Opinions","ISA 706 — Emphasis of Matter","ISA 710 — Comparatives","ISA 720 — Other Information","ISQM 1 — Quality Management","ISRE 2410 — Review Engagements"]), mandatoryFlag: M, standardReference: "ISA 200", displayOrder: 12 }),
+  v("applicable_company_laws_multi", "Audit Firm & Report", "Applicable Laws", "Applicable Laws & Regulations", { dataType: "text", inputMode: "multi_select", dropdownOptionsJson: dd(["Companies Act 2017","Income Tax Ordinance 2001","Sales Tax Act 1990","Federal Excise Act 2005","Companies Ordinance 1984","LLP Act 2017","SECP Regulations","Companies (Audit) Rules 2017","Code of Corporate Governance 2019","Anti-Money Laundering Act 2010","FATF Regulations","Securities Act 2015","PSX Listing Regulations","SBP Prudential Regulations","NEPRA Act","OGRA Ordinance","NGO/NPO Regulations"]), mandatoryFlag: M, displayOrder: 13 }),
+  v("key_audit_matters_list", "Audit Firm & Report", "KAMs", "Key Audit Matter Areas", { dataType: "text", inputMode: "multi_select", dropdownOptionsJson: dd(["Revenue Recognition Complexity","Goodwill Impairment","ECL / Provision for Credit Losses","Fair Value Measurement","Going Concern Assessment","Inventory Valuation","Significant Estimates (ISA 540)","Tax Uncertainties","Related Party Disclosures","Business Combinations / Acquisitions","Pension / Actuarial Estimates","Litigation & Contingencies","COVID-19 / Economic Impact"]), standardReference: "ISA 701", affectsWorkingPapersJson: ["eqcr","reporting"], displayOrder: 14 }),
+  v("audit_file_reference", "Audit Firm & Report", "File Management", "Audit File Reference / Code", { dataType: "text", inputMode: "text", mandatoryFlag: M, standardReference: "ISA 230", displayOrder: 15 }),
+  v("audit_hours_budgeted", "Audit Firm & Report", "Resources", "Budgeted Audit Hours", { dataType: "number", inputMode: "number", displayOrder: 16 }),
+  v("audit_fee_agreed", "Audit Firm & Report", "Resources", "Agreed Audit Fee (PKR)", { dataType: "number", inputMode: "currency", displayOrder: 17 }),
 ];
 
 export const VARIABLE_GROUPS = [
+  "Audit Firm & Report",
   "Entity & Constitution",
   "Ownership & Governance",
   "Engagement Acceptance",
