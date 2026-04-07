@@ -96,6 +96,10 @@ async function getAIClient(): Promise<{ client: OpenAI; model: string } | null> 
       model: "gpt-4o",
     };
   }
+  const directKey = process.env.OPENAI_API_KEY;
+  if (directKey && directKey.length > 10) {
+    return { client: new OpenAI({ apiKey: directKey }), model: "gpt-4o" };
+  }
   try {
     const settingsKeys = ["chatgpt_api_key", "ai_provider", "ai_model", "ai_base_url"];
     const rows = await db.select().from(systemSettingsTable).where(inArray(systemSettingsTable.key, settingsKeys));

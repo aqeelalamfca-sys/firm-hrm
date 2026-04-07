@@ -38,6 +38,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       TOKEN_SECRET: ${JWT_SECRET}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     depends_on:
       ana-db:
         condition: service_healthy

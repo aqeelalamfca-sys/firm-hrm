@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import {
   Upload, FileText, CheckCircle2, AlertTriangle, Lock,
   ChevronRight, ChevronDown, Download, Loader2, Play, Eye, Shield, X, Plus,
-  ArrowLeft, ArrowRight, RefreshCw, AlertCircle, Check, Clock, Settings2,
+  ArrowLeft, ArrowRight, RefreshCw, AlertCircle, Check, Clock, Settings, Settings2,
   FileCheck, Layers, ClipboardCheck, Pencil, Save, Mail, Phone,
   Globe, EyeOff, Calendar, Tag, Sparkles, Bot, Zap,
   Info, AlertOctagon, Calculator, CircleDot,
@@ -123,6 +123,7 @@ export default function WorkingPapers() {
   const [editValue, setEditValue] = useState("");
   const [editReason, setEditReason] = useState("");
   const [showExceptionsPanel, setShowExceptionsPanel] = useState(false);
+  const [showAiSettings, setShowAiSettings] = useState(false);
   const [workbookExtracting, setWorkbookExtracting] = useState(false);
   const [workbookReport, setWorkbookReport] = useState<any>(null);
   const [showWorkbookPanel, setShowWorkbookPanel] = useState(false);
@@ -766,7 +767,13 @@ export default function WorkingPapers() {
         });
       } else {
         const err = await res.json().catch(() => ({}));
-        toast({ title: "AI Fill failed", description: err.error || "Could not fill variables.", variant: "destructive" });
+        const errMsg: string = err.error || "Could not fill variables.";
+        if (res.status === 503 || errMsg.toLowerCase().includes("not configured") || errMsg.toLowerCase().includes("no api key")) {
+          toast({ title: "AI not configured", description: "Open AI Settings to add your API key.", variant: "destructive" });
+          setShowAiSettings(true);
+        } else {
+          toast({ title: "AI Fill failed", description: errMsg, variant: "destructive" });
+        }
       }
     } catch (e: any) {
       toast({ title: "AI Fill failed", description: e?.message || "Network error", variant: "destructive" });
@@ -1698,6 +1705,7 @@ export default function WorkingPapers() {
           onRefreshVariables={() => { fetchVariables(); fetchCoaData(); }}
           onRerun={handleExtractData}
           onAiFill={handleAiFill}
+          onOpenAiSettings={() => setShowAiSettings(true)}
           loading={loading || parseLoading}
           confidenceBadge={confidenceBadge}
           variablesPanel={
@@ -1862,6 +1870,13 @@ export default function WorkingPapers() {
         </div>
       )}
       </div>
+      {showAiSettings && (
+        <AiSettingsModal
+          apiBase={API_BASE}
+          headers={headers}
+          onClose={() => setShowAiSettings(false)}
+        />
+      )}
     </div>
   );
 }
@@ -1870,6 +1885,210 @@ export default function WorkingPapers() {
 // ═══════════════════════════════════════════════════════════════════════════
 // STAGE COMPONENTS
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ── AI Settings Modal ─────────────────────────────────────────────────────────
+function AiSettingsModal({ apiBase, headers, onClose }: { apiBase: string; headers: Record<string, string>; onClose: () => void }) {
+  const { toast } = useToast();
+  const [apiKey, setApiKey] = useState("");
+  const [provider, setProvider] = useState("openai");
+  const [model, setModel] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "testing" | "saved">("idle");
+  const [configured, setConfigured] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch(`${apiBase}/system-settings`, { headers });
+        if (!res.ok) return;
+        const { settings } = await res.json();
+        const get = (key: string) => settings.find((s: any) => s.key === key);
+        const keyRow = get("chatgpt_api_key");
+        const provRow = get("ai_provider");
+        const modRow = get("ai_model");
+        const urlRow = get("ai_base_url");
+        setConfigured(keyRow ? keyRow.configured === true : false);
+        if (provRow?.value) setProvider(provRow.value);
+        if (modRow?.value) setModel(modRow.value);
+        if (urlRow?.value) setBaseUrl(urlRow.value);
+      } catch {}
+    };
+    load();
+  }, [apiBase]);
+
+  const upsert = async (key: string, value: string, description: string) => {
+    await fetch(`${apiBase}/system-settings/${key}`, {
+      method: "PUT",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ value, description }),
+    });
+  };
+
+  const handleSave = async () => {
+    setStatus("loading");
+    try {
+      if (apiKey.trim().length > 0) {
+        await upsert("chatgpt_api_key", apiKey.trim(), "AI provider API key");
+      }
+      await upsert("ai_provider", provider, "AI provider (openai/anthropic/google/deepseek/custom)");
+      if (model.trim()) await upsert("ai_model", model.trim(), "AI model name");
+      if (baseUrl.trim()) await upsert("ai_base_url", baseUrl.trim(), "Custom AI base URL");
+      setConfigured(apiKey.trim().length > 0 || configured === true);
+      setApiKey("");
+      setStatus("saved");
+      toast({ title: "AI settings saved", description: "API key configured successfully." });
+    } catch {
+      toast({ title: "Save failed", description: "Could not save settings. Please try again.", variant: "destructive" });
+      setStatus("idle");
+    }
+  };
+
+  const handleTest = async () => {
+    setStatus("testing");
+    try {
+      const res = await fetch(`${apiBase}/system-settings/test-api-key`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast({ title: "Connection successful", description: data.message });
+      } else {
+        toast({ title: "Connection failed", description: data.error || "Could not connect to AI provider.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Connection failed", description: "Network error. Please try again.", variant: "destructive" });
+    } finally {
+      setStatus("idle");
+    }
+  };
+
+  const PROVIDERS = [
+    { value: "openai", label: "OpenAI (GPT-4o, GPT-4 etc.)" },
+    { value: "anthropic", label: "Anthropic (Claude)" },
+    { value: "google", label: "Google (Gemini)" },
+    { value: "deepseek", label: "DeepSeek" },
+    { value: "custom", label: "Custom / Self-hosted" },
+  ];
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center">
+              <Settings className="w-4 h-4 text-violet-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-900 text-sm">AI Provider Settings</p>
+              <p className="text-[11px] text-slate-400">Configure your API key for AI Fill</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {/* Status banner */}
+          <div className={cn("flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border",
+            configured === true
+              ? "bg-green-50 border-green-200 text-green-700"
+              : configured === false
+              ? "bg-amber-50 border-amber-200 text-amber-700"
+              : "bg-slate-50 border-slate-200 text-slate-500"
+          )}>
+            {configured === true
+              ? <><CheckCircle2 className="w-3.5 h-3.5" /> API key is configured — AI Fill is ready</>
+              : configured === false
+              ? <><AlertTriangle className="w-3.5 h-3.5" /> No API key set — AI Fill will fail until configured</>
+              : <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking configuration…</>
+            }
+          </div>
+
+          {/* Provider select */}
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">Provider</label>
+            <select
+              value={provider}
+              onChange={e => setProvider(e.target.value)}
+              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
+            >
+              {PROVIDERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+          </div>
+
+          {/* API Key */}
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+              API Key {configured === true && <span className="text-green-600 font-normal">(currently configured — leave blank to keep existing)</span>}
+            </label>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+              placeholder={configured === true ? "••••••••••••••••••••••••" : "sk-... or your provider key"}
+              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 font-mono focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
+            />
+          </div>
+
+          {/* Model (optional) */}
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">Model <span className="text-slate-400 font-normal">(optional — uses provider default if blank)</span></label>
+            <input
+              type="text"
+              value={model}
+              onChange={e => setModel(e.target.value)}
+              placeholder="e.g. gpt-4o, claude-sonnet-4-20250514"
+              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
+            />
+          </div>
+
+          {/* Base URL for custom */}
+          {provider === "custom" && (
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">Base URL <span className="text-slate-400 font-normal">(must be HTTPS)</span></label>
+              <input
+                type="url"
+                value={baseUrl}
+                onChange={e => setBaseUrl(e.target.value)}
+                placeholder="https://your-provider.com/v1"
+                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
+              />
+            </div>
+          )}
+
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            Your API key is stored securely in the application database. It is never logged or exposed. Get a key from <span className="text-violet-600">platform.openai.com/api-keys</span> or your provider's dashboard.
+          </p>
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTest}
+            disabled={status === "loading" || status === "testing"}
+            className="text-xs h-8"
+          >
+            {status === "testing" ? <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Testing…</> : <><Zap className="w-3 h-3 mr-1" /> Test Connection</>}
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={onClose} className="text-xs h-8">Cancel</Button>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={status === "loading" || status === "testing"}
+              className="text-xs h-8 bg-violet-600 hover:bg-violet-700"
+            >
+              {status === "loading" ? <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Saving…</> : <><Save className="w-3 h-3 mr-1" /> Save Settings</>}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
 
 // ── Workbook Pipeline Panel ───────────────────────────────────────────────────
 function WorkbookPipelinePanel({ onExtract, extracting, report, onClose }: any) {
@@ -2748,7 +2967,7 @@ function TemplateParsedPanel({ result, onClear }: { result: any; onClear: () => 
   );
 }
 
-function ExtractionStage({ data, session, onRefreshVariables, onRerun, onAiFill, loading, confidenceBadge, variablesPanel }: any) {
+function ExtractionStage({ data, session, onRefreshVariables, onRerun, onAiFill, onOpenAiSettings, loading, confidenceBadge, variablesPanel }: any) {
   const extractionData = data?.data || session?.extractionData;
   const stats = data?.stats;
   const [showRawResults, setShowRawResults] = useState(false);
@@ -2795,6 +3014,15 @@ function ExtractionStage({ data, session, onRefreshVariables, onRerun, onAiFill,
               ? <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Filling…</>
               : <><Sparkles className="w-3 h-3 mr-1" /> AI Filled</>
             }
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-slate-400 hover:text-violet-600"
+            onClick={onOpenAiSettings}
+            title="Configure AI provider and API key"
+          >
+            <Settings className="w-3.5 h-3.5" />
           </Button>
         </div>
       </div>
