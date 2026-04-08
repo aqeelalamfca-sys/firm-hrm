@@ -6540,7 +6540,14 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
               <h2 className="font-semibold text-slate-900 flex items-center gap-2">
                 <Layers className="w-5 h-5 text-orange-600" /> Audit Head Generation
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">Generate → Review → Approve → Export</p>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <p className="text-xs text-slate-500">Generate → Review → Approve → Export</p>
+                {session?.entityType && (
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
+                    {session.entityType}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2 self-start flex-wrap">
               <Button variant="outline" size="sm" onClick={onRefresh} className="h-8">
@@ -6639,9 +6646,14 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
                       </span>
                     </div>
                     <div className="flex items-center gap-2 sm:gap-3 mt-0.5 flex-wrap">
+                      {head.papersIncluded && (
+                        <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                          <FileText className="w-3 h-3" /> {(head.papersIncluded as string[]).length} WPs
+                        </span>
+                      )}
                       {head.outputType && (
                         <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                          <FileText className="w-3 h-3" /> {head.outputType.toUpperCase()}
+                          {head.outputType.toUpperCase()}
                         </span>
                       )}
                       {head.generatedAt && (

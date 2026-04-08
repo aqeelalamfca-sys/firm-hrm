@@ -51,19 +51,41 @@ const upload = multer({
 const AUDIT_HEADS = [
   { index: 0, name: "Trial Balance", outputType: "excel", papers: ["TB-Master", "TB-Mapping", "TB-VS-FS-Recon"] },
   { index: 1, name: "General Ledger", outputType: "excel", papers: ["GL-Summary", "GL-Detail", "Lead-Schedules", "Account-Mapping"] },
-  { index: 2, name: "Pre-Planning", outputType: "word", papers: ["PP-01", "PP-02", "PP-03", "PP-04", "PP-05", "PP-06", "PP-07"] },
+  { index: 2, name: "Pre-Planning", outputType: "word", papers: ["PP-01", "PP-02", "PP-03", "PP-04", "PP-05", "PP-06", "PP-07", "PP-08", "PP-09", "PP-10", "PP-11", "PP-12", "PP-13"] },
   { index: 3, name: "Data Intake", outputType: "word+excel", papers: ["DI-01", "DI-04", "DI-05", "DI-06", "DI-07", "DI-08", "DI-09", "DI-10", "DI-11", "DI-12", "DI-13"] },
   { index: 4, name: "Information Requisition", outputType: "word", papers: ["IR-01", "IR-02", "IR-03", "IR-04", "IR-05", "IR-06"] },
-  { index: 5, name: "OB Verification", outputType: "word+excel", papers: ["OB-01", "OB-02", "OB-03", "OB-04"] },
-  { index: 6, name: "Planning", outputType: "word", papers: ["PL-01", "PL-02", "PL-03", "PL-04", "PL-05", "PL-06", "PL-07", "PL-08", "PL-09", "PL-10", "PL-11"] },
-  { index: 7, name: "Execution", outputType: "word+excel", papers: ["EX-01", "EX-02", "EX-03", "EX-BS-01", "EX-BS-02", "EX-BS-03", "EX-BS-04", "EX-BS-05", "EX-BS-06", "EX-PL-01", "EX-PL-02", "EX-04", "FH-01"] },
-  { index: 8, name: "Evidence & Finalization", outputType: "word", papers: ["EV-01", "EV-02", "EV-03", "FN-01", "FN-02", "FN-03", "FN-04", "FN-05", "FN-06"] },
-  { index: 9, name: "Deliverables", outputType: "word+pdf", papers: ["DL-01", "DL-02"] },
+  { index: 5, name: "OB Verification", outputType: "word+excel", papers: ["OB-01", "OB-02", "OB-03", "OB-04", "M6", "M7"] },
+  { index: 6, name: "Planning", outputType: "word", papers: [
+    "PL-01", "PL-02", "PL-03", "PL-04", "PL-05", "PL-06", "PL-07", "PL-08", "PL-09", "PL-10", "PL-11",
+    "PL-12", "PL-13", "PL-14", "PL-15", "PL-16", "PL-17", "PL-18",
+    "PL-19", "PL-20", "PL-21", "PL-22", "PL-23", "PL-24",
+    "M1", "M2",
+  ] },
+  { index: 7, name: "Execution", outputType: "word+excel", papers: [
+    "EX-01", "EX-02", "EX-03",
+    "EX-BS-01", "EX-BS-02", "EX-BS-03", "EX-BS-04", "EX-BS-05", "EX-BS-06",
+    "EX-BS-07", "EX-BS-08", "EX-BS-09", "EX-BS-10",
+    "EX-BS-11", "EX-BS-12", "EX-BS-13",
+    "EX-PL-01", "EX-PL-02", "EX-PL-03", "EX-PL-04",
+    "EX-04", "FH-01",
+    "EX-IC-01", "EX-IC-02",
+    "EX-EST-01", "EX-EST-02",
+    "M3", "M4", "M5", "M8",
+    "M10", "M11", "M12", "M13", "M14", "M15", "M16",
+  ] },
+  { index: 8, name: "Evidence & Finalization", outputType: "word", papers: [
+    "EV-01", "EV-02", "EV-03",
+    "FN-01", "FN-02", "FN-03", "FN-04", "FN-05", "FN-06",
+    "FN-07", "FN-08", "FN-09", "FN-10", "FN-11", "FN-12",
+    "M9",
+  ] },
+  { index: 9, name: "Deliverables", outputType: "word+pdf", papers: ["DL-01", "DL-02", "DL-03", "DL-04", "DL-05", "DL-06", "DL-07"] },
   { index: 10, name: "QR (EQCR)", outputType: "word", papers: ["QR-01", "QR-02", "QR-03", "QR-04"] },
   { index: 11, name: "Inspection", outputType: "word", papers: ["IN-01", "IN-02", "IN-03", "IN-04"] },
 ];
 
-const WP_METADATA: Record<string, { name: string; isa: string; phase: string; riskLevel: string; assertions: string; fsArea: string }> = {
+type WpMeta = { name: string; isa: string; phase: string; riskLevel: string; assertions: string; fsArea: string; applicableTo?: string[] };
+const WP_METADATA: Record<string, WpMeta> = {
   "PP-01": { name: "Engagement Setup", isa: "ISA 210, ISA 220, ISA 300, ISA 315", phase: "Pre-Planning", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
   "PP-02": { name: "Entity Understanding", isa: "ISA 315", phase: "Pre-Planning", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
   "PP-03": { name: "Ethics & Independence", isa: "ISA 220, ISQM 1, ICAP Code of Ethics", phase: "Pre-Planning", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
@@ -71,6 +93,12 @@ const WP_METADATA: Record<string, { name: string; isa: string; phase: string; ri
   "PP-05": { name: "Engagement Letter", isa: "ISA 210", phase: "Pre-Planning", riskLevel: "Low", assertions: "N/A", fsArea: "Engagement Level" },
   "PP-06": { name: "Completion & Sign-off", isa: "ISA 300", phase: "Pre-Planning", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
   "PP-07": { name: "Phase Summary", isa: "ISA 300, ISA 230", phase: "Pre-Planning", riskLevel: "Low", assertions: "N/A", fsArea: "Engagement Level" },
+  "PP-08": { name: "Client Acceptance Checklist", isa: "ISA 210, ISA 220, ISQM 1", phase: "Pre-Planning", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "PP-09": { name: "Independence Confirmation", isa: "ISA 220, ISQM 1, ICAP Code of Ethics", phase: "Pre-Planning", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "PP-10": { name: "Engagement Team Appointment & Briefing", isa: "ISA 220, ISA 300", phase: "Pre-Planning", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
+  "PP-11": { name: "Initial Planning Meeting Minutes", isa: "ISA 300, ISA 315", phase: "Pre-Planning", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
+  "PP-12": { name: "Understanding of Company Type Mapping", isa: "ISA 315, Companies Act 2017", phase: "Pre-Planning", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
+  "PP-13": { name: "Applicable Regulatory Framework Mapping", isa: "ISA 250, ISA 315", phase: "Pre-Planning", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
   "DI-01": { name: "Upload & Data Intake", isa: "ISA 500", phase: "Data Intake", riskLevel: "Medium", assertions: "C, E", fsArea: "All FS Areas" },
   "DI-04": { name: "FS Mapping", isa: "ISA 315, ISA 200", phase: "Data Intake", riskLevel: "Medium", assertions: "C, E, A, V", fsArea: "All FS Areas" },
   "DI-05": { name: "Analytical Review", isa: "ISA 520", phase: "Data Intake", riskLevel: "High", assertions: "C, E, A, V, R", fsArea: "All FS Areas" },
@@ -103,19 +131,61 @@ const WP_METADATA: Record<string, { name: string; isa: string; phase: string; ri
   "PL-09": { name: "Specialized Areas", isa: "ISA 550, ISA 540, ISA 600, ISA 620", phase: "Planning", riskLevel: "High", assertions: "C, E, A, V", fsArea: "Estimates, Related Parties, Group" },
   "PL-10": { name: "TCWG Communication", isa: "ISA 260, ISA 265", phase: "Planning", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
   "PL-11": { name: "Quality Control", isa: "ISA 220, ISQM 1", phase: "Planning", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "PL-12": { name: "PSX / GEM Board Listing Compliance Planning", isa: "ISA 250, PSX Regulations", phase: "Planning", riskLevel: "High", assertions: "C, R", fsArea: "Engagement Level", applicableTo: ["listed", "gem"] },
+  "PL-13": { name: "Code of Corporate Governance (CCG) 2019 Compliance Plan", isa: "ISA 250, CCG 2019", phase: "Planning", riskLevel: "High", assertions: "C, R", fsArea: "Engagement Level", applicableTo: ["listed"] },
+  "PL-14": { name: "Single Member Company Specific Considerations", isa: "ISA 315, Companies Act 2017 s.2(1)(58A)", phase: "Planning", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level", applicableTo: ["smc"] },
+  "PL-15": { name: "SBP Prudential Regulations Compliance Plan", isa: "ISA 250, SBP PRs", phase: "Planning", riskLevel: "High", assertions: "C, R", fsArea: "All FS Areas", applicableTo: ["bank", "islamic_bank"] },
+  "PL-16": { name: "SECP NBFC / Leasing / Modaraba Compliance Plan", isa: "ISA 250, NBFC Rules 2003", phase: "Planning", riskLevel: "High", assertions: "C, R", fsArea: "All FS Areas", applicableTo: ["modaraba", "leasing"] },
+  "PL-17": { name: "SECP Insurance Rules Compliance Plan", isa: "ISA 250, Insurance Rules 2017", phase: "Planning", riskLevel: "High", assertions: "C, R", fsArea: "All FS Areas", applicableTo: ["insurance"] },
+  "PL-18": { name: "Partnership Act 1932 Compliance Plan", isa: "ISA 250, Partnership Act 1932", phase: "Planning", riskLevel: "Medium", assertions: "C, R", fsArea: "Engagement Level", applicableTo: ["aop"] },
+  "PL-19": { name: "PSX / SECP Whistleblower & Vigilance Mechanism Review", isa: "ISA 250, PSX Regulations Ch.5", phase: "Planning", riskLevel: "High", assertions: "C", fsArea: "Compliance", applicableTo: ["listed"] },
+  "PL-20": { name: "Dividend Distribution Risk Assessment", isa: "ISA 250, Companies Act 2017 s.83", phase: "Planning", riskLevel: "High", assertions: "V, R", fsArea: "Equity", applicableTo: ["listed", "pvt"] },
+  "PL-21": { name: "SBP Banking Regulatory Compliance Risk", isa: "ISA 250, SBP PRs, BPRD", phase: "Planning", riskLevel: "High", assertions: "C, E, V", fsArea: "All FS Areas", applicableTo: ["bank", "islamic_bank"] },
+  "PL-22": { name: "SECP NBFC / Leasing / Modaraba Regulatory Risk", isa: "ISA 250, NBFC Rules", phase: "Planning", riskLevel: "High", assertions: "C, V", fsArea: "All FS Areas", applicableTo: ["modaraba", "leasing"] },
+  "PL-23": { name: "Insurance Compliance Risk Assessment", isa: "ISA 250, Insurance Ordinance 2000", phase: "Planning", riskLevel: "High", assertions: "C, V", fsArea: "All FS Areas", applicableTo: ["insurance"] },
+  "PL-24": { name: "Partnership / AOP Unlimited Liability Risk", isa: "ISA 250, Partnership Act 1932", phase: "Planning", riskLevel: "Medium", assertions: "C, E", fsArea: "Liabilities", applicableTo: ["aop"] },
   "EX-01": { name: "Planning Prerequisites", isa: "ISA 300, ISA 330", phase: "Execution", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
   "EX-02": { name: "ISA Compliance Status", isa: "ISA 200, ISA 500, ISA 330", phase: "Execution", riskLevel: "High", assertions: "C, E, A, V, R, P", fsArea: "All FS Areas" },
   "EX-03": { name: "FS Head Working Papers Summary", isa: "ISA 330, ISA 500, ISA 501", phase: "Execution", riskLevel: "High", assertions: "C, E, A, V, R, P", fsArea: "All FS Areas" },
-  "EX-BS-01": { name: "FS Head: Cash and Bank Balances", isa: "ISA 330, ISA 500, ISA 501, ISA 505", phase: "Execution", riskLevel: "High", assertions: "E, A, V", fsArea: "Cash & Bank" },
-  "EX-BS-02": { name: "FS Head: Inventories", isa: "ISA 330, ISA 500, ISA 501", phase: "Execution", riskLevel: "High", assertions: "E, C, V, R", fsArea: "Inventories" },
-  "EX-BS-03": { name: "FS Head: Long Term Borrowings", isa: "ISA 330, ISA 500, ISA 501", phase: "Execution", riskLevel: "High", assertions: "C, E, A, V", fsArea: "Long Term Borrowings" },
-  "EX-BS-04": { name: "FS Head: Property, Plant and Equipment", isa: "ISA 330, ISA 500, ISA 501", phase: "Execution", riskLevel: "High", assertions: "E, C, A, V, R", fsArea: "PPE" },
-  "EX-BS-05": { name: "FS Head: Trade Receivables", isa: "ISA 330, ISA 500, ISA 505", phase: "Execution", riskLevel: "High", assertions: "E, C, A, V, R", fsArea: "Trade Receivables" },
-  "EX-BS-06": { name: "FS Head: Trade and Other Payables", isa: "ISA 330, ISA 500, ISA 501", phase: "Execution", riskLevel: "High", assertions: "C, E, A, V", fsArea: "Trade Payables" },
-  "EX-PL-01": { name: "FS Head: Cost of Sales", isa: "ISA 330, ISA 500, ISA 501", phase: "Execution", riskLevel: "High", assertions: "C, E, A, V", fsArea: "Cost of Sales" },
-  "EX-PL-02": { name: "FS Head: Revenue", isa: "ISA 330, ISA 500, ISA 240", phase: "Execution", riskLevel: "Significant", assertions: "C, E, A, V, R, P", fsArea: "Revenue" },
+  "EX-BS-01": { name: "Cash and Bank – Confirmation & Reconciliation", isa: "ISA 330, ISA 500, ISA 501, ISA 505", phase: "Execution", riskLevel: "High", assertions: "E, A, V", fsArea: "Cash & Bank" },
+  "EX-BS-02": { name: "Inventory – Physical Count & Valuation", isa: "ISA 330, ISA 500, ISA 501", phase: "Execution", riskLevel: "High", assertions: "E, C, V, R", fsArea: "Inventories" },
+  "EX-BS-03": { name: "Borrowings & Loans – Confirmation", isa: "ISA 330, ISA 500, ISA 501", phase: "Execution", riskLevel: "High", assertions: "C, E, A, V", fsArea: "Long Term Borrowings" },
+  "EX-BS-04": { name: "PPE – Roll-Forward & Depreciation Test", isa: "ISA 330, ISA 500, ISA 501", phase: "Execution", riskLevel: "High", assertions: "E, C, A, V, R", fsArea: "PPE" },
+  "EX-BS-05": { name: "Trade Receivables – Confirmation & Aging", isa: "ISA 330, ISA 500, ISA 505", phase: "Execution", riskLevel: "High", assertions: "E, C, A, V, R", fsArea: "Trade Receivables" },
+  "EX-BS-06": { name: "Trade and Other Payables – Confirmation & Reconciliation", isa: "ISA 330, ISA 500, ISA 501", phase: "Execution", riskLevel: "High", assertions: "C, E, A, V", fsArea: "Trade Payables" },
+  "EX-BS-07": { name: "Biological Assets & Agriculture", isa: "ISA 330, ISA 500, IAS 41", phase: "Execution", riskLevel: "High", assertions: "E, V", fsArea: "Biological Assets", applicableTo: ["construction"] },
+  "EX-BS-08": { name: "Islamic Financing Assets (Murabaha / Ijarah / Diminishing Musharaka)", isa: "ISA 330, ISA 500, AAOIFI", phase: "Execution", riskLevel: "High", assertions: "E, V, C", fsArea: "Islamic Finance Assets", applicableTo: ["islamic_bank"] },
+  "EX-BS-09": { name: "Leasing Assets (Ijarah Muntahia Bittamleek)", isa: "ISA 330, ISA 500, IFRS 16", phase: "Execution", riskLevel: "High", assertions: "E, V, C", fsArea: "Leasing Assets", applicableTo: ["leasing"] },
+  "EX-BS-10": { name: "Modaraba Specific Assets (Certificates / Sukuk / Mudaraba Funds)", isa: "ISA 330, ISA 500, Modaraba Rules", phase: "Execution", riskLevel: "High", assertions: "E, V", fsArea: "Modaraba Assets", applicableTo: ["modaraba"] },
+  "EX-BS-11": { name: "Certificates of Investment / Sukuk Liabilities", isa: "ISA 330, ISA 500, AAOIFI", phase: "Execution", riskLevel: "High", assertions: "C, E, V", fsArea: "Islamic Liabilities", applicableTo: ["modaraba", "islamic_bank"] },
+  "EX-BS-12": { name: "Insurance Policyholder Liabilities / Unearned Premium Reserve", isa: "ISA 330, ISA 540, IFRS 17", phase: "Execution", riskLevel: "High", assertions: "C, V, E", fsArea: "Insurance Liabilities", applicableTo: ["insurance"] },
+  "EX-BS-13": { name: "Bank Customer Deposits / Current Accounts (SBP Prudential)", isa: "ISA 330, ISA 500, SBP PRs", phase: "Execution", riskLevel: "High", assertions: "C, E, V", fsArea: "Deposits", applicableTo: ["bank", "islamic_bank"] },
+  "EX-PL-01": { name: "Cost of Sales & Inventory Movement", isa: "ISA 330, ISA 500, ISA 501", phase: "Execution", riskLevel: "High", assertions: "C, E, A, V", fsArea: "Cost of Sales" },
+  "EX-PL-02": { name: "Revenue Testing (IFRS 15)", isa: "ISA 330, ISA 500, ISA 240", phase: "Execution", riskLevel: "Significant", assertions: "C, E, A, V, R, P", fsArea: "Revenue" },
+  "EX-PL-03": { name: "Islamic Bank Income (Murabaha / Ijarah / Musharaka) Testing", isa: "ISA 330, ISA 500, AAOIFI", phase: "Execution", riskLevel: "High", assertions: "C, E, V", fsArea: "Islamic Income", applicableTo: ["islamic_bank"] },
+  "EX-PL-04": { name: "Insurance Premium Revenue / Claims Expense Testing", isa: "ISA 330, ISA 500, IFRS 17", phase: "Execution", riskLevel: "High", assertions: "C, E, V, R", fsArea: "Insurance Revenue", applicableTo: ["insurance"] },
   "EX-04": { name: "Journal Entry Testing", isa: "ISA 240, ISA 330", phase: "Execution", riskLevel: "Significant", assertions: "C, E, A, V", fsArea: "All FS Areas" },
   "FH-01": { name: "FS Heads – Execution Summary", isa: "ISA 330, ISA 500, ISA 501", phase: "FS Heads", riskLevel: "High", assertions: "C, E, A, V, R, P", fsArea: "All FS Areas" },
+  "EX-IC-01": { name: "PSX Mandatory Internal Audit Function Review (CCG 2019)", isa: "ISA 610, CCG 2019", phase: "Execution", riskLevel: "High", assertions: "N/A", fsArea: "Internal Controls", applicableTo: ["listed"] },
+  "EX-IC-02": { name: "SMC Director-Manager Segregation of Duties Assessment", isa: "ISA 315, Companies Act 2017 s.2(1)(58A)", phase: "Execution", riskLevel: "Medium", assertions: "N/A", fsArea: "Internal Controls", applicableTo: ["smc"] },
+  "EX-EST-01": { name: "Insurance Actuarial Reserves (Life / Non-Life) Review", isa: "ISA 540, ISA 620, IFRS 17", phase: "Execution", riskLevel: "High", assertions: "V, E", fsArea: "Insurance Estimates", applicableTo: ["insurance"] },
+  "EX-EST-02": { name: "Modaraba Management Fee & Profit Distribution Estimate", isa: "ISA 540, Modaraba Rules", phase: "Execution", riskLevel: "High", assertions: "V, C", fsArea: "Modaraba Estimates", applicableTo: ["modaraba"] },
+  "M1": { name: "Group Audit Instructions (ISA 600)", isa: "ISA 600", phase: "Planning", riskLevel: "High", assertions: "C, E, V", fsArea: "Group Audit", applicableTo: ["listed", "bank", "insurance"] },
+  "M2": { name: "Component Auditor Review", isa: "ISA 600", phase: "Planning", riskLevel: "High", assertions: "C, E, V", fsArea: "Group Audit", applicableTo: ["listed", "bank", "insurance"] },
+  "M3": { name: "Using the Work of Internal Audit (ISA 610)", isa: "ISA 610", phase: "Execution", riskLevel: "Medium", assertions: "N/A", fsArea: "Internal Audit", applicableTo: ["listed", "bank", "insurance"] },
+  "M4": { name: "Using an Auditor's Expert (ISA 620)", isa: "ISA 620", phase: "Execution", riskLevel: "High", assertions: "V", fsArea: "Expert Reliance", applicableTo: ["bank", "insurance", "modaraba"] },
+  "M5": { name: "Service Organization / SOC Review (ISA 402)", isa: "ISA 402", phase: "Execution", riskLevel: "Medium", assertions: "C, E", fsArea: "IT / Outsourced" },
+  "M6": { name: "Opening Balances Review (ISA 510)", isa: "ISA 510", phase: "OB Verification", riskLevel: "High", assertions: "C, E, A", fsArea: "All Balance Sheet Items" },
+  "M7": { name: "First-Year Audit Transition Memo", isa: "ISA 510, ISA 300", phase: "OB Verification", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "M8": { name: "Interim Review Procedures", isa: "ISA 330, ISRE 2410", phase: "Execution", riskLevel: "Medium", assertions: "C, E, V", fsArea: "All FS Areas" },
+  "M9": { name: "Consolidation / Combined FS Review", isa: "ISA 600, IFRS 10", phase: "Finalization", riskLevel: "High", assertions: "C, E, V, P", fsArea: "Consolidated FS", applicableTo: ["listed", "bank"] },
+  "M10": { name: "Donor / Grant / NGO Compliance WP", isa: "ISA 250, NGO Rules", phase: "Execution", riskLevel: "High", assertions: "C, R", fsArea: "Grant Compliance", applicableTo: ["ngo"] },
+  "M11": { name: "Public Sector / IPSAS Adjustments WP", isa: "ISA 250, IPSAS", phase: "Execution", riskLevel: "High", assertions: "C, V, R", fsArea: "Public Sector", applicableTo: ["public_sector"] },
+  "M12": { name: "Construction / Long-term Contracts WP", isa: "ISA 330, IFRS 15.35", phase: "Execution", riskLevel: "High", assertions: "C, E, V, R", fsArea: "Revenue / WIP", applicableTo: ["construction"] },
+  "M13": { name: "Capital Adequacy (CAR) & SBP Liquidity Ratios Testing", isa: "ISA 250, SBP PRs, Basel III", phase: "Execution", riskLevel: "High", assertions: "V, C", fsArea: "Regulatory Capital", applicableTo: ["bank", "islamic_bank", "insurance"] },
+  "M14": { name: "Solvency & Statutory Fund Testing (SECP Insurance)", isa: "ISA 250, Insurance Ordinance 2000", phase: "Execution", riskLevel: "High", assertions: "V, C", fsArea: "Solvency", applicableTo: ["insurance"] },
+  "M15": { name: "Modaraba Management Fee & Profit Distribution Schedule", isa: "ISA 540, Modaraba Companies Rules", phase: "Execution", riskLevel: "High", assertions: "V, C, R", fsArea: "Modaraba Distribution", applicableTo: ["modaraba"] },
+  "M16": { name: "Simplified Materiality & Reduced Disclosure Framework", isa: "ISA 320, IFRS for SMEs", phase: "Execution", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level", applicableTo: ["gem", "sme"] },
   "EV-01": { name: "Evidence – Documents", isa: "ISA 500, ISA 230", phase: "Evidence", riskLevel: "High", assertions: "C, E, V", fsArea: "All FS Areas" },
   "EV-02": { name: "Evidence – ISA 230 Checklist", isa: "ISA 230", phase: "Evidence", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
   "EV-03": { name: "Evidence – Stats & Links", isa: "ISA 500, ISA 330", phase: "Evidence", riskLevel: "Medium", assertions: "C, E, V", fsArea: "All FS Areas" },
@@ -125,8 +195,19 @@ const WP_METADATA: Record<string, { name: string; isa: string; phase: string; ri
   "FN-04": { name: "Finalization – Completion Checklist", isa: "ISA 500, ISA 580, ISA 220", phase: "Finalization", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
   "FN-05": { name: "Finalization – Audit Summary Memorandum", isa: "ISA 700, ISA 220", phase: "Finalization", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
   "FN-06": { name: "Finalization – Notes & Disclosures", isa: "ISA 700, ISA 720", phase: "Finalization", riskLevel: "High", assertions: "P, R", fsArea: "Financial Statements" },
+  "FN-07": { name: "PSX Listing Regulations Compliance (Ch. 5, 7, 9, 13)", isa: "ISA 250, PSX Regulations", phase: "Finalization", riskLevel: "High", assertions: "C, R", fsArea: "Compliance", applicableTo: ["listed"] },
+  "FN-08": { name: "SBP Prudential Regulations for Banks / DFIs", isa: "ISA 250, SBP PRs", phase: "Finalization", riskLevel: "High", assertions: "C, V", fsArea: "Regulatory Compliance", applicableTo: ["bank", "islamic_bank"] },
+  "FN-09": { name: "SECP NBFC / Leasing / Modaraba Regulations", isa: "ISA 250, NBFC Rules 2003", phase: "Finalization", riskLevel: "High", assertions: "C, V", fsArea: "Regulatory Compliance", applicableTo: ["modaraba", "leasing"] },
+  "FN-10": { name: "SECP Insurance Rules 2017", isa: "ISA 250, Insurance Rules 2017", phase: "Finalization", riskLevel: "High", assertions: "C, V", fsArea: "Regulatory Compliance", applicableTo: ["insurance"] },
+  "FN-11": { name: "GEM Board Listing Conditions & Continuous Compliance", isa: "ISA 250, GEM Board Rules", phase: "Finalization", riskLevel: "Medium", assertions: "C, R", fsArea: "Compliance", applicableTo: ["gem"] },
+  "FN-12": { name: "Partnership Act 1932 Compliance", isa: "ISA 250, Partnership Act 1932", phase: "Finalization", riskLevel: "Medium", assertions: "C", fsArea: "Compliance", applicableTo: ["aop"] },
   "DL-01": { name: "Deliverables – Auditor's Report", isa: "ISA 700, ISA 705, ISA 706", phase: "Deliverables", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
   "DL-02": { name: "Deliverables – Export Package", isa: "ISA 230", phase: "Deliverables", riskLevel: "Low", assertions: "N/A", fsArea: "Engagement Level" },
+  "DL-03": { name: "Management Representation Letter", isa: "ISA 580", phase: "Deliverables", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "DL-04": { name: "SMC Member Representation Letter (Single Person)", isa: "ISA 580, Companies Act 2017", phase: "Deliverables", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level", applicableTo: ["smc"] },
+  "DL-05": { name: "Partnership / AOP Representation from All Partners", isa: "ISA 580, Partnership Act 1932", phase: "Deliverables", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level", applicableTo: ["aop"] },
+  "DL-06": { name: "Draft Audit Report (Unmodified / Modified)", isa: "ISA 700, ISA 705, ISA 706", phase: "Deliverables", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "DL-07": { name: "PSX / SECP Specified Audit Report Format", isa: "ISA 700, PSX Regulations", phase: "Deliverables", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level", applicableTo: ["listed"] },
   "QR-01": { name: "EQCR Checklist", isa: "ISA 220, ISQM 2", phase: "QR (EQCR)", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
   "QR-02": { name: "EQCR – AI Summary", isa: "ISA 220", phase: "QR (EQCR)", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
   "QR-03": { name: "EQCR – Partner Comments", isa: "ISA 220, ISQM 2", phase: "QR (EQCR)", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
@@ -136,6 +217,39 @@ const WP_METADATA: Record<string, { name: string; isa: string; phase: string; ri
   "IN-03": { name: "Inspection – Phase Completion Summary", isa: "ISQM 1", phase: "Inspection", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
   "IN-04": { name: "Inspection – Risk & Audit Matters", isa: "ISA 315, ISA 330, ISQM 1", phase: "Inspection", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
 };
+
+function entityTypeToTags(entityType: string | null | undefined): string[] {
+  const et = (entityType || "").toLowerCase();
+  const tags: string[] = [];
+  if (et.includes("listed") && !et.includes("unlisted")) tags.push("listed");
+  if (et.includes("gem")) tags.push("gem");
+  if (et.includes("single member") || et.includes("smc")) tags.push("smc");
+  if (et.includes("aop") || et.includes("partnership")) tags.push("aop");
+  if (et.includes("bank") && !et.includes("islamic")) tags.push("bank");
+  if (et.includes("islamic")) tags.push("islamic_bank");
+  if (et.includes("modaraba")) tags.push("modaraba");
+  if (et.includes("leasing")) tags.push("leasing");
+  if (et.includes("insurance")) tags.push("insurance");
+  if (et.includes("ngo") || et.includes("npo") || et.includes("section 42") || et.includes("trust")) tags.push("ngo");
+  if (et.includes("government") || et.includes("public sector")) tags.push("public_sector");
+  if (et.includes("sme")) tags.push("sme");
+  if (et.includes("construction") || et.includes("real estate")) tags.push("construction");
+  if (et.includes("private") || et.includes("pvt")) tags.push("pvt");
+  if (et.includes("llp")) tags.push("llp");
+  if (et.includes("sole")) tags.push("sole");
+  if (et.includes("branch")) tags.push("branch");
+  return tags;
+}
+
+function filterPapersForEntity(papers: string[], entityType: string | null | undefined): string[] {
+  const tags = entityTypeToTags(entityType);
+  if (tags.length === 0) return papers;
+  return papers.filter(code => {
+    const meta = WP_METADATA[code];
+    if (!meta || !meta.applicableTo) return true;
+    return meta.applicableTo.some(t => tags.includes(t));
+  });
+}
 
 const ARRANGED_DATA_TABS = [
   "Entity Profile", "Reporting Metadata", "FS Line Items", "Prior Year Comparatives",
@@ -346,12 +460,13 @@ router.post("/sessions", async (req: Request, res: Response) => {
     }).returning();
 
     for (const head of AUDIT_HEADS) {
+      const filteredPapers = filterPapersForEntity(head.papers, entityType);
       await db.insert(wpHeadsTable).values({
         sessionId: session.id,
         headIndex: head.index,
         headName: head.name,
         status: "locked",
-        papersIncluded: head.papers,
+        papersIncluded: filteredPapers,
         outputType: head.outputType,
       });
     }
@@ -2977,7 +3092,7 @@ router.post("/sessions/:id/heads/:headIndex/generate", async (req: Request, res:
     const tbSummary = tbLines.map(l => `${l.accountCode} ${l.accountName}: Dr=${l.debit} Cr=${l.credit}`).join("\n");
 
     const headDef = AUDIT_HEADS[headIndex];
-    const papers = (head.papersIncluded as string[]) || headDef.papers;
+    const papers = filterPapersForEntity((head.papersIncluded as string[]) || headDef.papers, session?.entityType);
 
     const generatedDocs: any[] = [];
     const exceptions: string[] = [];
@@ -3325,7 +3440,7 @@ router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Re
         } else {
           // Heads 2-11
           const headDef = AUDIT_HEADS[hi];
-          const papers = (head.papersIncluded as string[]) || headDef.papers;
+          const papers = filterPapersForEntity((head.papersIncluded as string[]) || headDef.papers, session.entityType);
 
           for (const paperCode of papers) {
             try {
@@ -4903,8 +5018,17 @@ router.post("/sessions/:id/export-bundle", async (req: Request, res: Response) =
   }
 });
 
-router.get("/heads-definition", (_req: Request, res: Response) => {
-  res.json(AUDIT_HEADS);
+router.get("/heads-definition", (req: Request, res: Response) => {
+  const entityType = (req.query?.entityType || "") as string;
+  const heads = AUDIT_HEADS.map(h => ({
+    ...h,
+    papers: entityType ? filterPapersForEntity(h.papers, entityType) : h.papers,
+  }));
+  res.json(heads);
+});
+
+router.get("/wp-metadata", (_req: Request, res: Response) => {
+  res.json(WP_METADATA);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
