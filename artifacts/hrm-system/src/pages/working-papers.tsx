@@ -5798,12 +5798,18 @@ function sourceIcon(sourceType: string | null | undefined): { label: string; cls
 
 function categoryBadge(sourceType: string | null | undefined, reviewStatus: string | null | undefined): { label: string; cls: string } | null {
   if (!sourceType && !reviewStatus) return null;
+  if (reviewStatus === "user_confirmed" || reviewStatus === "confirmed" || reviewStatus === "locked")
+    return { label: "User Confirmed", cls: "bg-violet-100 text-violet-700 border-violet-200" };
   if (sourceType === "primary_session" || sourceType === "primary_template" || sourceType === "template" || sourceType === "session")
-    return { label: "Primary", cls: "bg-emerald-100 text-emerald-700 border-emerald-200" };
+    return { label: "Upload-Filled", cls: "bg-emerald-100 text-emerald-700 border-emerald-200" };
   if (sourceType === "system_calculated" || sourceType === "formula" || reviewStatus === "calculated")
-    return { label: "Secondary", cls: "bg-indigo-100 text-indigo-700 border-indigo-200" };
-  if (sourceType === "ai_extraction" || sourceType === "autofill" || reviewStatus === "ai_filled" || reviewStatus === "auto_filled")
-    return { label: "AI", cls: "bg-blue-100 text-blue-700 border-blue-200" };
+    return { label: "Formula-Filled", cls: "bg-indigo-100 text-indigo-700 border-indigo-200" };
+  if (sourceType === "ai_extraction" || sourceType === "autofill" || sourceType === "ai_fill" || reviewStatus === "ai_filled" || reviewStatus === "auto_filled")
+    return { label: "AI-Filled", cls: "bg-blue-100 text-blue-700 border-blue-200" };
+  if (sourceType === "assumption" || sourceType === "default")
+    return { label: "Low Confidence", cls: "bg-amber-100 text-amber-700 border-amber-200" };
+  if (!sourceType)
+    return { label: "Missing", cls: "bg-red-100 text-red-700 border-red-200" };
   return null;
 }
 const inputCls = "h-8 text-sm border rounded-md px-2 focus:ring-2 focus:ring-primary/20 focus:border-primary";
@@ -6409,7 +6415,6 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
 
   useEffect(() => { if (variables.length === 0) onFetch(); }, []);
 
-  // Computed counts (client-side, always fresh)
   const isPrimaryFilled = (v: any) => v.sourceType === "primary_session" || v.sourceType === "primary_template"
     || v.sourceType === "template" || v.sourceType === "session"
     || v.reviewStatus === "template_filled" || v.reviewStatus === "filled";
@@ -6417,16 +6422,19 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
     || v.reviewStatus === "calculated";
   const isAiFilled = (v: any) => ["ai_filled", "auto_filled", "ai_extraction", "autofill"].includes(v.reviewStatus)
     || v.sourceType === "ai_extraction" || v.sourceType === "ai_fill";
+  const isUserConfirmed = (v: any) => v.reviewStatus === "user_confirmed" || v.reviewStatus === "confirmed" || v.reviewStatus === "locked";
+  const isMissing = (v: any) => !v.finalValue || v.finalValue.trim() === "" || v.finalValue === "N/A";
+  const isLowConf = (v: any) => !!(v.confidence && Number(v.confidence) < 60 && !isMissing(v));
 
-  const primaryFilledCount  = variables.filter(isPrimaryFilled).length;
-  const secondaryCalcCount  = variables.filter(isSecondaryCalc).length;
+  const uploadFilledCount   = variables.filter(isPrimaryFilled).length;
+  const formulaFilledCount  = variables.filter(isSecondaryCalc).length;
   const aiFilledCount       = variables.filter(isAiFilled).length;
-  const missingCount        = variables.filter((v: any) =>
-    !v.finalValue || v.finalValue.trim() === "" || v.finalValue === "N/A").length;
-  const highConfCount = variables.filter((v: any) => v.confidence && Number(v.confidence) >= 85).length;
-  const lowConfCount  = variables.filter((v: any) => v.confidence && Number(v.confidence) < 60).length;
+  const userConfirmedCount  = variables.filter(isUserConfirmed).length;
+  const missingCount        = variables.filter(isMissing).length;
+  const lowConfCount        = variables.filter(isLowConf).length;
+  const filledCount         = variables.length - missingCount;
+  const fillPercent         = variables.length > 0 ? Math.round((filledCount / variables.length) * 100) : 0;
 
-  // Lock All is only enabled when zero variables are missing
   const canLockAll = missingCount === 0 && variables.length > 0 && !loading;
 
   const filterVar = (v: any) => {
@@ -6436,12 +6444,12 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
       const code  = (v.variableCode || "").toLowerCase();
       if (!label.includes(s) && !code.includes(s)) return false;
     }
-    if (filter === "primary")     return isPrimaryFilled(v);
-    if (filter === "secondary")   return isSecondaryCalc(v);
+    if (filter === "upload_filled") return isPrimaryFilled(v);
+    if (filter === "formula_filled") return isSecondaryCalc(v);
     if (filter === "ai_filled")   return isAiFilled(v);
-    if (filter === "missing")     return !v.finalValue || v.finalValue.trim() === "" || v.finalValue === "N/A";
-    if (filter === "high_conf")   return !!(v.confidence && Number(v.confidence) >= 85);
-    if (filter === "low_conf")    return !!(v.confidence && Number(v.confidence) < 60);
+    if (filter === "user_confirmed") return isUserConfirmed(v);
+    if (filter === "missing")     return isMissing(v);
+    if (filter === "low_conf")    return isLowConf(v);
     if (filter === "src_template") return getSourceTag(v.variableCode) === "template";
     if (filter === "src_form")     return getSourceTag(v.variableCode) === "form";
     if (filter === "src_both")     return getSourceTag(v.variableCode) === "both";
@@ -6458,13 +6466,13 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
   };
 
   const statTiles = [
-    { label: "Total",        value: variables.length,     icon: Settings2,     bg: "bg-slate-50",   iconColor: "text-slate-500",    key: "all" },
-    { label: "Primary",      value: primaryFilledCount,   icon: Upload,        bg: "bg-emerald-50", iconColor: "text-emerald-600",  key: "primary" },
-    { label: "Calculated",   value: secondaryCalcCount,   icon: CheckCircle2,  bg: "bg-indigo-50",  iconColor: "text-indigo-600",   key: "secondary" },
-    { label: "AI Filled",    value: aiFilledCount,        icon: Sparkles,      bg: "bg-blue-50",    iconColor: "text-blue-600",     key: "ai_filled" },
-    { label: "Missing",      value: missingCount,         icon: AlertCircle,   bg: "bg-red-50",     iconColor: "text-red-600",      key: "missing" },
-    { label: "High Conf.",   value: highConfCount,        icon: CheckCircle2,  bg: "bg-green-50",   iconColor: "text-green-600",    key: "high_conf" },
-    { label: "Low Conf.",    value: lowConfCount,         icon: XCircle,       bg: "bg-red-50",     iconColor: "text-red-500",      key: "low_conf" },
+    { label: "Total",          value: variables.length,     icon: Settings2,     bg: "bg-slate-50",   iconColor: "text-slate-500",    key: "all" },
+    { label: "Upload-Filled",  value: uploadFilledCount,    icon: Upload,        bg: "bg-emerald-50", iconColor: "text-emerald-600",  key: "upload_filled" },
+    { label: "Formula-Filled", value: formulaFilledCount,   icon: CheckCircle2,  bg: "bg-indigo-50",  iconColor: "text-indigo-600",   key: "formula_filled" },
+    { label: "AI-Filled",      value: aiFilledCount,        icon: Sparkles,      bg: "bg-blue-50",    iconColor: "text-blue-600",     key: "ai_filled" },
+    { label: "Confirmed",      value: userConfirmedCount,   icon: Shield,        bg: "bg-violet-50",  iconColor: "text-violet-600",   key: "user_confirmed" },
+    { label: "Missing",        value: missingCount,         icon: AlertCircle,   bg: "bg-red-50",     iconColor: "text-red-600",      key: "missing" },
+    { label: "Low Conf.",      value: lowConfCount,         icon: XCircle,       bg: "bg-amber-50",   iconColor: "text-amber-500",    key: "low_conf" },
   ];
 
   const templateCount = variables.filter((v: any) => getSourceTag(v.variableCode) === "template").length;
@@ -6473,17 +6481,17 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
   const noneCount     = variables.filter((v: any) => getSourceTag(v.variableCode) === null).length;
 
   const filterChips = [
-    { key: "all",          label: "All",             count: variables.length },
-    { key: "src_template", label: "📋 Template",      count: templateCount,  chipStyle: "border-teal-300 text-teal-700 bg-teal-50 data-[active=true]:bg-teal-600 data-[active=true]:text-white" },
-    { key: "src_form",     label: "📝 Form",          count: formCount,      chipStyle: "border-blue-300 text-blue-700 bg-blue-50 data-[active=true]:bg-blue-600 data-[active=true]:text-white" },
-    { key: "src_both",     label: "🔄 Both",          count: bothCount,      chipStyle: "border-purple-300 text-purple-700 bg-purple-50 data-[active=true]:bg-purple-600 data-[active=true]:text-white" },
-    { key: "src_none",     label: "⚙️ System/AI",     count: noneCount,      chipStyle: "border-slate-300 text-slate-600 bg-slate-50 data-[active=true]:bg-slate-600 data-[active=true]:text-white" },
-    { key: "primary",      label: "Primary" },
-    { key: "secondary",    label: "Calculated" },
-    { key: "ai_filled",    label: "AI Filled" },
-    { key: "missing",      label: "Missing" },
-    { key: "high_conf",    label: "High Conf." },
-    { key: "low_conf",     label: "Low Conf." },
+    { key: "all",              label: "All",             count: variables.length },
+    { key: "upload_filled",    label: "Upload-Filled",   count: uploadFilledCount },
+    { key: "formula_filled",   label: "Formula-Filled",  count: formulaFilledCount },
+    { key: "ai_filled",        label: "AI-Filled",       count: aiFilledCount },
+    { key: "user_confirmed",   label: "Confirmed",       count: userConfirmedCount },
+    { key: "missing",          label: "Missing",         count: missingCount },
+    { key: "low_conf",         label: "Low Confidence",  count: lowConfCount },
+    { key: "src_template",     label: "Src: Template",   count: templateCount },
+    { key: "src_form",         label: "Src: Form",       count: formCount },
+    { key: "src_both",         label: "Src: Both",       count: bothCount },
+    { key: "src_none",         label: "Src: System/AI",  count: noneCount },
   ];
 
   return (
@@ -6514,24 +6522,43 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
             <div className="flex-1 min-w-0">
               <h2 className="font-semibold text-slate-900 flex items-center gap-2 text-sm">
                 <ClipboardList className="w-4 h-4 text-blue-600 shrink-0" />
-                Audit Variable Register — 417 Variables
-                {stats && <span className="text-xs font-normal text-slate-400 ml-1">({stats.filled}/{stats.total} populated)</span>}
+                Audit Variable Register
+                <span className="text-xs font-normal text-slate-400 ml-1">({filledCount}/{variables.length} populated)</span>
               </h2>
-              <div className="flex items-center gap-3 mt-1 flex-wrap">
-                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">
-                  <Upload className="w-2.5 h-2.5" /> Phase 1 — Primary: {primaryFilledCount} from session/template
-                </span>
-                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5">
-                  <span className="font-bold text-[9px]">ƒ</span> Phase 2 — Secondary: {secondaryCalcCount} system-calculated
-                </span>
-                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-1.5 py-0.5">
-                  <Sparkles className="w-2.5 h-2.5" /> Phase 3 — AI: {aiFilledCount} AI-extracted
-                </span>
-                {missingCount > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-600">
-                    <AlertCircle className="w-2.5 h-2.5" /> {missingCount} still missing
+              <div className="mt-2 flex items-center gap-3">
+                <div className="flex-1 max-w-xs">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-semibold text-slate-600">Completeness</span>
+                    <span className={cn("text-[11px] font-bold tabular-nums", fillPercent === 100 ? "text-emerald-600" : fillPercent >= 75 ? "text-blue-600" : "text-amber-600")}>{fillPercent}%</span>
+                  </div>
+                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${fillPercent}%`, background: fillPercent === 100 ? "#059669" : fillPercent >= 75 ? "#2563eb" : "#d97706" }} />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">
+                    <Upload className="w-2.5 h-2.5" /> Upload: {uploadFilledCount}
                   </span>
-                )}
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5">
+                    <span className="font-bold text-[9px]">f</span> Formula: {formulaFilledCount}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-1.5 py-0.5">
+                    <Sparkles className="w-2.5 h-2.5" /> AI: {aiFilledCount}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded px-1.5 py-0.5">
+                    <Shield className="w-2.5 h-2.5" /> Confirmed: {userConfirmedCount}
+                  </span>
+                  {missingCount > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-600">
+                      <AlertCircle className="w-2.5 h-2.5" /> {missingCount} missing
+                    </span>
+                  )}
+                  {lowConfCount > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600">
+                      <XCircle className="w-2.5 h-2.5" /> {lowConfCount} low conf.
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -6581,23 +6608,29 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
             <div className="flex flex-wrap gap-1">
               {filterChips.map(f => {
                 const isActive = filter === f.key;
-                const srcStyles: Record<string, { base: string; active: string }> = {
-                  src_template: { base: "border-teal-200 text-teal-700 bg-teal-50 hover:bg-teal-100",   active: "border-teal-600 bg-teal-600 text-white" },
-                  src_form:     { base: "border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100",   active: "border-blue-600 bg-blue-600 text-white" },
-                  src_both:     { base: "border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100", active: "border-purple-600 bg-purple-600 text-white" },
-                  src_none:     { base: "border-slate-200 text-slate-600 bg-slate-50 hover:bg-slate-100", active: "border-slate-600 bg-slate-600 text-white" },
+                const chipStyles: Record<string, { base: string; active: string }> = {
+                  upload_filled:  { base: "border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100", active: "border-emerald-600 bg-emerald-600 text-white" },
+                  formula_filled: { base: "border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100",   active: "border-indigo-600 bg-indigo-600 text-white" },
+                  ai_filled:      { base: "border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100",           active: "border-blue-600 bg-blue-600 text-white" },
+                  user_confirmed: { base: "border-violet-200 text-violet-700 bg-violet-50 hover:bg-violet-100",   active: "border-violet-600 bg-violet-600 text-white" },
+                  missing:        { base: "border-red-200 text-red-700 bg-red-50 hover:bg-red-100",               active: "border-red-600 bg-red-600 text-white" },
+                  low_conf:       { base: "border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100",       active: "border-amber-600 bg-amber-600 text-white" },
+                  src_template:   { base: "border-teal-200 text-teal-700 bg-teal-50 hover:bg-teal-100",           active: "border-teal-600 bg-teal-600 text-white" },
+                  src_form:       { base: "border-cyan-200 text-cyan-700 bg-cyan-50 hover:bg-cyan-100",           active: "border-cyan-600 bg-cyan-600 text-white" },
+                  src_both:       { base: "border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100",   active: "border-purple-600 bg-purple-600 text-white" },
+                  src_none:       { base: "border-slate-200 text-slate-600 bg-slate-50 hover:bg-slate-100",       active: "border-slate-600 bg-slate-600 text-white" },
                 };
-                const srcCfg = srcStyles[f.key];
+                const cfg = chipStyles[f.key];
                 return (
                   <button key={f.key} onClick={() => setFilter(f.key)} className={cn(
                     "px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all border",
-                    srcCfg
-                      ? (isActive ? srcCfg.active : srcCfg.base)
+                    cfg
+                      ? (isActive ? cfg.active : cfg.base)
                       : (isActive ? "bg-slate-900 text-white border-slate-900" : "bg-slate-100 text-slate-500 hover:bg-slate-200 border-transparent")
                   )}>
                     {f.label}
-                    {(f as any).count !== undefined && (
-                      <span className="ml-1 text-[9px] opacity-75">({(f as any).count})</span>
+                    {f.count !== undefined && (
+                      <span className="ml-1 text-[9px] opacity-75">({f.count})</span>
                     )}
                   </button>
                 );
@@ -6609,17 +6642,12 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
         {/* Legend */}
         <div className="px-5 py-2 border-b border-slate-100 bg-slate-50/60 flex flex-wrap items-center gap-3 text-[10px] text-slate-500">
           <span className="font-semibold text-slate-600 uppercase tracking-wide">Status:</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-emerald-400" /> From Upload</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-blue-400" /> AI Filled</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-violet-400" /> User Edited</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-emerald-400" /> Upload-Filled</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-indigo-400" /> Formula-Filled</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-blue-400" /> AI-Filled</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-violet-400" /> User Confirmed</span>
           <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-400" /> Missing</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-slate-300" /> Locked</span>
-          <span className="mx-1 text-slate-300">|</span>
-          <span className="font-semibold text-slate-600 uppercase tracking-wide">Source:</span>
-          <span className="flex items-center gap-1">📋 <span className="text-teal-700 font-semibold">Template</span> — populated from uploaded Excel</span>
-          <span className="flex items-center gap-1">📝 <span className="text-blue-700 font-semibold">Form</span> — entered on engagement creation form</span>
-          <span className="flex items-center gap-1">🔄 <span className="text-purple-700 font-semibold">Both</span> — available from template or form</span>
-          <span className="flex items-center gap-1">⚙️ <span className="text-slate-600 font-semibold">System/AI</span> — auto-calculated or AI-extracted</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-amber-400" /> Low Confidence</span>
           <span className="ml-auto text-slate-400 italic">Inline edit — changes autosave on blur</span>
         </div>
 

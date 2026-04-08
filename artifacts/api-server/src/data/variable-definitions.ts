@@ -1,4 +1,5 @@
 export type VariableCategory = "primary" | "secondary" | "ai";
+export type VariableSourceType = "upload-filled" | "formula-filled" | "ai-filled" | "missing" | "low-confidence" | "user-confirmed";
 
 // ── PRIMARY variables — filled directly from template upload or session form ──
 export const PRIMARY_VARIABLE_CODES = new Set<string>([
@@ -69,6 +70,24 @@ export const SECONDARY_VARIABLE_CODES = new Set<string>([
   "significant_risk_areas", "account_level_risk_mapping_done", "sampling_required",
   "population_value", "sampling_basis", "gc_losses_flag", "gc_negative_equity_flag",
   "gc_negative_operating_cashflows_flag",
+  "subsequent_events_exist", "adjusting_events_exist", "non_adjusting_events_exist",
+  "subsequent_events_disclosure_adequate",
+  "significant_estimates_exist", "estimation_uncertainty_level", "management_bias_risk",
+  "expert_used_for_estimates", "retrospective_review_done",
+  "group_audit_flag", "number_of_components", "significant_components_count",
+  "component_materiality_set", "component_auditor_involved",
+  "component_auditor_independence_confirmed", "consolidation_adjustments_reviewed",
+  "intercompany_eliminations_verified",
+  "accounting_policies_disclosed", "segment_reporting_applicable", "earnings_per_share_disclosed",
+  "financial_instruments_disclosed", "lease_disclosures_complete", "related_party_disclosures_complete",
+  "contingencies_disclosures_complete", "events_after_reporting_disclosed",
+  "directors_remuneration_disclosed", "fourth_schedule_compliance", "disclosure_checklist_completed",
+  "it_infrastructure_complexity", "cloud_based_systems_used", "cybersecurity_risk_assessment_done",
+  "data_backup_procedures_adequate", "disaster_recovery_plan_exists", "automated_controls_identified",
+  "service_organization_used", "soc_report_obtained",
+  "tcwg_identified", "planned_scope_communicated", "significant_findings_communicated",
+  "control_deficiencies_communicated", "independence_communicated",
+  "management_letter_issued", "management_letter_points_count",
 ]);
 
 export interface VariableDefinition {
@@ -587,6 +606,79 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("audit_file_reference", "Audit Firm & Report", "File Management", "Audit File Reference / Code", { dataType: "text", inputMode: "text", mandatoryFlag: M, standardReference: "ISA 230", displayOrder: 15 }),
   v("audit_hours_budgeted", "Audit Firm & Report", "Resources", "Budgeted Audit Hours", { dataType: "number", inputMode: "number", displayOrder: 16 }),
   v("audit_fee_agreed", "Audit Firm & Report", "Resources", "Agreed Audit Fee (PKR)", { dataType: "number", inputMode: "currency", displayOrder: 17 }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GROUP 22 — Subsequent Events (ISA 560)
+  // ═══════════════════════════════════════════════════════════════════════════
+  v("subsequent_events_exist", "Subsequent Events", "Identification", "Subsequent Events Exist", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 560.6", reviewRequiredFlag: RV, displayOrder: 1 }),
+  v("adjusting_events_exist", "Subsequent Events", "Classification", "Adjusting Events Exist", { dataType: "boolean", inputMode: "toggle", standardReference: "IAS 10", displayOrder: 2 }),
+  v("non_adjusting_events_exist", "Subsequent Events", "Classification", "Non-Adjusting Events Exist", { dataType: "boolean", inputMode: "toggle", standardReference: "IAS 10", displayOrder: 3 }),
+  v("subsequent_events_cutoff_date", "Subsequent Events", "Dates", "Subsequent Events Cutoff Date", { dataType: "date", inputMode: "date", standardReference: "ISA 560.7", displayOrder: 4 }),
+  v("board_approval_date_of_fs", "Subsequent Events", "Dates", "Board Approval Date of FS", { dataType: "date", inputMode: "date", standardReference: "IAS 10.17", displayOrder: 5 }),
+  v("subsequent_events_disclosure_adequate", "Subsequent Events", "Disclosure", "SE Disclosure Adequate", { dataType: "boolean", inputMode: "toggle", displayOrder: 6 }),
+  v("subsequent_events_summary", "Subsequent Events", "Summary", "Subsequent Events Summary", { dataType: "textarea", inputMode: "textarea", displayOrder: 7 }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GROUP 23 — Estimates & Judgments (ISA 540)
+  // ═══════════════════════════════════════════════════════════════════════════
+  v("significant_estimates_exist", "Estimates & Judgments", "Identification", "Significant Estimates Exist", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 540.8", reviewRequiredFlag: RV, displayOrder: 1 }),
+  v("estimation_areas", "Estimates & Judgments", "Areas", "Estimation Areas", { dataType: "text", inputMode: "multi_select", dropdownOptionsJson: dd(["Provision for Doubtful Debts / ECL","Inventory NRV","Useful Life of Assets","Impairment of Assets","Fair Value Measurement","Actuarial Valuation","Deferred Tax","Warranty Provisions","Revenue Accruals","Contingent Liability Estimation","Goodwill Impairment","Revaluation of PPE","Lease Liability (IFRS 16)","Share-Based Payments"]), standardReference: "ISA 540", displayOrder: 2 }),
+  v("estimation_uncertainty_level", "Estimates & Judgments", "Risk", "Estimation Uncertainty Level", { dataType: "text", inputMode: "risk_level", dropdownOptionsJson: dd(["Low","Medium","High"]), standardReference: "ISA 540.13", displayOrder: 3 }),
+  v("management_bias_risk", "Estimates & Judgments", "Risk", "Management Bias Risk", { dataType: "text", inputMode: "risk_level", dropdownOptionsJson: dd(["Low","Medium","High"]), standardReference: "ISA 540.32", reviewRequiredFlag: RV, displayOrder: 4 }),
+  v("expert_used_for_estimates", "Estimates & Judgments", "Expert", "Expert Used for Estimates", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 620", displayOrder: 5 }),
+  v("expert_name_and_qualifications", "Estimates & Judgments", "Expert", "Expert Name & Qualifications", { dataType: "text", inputMode: "textarea", displayOrder: 6 }),
+  v("retrospective_review_done", "Estimates & Judgments", "Review", "Retrospective Review Done", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 540.A125", displayOrder: 7 }),
+  v("estimates_conclusion", "Estimates & Judgments", "Conclusion", "Estimates Conclusion", { dataType: "textarea", inputMode: "textarea", displayOrder: 8 }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GROUP 24 — Group Audit (ISA 600)
+  // ═══════════════════════════════════════════════════════════════════════════
+  v("group_audit_flag", "Group Audit", "Scope", "Group Audit Applicable", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 600", affectsWorkingPapersJson: ["group_audit"], displayOrder: 1 }),
+  v("number_of_components", "Group Audit", "Components", "Number of Components", { dataType: "number", inputMode: "number", displayOrder: 2 }),
+  v("significant_components_count", "Group Audit", "Components", "Significant Components", { dataType: "number", inputMode: "number", standardReference: "ISA 600.27", displayOrder: 3 }),
+  v("component_materiality_set", "Group Audit", "Materiality", "Component Materiality Set", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 600.21", displayOrder: 4 }),
+  v("component_auditor_involved", "Group Audit", "Team", "Component Auditor Involved", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 600.19", displayOrder: 5 }),
+  v("component_auditor_independence_confirmed", "Group Audit", "Ethics", "Component Auditor Independence", { dataType: "boolean", inputMode: "toggle", displayOrder: 6 }),
+  v("consolidation_adjustments_reviewed", "Group Audit", "Consolidation", "Consolidation Adjustments Reviewed", { dataType: "boolean", inputMode: "toggle", displayOrder: 7 }),
+  v("intercompany_eliminations_verified", "Group Audit", "Consolidation", "Intercompany Eliminations Verified", { dataType: "boolean", inputMode: "toggle", displayOrder: 8 }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GROUP 25 — Disclosure Completeness
+  // ═══════════════════════════════════════════════════════════════════════════
+  v("accounting_policies_disclosed", "Disclosure Completeness", "Policies", "Accounting Policies Disclosed", { dataType: "boolean", inputMode: "toggle", standardReference: "IAS 1.117", displayOrder: 1 }),
+  v("segment_reporting_applicable", "Disclosure Completeness", "IFRS 8", "Segment Reporting Applicable", { dataType: "boolean", inputMode: "toggle", standardReference: "IFRS 8", displayOrder: 2 }),
+  v("earnings_per_share_disclosed", "Disclosure Completeness", "IAS 33", "EPS Disclosed", { dataType: "boolean", inputMode: "toggle", standardReference: "IAS 33", displayOrder: 3 }),
+  v("financial_instruments_disclosed", "Disclosure Completeness", "IFRS 7", "Financial Instruments Disclosed", { dataType: "boolean", inputMode: "toggle", standardReference: "IFRS 7", displayOrder: 4 }),
+  v("lease_disclosures_complete", "Disclosure Completeness", "IFRS 16", "Lease Disclosures Complete", { dataType: "boolean", inputMode: "toggle", standardReference: "IFRS 16", displayOrder: 5 }),
+  v("related_party_disclosures_complete", "Disclosure Completeness", "IAS 24", "RP Disclosures Complete", { dataType: "boolean", inputMode: "toggle", standardReference: "IAS 24", displayOrder: 6 }),
+  v("contingencies_disclosures_complete", "Disclosure Completeness", "IAS 37", "Contingencies Disclosures Complete", { dataType: "boolean", inputMode: "toggle", standardReference: "IAS 37", displayOrder: 7 }),
+  v("events_after_reporting_disclosed", "Disclosure Completeness", "IAS 10", "Events After Reporting Disclosed", { dataType: "boolean", inputMode: "toggle", standardReference: "IAS 10", displayOrder: 8 }),
+  v("directors_remuneration_disclosed", "Disclosure Completeness", "Companies Act", "Directors Remuneration Disclosed", { dataType: "boolean", inputMode: "toggle", pakistanReference: "Companies Act 2017 Fourth Schedule", displayOrder: 9 }),
+  v("fourth_schedule_compliance", "Disclosure Completeness", "Companies Act", "Fourth Schedule Compliance", { dataType: "boolean", inputMode: "toggle", pakistanReference: "Companies Act 2017", displayOrder: 10 }),
+  v("disclosure_checklist_completed", "Disclosure Completeness", "Checklist", "Disclosure Checklist Completed", { dataType: "boolean", inputMode: "toggle", displayOrder: 11 }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GROUP 26 — IT Environment & Cybersecurity
+  // ═══════════════════════════════════════════════════════════════════════════
+  v("it_infrastructure_complexity", "IT Environment", "Infrastructure", "IT Infrastructure Complexity", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Simple","Moderate","Complex"]), standardReference: "ISA 315.A132", displayOrder: 1 }),
+  v("cloud_based_systems_used", "IT Environment", "Infrastructure", "Cloud-Based Systems Used", { dataType: "boolean", inputMode: "toggle", displayOrder: 2 }),
+  v("cybersecurity_risk_assessment_done", "IT Environment", "Security", "Cybersecurity Risk Assessment Done", { dataType: "boolean", inputMode: "toggle", displayOrder: 3 }),
+  v("data_backup_procedures_adequate", "IT Environment", "Backup", "Data Backup Procedures Adequate", { dataType: "boolean", inputMode: "toggle", displayOrder: 4 }),
+  v("disaster_recovery_plan_exists", "IT Environment", "BCP", "Disaster Recovery Plan Exists", { dataType: "boolean", inputMode: "toggle", displayOrder: 5 }),
+  v("automated_controls_identified", "IT Environment", "Controls", "Automated Controls Identified", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 315.A133", displayOrder: 6 }),
+  v("service_organization_used", "IT Environment", "Service Org", "Service Organization Used", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 402", displayOrder: 7 }),
+  v("soc_report_obtained", "IT Environment", "Service Org", "SOC Report Obtained", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 402.9", displayOrder: 8 }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GROUP 27 — Communication with TCWG (ISA 260/265)
+  // ═══════════════════════════════════════════════════════════════════════════
+  v("tcwg_identified", "Communication", "TCWG", "TCWG Identified", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 260.11", displayOrder: 1 }),
+  v("planned_scope_communicated", "Communication", "Planning", "Planned Scope Communicated", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 260.15", displayOrder: 2 }),
+  v("significant_findings_communicated", "Communication", "Findings", "Significant Findings Communicated", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 260.16", displayOrder: 3 }),
+  v("control_deficiencies_communicated", "Communication", "Deficiencies", "Control Deficiencies Communicated", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 265", displayOrder: 4 }),
+  v("independence_communicated", "Communication", "Independence", "Independence Communicated", { dataType: "boolean", inputMode: "toggle", standardReference: "ISA 260.17", displayOrder: 5 }),
+  v("management_letter_issued", "Communication", "Management Letter", "Management Letter Issued", { dataType: "boolean", inputMode: "toggle", displayOrder: 6 }),
+  v("management_letter_points_count", "Communication", "Management Letter", "Management Letter Points Count", { dataType: "number", inputMode: "number", displayOrder: 7 }),
 ];
 
 export const VARIABLE_GROUPS = [
@@ -611,7 +703,22 @@ export const VARIABLE_GROUPS = [
   "Completion & Reporting",
   "QC & Inspection",
   "Workflow & Sign-offs",
+  "Subsequent Events",
+  "Estimates & Judgments",
+  "Group Audit",
+  "Disclosure Completeness",
+  "IT Environment",
+  "Communication",
 ];
+
+export const SOURCE_TYPE_LABELS: Record<VariableSourceType, string> = {
+  "upload-filled": "Uploaded from Template",
+  "formula-filled": "System Formula",
+  "ai-filled": "AI Extracted",
+  "missing": "Missing — Requires Input",
+  "low-confidence": "Low Confidence — Review Required",
+  "user-confirmed": "User Confirmed",
+};
 
 export const EXTRACTION_FIELD_TO_VARIABLE_MAP: Record<string, string> = {
   name: "entity_name",

@@ -1988,6 +1988,100 @@ router.post("/sessions/:id/variables/auto-fill", requireRoles(...WP_ROLES_WRITE)
     sessionMetaMap["current_stage"] = "Variables";
     sessionMetaMap["current_substage"] = "Auto-Fill";
 
+    const defaultSourceMap: Record<string, string> = {};
+
+    sessionMetaMap["subsequent_events_exist"] = "false";
+    sessionMetaMap["adjusting_events_exist"] = "false";
+    sessionMetaMap["non_adjusting_events_exist"] = "false";
+    sessionMetaMap["subsequent_events_disclosure_adequate"] = "false";
+    defaultSourceMap["subsequent_events_exist"] = "default";
+    defaultSourceMap["adjusting_events_exist"] = "default";
+    defaultSourceMap["non_adjusting_events_exist"] = "default";
+    defaultSourceMap["subsequent_events_disclosure_adequate"] = "default";
+
+    sessionMetaMap["significant_estimates_exist"] = "false";
+    sessionMetaMap["estimation_uncertainty_level"] = "Medium";
+    sessionMetaMap["management_bias_risk"] = "Low";
+    sessionMetaMap["expert_used_for_estimates"] = "false";
+    sessionMetaMap["retrospective_review_done"] = "false";
+    defaultSourceMap["significant_estimates_exist"] = "default";
+    defaultSourceMap["estimation_uncertainty_level"] = "default";
+    defaultSourceMap["management_bias_risk"] = "default";
+    defaultSourceMap["expert_used_for_estimates"] = "default";
+    defaultSourceMap["retrospective_review_done"] = "default";
+
+    sessionMetaMap["group_audit_flag"] = isGroupAudit ? "true" : "false";
+    sessionMetaMap["number_of_components"] = "0";
+    sessionMetaMap["significant_components_count"] = "0";
+    sessionMetaMap["component_materiality_set"] = "false";
+    sessionMetaMap["component_auditor_involved"] = isGroupAudit ? "true" : "false";
+    sessionMetaMap["component_auditor_independence_confirmed"] = "false";
+    sessionMetaMap["consolidation_adjustments_reviewed"] = "false";
+    sessionMetaMap["intercompany_eliminations_verified"] = "false";
+    defaultSourceMap["group_audit_flag"] = isGroupAudit ? "session" : "default";
+    defaultSourceMap["number_of_components"] = "default";
+    defaultSourceMap["significant_components_count"] = "default";
+    defaultSourceMap["component_materiality_set"] = "default";
+    defaultSourceMap["component_auditor_involved"] = isGroupAudit ? "session" : "default";
+    defaultSourceMap["component_auditor_independence_confirmed"] = "default";
+    defaultSourceMap["consolidation_adjustments_reviewed"] = "default";
+    defaultSourceMap["intercompany_eliminations_verified"] = "default";
+
+    sessionMetaMap["accounting_policies_disclosed"] = "false";
+    sessionMetaMap["segment_reporting_applicable"] = isListed ? "true" : "false";
+    sessionMetaMap["earnings_per_share_disclosed"] = isListed ? "true" : "false";
+    sessionMetaMap["financial_instruments_disclosed"] = "false";
+    sessionMetaMap["lease_disclosures_complete"] = "false";
+    sessionMetaMap["related_party_disclosures_complete"] = "false";
+    sessionMetaMap["contingencies_disclosures_complete"] = "false";
+    sessionMetaMap["events_after_reporting_disclosed"] = "false";
+    sessionMetaMap["directors_remuneration_disclosed"] = "false";
+    sessionMetaMap["fourth_schedule_compliance"] = "false";
+    sessionMetaMap["disclosure_checklist_completed"] = "false";
+    defaultSourceMap["accounting_policies_disclosed"] = "default";
+    defaultSourceMap["segment_reporting_applicable"] = isListed ? "session" : "default";
+    defaultSourceMap["earnings_per_share_disclosed"] = isListed ? "session" : "default";
+    defaultSourceMap["financial_instruments_disclosed"] = "default";
+    defaultSourceMap["lease_disclosures_complete"] = "default";
+    defaultSourceMap["related_party_disclosures_complete"] = "default";
+    defaultSourceMap["contingencies_disclosures_complete"] = "default";
+    defaultSourceMap["events_after_reporting_disclosed"] = "default";
+    defaultSourceMap["directors_remuneration_disclosed"] = "default";
+    defaultSourceMap["fourth_schedule_compliance"] = "default";
+    defaultSourceMap["disclosure_checklist_completed"] = "default";
+
+    sessionMetaMap["it_infrastructure_complexity"] = "Simple";
+    sessionMetaMap["cloud_based_systems_used"] = "false";
+    sessionMetaMap["cybersecurity_risk_assessment_done"] = "false";
+    sessionMetaMap["data_backup_procedures_adequate"] = "false";
+    sessionMetaMap["disaster_recovery_plan_exists"] = "false";
+    sessionMetaMap["automated_controls_identified"] = "false";
+    sessionMetaMap["service_organization_used"] = "false";
+    sessionMetaMap["soc_report_obtained"] = "false";
+    defaultSourceMap["it_infrastructure_complexity"] = "default";
+    defaultSourceMap["cloud_based_systems_used"] = "default";
+    defaultSourceMap["cybersecurity_risk_assessment_done"] = "default";
+    defaultSourceMap["data_backup_procedures_adequate"] = "default";
+    defaultSourceMap["disaster_recovery_plan_exists"] = "default";
+    defaultSourceMap["automated_controls_identified"] = "default";
+    defaultSourceMap["service_organization_used"] = "default";
+    defaultSourceMap["soc_report_obtained"] = "default";
+
+    sessionMetaMap["tcwg_identified"] = isPIE ? "true" : "false";
+    sessionMetaMap["planned_scope_communicated"] = "false";
+    sessionMetaMap["significant_findings_communicated"] = "false";
+    sessionMetaMap["control_deficiencies_communicated"] = "false";
+    sessionMetaMap["independence_communicated"] = "false";
+    sessionMetaMap["management_letter_issued"] = "false";
+    sessionMetaMap["management_letter_points_count"] = "0";
+    defaultSourceMap["tcwg_identified"] = isPIE ? "session" : "default";
+    defaultSourceMap["planned_scope_communicated"] = "default";
+    defaultSourceMap["significant_findings_communicated"] = "default";
+    defaultSourceMap["control_deficiencies_communicated"] = "default";
+    defaultSourceMap["independence_communicated"] = "default";
+    defaultSourceMap["management_letter_issued"] = "default";
+    defaultSourceMap["management_letter_points_count"] = "default";
+
     const cyPyFieldCodes = [
       "total_assets","non_current_assets","current_assets","fixed_assets","right_of_use_assets",
       "capital_work_in_progress","intangible_assets","investments","long_term_loans",
@@ -2053,8 +2147,6 @@ router.post("/sessions/:id/variables/auto-fill", requireRoles(...WP_ROLES_WRITE)
       "eqcr_required", "key_audit_matters_flag", "audit_committee_exists", "internal_audit_function_exists",
       "sales_tax_applicable", "signing_partner_name", "engagement_manager", "reviewer", "approver",
     ]);
-
-    const defaultSourceMap: Record<string, string> = {};
 
     const assumptionPhrases = ["to be confirmed", "to be determined", "to be assigned", "to be obtained", "to be completed", "pending verification", "refer to form", "not yet", "not applicable or to be"];
     const isAssumptionValue = (v: string) => {
@@ -3052,7 +3144,9 @@ router.post("/sessions/:id/generate-gl", requireRoles(...WP_ROLES_WRITE), async 
     }
 
     const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
-    if (tbLines.length === 0) return res.status(400).json({ error: "TB must be generated first" });
+    const uploadedFiles = await db.select().from(wpUploadedFilesTable).where(eq(wpUploadedFilesTable.sessionId, sessionId));
+    const hasTemplate = uploadedFiles.some(f => f.category === "financial_statements");
+    if (tbLines.length === 0 && !hasTemplate) return res.status(400).json({ error: "TB must be generated first, or upload a financial statements template" });
 
     const ai = await getAIClient();
     if (!ai) return res.status(503).json({ error: "AI service not configured — add API key in Settings" });
@@ -5048,8 +5142,9 @@ async function checkDependencies(sessionId: number, headIndex: number): Promise<
     if (variables.length > 0 && lockedVars.length === 0) missing.push("Variables not locked");
   }
 
-  if (headIndex >= 1) {
-    if (tbLines.length === 0) missing.push("Trial Balance not generated");
+  const hasUploadedTemplate = files.some(f => f.category === "financial_statements");
+  if (headIndex >= 1 && !hasUploadedTemplate) {
+    if (tbLines.length === 0) missing.push("Trial Balance not generated (upload financial statements template to skip)");
     const tbHead = heads.find(h => h.headIndex === 0);
     if (tbHead && tbHead.status !== "approved" && tbHead.status !== "exported" && tbHead.status !== "completed") {
       missing.push("Trial Balance head not approved");
@@ -5064,9 +5159,9 @@ async function checkDependencies(sessionId: number, headIndex: number): Promise<
     }
   }
 
-  if (headIndex >= 2) {
+  if (headIndex >= 2 && !hasUploadedTemplate) {
     const glAccounts = await db.select().from(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, sessionId));
-    if (glAccounts.length === 0) missing.push("General Ledger not generated");
+    if (glAccounts.length === 0) missing.push("General Ledger not generated (upload financial statements template to skip)");
     const glHead = heads.find(h => h.headIndex === 1);
     if (glHead && glHead.status !== "approved" && glHead.status !== "exported" && glHead.status !== "completed") {
       missing.push("General Ledger head not approved");
