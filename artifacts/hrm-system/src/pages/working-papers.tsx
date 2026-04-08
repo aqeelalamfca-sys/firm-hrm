@@ -225,16 +225,17 @@ export default function WorkingPapers() {
   };
 
   const statusToStageMap: Record<string, string> = {
-    completed:    "export",
-    variables:    "variables",
-    generation:   "generation",
-    wp_listing:   "wp_listing",
-    gl_generation:"generation",
-    tb_generation:"generation",
-    extraction:   "extraction",
-    upload:       "upload",
-    export:       "export",
-    data_sheet:   "extraction",
+    completed:      "export",
+    variables:      "variables",
+    generation:     "generation",
+    wp_listing:     "wp_listing",
+    gl_generation:  "generation",
+    tb_generation:  "generation",
+    extraction:     "extraction",
+    upload:         "upload",
+    export:         "export",
+    data_sheet:     "extraction",
+    arranged_data:  "extraction",
   };
   const stageInitialisedRef = useRef(false);
 
@@ -1219,7 +1220,7 @@ export default function WorkingPapers() {
       const ext = jobType === "wp_word" ? "docx" : "xlsx";
       const label = { wp_excel: "WP_Index", wp_word: "WP_Index", full_bundle: "Bundle" }[jobType];
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/generate-output`, {
-        method: "POST", headers,
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
         body: JSON.stringify({ jobType, triggeredBy: "User" }),
       });
       if (res.ok) {
@@ -1836,7 +1837,25 @@ export default function WorkingPapers() {
           loading={loading}
           onEvaluateTriggers={evaluateWpTriggers}
           onRefresh={() => { fetchWpTriggers(); fetchSession(activeSession.id); }}
-          onNext={() => { fetchSession(activeSession.id); fetchExceptions(); setStage("generation"); }}
+          onNext={async () => {
+            try {
+              const statusRes = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/status`, {
+                method: "PATCH", headers: { ...headers, "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "generation" }),
+              });
+              if (!statusRes.ok) {
+                const err = await statusRes.json().catch(() => ({}));
+                toast({ title: "Cannot proceed", description: err.error || "Status transition failed", variant: "destructive" });
+                return;
+              }
+            } catch {
+              toast({ title: "Cannot proceed", description: "Network error updating session", variant: "destructive" });
+              return;
+            }
+            await fetchSession(activeSession.id);
+            await fetchExceptions();
+            setStage("generation");
+          }}
         />
       )}
 
@@ -1856,7 +1875,24 @@ export default function WorkingPapers() {
           autoChainRunning={autoChainRunning}
           autoChainCurrentHead={autoChainCurrentHead}
           onStopChain={stopChain}
-          onNext={async () => { await fetchSession(activeSession.id); setStage("export"); }}
+          onNext={async () => {
+            try {
+              const statusRes = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/status`, {
+                method: "PATCH", headers: { ...headers, "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "export" }),
+              });
+              if (!statusRes.ok) {
+                const err = await statusRes.json().catch(() => ({}));
+                toast({ title: "Cannot proceed", description: err.error || "Status transition failed", variant: "destructive" });
+                return;
+              }
+            } catch {
+              toast({ title: "Cannot proceed", description: "Network error updating session", variant: "destructive" });
+              return;
+            }
+            await fetchSession(activeSession.id);
+            setStage("export");
+          }}
         />
       )}
 
@@ -10028,7 +10064,7 @@ const FORMAT_LABEL: Record<string, string> = {
 function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle, onExportQuick, exportingQuick, onResolveException, onRefresh, loading, downloadingHeads, downloadedHeads }: any) {
   const dlSet: Set<number> = downloadingHeads || new Set();
   const dledSet: Set<number> = downloadedHeads || new Set();
-  const wpHeads = (heads || []).filter((h: any) => h.headIndex >= 2);
+  const wpHeads = (heads || []).filter((h: any) => h.headIndex >= 0);
   const completedHeads = wpHeads.filter((h: any) => ["approved", "exported", "completed"].includes(h.status));
   const openExceptions = (exceptions || []).filter((e: any) => e.status === "open");
   const totalHeads = wpHeads.length;
@@ -10044,8 +10080,8 @@ function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle,
   };
 
   const QUICK_EXPORTS = [
-    { key: "wp_excel",  label: "WP Index (Excel)",  ext: ".xlsx", icon: FileCheck, color: "emerald",desc: "Working paper listing — phases, status, prepared/approved by" },
-    { key: "wp_word",   label: "WP Index (Word)",   ext: ".docx", icon: FileText,  color: "indigo", desc: "ISA-formatted Word document suitable for physical audit file" },
+    { key: "wp_excel",    label: "WP Index (Excel)",  ext: ".xlsx", icon: FileCheck, color: "emerald",desc: "Working paper listing — phases, status, prepared/approved by" },
+    { key: "wp_word",     label: "WP Index (Word)",   ext: ".docx", icon: FileText,  color: "indigo", desc: "ISA-formatted Word document suitable for physical audit file" },
   ] as const;
 
   const colorMap: Record<string, string> = {
@@ -10220,24 +10256,58 @@ function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle,
                         <span className="text-[10px] text-slate-400 font-mono">{FORMAT_LABEL[head.outputType] || head.outputType?.toUpperCase()}</span>
                       </div>
                     </div>
-                    <Button
-                      size="sm"
-                      variant={canExport ? "default" : "outline"}
-                      disabled={!canExport || isDownloading}
-                      onClick={() => onExportHead(head.headIndex)}
-                      className={cn(
-                        "h-8 shrink-0 min-w-[80px]",
-                        isDownloaded ? "bg-emerald-500 hover:bg-emerald-600" :
-                        canExport ? "bg-emerald-600 hover:bg-emerald-700" : ""
+                    <div className="flex items-center gap-1 shrink-0">
+                      {head.headIndex < 2 ? (
+                        <Button
+                          size="sm"
+                          variant={canExport ? "default" : "outline"}
+                          disabled={!canExport || isDownloading}
+                          onClick={() => onExportHead(head.headIndex, "word")}
+                          className={cn(
+                            "h-8 min-w-[70px]",
+                            isDownloaded ? "bg-emerald-500 hover:bg-emerald-600" :
+                            canExport ? "bg-emerald-600 hover:bg-emerald-700" : ""
+                          )}
+                        >
+                          {isDownloading
+                            ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> Saving…</>
+                            : isDownloaded
+                            ? <><CheckCircle2 className="w-3.5 h-3.5 mr-1" /> XLSX</>
+                            : <><Download className="w-3.5 h-3.5 mr-1" /> XLSX</>
+                          }
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            size="sm"
+                            variant={canExport ? "default" : "outline"}
+                            disabled={!canExport || isDownloading}
+                            onClick={() => onExportHead(head.headIndex, "word")}
+                            className={cn(
+                              "h-8 min-w-[70px]",
+                              isDownloaded ? "bg-emerald-500 hover:bg-emerald-600" :
+                              canExport ? "bg-emerald-600 hover:bg-emerald-700" : ""
+                            )}
+                          >
+                            {isDownloading
+                              ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> Saving…</>
+                              : isDownloaded
+                              ? <><CheckCircle2 className="w-3.5 h-3.5 mr-1" /> DOCX</>
+                              : <><Download className="w-3.5 h-3.5 mr-1" /> DOCX</>
+                            }
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!canExport || isDownloading}
+                            onClick={() => onExportHead(head.headIndex, "pdf")}
+                            className="h-8 min-w-[56px] text-xs"
+                          >
+                            PDF
+                          </Button>
+                        </>
                       )}
-                    >
-                      {isDownloading
-                        ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> Saving…</>
-                        : isDownloaded
-                        ? <><CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Again</>
-                        : <><Download className="w-3.5 h-3.5 mr-1" /> Download</>
-                      }
-                    </Button>
+                    </div>
                   </div>
                 );
               })}
