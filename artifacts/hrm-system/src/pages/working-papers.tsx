@@ -16,7 +16,7 @@ import {
   Info, AlertOctagon, Calculator, CircleDot,
   ExternalLink, Gauge, Table2, Trash2, Database,
   GitMerge, BarChart2, Cpu, CheckCheck, ListChecks, Network, BookOpen,
-  Search, ClipboardList, XCircle, SlidersHorizontal,
+  Search, ClipboardList, XCircle, SlidersHorizontal, Printer,
 } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
@@ -1123,12 +1123,14 @@ export default function WorkingPapers() {
     } catch { toast({ title: "Approval failed", variant: "destructive" }); }
   };
 
-  const exportHead = async (headIndex: number) => {
+  const exportHead = async (headIndex: number, format: "word" | "pdf" = "word") => {
     if (!activeSession) return;
     setDownloadingHeads(prev => new Set(prev).add(headIndex));
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/heads/${headIndex}/export`, {
-        method: "POST", headers,
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ format }),
       });
       if (res.ok) {
         const blob = await res.blob();
@@ -1136,7 +1138,7 @@ export default function WorkingPapers() {
         const a = document.createElement("a");
         const disp = res.headers.get("content-disposition") || "";
         const match = disp.match(/filename="?([^"]+)"?/);
-        const filename = match?.[1] || `head_${headIndex}.xlsx`;
+        const filename = match?.[1] || `head_${headIndex}.${format === "pdf" ? "pdf" : "docx"}`;
         a.download = filename;
         a.href = url;
         document.body.appendChild(a);
@@ -1144,7 +1146,7 @@ export default function WorkingPapers() {
         setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
         setDownloadedHeads(prev => new Set(prev).add(headIndex));
         const headName = heads.find(h => h.headIndex === headIndex)?.headName || `Head ${headIndex + 1}`;
-        toast({ title: `Downloaded: ${headName}`, description: filename });
+        toast({ title: `Downloaded: ${headName} (${format.toUpperCase()})`, description: filename });
         await fetchSession(activeSession.id);
       } else {
         const err = await res.json().catch(() => ({ error: "Export failed" }));
@@ -6150,10 +6152,65 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
 
 function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, onExport, onAutoProcessAll, onResolveException, loading, onRefresh, autoChainRunning, autoChainCurrentHead, onStopChain }: any) {
   const allExceptions: any[] = exceptions || [];
-  // Heads 0 (TB) and 1 (GL) are generated silently; show only WP heads from index 2
   const allHeads: any[] = (heads || []).filter((h: any) => h.headIndex >= 2);
   const [approvalInProgress, setApprovalInProgress] = useState(false);
   const [expandedHead, setExpandedHead] = useState<number | null>(null);
+  const [previewHead, setPreviewHead] = useState<any | null>(null);
+  const [previewDocs, setPreviewDocs] = useState<any[]>([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  const openPreview = async (head: any) => {
+    setPreviewHead(head);
+    setPreviewDocs([]);
+    setPreviewLoading(true);
+    try {
+      const base = import.meta.env.VITE_API_URL || "/api";
+      const token = localStorage.getItem("auth_token");
+      const res = await fetch(`${base}/working-papers/sessions/${session?.id}/heads/${head.headIndex}/documents`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPreviewDocs(data.documents || []);
+      }
+    } catch {}
+    finally { setPreviewLoading(false); }
+  };
+
+  const printPreview = () => {
+    const w = window.open("", "_blank");
+    if (!w) return;
+    const html = document.getElementById("wp-print-preview-content")?.innerHTML || "";
+    w.document.write(`<!DOCTYPE html><html><head><title>Audit Working Paper Preview</title><style>
+      body{font-family:Calibri,sans-serif;font-size:11pt;color:#1e293b;margin:0;padding:0}
+      @media print{body{margin:15mm 20mm 15mm 25mm}.no-print{display:none}.page-break{page-break-after:always}}
+      .firm-hdr{background:#0F3460;color:white;padding:16px 24px;margin-bottom:4px}
+      .firm-hdr h1{font-size:18pt;margin:0;color:white}
+      .firm-hdr p{font-size:9pt;margin:4px 0 0 0;color:#CBD5E1}
+      .wp-title{background:#EFF6FF;padding:10px 24px;border-bottom:2px solid #1E3A8A;margin-bottom:12px}
+      .wp-title h2{font-size:14pt;color:#1E3A8A;margin:0}
+      .meta-table{width:100%;border-collapse:collapse;margin:8px 0 16px 0;font-size:9pt}
+      .meta-table td{padding:4px 8px;border:1px solid #E2E8F0}
+      .meta-table td:first-child{font-weight:bold;background:#F8FAFC;width:30%;color:#475569}
+      .section-hdr{font-size:10pt;font-weight:bold;color:#1E3A8A;border-bottom:2px solid #1E3A8A;padding:6px 0 3px 0;margin:16px 0 8px 0}
+      .body-text{font-size:9.5pt;line-height:1.6;color:#1e293b;margin-bottom:8px;text-align:justify}
+      .wp-table{width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:12px}
+      .wp-table th{background:#1E3A8A;color:white;padding:5px 6px;text-align:left}
+      .wp-table td{padding:4px 6px;border:1px solid #E2E8F0;vertical-align:top}
+      .wp-table tr:nth-child(even) td{background:#F8FAFC}
+      .sign-hdr{background:#1E3A8A;color:white;padding:6px 8px;font-weight:bold;font-size:9pt;margin-top:20px}
+      .sign-grid{display:grid;grid-template-columns:repeat(5,1fr);border:1px solid #E2E8F0}
+      .sign-cell{border-right:1px solid #E2E8F0;padding:8px;font-size:8pt}
+      .sign-cell:last-child{border-right:none}
+      .sign-line{border-bottom:1px solid #666;margin:4px 0;height:16px}
+      .conclusion-box{padding:8px 12px;border-left:4px solid #15803D;background:#F0FDF4;margin:8px 0;font-weight:bold;font-size:10pt}
+      .conclusion-box.unsat{border-color:#B91C1C;background:#FEF2F2}
+      .footer{border-top:1px solid #E2E8F0;padding:6px 0;font-size:8pt;color:#94A3B8;text-align:center;margin-top:12px}
+      .confidential{background:#FEF2F2;border:1px solid #FECACA;color:#B91C1C;font-weight:bold;font-size:8pt;padding:4px 8px;text-align:center;margin-bottom:8px}
+    </style></head><body>${html}</body></html>`);
+    w.document.close();
+    setTimeout(() => w.print(), 300);
+  };
 
   const completed = allHeads.filter((h: any) => ["approved", "exported", "completed"].includes(h.status)).length;
   const validating = allHeads.filter((h: any) => h.status === "validating" || h.status === "review").length;
@@ -6212,6 +6269,219 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
 
   return (
     <div className="space-y-5">
+
+      {/* ── Print Preview Modal ──────────────────────────────────────────── */}
+      {previewHead && createPortal(
+        <div className="fixed inset-0 z-50 flex items-stretch bg-black/60 backdrop-blur-sm">
+          <div className="flex flex-col w-full max-w-5xl mx-auto my-4 bg-white rounded-2xl shadow-2xl overflow-hidden">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-3 bg-[#0F3460] text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <FileText className="w-5 h-5 text-blue-300" />
+                <div>
+                  <p className="text-xs text-blue-200 uppercase tracking-wider">Audit Working Paper Preview</p>
+                  <p className="font-semibold text-sm">{previewHead.headName}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={printPreview} className="h-8 px-3 border-white/20 text-white hover:bg-white/10 text-xs">
+                  <Printer className="w-3.5 h-3.5 mr-1.5" />Print / Save PDF
+                </Button>
+                {previewDocs.length > 0 && (
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => onExport(previewHead.headIndex, "word")} className="h-8 px-3 border-white/20 text-white hover:bg-white/10 text-xs">
+                      <Download className="w-3.5 h-3.5 mr-1.5" />Word
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => onExport(previewHead.headIndex, "pdf")} className="h-8 px-3 border-rose-400/40 text-rose-200 hover:bg-rose-500/20 text-xs">
+                      <FileText className="w-3.5 h-3.5 mr-1.5" />PDF
+                    </Button>
+                  </>
+                )}
+                <button onClick={() => setPreviewHead(null)} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
+                  <X className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal content */}
+            <div className="flex-1 overflow-y-auto bg-slate-100 p-4">
+              {previewLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                  <span className="ml-3 text-slate-500">Loading working papers…</span>
+                </div>
+              ) : previewDocs.length === 0 ? (
+                <div className="flex items-center justify-center h-64 text-slate-400">
+                  <AlertTriangle className="w-8 h-8 mr-3" />
+                  No documents found for this head.
+                </div>
+              ) : (
+                <div id="wp-print-preview-content" className="space-y-6">
+                  {previewDocs.map((doc: any, di: number) => {
+                    const wp = doc.content || {};
+                    const procedures: any[] = wp.procedures_table || [];
+                    const evidence: any[] = wp.evidence_table || [];
+                    const varAnalysis = wp.variance_analysis || {};
+                    const risks: any[] = wp.risk_assertion_table || [];
+                    const proposed: any[] = wp.proposed_adjustments || [];
+                    const crossRefs: any[] = wp.cross_references || [];
+                    const exceptions: any[] = wp.exceptions || [];
+                    return (
+                      <div key={di} className={cn("bg-white shadow-md rounded-xl overflow-hidden", di > 0 && "page-break")}>
+                        {/* Firm Header */}
+                        <div className="firm-hdr bg-[#0F3460] text-white px-6 py-4">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h1 className="text-lg font-bold text-white">{session?.firmName || "Audit Firm"}</h1>
+                              <p className="text-xs text-blue-200 mt-1">{session?.firmAddress || "Pakistan"} | ICAP Member Firm</p>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-xs bg-white/10 px-2 py-1 rounded font-mono">{doc.paperCode}</span>
+                              {wp.lock_status === "final" && <div className="text-[10px] text-amber-300 mt-1">FINAL — LOCKED</div>}
+                              {wp.ai_generated && <div className="text-[10px] text-blue-300 mt-1">AI Generated</div>}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* WP Title */}
+                        <div className="bg-blue-50 border-b-2 border-[#1E3A8A] px-6 py-3">
+                          <h2 className="text-base font-bold text-[#1E3A8A]">{doc.paperName || wp.paper_name}</h2>
+                          <p className="text-xs text-slate-500 mt-0.5">{wp.fs_head || previewHead.headName}</p>
+                        </div>
+
+                        <div className="px-6 py-4 space-y-5">
+                          {/* Metadata Grid */}
+                          <div className="confidential bg-red-50 border border-red-200 rounded px-4 py-2 text-xs text-red-700 font-semibold text-center uppercase tracking-wider">
+                            Confidential — Audit Working Paper — Not for External Distribution
+                          </div>
+                          <table className="meta-table w-full text-xs border-collapse">
+                            <tbody>
+                              <tr><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200 w-[28%]">Client</td><td className="px-3 py-2 border border-slate-200">{session?.clientName}</td><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200 w-[28%]">Period</td><td className="px-3 py-2 border border-slate-200">{session?.engagementYear}</td></tr>
+                              <tr><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">Engagement Code</td><td className="px-3 py-2 border border-slate-200 font-mono">{wp.engagement_code || "—"}</td><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">Lead Schedule Ref</td><td className="px-3 py-2 border border-slate-200 font-mono">{wp.lead_schedule_ref || "—"}</td></tr>
+                              <tr><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">ISA References</td><td className="px-3 py-2 border border-slate-200" colSpan={3}>{Array.isArray(wp.isa_references) ? wp.isa_references.join(", ") : wp.isa_references || "—"}</td></tr>
+                              {wp.materiality_linkage && <tr><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">Materiality</td><td className="px-3 py-2 border border-slate-200">PKR {wp.materiality_linkage.overall_materiality?.toLocaleString()} ({wp.materiality_linkage.basis} — {wp.materiality_linkage.percentage})</td><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">PM</td><td className="px-3 py-2 border border-slate-200">PKR {wp.materiality_linkage.performance_materiality?.toLocaleString()}</td></tr>}
+                              {wp.population && <tr><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">Population</td><td className="px-3 py-2 border border-slate-200">{wp.population.count} items / PKR {wp.population.amount?.toLocaleString()}</td><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">Sample</td><td className="px-3 py-2 border border-slate-200">{wp.sample?.count} items / PKR {wp.sample?.amount?.toLocaleString()} ({wp.sample?.coverage_percentage})</td></tr>}
+                              <tr><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">Status</td><td className="px-3 py-2 border border-slate-200 capitalize">{doc.status || wp.status}</td><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">Version</td><td className="px-3 py-2 border border-slate-200">{doc.version || wp.version}</td></tr>
+                            </tbody>
+                          </table>
+
+                          {/* Objective */}
+                          {wp.objective && <div><div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Audit Objective</div><p className="body-text text-sm text-slate-700 leading-relaxed">{wp.objective}</p></div>}
+
+                          {/* Risk & Assertion Table */}
+                          {risks.length > 0 && (
+                            <div>
+                              <div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Risks & Assertions</div>
+                              <table className="wp-table w-full text-xs border-collapse">
+                                <thead><tr className="bg-[#1E3A8A] text-white"><th className="px-3 py-2 text-left">Risk</th><th className="px-3 py-2 text-left">Assertion</th><th className="px-3 py-2 text-left">Level</th><th className="px-3 py-2 text-left">Approach</th></tr></thead>
+                                <tbody>{risks.map((r: any, i: number) => <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}><td className="px-3 py-2 border border-slate-200">{r.risk_description}</td><td className="px-3 py-2 border border-slate-200">{r.assertion}</td><td className="px-3 py-2 border border-slate-200">{r.risk_level}</td><td className="px-3 py-2 border border-slate-200">{r.audit_approach}</td></tr>)}</tbody>
+                              </table>
+                            </div>
+                          )}
+
+                          {/* Procedures */}
+                          {procedures.length > 0 && (
+                            <div>
+                              <div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Audit Procedures</div>
+                              <table className="wp-table w-full text-xs border-collapse">
+                                <thead><tr className="bg-[#1E3A8A] text-white"><th className="px-3 py-2 text-left">#</th><th className="px-3 py-2 text-left">Procedure</th><th className="px-3 py-2 text-left">Assertion</th><th className="px-3 py-2 text-left">Ref</th><th className="px-3 py-2 text-left">Done By</th><th className="px-3 py-2 text-left">Date</th><th className="px-3 py-2 text-left">Result</th></tr></thead>
+                                <tbody>{procedures.map((p: any, i: number) => <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}><td className="px-3 py-2 border border-slate-200 font-mono">{p.step_no}</td><td className="px-3 py-2 border border-slate-200">{p.description}</td><td className="px-3 py-2 border border-slate-200">{p.assertion}</td><td className="px-3 py-2 border border-slate-200 font-mono">{p.reference}</td><td className="px-3 py-2 border border-slate-200">{p.done_by}</td><td className="px-3 py-2 border border-slate-200">{p.date}</td><td className="px-3 py-2 border border-slate-200">{p.result}</td></tr>)}</tbody>
+                              </table>
+                            </div>
+                          )}
+
+                          {/* Work Performed */}
+                          {wp.work_performed && <div><div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Work Performed</div><p className="body-text text-sm text-slate-700 leading-relaxed whitespace-pre-line">{wp.work_performed}</p></div>}
+
+                          {/* Variance Analysis */}
+                          {(varAnalysis.current_year || varAnalysis.prior_year) && (
+                            <div>
+                              <div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Variance Analysis</div>
+                              <table className="wp-table w-full text-xs border-collapse">
+                                <tbody>
+                                  <tr><td className="bg-slate-50 font-semibold px-3 py-2 border border-slate-200 w-[25%]">Current Year (PKR)</td><td className="px-3 py-2 border border-slate-200">{varAnalysis.current_year?.toLocaleString()}</td></tr>
+                                  <tr><td className="bg-slate-50 font-semibold px-3 py-2 border border-slate-200">Prior Year (PKR)</td><td className="px-3 py-2 border border-slate-200">{varAnalysis.prior_year?.toLocaleString()}</td></tr>
+                                  <tr><td className="bg-slate-50 font-semibold px-3 py-2 border border-slate-200">Variance</td><td className="px-3 py-2 border border-slate-200">{varAnalysis.variance?.toLocaleString()} ({varAnalysis.variance_percentage})</td></tr>
+                                  {varAnalysis.management_response && <tr><td className="bg-slate-50 font-semibold px-3 py-2 border border-slate-200">Mgmt Response</td><td className="px-3 py-2 border border-slate-200">{varAnalysis.management_response}</td></tr>}
+                                  {varAnalysis.auditor_evaluation && <tr><td className="bg-slate-50 font-semibold px-3 py-2 border border-slate-200">Auditor Evaluation</td><td className="px-3 py-2 border border-slate-200">{varAnalysis.auditor_evaluation}</td></tr>}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+
+                          {/* Evidence */}
+                          {evidence.length > 0 && (
+                            <div>
+                              <div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Evidence Obtained</div>
+                              <table className="wp-table w-full text-xs border-collapse">
+                                <thead><tr className="bg-[#1E3A8A] text-white"><th className="px-3 py-2 text-left">Ref</th><th className="px-3 py-2 text-left">Description</th><th className="px-3 py-2 text-left">Type</th><th className="px-3 py-2 text-left">Source</th><th className="px-3 py-2 text-left">Reliability</th></tr></thead>
+                                <tbody>{evidence.map((e: any, i: number) => <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}><td className="px-3 py-2 border border-slate-200 font-mono">{e.ref}</td><td className="px-3 py-2 border border-slate-200">{e.description}</td><td className="px-3 py-2 border border-slate-200">{e.evidence_type}</td><td className="px-3 py-2 border border-slate-200">{e.source}</td><td className="px-3 py-2 border border-slate-200">{e.reliability}</td></tr>)}</tbody>
+                              </table>
+                            </div>
+                          )}
+
+                          {/* Proposed Adjustments */}
+                          {proposed.length > 0 && (
+                            <div>
+                              <div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Proposed Adjustments</div>
+                              <table className="wp-table w-full text-xs border-collapse">
+                                <thead><tr className="bg-[#1E3A8A] text-white"><th className="px-3 py-2 text-left">Description</th><th className="px-3 py-2 text-left">Account</th><th className="px-3 py-2 text-left">Dr (PKR)</th><th className="px-3 py-2 text-left">Cr (PKR)</th><th className="px-3 py-2 text-left">Type</th></tr></thead>
+                                <tbody>{proposed.map((p: any, i: number) => <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}><td className="px-3 py-2 border border-slate-200">{p.description}</td><td className="px-3 py-2 border border-slate-200">{p.account_affected}</td><td className="px-3 py-2 border border-slate-200">{p.debit?.toLocaleString()}</td><td className="px-3 py-2 border border-slate-200">{p.credit?.toLocaleString()}</td><td className="px-3 py-2 border border-slate-200">{p.type}</td></tr>)}</tbody>
+                              </table>
+                            </div>
+                          )}
+
+                          {/* Auditor Judgement */}
+                          {wp.auditor_judgement && <div><div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Auditor Judgement</div><p className="body-text text-sm text-slate-700 leading-relaxed">{wp.auditor_judgement}</p></div>}
+
+                          {/* Conclusion */}
+                          {wp.conclusion && (
+                            <div className={cn("px-4 py-3 rounded border-l-4 text-sm font-semibold", wp.conclusion?.toLowerCase()?.includes("satisf") ? "bg-emerald-50 border-emerald-500 text-emerald-800" : "bg-red-50 border-red-500 text-red-800")}>
+                              {wp.conclusion}
+                            </div>
+                          )}
+
+                          {/* Review Notes */}
+                          {wp.review_notes && <div><div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Review Notes</div><p className="body-text text-sm text-slate-700 leading-relaxed whitespace-pre-line">{wp.review_notes}</p></div>}
+
+                          {/* Exceptions */}
+                          {exceptions.length > 0 && <div className="bg-amber-50 border border-amber-200 rounded-lg p-3"><div className="section-hdr text-xs font-bold text-amber-700 uppercase tracking-wider mb-2">Exceptions / Action Points</div>{exceptions.map((ex: any, i: number) => <div key={i} className="text-xs text-amber-800 mb-1">{i + 1}. {ex.description || ex}</div>)}</div>}
+
+                          {/* Cross References */}
+                          {crossRefs.length > 0 && <div><div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Cross References</div><div className="flex flex-wrap gap-2">{crossRefs.map((cr: any, i: number) => <span key={i} className="bg-blue-50 border border-blue-200 text-blue-700 text-xs px-2 py-1 rounded font-mono">{typeof cr === "string" ? cr : `${cr.wp_ref} — ${cr.description}`}</span>)}</div></div>}
+
+                          {/* Sign-off Block */}
+                          <div>
+                            <div className="bg-[#1E3A8A] text-white text-xs font-bold px-4 py-2 uppercase tracking-wider mt-4">Sign-off & Review Authorization</div>
+                            <div className="grid grid-cols-5 border border-slate-200">
+                              {["Staff", "Senior", "Manager", "Partner", "EQCR"].map((role, i) => (
+                                <div key={i} className={cn("p-3 text-xs", i < 4 && "border-r border-slate-200")}>
+                                  <p className="font-semibold text-slate-600 mb-3">{role}</p>
+                                  <div className="border-b border-slate-400 h-5 mb-2" />
+                                  <p className="text-slate-400 text-[10px]">Name: _____________</p>
+                                  <div className="border-b border-slate-300 h-4 mt-3 mb-2" />
+                                  <p className="text-slate-400 text-[10px]">Date: _____________</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Footer */}
+                          <div className="border-t border-slate-200 pt-3 flex justify-between text-[10px] text-slate-400">
+                            <span>{doc.paperCode} | {session?.clientName} | {session?.engagementYear}</span>
+                            <span>Generated by AuditWise — ISA Compliant</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* ── Auto-chain progress banner ──────────────────────────────────── */}
       {autoChainRunning && (
@@ -6433,9 +6703,19 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
                         <CheckCircle2 className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Approve</span>
                       </Button>
                     )}
+                    {(canExport || head.status === "approved") && (
+                      <Button size="sm" variant="outline" onClick={() => openPreview(head)} className="h-8 px-2.5 sm:px-3 border-blue-200 hover:bg-blue-50 text-blue-700 text-xs">
+                        <Eye className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Preview</span>
+                      </Button>
+                    )}
                     {canExport && (
-                      <Button size="sm" variant="outline" onClick={() => onExport(head.headIndex)} className="h-8 px-2.5 sm:px-3 border-slate-200 hover:bg-slate-50 text-xs">
-                        <Download className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Export</span>
+                      <Button size="sm" variant="outline" onClick={() => onExport(head.headIndex, "word")} className="h-8 px-2.5 sm:px-3 border-slate-200 hover:bg-slate-50 text-xs">
+                        <Download className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Word</span>
+                      </Button>
+                    )}
+                    {canExport && head.headIndex >= 2 && (
+                      <Button size="sm" variant="outline" onClick={() => onExport(head.headIndex, "pdf")} className="h-8 px-2.5 sm:px-3 border-rose-200 hover:bg-rose-50 text-rose-700 text-xs">
+                        <FileText className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">PDF</span>
                       </Button>
                     )}
                     {!isLocked && (

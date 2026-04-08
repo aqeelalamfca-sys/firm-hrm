@@ -2984,12 +2984,13 @@ router.post("/sessions/:id/heads/:headIndex/generate", async (req: Request, res:
 
     for (const paperCode of papers) {
       const wpMeta = WP_METADATA[paperCode] || { name: paperCode, isa: "ISA 500", phase: headDef.name, riskLevel: "Medium", assertions: "C, E, V", fsArea: "All FS Areas" };
-      const paperPrompt = `You are a senior audit partner generating a fully professional, ISA-compliant, audit-defensible working paper for a Pakistani CA firm. Generate working paper "${paperCode}" — "${wpMeta.name}" for the "${headDef.name}" phase.
+      const engCode = `ENG-${session?.engagementYear || "2026"}-${String(sessionId).padStart(3, "0")}`;
+      const paperPrompt = `You are a Big-4 trained senior audit partner generating a COMPLETE, 100% ISA-compliant, ISQM-1 compliant, audit-defensible, inspection-ready working paper for a Pakistani CA firm (ICAP). Generate working paper "${paperCode}" — "${wpMeta.name}" for the "${headDef.name}" phase.
 
 ═══ ENGAGEMENT DETAILS ═══
-Firm: ${session?.firmName || "AuditWise Firm"}
+Firm: ${session?.firmName || "Alam & Aulakh Chartered Accountants"}
 Client: ${session?.clientName || "Unknown"}
-Engagement Code: ENG-${session?.engagementYear || "2026"}-${String(sessionId).padStart(3, "0")}
+Engagement Code: ${engCode}
 Entity Type: ${session?.entityType || "Private Limited"}
 Financial Year End: ${session?.periodEnd || `30 June ${session?.engagementYear || "2026"}`}
 Period: ${session?.periodStart || "01/07/2025"} to ${session?.periodEnd || "30/06/2026"}
@@ -3001,89 +3002,168 @@ Listed Status: ${session?.entityType === "Public Limited (Listed)" ? "Listed / P
 WP Phase: ${wpMeta.phase}
 ISA References: ${wpMeta.isa}
 Risk Level: ${wpMeta.riskLevel}
-FS Area: ${wpMeta.fsArea}
-Assertions: ${wpMeta.assertions}
+FS Area / Scope: ${wpMeta.fsArea}
+Assertions Covered: ${wpMeta.assertions}
 
-═══ ENGAGEMENT VARIABLES ═══
+═══ ENGAGEMENT VARIABLES (from client template & form) ═══
 ${varSummary}
 
 ═══ TRIAL BALANCE SUMMARY ═══
 ${smartChunk(tbSummary, 3000)}
 
-═══ MANDATORY STRUCTURE ═══
-Generate a COMPLETE, SPECIFIC, NON-GENERIC working paper with ALL of the following sections. Every field must reference actual client data, account balances, or ISA-specific procedures. No placeholder text allowed.
+═══ MANDATORY REQUIREMENTS ═══
+Generate a COMPLETE, SPECIFIC, NON-GENERIC working paper. Every field must reference actual client data, actual account balances from the TB above, or specific ISA paragraph numbers. No generic placeholders. All PKR amounts must be realistic and consistent with TB data.
 
-Return ONLY valid JSON with this exact structure:
+Return ONLY valid JSON (no markdown, no extra text) with this EXACT complete structure:
 {
   "paper_code": "${paperCode}",
   "paper_name": "${wpMeta.name}",
   "version": "v1.0",
   "status": "Draft",
-  "objective": "Specific, measurable ISA-aligned objective for this working paper referencing the client and FS area. Minimum 3 sentences.",
+  "lock_status": "draft",
+  "ai_generated": true,
+  "ai_tags": ["ai_generated_v1", "ai_content", "ai_procedures"],
+  "engagement_code": "${engCode}",
+  "lead_schedule_ref": "LS-${headDef.name.replace(/\s/g, "-").toUpperCase().slice(0,8)}-01",
+  "fs_head": "${wpMeta.fsArea}",
+  "tb_codes": ["List actual TB account codes relevant to this WP from the TB data above"],
+  "gl_linkage": "Names of GL accounts reviewed for this WP based on TB data",
+  "prior_year_ref": "${paperCode}-PY or N/A if first year",
+  "isa_references": "${wpMeta.isa}",
+  "objective": "Specific, measurable ISA-aligned objective for this WP referencing the client name and FS area. State the audit objective, the assertions being tested, and the expected outcome. Minimum 4 sentences.",
+  "materiality_linkage": {
+    "overall_materiality_pkr": "Derive from TB total assets or revenue — use realistic PKR amount",
+    "performance_materiality_pkr": "Typically 75% of overall materiality — show calculation",
+    "trivial_threshold_pkr": "Typically 5% of overall materiality",
+    "basis": "Revenue / Total Assets / Profit Before Tax — state which and why",
+    "materiality_pct": "State percentage used e.g. 1.5% of revenue",
+    "applicable_to_this_wp": "How materiality applies to the specific FS area of this WP"
+  },
   "risk_assertion_table": [
     {
       "risk_id": "R001",
-      "risk_description": "Specific risk description referencing client's business or industry",
+      "risk_description": "Specific risk referencing client industry or TB balances",
       "risk_type": "Inherent | Control | Fraud",
-      "fs_area": "Specific FS line item or area",
-      "assertions_impacted": "E, C, V (use: Existence=E, Completeness=C, Accuracy=A, Valuation=V, Rights&Obligations=R, Presentation=P)",
+      "fs_area": "Specific FS line item",
+      "assertions_impacted": "E, C, A, V, R, P",
       "risk_level": "Low | Medium | High | Significant",
-      "risk_register_ref": "PL-03 or DI-07"
+      "risk_register_ref": "DI-01",
+      "isa_reference": "ISA 315 para XX",
+      "mitigating_control": "Control that mitigates this risk"
     }
   ],
   "procedures_table": [
     {
       "proc_id": "P001",
-      "nature": "Test of Control | Substantive | Analytical Review | Inquiry | Observation | Inspection | Confirmation",
-      "description": "Detailed specific audit procedure referencing client data, account names, balances",
+      "nature": "Test of Control | Substantive | Analytical Review | Inquiry | Observation | Inspection | Confirmation | Recalculation",
+      "description": "Detailed specific audit procedure referencing actual account names and TB balances",
       "isa_reference": "ISA XXX para XX",
-      "performed_by": "Staff | Senior | Manager",
-      "planned_date": "During fieldwork",
-      "status": "Planned | In Progress | Complete | Exception"
+      "performed_by": "Staff Auditor | Senior Auditor | Audit Manager | Engagement Partner",
+      "assertions_tested": "E, C, A, V",
+      "planned_date": "During fieldwork Week 1",
+      "actual_date": "Completed",
+      "status": "Complete | In Progress | Planned | Exception",
+      "result": "No exception | Exception noted — describe"
     }
   ],
+  "population": {
+    "description": "Full description of population referencing actual TB balance and GL accounts",
+    "count": 0,
+    "amount_pkr": "PKR X from TB account code XXXX",
+    "source": "Trial Balance / GL / Management Schedule"
+  },
+  "sample": {
+    "basis": "MUS | Random | Haphazard | Judgmental | 100% per ISA 530",
+    "count": 0,
+    "amount_pkr": "PKR X representing X% of population",
+    "coverage_pct": "X%",
+    "selection_rationale": "Rationale per ISA 530"
+  },
   "testing_results": {
-    "population_description": "Description of population tested with reference to TB balance or GL entries",
-    "population_size_pkr": "PKR amount or count",
-    "sampling_method": "MUS | Random | Haphazard | Judgmental | 100% (per ISA 530)",
-    "sample_size": "Number of items",
-    "items_tested": "Number tested",
+    "population_description": "Full description referencing TB balance",
+    "population_count": 0,
+    "population_amount_pkr": "PKR X",
+    "sampling_method": "MUS | Random | Haphazard | Judgmental | 100%",
+    "sample_count": 0,
+    "sample_amount_pkr": "PKR X",
+    "coverage_pct": "X%",
     "exceptions_identified": 0,
     "exception_rate_pct": "0%",
-    "exceptions_detail": ["List of any exceptions found, or 'No exceptions noted'"],
-    "tb_cross_ref": "Account code and name from TB",
-    "gl_cross_ref": "GL account reference"
+    "exceptions_detail": ["No exceptions noted"],
+    "tb_cross_ref": "TB Account Code + Name",
+    "gl_cross_ref": "GL Account name and reference"
   },
+  "work_performed": "DETAILED NARRATIVE (minimum 6 sentences) of exactly what the auditor did: which documents were examined, which balances were traced, which confirmations were sent and received, which calculations were re-performed, what analytical comparisons were made, what management representations were obtained. Must be specific to this client and FS area.",
+  "variance_analysis": [
+    {
+      "line_item": "Specific FS line item from TB",
+      "cy_amount_pkr": "Current year PKR amount",
+      "py_amount_pkr": "Prior year PKR amount",
+      "variance_amount_pkr": "CY minus PY",
+      "variance_pct": "X% increase/decrease",
+      "explanation": "Business reason for variance",
+      "management_response": "Management explanation",
+      "auditor_evaluation": "Whether auditor accepts per ISA 520",
+      "further_action_required": "Yes / No"
+    }
+  ],
   "evidence_table": [
     {
       "evidence_id": "E001",
-      "type": "External | Internal | Analytical | Third-Party",
-      "source": "Source of evidence (e.g., Bank confirmation, Management representation, Invoice)",
+      "type": "External | Internal | Analytical | Third-Party | Physical",
+      "source": "Specific source e.g. Bank confirmation, Management representation, Invoice",
       "reliability": "High | Medium | Low",
       "linked_procedure": "P001",
-      "description": "What the evidence confirms"
+      "isa_reference": "ISA 500 para XX",
+      "description": "What this evidence confirms"
     }
   ],
-  "auditor_judgement": "Minimum 4-sentence professional narrative covering: interpretation of results, professional judgment applied, any contradictions or anomalies, corroboration with other audit areas. Must be specific to this WP and client.",
+  "auditor_judgement": "Minimum 5-sentence professional narrative: interpretation of results, professional judgment applied, contradictions or anomalies found and resolved, corroboration with other WPs, overall risk assessment after procedures.",
+  "proposed_adjustments": [
+    {
+      "adj_id": "ADJ001",
+      "description": "Proposed adjustment or No adjustments proposed",
+      "fs_line": "FS line affected",
+      "amount_pkr": "PKR amount",
+      "debit_credit": "Dr / Cr",
+      "management_accepted": "Yes | No | Partial",
+      "management_explanation": "Reason if rejected",
+      "auditor_position": "Final auditor position"
+    }
+  ],
   "conclusion": {
     "status": "Satisfactory | Satisfactory with Exception | Unsatisfactory | Not Applicable",
-    "basis": "Specific basis for conclusion referencing procedures performed and evidence obtained",
+    "basis": "Specific basis referencing procedures performed and evidence obtained",
+    "misstatements_identified": "None | Describe per ISA 450",
+    "corrected_misstatements_pkr": "PKR 0",
+    "uncorrected_misstatements_pkr": "PKR 0",
     "impact_on_opinion": "No impact | Qualified | Emphasis of Matter | Other Matter",
-    "further_actions": "None required | Specific follow-up actions if any",
-    "misstatements_identified": "None | Description of uncorrected/corrected misstatements per ISA 450"
+    "further_actions": "None required | Specific follow-up",
+    "management_letter_point": "Yes | No",
+    "isa_reference": "ISA 700 / ISA 450"
   },
+  "review_notes": [
+    {
+      "note_id": "RN001",
+      "reviewer": "Audit Manager",
+      "date": "During review",
+      "note": "Review comment or No review queries raised",
+      "status": "Open | Resolved",
+      "resolved_by": "Preparer name"
+    }
+  ],
   "action_points": [
     {
       "issue_id": "AP001",
-      "description": "Specific action or issue if any",
+      "description": "Specific action or No open action points",
       "risk_impact": "Low | Medium | High",
-      "assigned_to": "Manager",
+      "assigned_to": "Staff | Senior | Manager | Partner",
       "deadline": "Before sign-off",
       "status": "Open | Closed | Monitoring"
     }
   ],
-  "cross_references": ["${paperCode} → Related WP codes that this paper cross-references"],
-  "exceptions": ["List of audit exceptions or findings, or empty array if none"]
+  "cross_references": ["${paperCode} links to related WP codes"],
+  "exceptions": []
 }`;
 
       try {
@@ -3508,11 +3588,11 @@ function dxTable(headers: string[], rows: string[][], colWidths?: number[]): Tab
   });
 }
 
-function dxFirmHeader(firmName: string, clientName: string, docTitle: string, period: string, ntn: string, isaRef: string, extra?: { wpCode?: string; version?: string; riskLevel?: string; assertions?: string; phase?: string; fsArea?: string }): (Paragraph | Table)[] {
+function dxFirmHeader(firmName: string, clientName: string, docTitle: string, period: string, ntn: string, isaRef: string, extra?: { wpCode?: string; version?: string; riskLevel?: string; assertions?: string; phase?: string; fsArea?: string; engCode?: string; leadRef?: string; lockStatus?: string; aiGenerated?: boolean }): (Paragraph | Table)[] {
   const riskColor = extra?.riskLevel === "Significant" || extra?.riskLevel === "High" ? DOCX_RED : extra?.riskLevel === "Medium" ? DOCX_AMBER : DOCX_GREEN;
   return [
     new Paragraph({
-      children: [new TextRun({ text: firmName, bold: true, size: 32, color: DOCX_NAVY, font: "Calibri" })],
+      children: [new TextRun({ text: firmName, bold: true, size: 36, color: DOCX_NAVY, font: "Calibri" })],
       alignment: AlignmentType.CENTER,
       spacing: { after: 60 },
     }),
@@ -3521,12 +3601,11 @@ function dxFirmHeader(firmName: string, clientName: string, docTitle: string, pe
       alignment: AlignmentType.CENTER,
       spacing: { after: 160 },
     }),
-    // separator line as a table
     new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
       rows: [new TableRow({ children: [new TableCell({
         shading: { fill: DOCX_NAVY, type: ShadingType.SOLID },
-        children: [new Paragraph({ text: "" })],
+        children: [new Paragraph({ text: "", spacing: { after: 0 } })],
         borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
       })] })],
     }),
@@ -3537,27 +3616,29 @@ function dxFirmHeader(firmName: string, clientName: string, docTitle: string, pe
       spacing: { after: 60 },
     }),
     new Paragraph({
-      children: [new TextRun({ text: docTitle.toUpperCase(), bold: true, size: 30, color: DOCX_BLUE, font: "Calibri" })],
+      children: [new TextRun({ text: docTitle.toUpperCase(), bold: true, size: 32, color: DOCX_BLUE, font: "Calibri" })],
       alignment: AlignmentType.CENTER,
       spacing: { after: 160 },
     }),
-    // 2-column metadata table: left column = label, right column = value
     dxTable(
       ["Field", "Details"],
       [
         ["Client", clientName],
+        ["Engagement Code", extra?.engCode || "—"],
         ["Period", period],
         ["NTN / STRN", ntn || "N/A"],
         ["WP Reference", extra?.wpCode || "—"],
+        ["Lead Schedule Ref", extra?.leadRef || "—"],
         ["WP Version", extra?.version || "v1.0"],
         ["Phase", extra?.phase || docTitle],
         ["ISA References", isaRef || "—"],
         ["Risk Level", extra?.riskLevel || "—"],
         ["FS Area / Scope", extra?.fsArea || "—"],
         ["Assertions Covered", extra?.assertions || "—"],
+        ["AI Generated", extra?.aiGenerated ? "Yes — all fields editable before lock" : "No"],
+        ["Lock Status", extra?.lockStatus || "Draft"],
         ["Generated", new Date().toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" })],
-        ["Status", "DRAFT — For Review"],
-        ["CONFIDENTIAL", "For Audit Use Only — ISA / ISQM-1 Compliant"],
+        ["CONFIDENTIAL", "For Audit Use Only — ISA / ISQM-1 Compliant — Do not distribute"],
       ],
       [30, 70]
     ),
@@ -3632,47 +3713,89 @@ function parseStructuredWP(wp: any): (Paragraph | Table)[] {
   const out: (Paragraph | Table)[] = [];
   const sp = (n = 160) => new Paragraph({ text: "", spacing: { after: n } });
 
-  // ── 1. Objective ──
+  // 1. Objective
   if (wp.objective) {
     out.push(dxSection("1.  OBJECTIVE"));
     out.push(dxBody(wp.objective));
     out.push(sp());
   }
 
-  // ── 2. Risk & Assertion Linkage Table ──
+  // 1a. Materiality Linkage
+  if (wp.materiality_linkage) {
+    const ml = wp.materiality_linkage;
+    out.push(dxSection("1a. MATERIALITY LINKAGE  (ISA 320)"));
+    out.push(dxTable(
+      ["Parameter", "Detail"],
+      [
+        ["Overall Materiality (PKR)", ml.overall_materiality_pkr || "—"],
+        ["Performance Materiality (PKR)", ml.performance_materiality_pkr || "—"],
+        ["Trivial Threshold (PKR)", ml.trivial_threshold_pkr || "—"],
+        ["Materiality Basis", ml.basis || "—"],
+        ["Percentage Used", ml.materiality_pct || "—"],
+        ["Application to this WP", ml.applicable_to_this_wp || "—"],
+      ],
+      [35, 65]
+    ));
+    out.push(sp());
+  }
+
+  // 2. Risk & Assertion Linkage
   if (wp.risk_assertion_table?.length) {
     out.push(dxSection("2.  RISK & ASSERTION LINKAGE  (ISA 315 / ISA 330)"));
     out.push(dxTable(
-      ["Risk ID", "Risk Description", "Type", "FS Area", "Assertions", "Risk Level", "Register Ref"],
-      wp.risk_assertion_table.map((r: any) => [r.risk_id, r.risk_description, r.risk_type, r.fs_area, r.assertions_impacted, r.risk_level, r.risk_register_ref]),
-      [7, 28, 10, 14, 12, 10, 11]
+      ["Risk ID", "Risk Description", "Type", "FS Area", "Assertions", "Risk Level", "ISA Ref", "Mitigating Control"],
+      wp.risk_assertion_table.map((r: any) => [r.risk_id, r.risk_description, r.risk_type, r.fs_area, r.assertions_impacted, r.risk_level, r.isa_reference || r.risk_register_ref, r.mitigating_control || "—"]),
+      [6, 22, 9, 12, 11, 9, 9, 22]
     ));
     out.push(sp());
   }
 
-  // ── 3. Procedures Table ──
+  // 3. Procedures Table
   if (wp.procedures_table?.length) {
     out.push(dxSection("3.  AUDIT PROCEDURES PERFORMED  (ISA 330)"));
     out.push(dxTable(
-      ["Proc ID", "Nature", "Description", "ISA Ref", "By", "Date", "Status"],
-      wp.procedures_table.map((p: any) => [p.proc_id, p.nature, p.description, p.isa_reference, p.performed_by, p.planned_date, p.status]),
-      [7, 13, 35, 12, 8, 12, 13]
+      ["Proc", "Nature", "Description", "ISA Ref", "By", "Assertions", "Status", "Result"],
+      wp.procedures_table.map((p: any) => [p.proc_id, p.nature, p.description, p.isa_reference, p.performed_by, p.assertions_tested || "—", p.status, p.result || "—"]),
+      [5, 13, 30, 10, 9, 9, 9, 15]
     ));
     out.push(sp());
   }
 
-  // ── 4. Testing & Results ──
+  // 4. Population & Sample
+  const pop = wp.population;
+  const samp = wp.sample;
+  if (pop || samp) {
+    out.push(dxSection("4.  POPULATION & SAMPLE SELECTION  (ISA 530)"));
+    const sampBasis = samp ? ("Basis: " + samp.basis) : "—";
+    const sampCoverage = samp?.coverage_pct ? ("Coverage: " + samp.coverage_pct) : "—";
+    out.push(dxTable(
+      ["Parameter", "Population", "Sample"],
+      [
+        ["Description", pop?.description || "—", sampBasis],
+        ["Count (Items)", String(pop?.count ?? "—"), String(samp?.count ?? "—")],
+        ["Amount (PKR)", pop?.amount_pkr || "—", samp?.amount_pkr || "—"],
+        ["Source / Coverage", pop?.source || "—", sampCoverage],
+        ["Selection Rationale", "—", samp?.selection_rationale || "—"],
+      ],
+      [22, 39, 39]
+    ));
+    out.push(sp());
+  }
+
+  // 5. Testing & Results
   if (wp.testing_results) {
     const tr = wp.testing_results;
-    out.push(dxSection("4.  TESTING & RESULTS  (ISA 530 / ISA 500)"));
+    out.push(dxSection("5.  TESTING & RESULTS  (ISA 530 / ISA 500)"));
     out.push(dxTable(
       ["Parameter", "Detail"],
       [
         ["Population Description", tr.population_description || "—"],
-        ["Population Size (PKR)", tr.population_size_pkr || "—"],
+        ["Population Count (Items)", String(tr.population_count ?? tr.population_size_pkr ?? "—")],
+        ["Population Amount (PKR)", tr.population_amount_pkr || tr.population_size_pkr || "—"],
         ["Sampling Method", tr.sampling_method || "—"],
-        ["Sample Size", tr.sample_size || "—"],
-        ["Items Tested", tr.items_tested || "—"],
+        ["Sample Count (Items)", String(tr.sample_count ?? tr.sample_size ?? "—")],
+        ["Sample Amount (PKR)", tr.sample_amount_pkr || "—"],
+        ["Coverage %", tr.coverage_pct || "—"],
         ["Exceptions Identified", String(tr.exceptions_identified ?? "0")],
         ["Exception Rate", tr.exception_rate_pct || "0%"],
         ["TB Cross-Reference", tr.tb_cross_ref || "—"],
@@ -3684,73 +3807,117 @@ function parseStructuredWP(wp: any): (Paragraph | Table)[] {
       out.push(sp(80));
       out.push(dxBody("Exception Details:"));
       for (const exc of tr.exceptions_detail) {
-        out.push(dxBullet(exc));
+        out.push(dxBullet(String(exc)));
       }
     }
     out.push(sp());
   }
 
-  // ── 5. Evidence Documentation ──
+  // 6. Work Performed
+  if (wp.work_performed) {
+    out.push(dxSection("6.  WORK PERFORMED  (ISA 230 / ISA 500)"));
+    out.push(dxBody(wp.work_performed));
+    out.push(sp());
+  }
+
+  // 7. Evidence Documentation
   if (wp.evidence_table?.length) {
-    out.push(dxSection("5.  EVIDENCE DOCUMENTATION  (ISA 500 / ISA 230)"));
+    out.push(dxSection("7.  EVIDENCE DOCUMENTATION  (ISA 500 / ISA 230)"));
     out.push(dxTable(
-      ["Evid ID", "Type", "Source", "Reliability", "Linked Proc", "Description"],
-      wp.evidence_table.map((e: any) => [e.evidence_id, e.type, e.source, e.reliability, e.linked_procedure, e.description]),
-      [8, 12, 18, 10, 10, 42]
+      ["Evid ID", "Type", "Source", "Reliability", "ISA Ref", "Linked Proc", "Description"],
+      wp.evidence_table.map((e: any) => [e.evidence_id, e.type, e.source, e.reliability, e.isa_reference || "ISA 500", e.linked_procedure, e.description]),
+      [7, 11, 16, 9, 9, 9, 39]
     ));
     out.push(sp());
   }
 
-  // ── 6. Auditor's Judgement ──
+  // 8. Variance Analysis
+  if (wp.variance_analysis?.length) {
+    out.push(dxSection("8.  VARIANCE ANALYSIS  (ISA 520 / ISA 315)"));
+    out.push(dxTable(
+      ["FS Line", "CY (PKR)", "PY (PKR)", "Variance", "Var %", "Explanation", "Mgmt Response", "Auditor Eval."],
+      wp.variance_analysis.map((v: any) => [v.line_item, v.cy_amount_pkr, v.py_amount_pkr, v.variance_amount_pkr, v.variance_pct, v.explanation, v.management_response, v.auditor_evaluation]),
+      [12, 10, 10, 10, 7, 18, 16, 17]
+    ));
+    out.push(sp());
+  }
+
+  // 9. Auditor's Judgement
   if (wp.auditor_judgement) {
-    out.push(dxSection("6.  ANALYSIS & AUDITOR'S JUDGEMENT  (ISA 230)"));
+    out.push(dxSection("9.  ANALYSIS & AUDITOR'S JUDGEMENT  (ISA 230)"));
     out.push(dxBody(wp.auditor_judgement));
     out.push(sp());
   }
 
-  // ── 7. Conclusion ──
+  // 10. Proposed Adjustments
+  const adjustments = (wp.proposed_adjustments || []).filter((a: any) => a.description && !/no adjustment/i.test(a.description));
+  if (adjustments.length) {
+    out.push(dxSection("10. PROPOSED ADJUSTMENTS  (ISA 450)"));
+    out.push(dxTable(
+      ["Adj ID", "Description", "FS Line", "Amount (PKR)", "Dr/Cr", "Mgmt Accepted", "Auditor Position"],
+      adjustments.map((a: any) => [a.adj_id, a.description, a.fs_line, a.amount_pkr, a.debit_credit, a.management_accepted, a.auditor_position]),
+      [7, 28, 12, 12, 7, 13, 21]
+    ));
+    out.push(sp());
+  }
+
+  // 11. Conclusion
   if (wp.conclusion) {
     const c = wp.conclusion;
-    out.push(dxSection("7.  CONCLUSION  (ISA 700 / ISA 450)"));
+    out.push(dxSection("11. CONCLUSION  (ISA 700 / ISA 450)"));
     out.push(dxTable(
       ["Field", "Detail"],
       [
         ["Conclusion Status", c.status || "—"],
         ["Basis of Conclusion", c.basis || "—"],
+        ["Corrected Misstatements (PKR)", c.corrected_misstatements_pkr || "PKR 0"],
+        ["Uncorrected Misstatements (PKR)", c.uncorrected_misstatements_pkr || "PKR 0"],
         ["Impact on Audit Opinion", c.impact_on_opinion || "No impact"],
+        ["Management Letter Point", c.management_letter_point || "No"],
         ["Further Actions Required", c.further_actions || "None"],
-        ["Misstatements Identified", c.misstatements_identified || "None"],
+        ["ISA Reference", c.isa_reference || "ISA 700"],
       ],
       [30, 70]
     ));
     out.push(sp());
   }
 
-  // ── 8. Action Points ──
-  if (wp.action_points?.length) {
-    out.push(dxSection("8.  ACTION POINTS & FOLLOW-UPS"));
+  // 12. Review Notes
+  if (wp.review_notes?.length) {
+    out.push(dxSection("12. REVIEW NOTES  (ISQM-1 / ISA 220)"));
     out.push(dxTable(
-      ["Issue ID", "Description", "Risk Impact", "Assigned To", "Deadline", "Status"],
-      wp.action_points.map((a: any) => [a.issue_id, a.description, a.risk_impact, a.assigned_to, a.deadline, a.status]),
-      [8, 40, 10, 12, 15, 10]
+      ["Note ID", "Reviewer", "Date", "Note", "Status", "Resolved By"],
+      wp.review_notes.map((n: any) => [n.note_id, n.reviewer, n.date, n.note, n.status, n.resolved_by || "—"]),
+      [8, 12, 12, 40, 10, 18]
     ));
     out.push(sp());
   }
 
-  // ── 9. Cross-References ──
+  // 13. Action Points
+  if (wp.action_points?.length) {
+    out.push(dxSection("13. ACTION POINTS & FOLLOW-UPS"));
+    out.push(dxTable(
+      ["Issue ID", "Description", "Risk Impact", "Assigned To", "Deadline", "Status"],
+      wp.action_points.map((a: any) => [a.issue_id, a.description, a.risk_impact, a.assigned_to, a.deadline, a.status]),
+      [8, 38, 10, 12, 15, 10]
+    ));
+    out.push(sp());
+  }
+
+  // 14. Cross-References
   if (wp.cross_references?.length) {
-    out.push(dxSection("9.  CROSS-REFERENCES"));
+    out.push(dxSection("14. CROSS-REFERENCES"));
     for (const ref of wp.cross_references) {
-      out.push(dxBullet(ref));
+      out.push(dxBullet(String(ref)));
     }
     out.push(sp());
   }
 
-  // ── 10. Exceptions ──
+  // 15. Exceptions & Findings
   if (wp.exceptions?.length) {
-    out.push(dxSection("10. EXCEPTIONS & FINDINGS"));
+    out.push(dxSection("15. EXCEPTIONS & FINDINGS"));
     for (const exc of wp.exceptions) {
-      out.push(dxBullet(exc));
+      out.push(dxBullet(String(exc)));
     }
     out.push(sp());
   }
@@ -3758,10 +3925,43 @@ function parseStructuredWP(wp: any): (Paragraph | Table)[] {
   return out;
 }
 
+
+// GET head documents for preview
+router.get("/sessions/:id/heads/:headIndex/documents", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    const headIndex = parseInt(p(req.params.headIndex));
+    const heads = await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, headIndex)));
+    if (!heads[0]) return res.status(404).json({ error: "Head not found" });
+    const documents = await db.select().from(wpHeadDocumentsTable).where(eq(wpHeadDocumentsTable.headId, heads[0].id));
+    return res.json({
+      head: {
+        headIndex,
+        headName: heads[0].headName,
+        status: heads[0].status,
+        generatedAt: heads[0].generatedAt,
+        approvedAt: heads[0].approvedAt,
+        approvedBy: heads[0].approvedBy,
+      },
+      documents: documents.map(d => ({
+        id: d.id,
+        paperCode: d.paperCode,
+        paperName: d.paperName,
+        content: d.content ? (() => { try { return JSON.parse(d.content!); } catch { return {}; } })() : {},
+        version: d.version,
+        status: d.status,
+      })),
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 router.post("/sessions/:id/heads/:headIndex/export", async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(p(req.params.id));
     const headIndex = parseInt(p(req.params.headIndex));
+    const exportFormat = ((req.body?.format || req.query?.format || "word") as string).toLowerCase();
 
     const heads = await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, headIndex)));
     if (!heads[0]) return res.status(404).json({ error: "Head not found" });
@@ -3773,6 +3973,7 @@ router.post("/sessions/:id/heads/:headIndex/export", async (req: Request, res: R
     const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
     const clientName = session?.clientName || "Client";
     const ntn = session?.ntn || "N/A";
+    const engCode = `ENG-${session?.engagementYear || "2026"}-${String(sessionId).padStart(3, "0")}`;
     const period = session?.periodStart && session?.periodEnd
       ? `${session.periodStart} to ${session.periodEnd}`
       : session?.engagementYear ? `FY ${session.engagementYear}` : "—";
@@ -4055,6 +4256,247 @@ router.post("/sessions/:id/heads/:headIndex/export", async (req: Request, res: R
       await wb.xlsx.write(res); return res.end();
     }
 
+    // ── HEADS 2-11: PDF output ─────────────────────────────────────────────────
+    if (exportFormat === "pdf" && headIndex >= 2) {
+      const pdfBuf = await new Promise<Buffer>((resolve, reject) => {
+        const doc = new PDFDocument({ size: "A4", margin: 45, info: { Title: `${headDef.name} — ${clientName}`, Author: firmName, Creator: "AuditWise" } });
+        const chunks: Buffer[] = [];
+        doc.on("data", (c: Buffer) => chunks.push(c));
+        doc.on("end", () => resolve(Buffer.concat(chunks)));
+        doc.on("error", reject);
+
+        const NAVY = "#0F3460", BLUE = "#1E3A8A", SLATE = "#475569", LIGHT = "#EFF6FF", RED = "#B91C1C", GREEN = "#15803D";
+        const pgW = doc.page.width - 90;
+
+        const drawHRule = (color = "#CBD5E1", y?: number) => {
+          if (y !== undefined) doc.moveTo(45, y).lineTo(45 + pgW, y).strokeColor(color).lineWidth(0.5).stroke();
+          else doc.moveTo(45, doc.y).lineTo(45 + pgW, doc.y).strokeColor(color).lineWidth(0.5).stroke();
+        };
+
+        const sectionTitle = (text: string) => {
+          doc.moveDown(0.4);
+          drawHRule(BLUE);
+          doc.moveDown(0.2).font("Helvetica-Bold").fontSize(10).fillColor(BLUE).text(text).moveDown(0.3);
+          doc.font("Helvetica").fontSize(9).fillColor("#1E293B");
+        };
+
+        const kv = (label: string, value: string, indent = 0) => {
+          doc.font("Helvetica-Bold").fontSize(8.5).fillColor(SLATE).text(label + ":", { continued: true, indent }).font("Helvetica").fillColor("#1E293B").text("  " + (value || "—"));
+        };
+
+        const bodyText = (text: string) => {
+          doc.font("Helvetica").fontSize(9).fillColor("#1E293B").text(text || "—", { align: "justify", lineGap: 2 }).moveDown(0.3);
+        };
+
+        const simpleTable = (headers: string[], rows: string[][], widths: number[]) => {
+          const total = widths.reduce((s, w) => s + w, 0);
+          const colW = widths.map(w => (w / total) * pgW);
+          let x = 45, y = doc.y;
+          // Header row
+          doc.rect(45, y, pgW, 14).fill(BLUE);
+          let cx = x;
+          headers.forEach((h, i) => {
+            doc.font("Helvetica-Bold").fontSize(7.5).fillColor("white").text(h, cx + 2, y + 3, { width: colW[i] - 4, lineBreak: false });
+            cx += colW[i];
+          });
+          y += 14;
+          // Data rows
+          rows.forEach((row, ri) => {
+            const rowColor = ri % 2 === 0 ? "#F8FAFC" : "white";
+            // estimate row height
+            let maxH = 14;
+            row.forEach((cell, i) => {
+              const h2 = doc.heightOfString(cell || "—", { width: colW[i] - 6, fontSize: 8 });
+              if (h2 + 6 > maxH) maxH = h2 + 6;
+            });
+            if (y + maxH > doc.page.height - 60) { doc.addPage(); y = 45; }
+            doc.rect(45, y, pgW, maxH).fill(rowColor);
+            cx = x;
+            row.forEach((cell, i) => {
+              doc.font("Helvetica").fontSize(8).fillColor("#1E293B").text(cell || "—", cx + 2, y + 3, { width: colW[i] - 6, lineBreak: true });
+              cx += colW[i];
+            });
+            // Border bottom
+            doc.rect(45, y, pgW, maxH).strokeColor("#E2E8F0").lineWidth(0.3).stroke();
+            y += maxH;
+          });
+          doc.y = y + 4;
+        };
+
+        let firstDoc = true;
+        for (const wpDoc of documents) {
+          if (!firstDoc) doc.addPage();
+          firstDoc = false;
+
+          let wpData: any = {};
+          try { wpData = JSON.parse(wpDoc.content || "{}"); } catch {}
+          const meta = WP_METADATA[wpDoc.paperCode] || null;
+          const headIsaR: Record<number, string> = {
+            2: "ISA 210, ISA 220, ISA 300", 3: "ISA 315, ISA 320, ISA 530", 4: "ISA 230, ISA 300",
+            5: "ISA 510, ISA 520", 6: "ISA 315, ISA 330, ISA 540", 7: "ISA 240, ISA 530",
+            8: "ISA 450, ISA 560, ISA 570", 9: "ISA 700, ISA 705, ISA 706", 10: "ISA 220, ISQM 2", 11: "ISQM 1, ISA 220",
+          };
+
+          // COVER HEADER
+          doc.rect(45, 45, pgW, 36).fill(NAVY);
+          doc.font("Helvetica-Bold").fontSize(16).fillColor("white").text(firmName, 55, 52, { width: pgW - 20, lineBreak: false });
+          doc.font("Helvetica").fontSize(8.5).fillColor("#CBD5E1").text("Chartered Accountants  |  Registered with ICAP  |  CONFIDENTIAL — FOR AUDIT USE ONLY", 55, 71, { width: pgW - 20, lineBreak: false });
+          doc.rect(45, 81, pgW, 18).fill(LIGHT);
+          doc.font("Helvetica-Bold").fontSize(10).fillColor(BLUE).text("AUDIT WORKING PAPER", 55, 85, { continued: true }).font("Helvetica").text(`  —  ${headDef.name.toUpperCase()}`, { fillColor: SLATE });
+          doc.y = 110;
+
+          // WP Title
+          doc.font("Helvetica-Bold").fontSize(13).fillColor(NAVY).text(`${wpDoc.paperCode}  —  ${wpDoc.paperName || meta?.name || headDef.name}`).moveDown(0.4);
+          drawHRule(BLUE);
+
+          // Metadata 2-column kv
+          const metaRows: [string, string][] = [
+            ["Client", clientName], ["Engagement Code", engCode], ["Period", period], ["NTN / STRN", ntn],
+            ["WP Version", wpData.version || "v1.0"], ["Phase", meta?.phase || headDef.name],
+            ["ISA References", meta?.isa || headIsaR[headIndex] || "ISA 500"], ["Risk Level", meta?.riskLevel || "Medium"],
+            ["FS Area / Scope", meta?.fsArea || headDef.name], ["Assertions Covered", meta?.assertions || "C, E, A, V"],
+            ["Lead Schedule Ref", wpData.lead_schedule_ref || "—"], ["AI Generated", wpData.ai_generated ? "Yes — all fields editable before lock" : "No"],
+            ["Lock Status", wpData.lock_status || "draft"], ["Generated Date", new Date().toLocaleDateString("en-GB")],
+          ];
+          doc.moveDown(0.3);
+          metaRows.forEach(([k, v]) => kv(k, v, 0));
+          doc.moveDown(0.3);
+
+          // Sections from WP JSON
+          if (wpData.objective) { sectionTitle("1. OBJECTIVE"); bodyText(wpData.objective); }
+          if (wpData.materiality_linkage) {
+            const ml = wpData.materiality_linkage;
+            sectionTitle("1a. MATERIALITY LINKAGE  (ISA 320)");
+            simpleTable(["Parameter", "Detail"], [
+              ["Overall Materiality (PKR)", ml.overall_materiality_pkr || "—"], ["Performance Materiality (PKR)", ml.performance_materiality_pkr || "—"],
+              ["Trivial Threshold (PKR)", ml.trivial_threshold_pkr || "—"], ["Basis", ml.basis || "—"],
+              ["Percentage", ml.materiality_pct || "—"], ["Application", ml.applicable_to_this_wp || "—"],
+            ], [40, 60]);
+          }
+          if (wpData.risk_assertion_table?.length) {
+            sectionTitle("2. RISK & ASSERTION LINKAGE  (ISA 315 / ISA 330)");
+            simpleTable(["Risk ID", "Risk Description", "Type", "FS Area", "Assertions", "Level", "Mitigating Control"],
+              wpData.risk_assertion_table.map((r: any) => [r.risk_id, r.risk_description, r.risk_type, r.fs_area, r.assertions_impacted, r.risk_level, r.mitigating_control || "—"]),
+              [6, 25, 10, 12, 11, 9, 27]);
+          }
+          if (wpData.procedures_table?.length) {
+            sectionTitle("3. AUDIT PROCEDURES PERFORMED  (ISA 330)");
+            simpleTable(["Proc", "Nature", "Description", "ISA Ref", "By", "Status", "Result"],
+              wpData.procedures_table.map((pr: any) => [pr.proc_id, pr.nature, pr.description, pr.isa_reference, pr.performed_by, pr.status, pr.result || "—"]),
+              [5, 14, 30, 11, 9, 9, 22]);
+          }
+          const pop2 = wpData.population, samp2 = wpData.sample;
+          if (pop2 || samp2) {
+            sectionTitle("4. POPULATION & SAMPLE  (ISA 530)");
+            simpleTable(["Parameter", "Population", "Sample"], [
+              ["Description", pop2?.description || "—", samp2 ? "Basis: " + samp2.basis : "—"],
+              ["Count", String(pop2?.count ?? "—"), String(samp2?.count ?? "—")],
+              ["Amount (PKR)", pop2?.amount_pkr || "—", samp2?.amount_pkr || "—"],
+              ["Coverage", pop2?.source || "—", samp2?.coverage_pct ? "Coverage: " + samp2.coverage_pct : "—"],
+            ], [25, 37, 38]);
+          }
+          if (wpData.testing_results) {
+            const tr2 = wpData.testing_results;
+            sectionTitle("5. TESTING & RESULTS  (ISA 530 / ISA 500)");
+            simpleTable(["Parameter", "Detail"], [
+              ["Population Count", String(tr2.population_count ?? tr2.population_size_pkr ?? "—")],
+              ["Population Amount (PKR)", tr2.population_amount_pkr || tr2.population_size_pkr || "—"],
+              ["Sampling Method", tr2.sampling_method || "—"], ["Sample Count", String(tr2.sample_count ?? tr2.sample_size ?? "—")],
+              ["Sample Amount (PKR)", tr2.sample_amount_pkr || "—"], ["Coverage %", tr2.coverage_pct || "—"],
+              ["Exceptions", String(tr2.exceptions_identified ?? "0")], ["Exception Rate", tr2.exception_rate_pct || "0%"],
+              ["TB Cross-Ref", tr2.tb_cross_ref || "—"], ["GL Cross-Ref", tr2.gl_cross_ref || "—"],
+            ], [40, 60]);
+            if (tr2.exceptions_detail?.length) { bodyText("Exception Details: " + tr2.exceptions_detail.join("; ")); }
+          }
+          if (wpData.work_performed) { sectionTitle("6. WORK PERFORMED  (ISA 230)"); bodyText(wpData.work_performed); }
+          if (wpData.evidence_table?.length) {
+            sectionTitle("7. EVIDENCE DOCUMENTATION  (ISA 500)");
+            simpleTable(["ID", "Type", "Source", "Reliability", "Linked Proc", "Description"],
+              wpData.evidence_table.map((e: any) => [e.evidence_id, e.type, e.source, e.reliability, e.linked_procedure, e.description]),
+              [6, 11, 17, 9, 10, 47]);
+          }
+          if (wpData.variance_analysis?.length) {
+            sectionTitle("8. VARIANCE ANALYSIS  (ISA 520)");
+            simpleTable(["FS Line", "CY (PKR)", "PY (PKR)", "Variance", "Var %", "Explanation", "Mgmt Response"],
+              wpData.variance_analysis.map((v: any) => [v.line_item, v.cy_amount_pkr, v.py_amount_pkr, v.variance_amount_pkr, v.variance_pct, v.explanation, v.management_response]),
+              [13, 11, 11, 11, 7, 23, 24]);
+          }
+          if (wpData.auditor_judgement) { sectionTitle("9. AUDITOR'S JUDGEMENT  (ISA 230)"); bodyText(wpData.auditor_judgement); }
+          const adjs = (wpData.proposed_adjustments || []).filter((a: any) => a.description && !/no adjustment/i.test(a.description));
+          if (adjs.length) {
+            sectionTitle("10. PROPOSED ADJUSTMENTS  (ISA 450)");
+            simpleTable(["ID", "Description", "FS Line", "Amount", "Dr/Cr", "Mgmt Accepted", "Auditor Position"],
+              adjs.map((a: any) => [a.adj_id, a.description, a.fs_line, a.amount_pkr, a.debit_credit, a.management_accepted, a.auditor_position]),
+              [7, 26, 12, 12, 7, 13, 23]);
+          }
+          if (wpData.conclusion) {
+            const c = wpData.conclusion;
+            sectionTitle("11. CONCLUSION  (ISA 700 / ISA 450)");
+            const concColor = c.status === "Satisfactory" ? GREEN : c.status === "Unsatisfactory" ? RED : SLATE;
+            doc.font("Helvetica-Bold").fontSize(11).fillColor(concColor).text(c.status || "—").moveDown(0.3);
+            doc.font("Helvetica").fontSize(9).fillColor("#1E293B");
+            simpleTable(["Field", "Detail"], [
+              ["Basis", c.basis || "—"], ["Corrected Misstatements (PKR)", c.corrected_misstatements_pkr || "PKR 0"],
+              ["Uncorrected Misstatements (PKR)", c.uncorrected_misstatements_pkr || "PKR 0"],
+              ["Impact on Opinion", c.impact_on_opinion || "No impact"], ["Management Letter Point", c.management_letter_point || "No"],
+              ["Further Actions", c.further_actions || "None"], ["ISA Reference", c.isa_reference || "ISA 700"],
+            ], [35, 65]);
+          }
+          if (wpData.review_notes?.length) {
+            sectionTitle("12. REVIEW NOTES  (ISQM-1 / ISA 220)");
+            simpleTable(["Note ID", "Reviewer", "Date", "Note", "Status", "Resolved By"],
+              wpData.review_notes.map((n: any) => [n.note_id, n.reviewer, n.date, n.note, n.status, n.resolved_by || "—"]),
+              [8, 12, 12, 40, 10, 18]);
+          }
+          if (wpData.cross_references?.length) {
+            sectionTitle("14. CROSS-REFERENCES");
+            wpData.cross_references.forEach((r: string) => doc.font("Helvetica").fontSize(9).fillColor("#1E293B").text("• " + r).moveDown(0.1));
+          }
+
+          // SIGN-OFF BLOCK
+          doc.moveDown(1);
+          if (doc.y > doc.page.height - 130) doc.addPage();
+          drawHRule(BLUE);
+          doc.moveDown(0.4).font("Helvetica-Bold").fontSize(10).fillColor(BLUE).text("SIGN-OFF & REVIEW  (ISQM-1 / ISA 220 COMPLIANT)").moveDown(0.5);
+          const signLevels = ["Staff Preparer", "Senior Auditor", "Audit Manager", "Engagement Partner", "EQCR Reviewer"];
+          const colW2 = pgW / 5;
+          const signY = doc.y;
+          // header row
+          doc.rect(45, signY, pgW, 16).fill(BLUE);
+          signLevels.forEach((lv, i) => {
+            doc.font("Helvetica-Bold").fontSize(8).fillColor("white").text(lv, 45 + i * colW2 + 3, signY + 4, { width: colW2 - 6, lineBreak: false });
+          });
+          // sign row
+          const signRowY = signY + 16;
+          doc.rect(45, signRowY, pgW, 60).fill("#F8FAFC").strokeColor("#E2E8F0").lineWidth(0.3).stroke();
+          signLevels.forEach((_, i) => {
+            const cx2 = 45 + i * colW2 + 3;
+            doc.font("Helvetica").fontSize(8).fillColor("#1E293B")
+              .text("Name: _______________", cx2, signRowY + 5, { width: colW2 - 6, lineBreak: false }).moveDown(0.4)
+              .text("Signature: ___________", cx2, signRowY + 18, { width: colW2 - 6, lineBreak: false })
+              .text("Date: _______________", cx2, signRowY + 31, { width: colW2 - 6, lineBreak: false })
+              .text("☐ Sat  ☐ Sat w/Exc  ☐ Unsat", cx2, signRowY + 44, { width: colW2 - 6, lineBreak: false });
+          });
+          doc.y = signRowY + 66;
+
+          // Page footer
+          drawHRule("#E2E8F0");
+          doc.moveDown(0.2).font("Helvetica").fontSize(7.5).fillColor("#94A3B8")
+            .text(`${firmName}  |  CONFIDENTIAL — For Audit Use Only  |  ${clientName}  |  ${period}  |  Generated: ${new Date().toLocaleDateString("en-GB")}`, { align: "center" });
+          doc.moveDown(0.1).font("Helvetica-Bold").fontSize(8).fillColor(SLATE).text("⚠  LOCKED after Engagement Partner sign-off. Amendment requires EQCR re-review per ISQM 1.", { align: "center" });
+        }
+
+        // Page numbers
+        const pagesR = (doc as any)._pageBuffer?.length || 0;
+        doc.end();
+      });
+
+      await db.update(wpHeadsTable).set({ status: "exported", exportedAt: new Date(), updatedAt: new Date() }).where(eq(wpHeadsTable.id, heads[0].id));
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${headDef.name.replace(/\s/g, "_")}_${clientName.replace(/\s/g, "_")}_${session?.engagementYear || sessionId}.pdf"`);
+      return res.send(pdfBuf);
+    }
+
     // ── HEADS 2-11: WORD / WORD+EXCEL / WORD+PDF output ──────────────────────
     const headIsaRefs: Record<number, string> = {
       2: "ISA 200, ISA 210, ISA 220, ISA 300, ISA 315",
@@ -4092,6 +4534,10 @@ router.post("/sessions/:id/heads/:headIndex/export", async (req: Request, res: R
         assertions: meta?.assertions || "C, E, A, V",
         phase: meta?.phase || headDef.name,
         fsArea: meta?.fsArea || "All FS Areas",
+        engCode,
+        leadRef: wpData.lead_schedule_ref || "—",
+        lockStatus: wpData.lock_status || "draft",
+        aiGenerated: wpData.ai_generated === true,
       }));
 
       // WP title bar
