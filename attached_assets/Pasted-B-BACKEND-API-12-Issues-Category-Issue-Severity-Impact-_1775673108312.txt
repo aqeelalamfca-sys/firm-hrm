@@ -1,0 +1,16 @@
+B. BACKEND / API — 12 Issues
+#	Category	Issue	Severity	Impact	
+1	No Transactions	Multi-table operations (session creation, extraction, TB/GL generation) never use db.transaction() — partial failures leave data in inconsistent state	Critical	Data corruption risk	Link directly the uploaded template & input fields with the Variables & Working Papers
+2	N+1 Queries	Session creation loops db.insert per head (12 inserts). AI-fill loops individual db.update per variable. TB generation loops individual inserts	High	Severe performance degradation at scale	Fix it 
+3	No Pagination	All list endpoints (GET /sessions, GET /variables, GET /exceptions, GET /version-history) fetch ALL records with no limit/offset	High	Will timeout with large datasets	Fix it.
+4	No Input Validation	Routes accept any string for status, riskLevel, etc. without validating against allowed values — no Zod schema validation on request bodies	High	Invalid data can enter DB	Fix it.
+5	No Role-Based Access	All authenticated users can access all WP routes — a "trainee" can sign off as "partner" or delete sessions	Critical	Security vulnerability	Fix it
+6	No Rate Limiting on AI	AI-heavy routes (/ai-fill, /ai-generate, compliance doc generation) lack specific rate limits — a loop of API calls could exhaust quota	Medium	Cost/availability risk	Make the good and make robusttic working Paper generator.
+7	Inconsistent Error Responses	Some routes return { error: "message" }, others { message: "...", data: ... }	Low	Frontend error handling inconsistency	Fix it.
+8	Empty Catch Blocks	Several backend catch blocks only re-throw err.message without logging — errors may be swallowed	Medium	Debugging difficulty	Fix it
+
+9	Raw SQL Patterns	Some complex queries use db.execute(sql...) instead of the query builder — harder to maintain	Low	Maintenance risk	Fix it
+10	No File Size Limits per Category	Upload middleware has a global 30MB limit but doesn't enforce per-category limits (template vs supporting doc)	Low	Oversized uploads accepted	
+11	as any Type Casts	Extensive use of as any throughout the file masks potential type safety issues	Low	Hidden bugs	Fix it
+12	No Cleanup Mechanism	Deleted sessions leave behind uploaded files on disk (no file cleanup on session delete)	Medium	Storage leak	Fix it
+________________________________________

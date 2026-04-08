@@ -141,8 +141,10 @@ export default function WorkingPapers() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrm_token") : null;
-  const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+  const getToken = useCallback(() => typeof window !== "undefined" ? localStorage.getItem("hrm_token") : null, []);
+  const headers: Record<string, string> = getToken() ? { Authorization: `Bearer ${getToken()}` } : {};
+  const [showBackConfirm, setShowBackConfirm] = useState(false);
+  const [extractionStep, setExtractionStep] = useState<string>("");
 
   const [sessions, setSessions] = useState<any[]>([]);
   const [activeSession, setActiveSession] = useState<any>(null);
@@ -237,11 +239,25 @@ export default function WorkingPapers() {
 
   useEffect(() => { fetchSessions(); fetchTeamMembers(); }, []);
 
+  useEffect(() => {
+    const handleKeyboard = (e: KeyboardEvent) => {
+      if (!activeSession) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      const stageKeys: string[] = STAGES.map(s => s.key as string);
+      const idx = stageKeys.indexOf(stage);
+      if (e.altKey && e.key === "ArrowRight" && idx < stageKeys.length - 1) { e.preventDefault(); setStage(stageKeys[idx + 1]); }
+      if (e.altKey && e.key === "ArrowLeft" && idx > 0) { e.preventDefault(); setStage(stageKeys[idx - 1]); }
+      if (e.altKey && e.key === "r") { e.preventDefault(); fetchSession(activeSession.id); }
+    };
+    window.addEventListener("keydown", handleKeyboard);
+    return () => window.removeEventListener("keydown", handleKeyboard);
+  }, [activeSession, stage]);
+
   const fetchTeamMembers = async () => {
     try {
       const res = await fetch(`${API_BASE}/working-papers/team-members`, { headers });
       if (res.ok) setTeamMembers(await res.json());
-    } catch {}
+    } catch { toast({ title: "Failed to load team members", variant: "destructive" }); }
   };
 
   const statusToStageMap: Record<string, string> = {
@@ -277,7 +293,7 @@ export default function WorkingPapers() {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions`, { headers });
       if (res.ok) setSessions(await res.json());
-    } catch {}
+    } catch { toast({ title: "Failed to load sessions", variant: "destructive" }); }
   };
 
   const fetchSession = async (id: number) => {
@@ -290,7 +306,7 @@ export default function WorkingPapers() {
         fetchComplianceDocs(id);
         return data;
       }
-    } catch {} finally { setLoading(false); }
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); } finally { setLoading(false); }
   };
 
   const createSession = async () => {
@@ -302,6 +318,10 @@ export default function WorkingPapers() {
     if (!newPeriodEnd) missing.push("Period End");
     if (missing.length > 0) {
       toast({ title: "Required fields missing", description: missing.join(", "), variant: "destructive" });
+      return;
+    }
+    if (newPeriodStart && newPeriodEnd && new Date(newPeriodEnd) <= new Date(newPeriodStart)) {
+      toast({ title: "Invalid date range", description: "Period End must be after Period Start", variant: "destructive" });
       return;
     }
     try {
@@ -472,13 +492,13 @@ export default function WorkingPapers() {
 
   const handleExtractData = async () => {
     if (!activeSession) return;
-    // Step 1: Create all variable rows from session metadata first
-    // (autoFillVariablesFromTemplate only UPDATES existing rows, so rows must exist first)
+    setExtractionStep("Step 1/3: Creating variable rows from session metadata…");
     await autoFillVariables();
-    // Step 2: Parse template and overwrite relevant variables with template values (highest source)
+    setExtractionStep("Step 2/3: Parsing template and mapping financial data…");
     await handleParseTemplate();
-    // Step 3: Sync UI state — fetch all variables (template-filled + session-meta defaults)
+    setExtractionStep("Step 3/3: Syncing all variables…");
     await fetchVariables();
+    setExtractionStep("");
     setStage("extraction");
   };
 
@@ -541,7 +561,7 @@ export default function WorkingPapers() {
       setCoaLoading(true);
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/coa`, { headers });
       if (res.ok) setCoaData(await res.json());
-    } catch {} finally { setCoaLoading(false); }
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); } finally { setCoaLoading(false); }
   };
 
   const populateCoa = async () => {
@@ -580,7 +600,7 @@ export default function WorkingPapers() {
         const err = await res.json();
         toast({ title: "Update failed", description: err.error, variant: "destructive" });
       }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const addCoaRow = async (row: any) => {
@@ -598,7 +618,7 @@ export default function WorkingPapers() {
         const err = await res.json();
         toast({ title: "Add failed", description: err.error, variant: "destructive" });
       }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const deleteCoaRow = async (rowId: number) => {
@@ -611,7 +631,7 @@ export default function WorkingPapers() {
         setCoaData(prev => prev.filter(r => r.id !== rowId));
         toast({ title: "Row deleted" });
       }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const validateCoa = async (): Promise<any> => {
@@ -621,7 +641,7 @@ export default function WorkingPapers() {
         method: "POST", headers: { ...headers, "Content-Type": "application/json" },
       });
       if (res.ok) return await res.json();
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
     return { valid: false, issues: ["Validation request failed"] };
   };
 
@@ -654,7 +674,7 @@ export default function WorkingPapers() {
         setArrangedData(data);
         if (data.tabNames?.length > 0 && !activeTab) setActiveTab(data.tabNames[0]);
       }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const fetchAuditMaster = async () => {
@@ -663,7 +683,7 @@ export default function WorkingPapers() {
       setAuditMasterLoading(true);
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/audit-engine`, { headers });
       if (res.ok) setAuditMaster(await res.json());
-    } catch {} finally { setAuditMasterLoading(false); }
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); } finally { setAuditMasterLoading(false); }
   };
 
   const updateAuditMaster = async (updates: any) => {
@@ -674,7 +694,7 @@ export default function WorkingPapers() {
         body: JSON.stringify(updates),
       });
       if (res.ok) { setAuditMaster(await res.json()); toast({ title: "Audit engine updated" }); }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const autoPopulateAuditMaster = async () => {
@@ -698,7 +718,7 @@ export default function WorkingPapers() {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/wp-triggers`, { headers });
       if (res.ok) setWpTriggers(await res.json());
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const evaluateWpTriggers = async () => {
@@ -710,7 +730,7 @@ export default function WorkingPapers() {
       const data = await res.json();
       if (res.ok) { toast({ title: "WP Triggers Evaluated", description: data.message }); await fetchWpTriggers(); }
       else toast({ title: "Evaluation failed", description: data.error, variant: "destructive" });
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const updateWpTrigger = async (wpCode: string, updates: any) => {
@@ -727,7 +747,7 @@ export default function WorkingPapers() {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/sampling`, { headers });
       if (res.ok) setSamplingData(await res.json());
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const fetchAnalytics = async () => {
@@ -735,7 +755,7 @@ export default function WorkingPapers() {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/analytics`, { headers });
       if (res.ok) setAnalyticsData(await res.json());
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const fetchControlMatrix = async () => {
@@ -743,7 +763,7 @@ export default function WorkingPapers() {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/control-matrix`, { headers });
       if (res.ok) setControlMatrix(await res.json());
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const updateControlMatrix = async (id: number, updates: any) => {
@@ -775,7 +795,7 @@ export default function WorkingPapers() {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/evidence`, { headers });
       if (res.ok) setEvidenceLog(await res.json());
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const addEvidence = async (ev: any) => {
@@ -811,7 +831,7 @@ export default function WorkingPapers() {
         setReconResults(data.checks);
         toast({ title: data.allPassed ? "All checks passed ✓" : "Issues found", description: data.summary, variant: data.allPassed ? "default" : "destructive" });
       }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const approveAllFields = async () => {
@@ -827,7 +847,7 @@ export default function WorkingPapers() {
         fetchVariables();
         setStage("extraction");
       }
-    } catch {} finally { setLoading(false); }
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); } finally { setLoading(false); }
   };
 
   const autoFillVariables = async () => {
@@ -846,7 +866,7 @@ export default function WorkingPapers() {
       }
       // Always fetch — template-filled variables may already be in DB even if auto-fill fails
       await fetchVariables();
-    } catch {} finally { setLoading(false); }
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); } finally { setLoading(false); }
   };
 
   const handleAiFill = async () => {
@@ -893,7 +913,7 @@ export default function WorkingPapers() {
         setVariableStats(data.stats || null);
         setChangeLog(data.changeLog || []);
       }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const saveVariableEdit = async (varId: number) => {
@@ -913,7 +933,7 @@ export default function WorkingPapers() {
         const err = await res.json();
         toast({ title: "Update failed", description: err.error, variant: "destructive" });
       }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const saveVariableDirect = async (varId: number, value: string, reason: string = "User edit") => {
@@ -929,7 +949,7 @@ export default function WorkingPapers() {
       } else {
         await fetchVariables();
       }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const lockAllVariables = async () => {
@@ -959,7 +979,7 @@ export default function WorkingPapers() {
           toast({ title: "Cannot lock", description: err.error || "Mandatory variables missing", variant: "destructive" });
         }
       }
-    } catch {} finally { setLoading(false); }
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); } finally { setLoading(false); }
   };
 
   const lockSection = async (group: string) => {
@@ -976,7 +996,7 @@ export default function WorkingPapers() {
         const err = await res.json();
         toast({ title: "Cannot lock section", description: err.error, variant: "destructive" });
       }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const markVariableReviewed = async (varId: number) => {
@@ -990,7 +1010,7 @@ export default function WorkingPapers() {
         toast({ title: "Marked as reviewed" });
         await fetchVariables();
       }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const reviewAllVariables = async () => {
@@ -1005,7 +1025,7 @@ export default function WorkingPapers() {
         toast({ title: data.message || "All variables marked as reviewed" });
         await fetchVariables();
       }
-    } catch {} finally { setLoading(false); }
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); } finally { setLoading(false); }
   };
 
   const validateVariables = async () => {
@@ -1018,7 +1038,7 @@ export default function WorkingPapers() {
         const data = await res.json();
         return data;
       }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
     return { issues: [], totalIssues: 0 };
   };
 
@@ -1031,7 +1051,8 @@ export default function WorkingPapers() {
     setLoading(true);
     let hi = startHeadIndex;
     try {
-      while (hi <= 11 && !chainStopRef.current) {
+      const maxHead = Math.max(11, (heads?.length || 12) - 1);
+      while (hi <= maxHead && !chainStopRef.current) {
         setAutoChainCurrentHead(hi);
         let url = "";
         if (hi === 0) url = `${API_BASE}/working-papers/sessions/${activeSession.id}/generate-tb`;
@@ -1058,13 +1079,13 @@ export default function WorkingPapers() {
           await fetchSession(activeSession.id);
           break;
         }
-        toast({ title: `Head ${hi + 1} approved`, description: hi < 11 ? `Starting head ${hi + 2}…` : "All heads complete!" });
+        toast({ title: `Head ${hi + 1} approved`, description: hi < maxHead ? `Starting head ${hi + 2}…` : "All heads complete!" });
         await fetchSession(activeSession.id);
         await fetchExceptions();
         hi++;
       }
-      if (hi > 11 && !chainStopRef.current) {
-        toast({ title: "All 12 heads generated & approved", description: "Download your working papers from the panel." });
+      if (hi > maxHead && !chainStopRef.current) {
+        toast({ title: `All ${maxHead + 1} heads generated & approved`, description: "Download your working papers from the panel." });
       }
     } catch (e: any) {
       toast({ title: "Chain interrupted", description: e?.message, variant: "destructive" });
@@ -1196,7 +1217,7 @@ export default function WorkingPapers() {
           try {
             await fetchSession(activeSession.id);
             await fetchExceptions();
-          } catch {}
+          } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
           // Stop polling after 10 minutes (40 × 15s) or if all heads approved
           if (pollCount >= 40) {
             clearInterval(pollInterval);
@@ -1230,7 +1251,7 @@ export default function WorkingPapers() {
         URL.revokeObjectURL(url);
         toast({ title: "Bundle exported" });
       }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const [exportingQuick, setExportingQuick] = useState<string | null>(null);
@@ -1271,7 +1292,7 @@ export default function WorkingPapers() {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${sid}/compliance-docs`, { headers });
       if (res.ok) { const data = await res.json(); setComplianceDocs(data.docs || []); }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const generateComplianceDoc = async (docType: string) => {
@@ -1301,7 +1322,7 @@ export default function WorkingPapers() {
       });
       if (res.ok) { toast({ title: "Status updated" }); await fetchComplianceDocs(); }
       else { const err = await res.json(); toast({ title: "Failed", description: err.error, variant: "destructive" }); }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const updateChecklistItem = async (docType: "eqcr_checklist" | "secp_ccg", itemCode: string, status: string, comment: string) => {
@@ -1316,7 +1337,7 @@ export default function WorkingPapers() {
       });
       if (res.ok) { const data = await res.json(); if (data.allComplete) toast({ title: "Checklist complete!" }); await fetchComplianceDocs(); }
       else { const err = await res.json(); toast({ title: "Update failed", description: err.error, variant: "destructive" }); }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const fetchAuditChain = async () => {
@@ -1324,7 +1345,7 @@ export default function WorkingPapers() {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/audit-chain`, { headers });
       if (res.ok) { const data = await res.json(); setAuditChains(data.chains || []); setAuditChainSummary(data.summary || null); }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const generateAuditChain = async (fsArea?: string, useAI?: boolean) => {
@@ -1350,7 +1371,7 @@ export default function WorkingPapers() {
         body: JSON.stringify(updates),
       });
       if (res.ok) { await fetchAuditChain(); }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const fetchReviewNotes = async () => {
@@ -1358,7 +1379,7 @@ export default function WorkingPapers() {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/review-notes`, { headers });
       if (res.ok) { const data = await res.json(); setReviewNotes(data.notes || []); setReviewSummary(data.summary || null); }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const addReviewNote = async (note: any) => {
@@ -1368,7 +1389,7 @@ export default function WorkingPapers() {
         method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(note),
       });
       if (res.ok) { toast({ title: "Review note added" }); await fetchReviewNotes(); }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const respondToReviewNote = async (noteId: number, responseBy: string, responseText: string) => {
@@ -1379,7 +1400,7 @@ export default function WorkingPapers() {
         body: JSON.stringify({ responseBy, responseText }),
       });
       await fetchReviewNotes();
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const clearReviewNote = async (noteId: number, clearedBy: string, clearanceNote: string) => {
@@ -1391,7 +1412,7 @@ export default function WorkingPapers() {
       });
       toast({ title: "Review note cleared" });
       await fetchReviewNotes();
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const fetchComplianceGates = async () => {
@@ -1399,7 +1420,7 @@ export default function WorkingPapers() {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/compliance-gates`, { headers });
       if (res.ok) { const data = await res.json(); setComplianceGates(data.gates || []); setComplianceGateSummary(data.summary || null); }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const runComplianceValidation = async () => {
@@ -1410,7 +1431,7 @@ export default function WorkingPapers() {
         method: "POST", headers: { ...headers, "Content-Type": "application/json" },
       });
       if (res.ok) { const data = await res.json(); setComplianceGates(data.gates || []); setComplianceGateSummary(data.summary || null); toast({ title: `Compliance: ${data.summary?.compliancePct}%` }); }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
     finally { setIsaLoading(false); }
   };
 
@@ -1419,7 +1440,7 @@ export default function WorkingPapers() {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/tick-marks`, { headers });
       if (res.ok) { const data = await res.json(); setTickMarks(data.marks || []); setTickMarkLegend(data.legend || []); }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const initTickMarks = async () => {
@@ -1429,7 +1450,7 @@ export default function WorkingPapers() {
         method: "POST", headers: { ...headers, "Content-Type": "application/json" },
       });
       await fetchTickMarks();
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const fetchVersionHistory = async () => {
@@ -1437,7 +1458,7 @@ export default function WorkingPapers() {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/version-history`, { headers });
       if (res.ok) { const data = await res.json(); setVersionHistory(data.history || []); }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const fetchLeadSchedules = async () => {
@@ -1445,7 +1466,7 @@ export default function WorkingPapers() {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/lead-schedules`, { headers });
       if (res.ok) { const data = await res.json(); setLeadSchedules(data.schedules || []); }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const generateLeadSchedules = async () => {
@@ -1457,7 +1478,7 @@ export default function WorkingPapers() {
       });
       if (res.ok) { toast({ title: "Lead schedules generated" }); await fetchLeadSchedules(); }
       else { const err = await res.json(); toast({ title: "Failed", description: err.error, variant: "destructive" }); }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
     finally { setIsaLoading(false); }
   };
 
@@ -1466,7 +1487,7 @@ export default function WorkingPapers() {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/fs-note-mapping`, { headers });
       if (res.ok) { const data = await res.json(); setFsNoteMappings(data.mappings || []); }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const generateFsNoteMappings = async () => {
@@ -1477,7 +1498,7 @@ export default function WorkingPapers() {
         method: "POST", headers: { ...headers, "Content-Type": "application/json" },
       });
       if (res.ok) { toast({ title: "FS notes mapped" }); await fetchFsNoteMappings(); }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
     finally { setIsaLoading(false); }
   };
 
@@ -1486,7 +1507,7 @@ export default function WorkingPapers() {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/sampling-detail`, { headers });
       if (res.ok) { const data = await res.json(); setSamplingDetails(data.details || []); }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const uploadTemplate = async (file: File) => {
@@ -1515,7 +1536,7 @@ export default function WorkingPapers() {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/exceptions`, { headers });
       if (res.ok) setExceptions(await res.json());
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
   const resolveException = async (excId: number, status: string, resolution?: string) => {
@@ -1650,7 +1671,7 @@ export default function WorkingPapers() {
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-slate-600">Engagement Year <span className="text-red-500">*</span></label>
                     <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newYear} onChange={e => handleYearChange(e.target.value)}>
-                      {[2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030].map(y => (
+                      {Array.from({ length: 15 }, (_, i) => new Date().getFullYear() - 5 + i).map(y => (
                         <option key={y} value={String(y)}>{y}</option>
                       ))}
                     </select>
@@ -1783,7 +1804,7 @@ export default function WorkingPapers() {
                   const statusDot = isDone ? "bg-emerald-500" : s.status === "generation" ? "bg-blue-500" : s.status === "upload" || s.status === "draft" ? "bg-slate-300" : "bg-amber-400";
                   const initials = (s.clientName || "?").split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase();
                   return (
-                    <div key={s.id} className="group bg-white border border-slate-200/80 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-200/80 cursor-pointer transition-all duration-200" onClick={() => fetchSession(s.id)}>
+                    <div key={s.id} role="button" tabIndex={0} aria-label={`Open session: ${s.clientName} ${s.engagementYear}`} className="group bg-white border border-slate-200/80 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-200/80 cursor-pointer transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 outline-none" onClick={() => fetchSession(s.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fetchSession(s.id); } }}>
                       <div className="p-4">
                         <div className="flex items-start gap-3">
                           <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[13px] font-bold text-white shrink-0"
@@ -1843,7 +1864,7 @@ export default function WorkingPapers() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="py-4 sm:py-5">
             <div className="flex items-start gap-3 sm:gap-4">
-              <button onClick={() => { stageInitialisedRef.current = false; setActiveSession(null); setStage("upload"); }} className="mt-0.5 p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors shrink-0">
+              <button onClick={() => setShowBackConfirm(true)} className="mt-0.5 p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors shrink-0" aria-label="Back to session list">
                 <ArrowLeft className="w-4 h-4" />
               </button>
               <div className="flex-1 min-w-0">
@@ -1875,7 +1896,7 @@ export default function WorkingPapers() {
                   )}
                 </div>
               </div>
-              <button onClick={() => { fetchExceptions(); setShowExceptionsPanel(!showExceptionsPanel); }} className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 transition-colors text-xs font-medium border border-amber-400/20">
+              <button aria-label="Toggle exceptions panel" onClick={() => { fetchExceptions(); setShowExceptionsPanel(!showExceptionsPanel); }} className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 transition-colors text-xs font-medium border border-amber-400/20">
                 <AlertTriangle className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Exceptions</span> ({exceptions.filter((e: any) => e.status === "open").length})
               </button>
@@ -1883,7 +1904,7 @@ export default function WorkingPapers() {
           </div>
 
           {/* Phase strip */}
-          <div className="hidden sm:flex items-center gap-0 pt-2 pb-0 text-[9px] font-bold uppercase tracking-widest">
+          <div className="flex items-center gap-0 pt-2 pb-0 text-[9px] font-bold uppercase tracking-widest overflow-x-auto scrollbar-hide">
             {([
               { label: "Facts", keys: ["upload","extraction"] as string[], color: "blue" },
               { label: "Defensible Output", keys: ["wp_listing","generation"] as string[], color: "emerald" },
@@ -1990,6 +2011,29 @@ export default function WorkingPapers() {
         </div>
       </div>
 
+      {showBackConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full mx-4 p-6">
+            <h3 className="font-semibold text-slate-900 text-base mb-2">Leave this session?</h3>
+            <p className="text-sm text-slate-500 mb-5">Your progress is saved, but you'll return to the session list. Are you sure you want to go back?</p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setShowBackConfirm(false)}>Cancel</Button>
+              <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={() => { setShowBackConfirm(false); stageInitialisedRef.current = false; setActiveSession(null); setStage("upload"); }}>Leave Session</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {extractionStep && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 p-6 text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-3" />
+            <p className="font-semibold text-slate-900 text-sm">{extractionStep}</p>
+            <p className="text-xs text-slate-400 mt-1">Please wait while the system processes your data…</p>
+          </div>
+        </div>
+      )}
+
       {showExceptionsPanel && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
           <div className="bg-white border border-amber-200 rounded-2xl shadow-sm overflow-hidden">
@@ -2064,6 +2108,7 @@ export default function WorkingPapers() {
           onExtractData={handleExtractData}
           onDeleteFile={handleDeleteFile}
           loading={parseLoading || loading}
+          onUploadTemplate={uploadTemplate}
         />
       )}
 
@@ -2332,7 +2377,7 @@ function AiSettingsModal({ apiBase, headers, onClose }: { apiBase: string; heade
         if (provRow?.value) setProvider(provRow.value);
         if (modRow?.value) setModel(modRow.value);
         if (urlRow?.value) setBaseUrl(urlRow.value);
-      } catch {}
+      } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
     };
     load();
   }, [apiBase]);
@@ -2700,7 +2745,7 @@ function WorkbookPipelinePanel({ onExtract, extracting, report, onClose }: any) 
   );
 }
 
-function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onUpload, onExtractData, onDeleteFile, loading }: any) {
+function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onUpload, onExtractData, onDeleteFile, loading, onUploadTemplate }: any) {
   const { toast } = useToast();
   const [tplDrag, setTplDrag] = useState(false);
   const [supDrag, setSupDrag] = useState(false);
@@ -2830,9 +2875,16 @@ function UploadStage({ files, setFiles, uploadedFiles, fileInputRef, onUpload, o
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-600">{tplQueue.length} template file{tplQueue.length > 1 ? "s" : ""} ready</span>
-                <Button onClick={onUpload} disabled={loading} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white h-7 text-xs px-3">
-                  {loading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Upload className="w-3 h-3 mr-1" />} Upload
-                </Button>
+                <div className="flex gap-1.5">
+                  <Button onClick={onUpload} disabled={loading} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white h-7 text-xs px-3" aria-label="Upload template file">
+                    {loading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Upload className="w-3 h-3 mr-1" />} Upload
+                  </Button>
+                  {onUploadTemplate && tplQueue.length > 0 && (
+                    <Button onClick={() => { if (tplQueue[0]) onUploadTemplate(tplQueue[0].file); }} disabled={loading} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 text-xs px-3" aria-label="Upload and process template with ISA mapping">
+                      {loading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Shield className="w-3 h-3 mr-1" />} Upload + ISA Process
+                    </Button>
+                  )}
+                </div>
               </div>
               <div className="space-y-1.5">
                 {tplQueue.map((uf: any) => {
@@ -3435,8 +3487,8 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
     return (
       <div className={cn("grid py-1 border-b border-slate-50", empty && "opacity-40", indent ? "pl-4" : "")} style={{ gridTemplateColumns: "1fr auto auto" }}>
         <span className="text-[11px] text-slate-600 font-medium pr-2 truncate">{label}</span>
-        <span className={cn("text-right font-mono text-[10px] tabular-nums w-32 pl-2", cyV !== "—" ? "text-slate-800 font-semibold" : "text-slate-300")}>{cyV}</span>
-        <span className={cn("text-right font-mono text-[10px] tabular-nums w-28 pl-2 text-slate-500", pyV !== "—" ? "" : "text-slate-300")}>{pyV}</span>
+        <span className={cn("text-right font-mono text-[10px] tabular-nums min-w-[80px] sm:min-w-[120px] pl-2", cyV !== "—" ? "text-slate-800 font-semibold" : "text-slate-300")}>{cyV}</span>
+        <span className={cn("text-right font-mono text-[10px] tabular-nums min-w-[80px] sm:min-w-[110px] pl-2 text-slate-500", pyV !== "—" ? "" : "text-slate-300")}>{pyV}</span>
       </div>
     );
   };
@@ -3652,12 +3704,19 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
               <span className="inline-block w-3 h-px bg-slate-300" /> Financial Statements Summary
               <span className="ml-auto text-[8px] font-normal normal-case tracking-normal text-slate-300">Values in {varVal("functional_currency") || "PKR"}</span>
             </p>
+            {!varVal("cy_total_assets") && !varVal("cy_revenue") && !varVal("cy_total_equity") && (
+              <div className="text-center py-8 bg-slate-50/60 rounded-xl border border-dashed border-slate-200">
+                <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p className="text-sm text-slate-500 font-medium">No financial data extracted yet</p>
+                <p className="text-xs text-slate-400 mt-1">Upload a completed template and click "Extract Data" to populate these figures.</p>
+              </div>
+            )}
 
             {/* Column headers */}
             <div className="grid pb-1 border-b border-slate-200 mb-1 text-[9px] font-bold text-slate-400 uppercase tracking-wide" style={{ gridTemplateColumns: "1fr auto auto" }}>
               <span>Line</span>
-              <span className="text-right w-32 pl-2">CY {session?.engagementYear || ""}</span>
-              <span className="text-right w-28 pl-2">PY {session?.engagementYear ? Number(session.engagementYear) - 1 : ""}</span>
+              <span className="text-right min-w-[80px] sm:min-w-[120px] pl-2">CY {session?.engagementYear || ""}</span>
+              <span className="text-right min-w-[80px] sm:min-w-[110px] pl-2">PY {session?.engagementYear ? Number(session.engagementYear) - 1 : ""}</span>
             </div>
 
             {/* ── Balance Sheet ── */}
@@ -3735,6 +3794,7 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
 }
 
 function DataSheetStage({ coaData, loading, onPopulate, onUpdate, onDelete, onAdd, onValidate, onApprove, onRefresh, session }: any) {
+  const { toast } = useToast();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [showAddForm, setShowAddForm] = useState(false);
@@ -3767,6 +3827,10 @@ function DataSheetStage({ coaData, loading, onPopulate, onUpdate, onDelete, onAd
   };
 
   const handleAddRow = async () => {
+    if (!addForm.accountCode?.trim() || !addForm.accountName?.trim()) {
+      toast({ title: "Validation error", description: "Account Code and Account Name are required", variant: "destructive" });
+      return;
+    }
     const ob = Number(addForm.openingBalance || 0);
     const dr = Number(addForm.debitTotal || 0);
     const cr = Number(addForm.creditTotal || 0);
@@ -6343,9 +6407,6 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
               <Button variant="outline" size="sm" onClick={onFetch} disabled={loading} className="h-7 text-xs">
                 <RefreshCw className="w-3 h-3 mr-1" /> Refresh
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowAuditTrail(v => !v)} className="h-7 text-xs">
-                <ClipboardCheck className="w-3 h-3 mr-1" /> Trail ({changeLog.length})
-              </Button>
               {onAiFill && (
                 <Button size="sm" onClick={handleAiFillClick} disabled={aiFilling || loading}
                   className="h-7 text-xs bg-blue-600 hover:bg-blue-700 shadow-none"
@@ -6450,7 +6511,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
         </div>
 
         {/* Audit trail */}
-        {showAuditTrail && changeLog.length > 0 && (
+        {changeLog.length > 0 && false && (
           <div className="m-5 mt-0 bg-slate-50 border border-slate-200 rounded-xl p-4">
             <h3 className="text-xs font-semibold text-slate-700 mb-3 flex items-center gap-2 uppercase tracking-wider">
               <ClipboardCheck className="w-4 h-4 text-slate-500" /> Audit Trail ({changeLog.length} changes)
@@ -6503,6 +6564,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
 }
 
 function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, onExport, onAutoProcessAll, onResolveException, loading, onRefresh, autoChainRunning, autoChainCurrentHead, onStopChain, onNext }: any) {
+  const { toast } = useToast();
   const allExceptions: any[] = exceptions || [];
   const allHeads: any[] = (heads || []).filter((h: any) => h.headIndex >= 2);
   const [approvalInProgress, setApprovalInProgress] = useState(false);
@@ -6525,7 +6587,7 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
         const data = await res.json();
         setPreviewDocs(data.documents || []);
       }
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
     finally { setPreviewLoading(false); }
   };
 
@@ -6574,10 +6636,20 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
 
   const approveAll = async () => {
     setApprovalInProgress(true);
+    let succeeded = 0;
+    let failed = 0;
     for (const h of approvableHeads) {
-      await onApprove(h.headIndex);
+      try {
+        await onApprove(h.headIndex);
+        succeeded++;
+      } catch {
+        failed++;
+      }
     }
     setApprovalInProgress(false);
+    if (failed > 0) {
+      toast({ title: `Approval completed with errors`, description: `${succeeded} approved, ${failed} failed`, variant: "destructive" });
+    }
   };
 
   const exportAll = async () => {
@@ -8504,7 +8576,7 @@ function WpExecutionModal({ wp, session, onClose }: { wp: any; session: any; onC
     try {
       const r = await fetch(`${apiBase}/validate`, { headers: hdr() });
       if (r.ok) setValidation(await r.json());
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
     setValidating(false);
   };
 
@@ -8517,7 +8589,7 @@ function WpExecutionModal({ wp, session, onClose }: { wp: any; session: any; onC
       const body = await r.json();
       if (r.ok) { setExec(body); toast({ title: "WP Locked (ISA 230)", description: "This working paper is now locked." }); }
       else toast({ title: "Cannot lock", description: body.validationErrors?.join("; ") || body.error, variant: "destructive" });
-    } catch {}
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
     setLocking(false);
   };
 
@@ -10896,7 +10968,7 @@ function ReviewQCStage({ reviewNotes, reviewSummary, complianceGates, compliance
                       {vh.newValue && <p className="text-[11px] text-slate-600 truncate">{vh.newValue.substring(0, 120)}</p>}
                       <p className="text-[10px] text-slate-400 mt-0.5">{vh.changedBy} ({vh.changedByRole}) · {new Date(vh.createdAt).toLocaleString()}</p>
                     </div>
-                    {vh.isImmutable && <Lock className="w-3 h-3 text-violet-400 shrink-0 mt-1" title="Immutable — ISA 230" />}
+                    {vh.isImmutable && <span title="Immutable — ISA 230"><Lock className="w-3 h-3 text-violet-400 shrink-0 mt-1" /></span>}
                   </div>
                 ))}
               </div>

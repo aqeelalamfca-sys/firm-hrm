@@ -1,0 +1,20 @@
+A. USER EXPERIENCE (Frontend) — 18 Issues
+#	Category	Issue	Severity	Impact	To do
+1	Dead-End Flow	The new /upload-template route (16-column format) is built in the backend but NOT connected in the Upload stage UI — users can't use the enhanced template upload	Critical	Template is the prime input but the dedicated processor isn't wired	Fix it
+2	Silent Failures	15+ fetch functions have empty catch {} blocks — when API is down or errors occur, users see nothing (no error message, no retry button)	Critical	User stuck on loading screen with zero feedback	Fix it
+3	Missing Confirmation	"Back" button exits session without any confirmation dialog — user can accidentally lose their place in a multi-hour generation chain	High	Accidental data loss risk	Fix it
+4	Hardcoded Years	Year dropdown hardcoded 2022–2030, will break in 2031	Medium	Time bomb	Fix it
+5	Hardcoded Head Count	Generation chain loop hardcoded to hi <= 11 — if audit library expands beyond 12 heads, new heads won't generate	High	Silently skips new heads	Fix it
+6	Missing Empty States	Extraction stage shows rows of "—" dashes when no data extracted instead of a friendly "No data yet" message	Medium	Confusing for new users	Fix it
+7	Missing Loading Context	handleExtractData triggers 3 sequential operations but shows only a generic spinner — user doesn't know which sub-step is running	Medium	Feels unresponsive	Fix it
+8	Trail Button Dead-End	Variables stage "Trail" button opens nothing when change log is empty — no empty state message	Low	Appears broken	Remove the TB button and related
+9	No Date Validation	Session creation doesn't validate period start/end dates (end must be after start)	Medium	Invalid date ranges allowed	Fix it
+10	No COA Row Validation	Manual COA entry doesn't validate account code/name before API call	Medium	Empty rows can be saved	Fix it
+11	Mobile Phase Strip Hidden	The pipeline progress indicator is hidden on mobile (hidden sm:flex) — mobile users lose navigation context	Medium	Mobile UX broken	Fix it
+12	Fixed-Width Financial Grids	Financial tables use fixed widths (w-32, w-28) that overflow on mobile screens	Medium	Numbers overlap on phones	Fix it
+13	Missing ARIA Labels	Custom buttons and clickable cards lack aria-label attributes	Low	Accessibility gap	Fix it
+14	Non-Keyboard-Accessible Cards	Session cards use onClick on div without onKeyDown — can't navigate by keyboard	Low	Accessibility gap	Fix it
+15	Approve All No Lock	"Approve All" runs async loop without global UI lock — if one fails, loop continues silently	Medium	Partial approvals unnoticed	Fix it
+16	Token in Component Body	localStorage.getItem("hrm_token") called directly in render — potential hydration issues	Low	Technical debt	Fix it
+17	Massive Prop Drilling	Components like ExportStage receive 15+ props — difficult to maintain and debug	Low	Technical debt	Fix it
+18	No Keyboard Shortcuts	No keyboard shortcuts for common actions (save, next stage, generate)	Low	Power user efficiency gap	Fix it
