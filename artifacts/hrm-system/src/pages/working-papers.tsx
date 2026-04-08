@@ -16,18 +16,19 @@ import {
   Info, AlertOctagon, Calculator, CircleDot,
   ExternalLink, Gauge, Table2, Trash2, Database,
   GitMerge, BarChart2, Cpu, CheckCheck, ListChecks, Network, BookOpen,
-  Search, ClipboardList, XCircle,
+  Search, ClipboardList, XCircle, SlidersHorizontal,
 } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
-// Pipeline: Upload → Data Extraction → WP Listing → WP Generation → Export
+// Pipeline: Upload → Data Extraction → Variables → WP Listing → WP Generation → Export
 const STAGES = [
-  { key: "upload",        label: "Upload",         icon: Upload,        phase: "facts",    desc: "Download the financial data template, fill it in, and upload the completed file" },
-  { key: "extraction",    label: "Data Extraction",icon: Sparkles,      phase: "facts",    desc: "Template-parsed variables — inline review, AI fill, exceptions & confirmation" },
-  { key: "wp_listing",    label: "WP Listing",     icon: ClipboardList, phase: "output",   desc: "AI-recommended WP selection — choose which papers to generate" },
-  { key: "generation",    label: "WP Generation",  icon: FileCheck,     phase: "output",   desc: "Sequential AI generation of all WP sections (ISA Compliant)" },
-  { key: "export",        label: "Export",         icon: Download,      phase: "output",   desc: "WP Excel · WP Word · Full Audit Bundle" },
+  { key: "upload",        label: "Upload",         icon: Upload,              phase: "facts",    desc: "Download the financial data template, fill it in, and upload the completed file" },
+  { key: "extraction",    label: "Data Extraction",icon: Sparkles,            phase: "facts",    desc: "Template-parsed variables — inline review, AI fill, exceptions & confirmation" },
+  { key: "variables",     label: "Variables",      icon: SlidersHorizontal,   phase: "facts",    desc: "Review and lock all engagement variables before WP generation" },
+  { key: "wp_listing",    label: "WP Listing",     icon: ClipboardList,       phase: "output",   desc: "AI-recommended WP selection — choose which papers to generate" },
+  { key: "generation",    label: "WP Generation",  icon: FileCheck,           phase: "output",   desc: "Sequential AI generation of all WP sections (ISA Compliant)" },
+  { key: "export",        label: "Export",         icon: Download,            phase: "output",   desc: "WP Excel · WP Word · Full Audit Bundle" },
 ] as const;
 
 const FILE_CATEGORIES = [
@@ -145,7 +146,7 @@ export default function WorkingPapers() {
 
   const statusToStageMap: Record<string, string> = {
     completed:    "generation",
-    variables:    "extraction",
+    variables:    "variables",
     generation:   "generation",
     wp_listing:   "wp_listing",
     gl_generation:"wp_listing",
@@ -1423,7 +1424,7 @@ export default function WorkingPapers() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {sessions.map((s: any) => {
-                  const stageOrder = ["upload","extraction","wp_listing","generation","export"];
+                  const stageOrder = ["upload","extraction","variables","wp_listing","generation","export"];
                   const stageIdx = stageOrder.indexOf(s.status);
                   const progressPct = stageIdx < 0 ? 0 : Math.round(((stageIdx + 1) / stageOrder.length) * 100);
                   const isDone = s.status === "completed" || s.status === "exported";
@@ -1608,11 +1609,12 @@ export default function WorkingPapers() {
           {[
             { step: "Upload",          phase: "facts",  active: stage === "upload" },
             { step: "Data Extraction", phase: "facts",  active: stage === "extraction" },
+            { step: "Variables",       phase: "facts",  active: stage === "variables" },
             { step: "WP Listing",      phase: "output", active: stage === "wp_listing" },
             { step: "WP Generation",   phase: "output", active: stage === "generation" },
             { step: "Export",          phase: "output", active: stage === "export" },
           ].map((item, idx) => {
-            const stageOrder = ["upload","extraction","wp_listing","generation","export"];
+            const stageOrder = ["upload","extraction","variables","wp_listing","generation","export"];
             const pastIdx = stageOrder.indexOf(stage);
             const isPast = pastIdx > idx;
             return (
@@ -1709,7 +1711,7 @@ export default function WorkingPapers() {
         />
       )}
 
-      {/* TAB 2 — Data Extraction (owns ALL variable review, editing, exceptions & confirmation) */}
+      {/* TAB 2 — Data Extraction */}
       {stage === "extraction" && (
         <ExtractionStage
           data={extractionData}
@@ -1720,25 +1722,29 @@ export default function WorkingPapers() {
           onOpenAiSettings={() => setShowAiSettings(true)}
           loading={loading || parseLoading}
           confidenceBadge={confidenceBadge}
-          variablesPanel={
-            <VariablesStage
-              variables={variables}
-              grouped={variableGroups}
-              stats={variableStats}
-              changeLog={changeLog}
-              onSave={saveVariableEdit}
-              onSaveDirect={saveVariableDirect}
-              onAiFill={handleAiFill}
-              onFetch={fetchVariables}
-              onLockAll={lockAllVariables}
-              loading={loading}
-              confidenceBadge={confidenceBadge}
-            />
-          }
+          onNext={() => { fetchVariables(); setStage("variables"); }}
         />
       )}
 
-      {/* TAB 3 — WP Listing */}
+      {/* TAB 3 — Variables */}
+      {stage === "variables" && (
+        <VariablesStage
+          variables={variables}
+          grouped={variableGroups}
+          stats={variableStats}
+          changeLog={changeLog}
+          onSave={saveVariableEdit}
+          onSaveDirect={saveVariableDirect}
+          onAiFill={handleAiFill}
+          onFetch={fetchVariables}
+          onLockAll={lockAllVariables}
+          loading={loading}
+          confidenceBadge={confidenceBadge}
+          onNext={() => { fetchWpTriggers(); setStage("wp_listing"); }}
+        />
+      )}
+
+      {/* TAB 4 — WP Listing */}
       {stage === "wp_listing" && (
         <WpListingStage
           heads={heads}
@@ -2944,7 +2950,7 @@ function TemplateParsedPanel({ result, onClear }: { result: any; onClear: () => 
   );
 }
 
-function ExtractionStage({ data, session, onRefreshVariables, onRerun, onAiFill, onOpenAiSettings, loading, confidenceBadge, variablesPanel }: any) {
+function ExtractionStage({ data, session, onRefreshVariables, onRerun, onAiFill, onOpenAiSettings, loading, confidenceBadge, onNext }: any) {
   const extractionData = data?.data || session?.extractionData;
   const stats = data?.stats;
   const [showRawResults, setShowRawResults] = useState(false);
@@ -3065,8 +3071,24 @@ function ExtractionStage({ data, session, onRefreshVariables, onRerun, onAiFill,
         </div>
       )}
 
-      {/* ── Main: Variables one-pager ── */}
-      {variablesPanel}
+      {/* ── Continue to Variables ── */}
+      <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
+            <SlidersHorizontal className="w-4 h-4 text-indigo-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Variables ready for review</p>
+            <p className="text-xs text-slate-400 mt-0.5">Proceed to the Variables page to review, edit, and lock all engagement fields before WP generation.</p>
+          </div>
+        </div>
+        <Button
+          onClick={onNext}
+          className="shrink-0 bg-indigo-600 hover:bg-indigo-700 h-8 text-xs px-4 shadow-sm"
+        >
+          Continue to Variables <ChevronRight className="w-3.5 h-3.5 ml-1" />
+        </Button>
+      </div>
 
     </div>
   );
@@ -5527,7 +5549,7 @@ function VariableRow({ v, onSaveDirect, confidenceBadge }: any) {
   );
 }
 
-function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDirect, onAiFill, onFetch, onLockAll, loading, confidenceBadge }: any) {
+function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDirect, onAiFill, onFetch, onLockAll, loading, confidenceBadge, onNext }: any) {
   const [search, setSearch]           = useState("");
   const [filter, setFilter]           = useState<string>("all");
   const [showAuditTrail, setShowAuditTrail] = useState(false);
@@ -5763,6 +5785,33 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
           </div>
         )}
       </div>
+
+      {/* ── Continue to WP Listing ── */}
+      {onNext && (
+        <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+              <ClipboardList className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">
+                {missingCount > 0
+                  ? `${missingCount} variable${missingCount !== 1 ? "s" : ""} still missing — you can still proceed`
+                  : "All variables confirmed — ready for WP selection"}
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Proceed to WP Listing to select and configure which working papers to generate.
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={onNext}
+            className="shrink-0 bg-emerald-600 hover:bg-emerald-700 h-8 text-xs px-4 shadow-sm"
+          >
+            Continue to WP Listing <ChevronRight className="w-3.5 h-3.5 ml-1" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
