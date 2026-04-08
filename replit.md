@@ -29,6 +29,19 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - **Multi-Provider AI Integration**: Supports OpenAI, Anthropic (Claude), Google (Gemini), DeepSeek, and custom OpenAI-compatible APIs. All providers use the OpenAI SDK with custom base URLs. Provider/model/URL configured via `system_settings` table keys: `ai_provider`, `ai_model`, `ai_base_url`, `chatgpt_api_key`. Environment variables `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL` take priority when set. SSRF protection via `isValidBaseUrl()` in `system-settings.ts`.
 - Security enhancements include Helmet security headers, AES-256-CBC encryption for sensitive client credentials, rate limiting, and structured logging with Pino.
 - Performance is optimized through N+1 query elimination strategies (e.g., batched queries, SQL-level filtering), extensive database indexing, and frontend memoization.
+- **Backend Hardening (12 issues fixed)**:
+  - **Transactions**: Session creation, TB generation, GL generation, and session delete all use `db.transaction()` for atomicity — partial failures no longer leave data in inconsistent state.
+  - **Batch Inserts**: Session head creation uses single batch insert (was N+1 loop), TB lines batch insert, exception batch insert — eliminates N+1 query pattern on critical paths.
+  - **Pagination**: GET /sessions, GET /exceptions, GET /version-history, GET /variables endpoints now support `?limit=N&offset=M` query params with `parsePagination()` helper (default 50-200, max 200-1000).
+  - **Input Validation**: Entity type, engagement type, reporting framework, session status, exception status, account type, risk tag, materiality tag all validated against allowed value enums before DB insert/update.
+  - **RBAC on WP Routes**: `requireRoles()` middleware applied to 7 critical routes: session delete (super_admin, partner), head approve (manager+), WP sign-off (manager+), session lock (partner+), WP lock (senior_manager+), compliance doc sign (manager+).
+  - **AI Rate Limiting**: In-memory per-user rate limiter (10 requests/60s window) on 7 AI-heavy routes: extract, ai-fill, head generate, auto-process-all, audit-chain generate, compliance-doc generate.
+  - **Error Logging**: 136 catch blocks now include `logger.error({ err })` — previously 64+ catch blocks silently swallowed errors.
+  - **Consistent Error Format**: All routes standardized to `{ error: "message" }` JSON response format.
+  - **Raw SQL Reduction**: `audit_engine_master` query converted from raw SQL to Drizzle query builder. Remaining raw SQL uses parameterized `sql\`\`` (safe, needed for `::numeric` casts in aggregate queries).
+  - **Per-Category File Size Limits**: Upload enforces category-specific limits (e.g., GL=20MB, FS=15MB, TB=10MB, tax=5MB) in addition to global 30MB cap.
+  - **Type Safety**: All `parseInt(req.params.x)` calls now use `p()` helper for Express v5 string|string[] params (27 occurrences fixed).
+  - **Session Delete with Cleanup**: `DELETE /sessions/:id` cascades through 30+ related tables in a transaction, then removes uploaded files from disk.
 
 **Admin Credentials (seeded):** `admin@calfirm.com` / `Admin@123` (role: `super_admin`). Password hashed as `SHA256(password + "hrm_salt_2024")`. DB column is `password_hash`; role enum values: `super_admin`, `hr_admin`, `finance_officer`, `manager`, `employee`, `partner`, `trainee`.
 

@@ -1,6 +1,7 @@
-import { Router, type Request, type Response } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import multer from "multer";
 import { logger } from "../lib/logger";
+import { type AuthenticatedRequest, requireRoles } from "../middleware/auth";
 import { db } from "@workspace/db";
 import {
   systemSettingsTable, usersTable, employeesTable,
@@ -36,7 +37,7 @@ import {
   runTBEngine, runGLEngine, runReconciliation, checkFinalEnforcement,
   PAKISTAN_COA, mapFsToCoa,
 } from "./tb-gl-engine";
-import { eq, and, inArray, asc, sql } from "drizzle-orm";
+import { eq, and, inArray, asc, sql, desc } from "drizzle-orm";
 import OpenAI from "openai";
 import PDFDocument from "pdfkit";
 import * as XLSX from "xlsx";
@@ -58,6 +59,54 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 30 * 1024 * 1024 },
 });
+
+const FILE_SIZE_LIMITS: Record<string, number> = {
+  financial_statements: 15 * 1024 * 1024,
+  trial_balance: 10 * 1024 * 1024,
+  general_ledger: 20 * 1024 * 1024,
+  bank_statement: 10 * 1024 * 1024,
+  sales_tax_return: 5 * 1024 * 1024,
+  tax_notice: 5 * 1024 * 1024,
+  schedule: 10 * 1024 * 1024,
+  annexure: 10 * 1024 * 1024,
+  other: 10 * 1024 * 1024,
+};
+
+const VALID_SESSION_STATUSES = ["upload", "extraction", "data_sheet", "arranged_data", "variables", "wp_listing", "generation", "audit_chain", "review", "export", "completed"] as const;
+const VALID_ENTITY_TYPES = ["Public Limited (Listed)", "Public Limited (Unlisted)", "Private Limited", "Single Member Company (SMC)", "Not-for-Profit (Section 42)", "Limited Liability Partnership (LLP)", "Association of Persons (AOP)", "Trust", "Sole Proprietorship"] as const;
+const VALID_ENGAGEMENT_TYPES = ["statutory_audit", "group_audit", "limited_review", "special_audit", "compliance_audit"] as const;
+const VALID_RISK_LEVELS = ["Low", "Medium", "High", "Critical"] as const;
+const VALID_REPORTING_FRAMEWORKS = ["IFRS", "AFRS", "IPSAS", "Custom"] as const;
+
+function parsePagination(req: Request, defaultLimit = 200, maxLimit = 1000): { limit: number; offset: number } {
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit)) || defaultLimit, 1), maxLimit);
+  const offset = Math.max(parseInt(String(req.query.offset)) || 0, 0);
+  return { limit, offset };
+}
+
+function standardError(res: Response, status: number, message: string, details?: string) {
+  logger.error({ status, message, details }, message);
+  return res.status(status).json({ error: message, ...(details ? { details } : {}) });
+}
+
+const aiRateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const AI_RATE_LIMIT = 10;
+const AI_RATE_WINDOW_MS = 60_000;
+
+function aiRateLimit(req: Request, res: Response, next: NextFunction) {
+  const userId = (req as AuthenticatedRequest).user?.id?.toString() || req.ip || "anon";
+  const now = Date.now();
+  let entry = aiRateLimitMap.get(userId);
+  if (!entry || now > entry.resetAt) {
+    entry = { count: 0, resetAt: now + AI_RATE_WINDOW_MS };
+    aiRateLimitMap.set(userId, entry);
+  }
+  entry.count++;
+  if (entry.count > AI_RATE_LIMIT) {
+    return res.status(429).json({ error: "AI rate limit exceeded. Please wait before making more AI requests." });
+  }
+  next();
+}
 
 const AUDIT_HEADS = [
   { index: 0, name: "Trial Balance", outputType: "excel", papers: ["TB-Master", "TB-Mapping", "TB-VS-FS-Recon"] },
@@ -403,11 +452,13 @@ function getConfidenceColor(c: number): string {
 // SESSION MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════════════
 
-router.get("/sessions", async (_req: Request, res: Response) => {
+router.get("/sessions", async (req: Request, res: Response) => {
   try {
-    const sessions = await db.select().from(wpSessionsTable).orderBy(asc(wpSessionsTable.id));
+    const { limit, offset } = parsePagination(req, 50, 200);
+    const sessions = await db.select().from(wpSessionsTable).orderBy(desc(wpSessionsTable.id)).limit(limit).offset(offset);
     res.json(sessions);
   } catch (err: any) {
+    logger.error({ err }, "Failed to fetch sessions");
     res.status(500).json({ error: "Failed to fetch sessions" });
   }
 });
@@ -449,47 +500,54 @@ router.get("/team-members", async (_req: Request, res: Response) => {
   }
 });
 
-router.post("/sessions", async (req: Request, res: Response) => {
+router.post("/sessions", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { clientName, engagementYear, entityType, ntn, strn, periodStart, periodEnd, reportingFramework, engagementType, engagementContinuity, auditFirmName, auditFirmLogo, preparerId, preparerName, reviewerId, reviewerName, approverId, approverName } = req.body;
     if (!clientName || !engagementYear || !entityType || !ntn || !periodStart || !periodEnd || !reportingFramework || !engagementType) {
       return res.status(400).json({ error: "All fields are required except STRN, Audit Firm Name, and Logo" });
     }
-    const [session] = await db.insert(wpSessionsTable).values({
-      clientName, engagementYear,
-      entityType,
-      ntn,
-      strn: strn || null,
-      periodStart,
-      periodEnd,
-      reportingFramework,
-      engagementType,
-      engagementContinuity: engagementContinuity || "first_time",
-      auditFirmName: auditFirmName || null,
-      auditFirmLogo: auditFirmLogo || null,
-      preparerId: preparerId || null,
-      preparerName: preparerName || null,
-      reviewerId: reviewerId || null,
-      reviewerName: reviewerName || null,
-      approverId: approverId || null,
-      approverName: approverName || null,
-      status: "upload",
-    }).returning();
+    if (!VALID_ENTITY_TYPES.includes(entityType)) return res.status(400).json({ error: `Invalid entity type. Allowed: ${VALID_ENTITY_TYPES.join(", ")}` });
+    if (!VALID_ENGAGEMENT_TYPES.includes(engagementType)) return res.status(400).json({ error: `Invalid engagement type. Allowed: ${VALID_ENGAGEMENT_TYPES.join(", ")}` });
+    if (!VALID_REPORTING_FRAMEWORKS.includes(reportingFramework)) return res.status(400).json({ error: `Invalid reporting framework. Allowed: ${VALID_REPORTING_FRAMEWORKS.join(", ")}` });
 
-    for (const head of AUDIT_HEADS) {
-      const filteredPapers = filterPapersForEntity(head.papers, entityType);
-      await db.insert(wpHeadsTable).values({
-        sessionId: session.id,
+    const session = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(wpSessionsTable).values({
+        clientName, engagementYear,
+        entityType,
+        ntn,
+        strn: strn || null,
+        periodStart,
+        periodEnd,
+        reportingFramework,
+        engagementType,
+        engagementContinuity: engagementContinuity || "first_time",
+        auditFirmName: auditFirmName || null,
+        auditFirmLogo: auditFirmLogo || null,
+        preparerId: preparerId || null,
+        preparerName: preparerName || null,
+        reviewerId: reviewerId || null,
+        reviewerName: reviewerName || null,
+        approverId: approverId || null,
+        approverName: approverName || null,
+        status: "upload",
+      }).returning();
+
+      const headValues = AUDIT_HEADS.map(head => ({
+        sessionId: created.id,
         headIndex: head.index,
         headName: head.name,
         status: "locked",
-        papersIncluded: filteredPapers,
+        papersIncluded: filterPapersForEntity(head.papers, entityType),
         outputType: head.outputType,
-      });
-    }
+      }));
+      await tx.insert(wpHeadsTable).values(headValues);
+
+      return created;
+    });
 
     res.status(201).json(session);
   } catch (err: any) {
+    logger.error({ err }, "Failed to create session");
     res.status(500).json({ error: "Failed to create session" });
   }
 });
@@ -506,6 +564,7 @@ router.get("/sessions/:id", async (req: Request, res: Response) => {
     const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, id));
     res.json({ ...sessions[0], heads, files, exceptions, variables, tbLines });
   } catch (err: any) {
+    logger.error({ err }, "Failed to fetch session");
     res.status(500).json({ error: "Failed to fetch session" });
   }
 });
@@ -515,7 +574,7 @@ router.patch("/sessions/:id/status", async (req: Request, res: Response) => {
     const id = parseInt(p(req.params.id));
     if (isNaN(id)) return res.status(400).json({ error: "Invalid session ID" });
     const { status } = req.body;
-    const validStatuses = ["upload", "extraction", "data_sheet", "arranged_data", "variables", "wp_listing", "generation", "export", "completed"];
+    const validStatuses = [...VALID_SESSION_STATUSES];
     if (!validStatuses.includes(status)) return res.status(400).json({ error: "Invalid status" });
 
     const validTransitions: Record<string, string[]> = {
@@ -525,7 +584,9 @@ router.patch("/sessions/:id/status", async (req: Request, res: Response) => {
       arranged_data: ["variables", "data_sheet"],
       variables: ["wp_listing", "generation"],
       wp_listing: ["generation"],
-      generation: ["export"],
+      generation: ["audit_chain", "export"],
+      audit_chain: ["review", "generation"],
+      review: ["export", "audit_chain"],
       export: ["completed", "generation"],
     };
     const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, id)))[0];
@@ -538,7 +599,74 @@ router.patch("/sessions/:id/status", async (req: Request, res: Response) => {
     const [updated] = await db.update(wpSessionsTable).set({ status: status as any, updatedAt: new Date() }).where(eq(wpSessionsTable.id, id)).returning();
     res.json(updated);
   } catch (err: any) {
+    logger.error({ err }, "Failed to update session status");
     res.status(500).json({ error: "Failed to update session status" });
+  }
+});
+
+router.delete("/sessions/:id", requireRoles("super_admin", "partner"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = parseInt(p(req.params.id));
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid session ID" });
+    const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, id)))[0];
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    await db.transaction(async (tx) => {
+      await tx.delete(wpVersionHistoryTable).where(eq(wpVersionHistoryTable.sessionId, id));
+      await tx.delete(wpReviewNoteTable).where(eq(wpReviewNoteTable.sessionId, id));
+      await tx.delete(wpTickMarkUsageTable).where(eq(wpTickMarkUsageTable.sessionId, id));
+      await tx.delete(wpTickMarkTable).where(eq(wpTickMarkTable.sessionId, id));
+      await tx.delete(wpAuditChainTable).where(eq(wpAuditChainTable.sessionId, id));
+      await tx.delete(wpComplianceGateTable).where(eq(wpComplianceGateTable.sessionId, id));
+      await tx.delete(wpComplianceDocTable).where(eq(wpComplianceDocTable.sessionId, id));
+      await tx.delete(wpLeadScheduleTable).where(eq(wpLeadScheduleTable.sessionId, id));
+      await tx.delete(wpFsNoteMappingTable).where(eq(wpFsNoteMappingTable.sessionId, id));
+      await tx.delete(wpSamplingDetailTable).where(eq(wpSamplingDetailTable.sessionId, id));
+      await tx.delete(wpIsaClauseRefTable).where(eq(wpIsaClauseRefTable.sessionId, id));
+      await tx.delete(wpExecutionTable).where(eq(wpExecutionTable.sessionId, id));
+      await tx.delete(wpOutputJobTable).where(eq(wpOutputJobTable.sessionId, id));
+      await tx.delete(wpSessionLockTable).where(eq(wpSessionLockTable.sessionId, id));
+      await tx.delete(wpValidationResultTable).where(eq(wpValidationResultTable.sessionId, id));
+      await tx.delete(wpExceptionsTable).where(eq(wpExceptionsTable.sessionId, id));
+      await tx.delete(wpExceptionLogTable).where(eq(wpExceptionLogTable.sessionId, id));
+      await tx.delete(wpExportJobsTable).where(eq(wpExportJobsTable.sessionId, id));
+      await tx.delete(wpHeadDocumentsTable).where(eq(wpHeadDocumentsTable.sessionId, id));
+      await tx.delete(wpHeadsTable).where(eq(wpHeadsTable.sessionId, id));
+      await tx.delete(wpVariableChangeLogTable).where(eq(wpVariableChangeLogTable.sessionId, id));
+      await tx.delete(wpVariablesTable).where(eq(wpVariablesTable.sessionId, id));
+      await tx.delete(wpGlEntriesTable).where(eq(wpGlEntriesTable.sessionId, id));
+      await tx.delete(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, id));
+      await tx.delete(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, id));
+      await tx.delete(wpArrangedDataTable).where(eq(wpArrangedDataTable.sessionId, id));
+      await tx.delete(wpExtractedFieldsTable).where(eq(wpExtractedFieldsTable.sessionId, id));
+      await tx.delete(wpExtractionRunsTable).where(eq(wpExtractionRunsTable.sessionId, id));
+      await tx.delete(wpUploadedFilesTable).where(eq(wpUploadedFilesTable.sessionId, id));
+      await tx.delete(wpFsExtractionTable).where(eq(wpFsExtractionTable.sessionId, id));
+      await tx.delete(wpFsMappingTable).where(eq(wpFsMappingTable.sessionId, id));
+      await tx.delete(reconEngineTable).where(eq(reconEngineTable.sessionId, id));
+      await tx.delete(evidenceLogTable).where(eq(evidenceLogTable.sessionId, id));
+      await tx.delete(controlMatrixTable).where(eq(controlMatrixTable.sessionId, id));
+      await tx.delete(analyticsSessionTable).where(eq(analyticsSessionTable.sessionId, id));
+      await tx.delete(wpTriggerSessionTable).where(eq(wpTriggerSessionTable.sessionId, id));
+      await tx.delete(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, id));
+      await tx.delete(wpLibrarySessionTable).where(eq(wpLibrarySessionTable.sessionId, id));
+      await tx.delete(wpJournalImportTable).where(eq(wpJournalImportTable.sessionId, id));
+      await tx.delete(auditEngineMasterTable).where(eq(auditEngineMasterTable.sessionId, id));
+      await tx.delete(wpSessionsTable).where(eq(wpSessionsTable.id, id));
+    });
+
+    const fs = await import("fs");
+    const path = await import("path");
+    const sessionUploadsDir = path.join(process.cwd(), "uploads", "sessions", String(id));
+    if (fs.existsSync(sessionUploadsDir)) {
+      fs.rmSync(sessionUploadsDir, { recursive: true, force: true });
+    }
+
+    logger.info({ sessionId: id }, "Session deleted with full cleanup");
+    res.json({ ok: true, message: `Session ${id} and all associated data deleted` });
+  } catch (err: any) {
+    logger.error({ err }, "Failed to delete session");
+    res.status(500).json({ error: "Failed to delete session" });
   }
 });
 
@@ -556,7 +684,7 @@ router.post("/sessions/:id/upload", upload.array("files", 20), async (req: Reque
     }
 
     let categories: Record<string, string> = {};
-    try { categories = JSON.parse(req.body.categories || "{}"); } catch {}
+    try { categories = JSON.parse(req.body.categories || "{}"); } catch (parseErr: any) { logger.warn({ parseErr }, "Failed to parse upload categories"); }
 
     const validCategories = ["financial_statements", "trial_balance", "general_ledger", "bank_statement", "sales_tax_return", "tax_notice", "schedule", "annexure", "other"];
     const results: any[] = [];
@@ -565,6 +693,13 @@ router.post("/sessions/:id/upload", upload.array("files", 20), async (req: Reque
     for (const file of files) {
       const rawCategory = categories[file.originalname] || "other";
       const category = validCategories.includes(rawCategory) ? rawCategory : "other";
+
+      const categoryLimit = FILE_SIZE_LIMITS[category] || FILE_SIZE_LIMITS.other;
+      if (file.size > categoryLimit) {
+        errors.push(`${file.originalname}: exceeds ${(categoryLimit / 1024 / 1024).toFixed(0)}MB limit for ${category} category (${(file.size / 1024 / 1024).toFixed(1)}MB uploaded)`);
+        continue;
+      }
+
       const validation = validateFileCategory(file, category);
 
       if (!validation.valid) {
@@ -594,6 +729,7 @@ router.post("/sessions/:id/upload", upload.array("files", 20), async (req: Reque
 
     res.json({ uploaded: results, errors });
   } catch (err: any) {
+    logger.error({ err }, "Upload failed");
     res.status(500).json({ error: "Upload failed" });
   }
 });
@@ -610,6 +746,7 @@ router.delete("/sessions/:id/files/:fileId", async (req: Request, res: Response)
     if (!deleted) return res.status(404).json({ error: "File not found" });
     res.json({ ok: true, id: fileId });
   } catch (err: any) {
+    logger.error({ err }, "Delete failed");
     res.status(500).json({ error: "Delete failed" });
   }
 });
@@ -619,7 +756,7 @@ router.delete("/sessions/:id/files/:fileId", async (req: Request, res: Response)
 // EXTRACTION — OCR + PARSING
 // ═══════════════════════════════════════════════════════════════════════════
 
-router.post("/sessions/:id/extract", async (req: Request, res: Response) => {
+router.post("/sessions/:id/extract", aiRateLimit, async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(p(req.params.id));
     const sessionRows = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
@@ -880,6 +1017,7 @@ router.get("/sessions/:id/coa", async (req: Request, res: Response) => {
       .orderBy(asc(wpMasterCoaTable.displayOrder));
     res.json(rows);
   } catch (err: any) {
+    logger.error({ err }, "Failed to fetch COA data");
     res.status(500).json({ error: "Failed to fetch COA data" });
   }
 });
@@ -1053,6 +1191,10 @@ router.post("/sessions/:id/coa", async (req: Request, res: Response) => {
     } = req.body;
 
     if (!accountCode || !accountName) return res.status(400).json({ error: "accountCode and accountName are required" });
+    const validAccountTypes = ["Asset", "Liability", "Equity", "Revenue", "Expense", "Contra"];
+    if (accountType && !validAccountTypes.includes(accountType)) return res.status(400).json({ error: `Invalid accountType. Allowed: ${validAccountTypes.join(", ")}` });
+    if (riskTag && !["Low", "Medium", "High", "Critical"].includes(riskTag)) return res.status(400).json({ error: "Invalid riskTag. Allowed: Low, Medium, High, Critical" });
+    if (materialityTag && !["Low", "Medium", "High"].includes(materialityTag)) return res.status(400).json({ error: "Invalid materialityTag. Allowed: Low, Medium, High" });
 
     const ob = Number(openingBalance || 0);
     const dr = Number(debitTotal || 0);
@@ -1102,6 +1244,7 @@ router.post("/sessions/:id/coa", async (req: Request, res: Response) => {
 
     res.json(inserted);
   } catch (err: any) {
+    logger.error({ err }, "Failed to add COA row");
     res.status(500).json({ error: "Failed to add COA row" });
   }
 });
@@ -1167,6 +1310,7 @@ router.patch("/sessions/:id/coa/:rowId", async (req: Request, res: Response) => 
     const [updated] = await db.update(wpMasterCoaTable).set(updates).where(eq(wpMasterCoaTable.id, rowId)).returning();
     res.json(updated);
   } catch (err: any) {
+    logger.error({ err }, "Failed to update COA row");
     res.status(500).json({ error: "Failed to update COA row" });
   }
 });
@@ -1177,6 +1321,7 @@ router.delete("/sessions/:id/coa/:rowId", async (req: Request, res: Response) =>
     await db.delete(wpMasterCoaTable).where(eq(wpMasterCoaTable.id, rowId));
     res.json({ success: true });
   } catch (err: any) {
+    logger.error({ err }, "Failed to delete COA row");
     res.status(500).json({ error: "Failed to delete COA row" });
   }
 });
@@ -1218,6 +1363,7 @@ router.post("/sessions/:id/coa/validate", async (req: Request, res: Response) =>
       valid: issues.length === 0,
     });
   } catch (err: any) {
+    logger.error({ err }, "Failed to validate COA");
     res.status(500).json({ error: "Failed to validate COA" });
   }
 });
@@ -1232,6 +1378,7 @@ router.post("/sessions/:id/coa/approve", async (req: Request, res: Response) => 
     await db.update(wpSessionsTable).set({ status: "arranged_data" as any, updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
     res.json({ success: true, message: `${rows.length} COA accounts approved. Advanced to Arranged Data.` });
   } catch (err: any) {
+    logger.error({ err }, "Failed to approve COA");
     res.status(500).json({ error: "Failed to approve COA" });
   }
 });
@@ -1285,6 +1432,7 @@ router.get("/sessions/:id/arranged-data", async (req: Request, res: Response) =>
 
     res.json({ tabs, tabNames: ARRANGED_DATA_TABS });
   } catch (err: any) {
+    logger.error({ err }, "Failed to fetch arranged data");
     res.status(500).json({ error: "Failed to fetch arranged data" });
   }
 });
@@ -1302,6 +1450,7 @@ router.patch("/sessions/:id/arranged-data/:fieldId", async (req: Request, res: R
     const [updated] = await db.update(wpExtractedFieldsTable).set(updates).where(eq(wpExtractedFieldsTable.id, fieldId)).returning();
     res.json(updated);
   } catch (err: any) {
+    logger.error({ err }, "Failed to update field");
     res.status(500).json({ error: "Failed to update field" });
   }
 });
@@ -1313,6 +1462,7 @@ router.post("/sessions/:id/arranged-data/approve-all", async (req: Request, res:
     await db.update(wpSessionsTable).set({ status: "arranged_data", updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
     res.json({ success: true });
   } catch (err: any) {
+    logger.error({ err }, "Failed to approve all fields");
     res.status(500).json({ error: "Failed to approve all fields" });
   }
 });
@@ -2231,7 +2381,7 @@ router.post("/sessions/:id/variables/auto-fill", async (req: Request, res: Respo
 // uploaded file (template + supporting docs via OCR) and cross-referencing
 // already-filled variables as context.  Only leaves a variable blank if the
 // value genuinely cannot be inferred.
-router.post("/sessions/:id/variables/ai-fill", async (req: Request, res: Response) => {
+router.post("/sessions/:id/variables/ai-fill", aiRateLimit, async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(p(req.params.id));
     if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
@@ -2548,6 +2698,7 @@ router.patch("/sessions/:id/variables/:varId/review", async (req: Request, res: 
     const [updated] = await db.update(wpVariablesTable).set({ reviewStatus, updatedAt: new Date() }).where(and(eq(wpVariablesTable.id, varId), eq(wpVariablesTable.sessionId, sessionId))).returning();
     res.json(updated);
   } catch (err: any) {
+    logger.error({ err }, "Failed to update review status");
     res.status(500).json({ error: "Failed to update review status" });
   }
 });
@@ -2568,6 +2719,7 @@ router.post("/sessions/:id/variables/review-all", async (req: Request, res: Resp
 
     res.json({ reviewed: unreviewedIds.length, message: `${unreviewedIds.length} variables marked as reviewed` });
   } catch (err: any) {
+    logger.error({ err }, "Failed to review all variables");
     res.status(500).json({ error: "Failed to review all variables" });
   }
 });
@@ -2601,6 +2753,7 @@ router.post("/sessions/:id/variables/lock-section", async (req: Request, res: Re
 
     res.json({ locked: ids.length, group });
   } catch (err: any) {
+    logger.error({ err }, "Failed to lock section");
     res.status(500).json({ error: "Failed to lock section" });
   }
 });
@@ -2643,6 +2796,7 @@ router.post("/sessions/:id/variables/lock-all", async (req: Request, res: Respon
     await db.update(wpSessionsTable).set({ status: "wp_listing" as any, updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
     res.json({ success: true, locked: vars.length });
   } catch (err: any) {
+    logger.error({ err }, "Failed to lock variables");
     res.status(500).json({ error: "Failed to lock variables" });
   }
 });
@@ -2713,6 +2867,7 @@ router.post("/sessions/:id/variables/validate", async (req: Request, res: Respon
 
     res.json({ issues, totalIssues: issues.length });
   } catch (err: any) {
+    logger.error({ err }, "Failed to validate variables");
     res.status(500).json({ error: "Failed to validate variables" });
   }
 });
@@ -2762,45 +2917,46 @@ router.post("/sessions/:id/generate-tb", async (req: Request, res: Response) => 
     const ai = await getAIClient();
     const result = await runTBEngine(sessionId, ai);
 
-    // Persist TB lines
-    await db.delete(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
-    for (const line of result.tbLines) {
-      await db.insert(wpTrialBalanceLinesTable).values({
-        sessionId,
-        accountCode: line.accountCode,
-        accountName: line.accountName,
-        classification: line.classification,
-        debit: line.debit,
-        credit: line.credit,
-        balance: line.balance,
-        source: line.source,
-        confidence: line.confidence,
-        fsLineMapping: line.fsLineMapping || null,
-        hasException: !result.balanced,
-        exceptionNote: result.balanced ? null : `Difference: ${result.difference.toFixed(4)}`,
-      });
-    }
+    await db.transaction(async (tx) => {
+      await tx.delete(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+      if (result.tbLines.length > 0) {
+        const tbValues = result.tbLines.map((line: any) => ({
+          sessionId,
+          accountCode: line.accountCode,
+          accountName: line.accountName,
+          classification: line.classification,
+          debit: line.debit,
+          credit: line.credit,
+          balance: line.balance,
+          source: line.source,
+          confidence: line.confidence,
+          fsLineMapping: line.fsLineMapping || null,
+          hasException: !result.balanced,
+          exceptionNote: result.balanced ? null : `Difference: ${result.difference.toFixed(4)}`,
+        }));
+        await tx.insert(wpTrialBalanceLinesTable).values(tbValues);
+      }
 
-    // Log exceptions
-    for (const exc of result.exceptions) {
-      await db.insert(wpExceptionLogTable).values({
-        sessionId, headIndex: 0,
-        exceptionType: exc.includes("Suspense") ? "tb_suspense" : exc.includes("AI") ? "tb_ai_generated" : "tb_note",
-        severity: exc.includes("Material") || exc.includes("REQUIRES") ? "high" : "medium",
-        title: "TB Generation — " + (exc.length > 60 ? exc.slice(0, 57) + "..." : exc),
-        description: exc + "\n\nAudit Log:\n" + result.auditLog.join("\n"),
-        status: "open",
-      });
-    }
+      if (result.exceptions.length > 0) {
+        const excValues = result.exceptions.map((exc: string) => ({
+          sessionId, headIndex: 0,
+          exceptionType: exc.includes("Suspense") ? "tb_suspense" : exc.includes("AI") ? "tb_ai_generated" : "tb_note",
+          severity: exc.includes("Material") || exc.includes("REQUIRES") ? "high" : "medium",
+          title: "TB Generation — " + (exc.length > 60 ? exc.slice(0, 57) + "..." : exc),
+          description: exc + "\n\nAudit Log:\n" + result.auditLog.join("\n"),
+          status: "open",
+        }));
+        await tx.insert(wpExceptionLogTable).values(excValues);
+      }
 
-    // Update head status
-    const head = await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, 0)));
-    if (head[0]) {
-      await db.update(wpHeadsTable).set({
-        status: "validating", generatedAt: new Date(), updatedAt: new Date(),
-        exceptionsCount: result.exceptions.length,
-      }).where(eq(wpHeadsTable.id, head[0].id));
-    }
+      const head = await tx.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, 0)));
+      if (head[0]) {
+        await tx.update(wpHeadsTable).set({
+          status: "validating", generatedAt: new Date(), updatedAt: new Date(),
+          exceptionsCount: result.exceptions.length,
+        }).where(eq(wpHeadsTable.id, head[0].id));
+      }
+    });
 
     res.json({
       tbLines: result.tbLines,
@@ -2843,22 +2999,24 @@ router.post("/sessions/:id/generate-gl", async (req: Request, res: Response) => 
     const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
     const result = await runGLEngine(sessionId, ai, session);
 
-    // Log exceptions
-    for (const exc of result.exceptions) {
-      await db.insert(wpExceptionLogTable).values({
-        sessionId, headIndex: 1, exceptionType: "gl_recon",
-        severity: "high", title: "GL Reconciliation Issue",
-        description: exc, status: "open",
-      });
-    }
+    await db.transaction(async (tx) => {
+      if (result.exceptions.length > 0) {
+        const excValues = result.exceptions.map((exc: string) => ({
+          sessionId, headIndex: 1, exceptionType: "gl_recon",
+          severity: "high", title: "GL Reconciliation Issue",
+          description: exc, status: "open",
+        }));
+        await tx.insert(wpExceptionLogTable).values(excValues);
+      }
 
-    const head = await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, 1)));
-    if (head[0]) {
-      await db.update(wpHeadsTable).set({
-        status: "validating", generatedAt: new Date(), updatedAt: new Date(),
-        exceptionsCount: result.exceptions.length,
-      }).where(eq(wpHeadsTable.id, head[0].id));
-    }
+      const head = await tx.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, 1)));
+      if (head[0]) {
+        await tx.update(wpHeadsTable).set({
+          status: "validating", generatedAt: new Date(), updatedAt: new Date(),
+          exceptionsCount: result.exceptions.length,
+        }).where(eq(wpHeadsTable.id, head[0].id));
+      }
+    });
 
     res.json({
       accounts: result.accountsProcessed,
@@ -3072,7 +3230,7 @@ router.post("/sessions/:id/generate-tb-gl", async (req: Request, res: Response) 
 // HEAD-WISE GENERATION ENGINE
 // ═══════════════════════════════════════════════════════════════════════════
 
-router.post("/sessions/:id/heads/:headIndex/generate", async (req: Request, res: Response) => {
+router.post("/sessions/:id/heads/:headIndex/generate", aiRateLimit, async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(p(req.params.id));
     const headIndex = parseInt(p(req.params.headIndex));
@@ -3358,7 +3516,7 @@ Return ONLY valid JSON (no markdown, no extra text) with this EXACT complete str
 // Track in-progress auto-process jobs to prevent duplicate runs
 const autoProcessInProgress = new Set<number>();
 
-router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Response) => {
+router.post("/sessions/:id/heads/auto-process-all", aiRateLimit, async (req: Request, res: Response) => {
   let sessionId = -1;
   try {
     sessionId = parseInt(p(req.params.id));
@@ -3548,7 +3706,7 @@ router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Re
   }
 });
 
-router.post("/sessions/:id/heads/:headIndex/approve", async (req: Request, res: Response) => {
+router.post("/sessions/:id/heads/:headIndex/approve", requireRoles("super_admin", "partner", "senior_manager", "manager"), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const sessionId = parseInt(p(req.params.id));
     const headIndex = parseInt(p(req.params.headIndex));
@@ -3573,6 +3731,7 @@ router.post("/sessions/:id/heads/:headIndex/approve", async (req: Request, res: 
 
     res.json({ success: true, nextHeadUnlocked: nextHeadIndex });
   } catch (err: any) {
+    logger.error({ err }, "Failed to approve head");
     res.status(500).json({ error: "Failed to approve head" });
   }
 });
@@ -4090,6 +4249,7 @@ router.get("/sessions/:id/heads/:headIndex/documents", async (req: Request, res:
       })),
     });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     return res.status(500).json({ error: err.message });
   }
 });
@@ -4774,9 +4934,11 @@ router.post("/sessions/:id/heads/:headIndex/export", async (req: Request, res: R
 router.get("/sessions/:id/exceptions", async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(p(req.params.id));
-    const exceptions = await db.select().from(wpExceptionLogTable).where(eq(wpExceptionLogTable.sessionId, sessionId));
+    const { limit, offset } = parsePagination(req, 100, 500);
+    const exceptions = await db.select().from(wpExceptionLogTable).where(eq(wpExceptionLogTable.sessionId, sessionId)).limit(limit).offset(offset);
     res.json(exceptions);
   } catch (err: any) {
+    logger.error({ err }, "Failed to fetch exceptions");
     res.status(500).json({ error: "Failed to fetch exceptions" });
   }
 });
@@ -4784,7 +4946,10 @@ router.get("/sessions/:id/exceptions", async (req: Request, res: Response) => {
 router.patch("/sessions/:id/exceptions/:excId", async (req: Request, res: Response) => {
   try {
     const excId = parseInt(p(req.params.excId));
+    if (isNaN(excId)) return res.status(400).json({ error: "Invalid exception ID" });
     const { status, resolution, resolvedBy } = req.body;
+    const validExcStatuses = ["open", "under_review", "cleared", "override_approved", "waived", "escalated"];
+    if (status && !validExcStatuses.includes(status)) return res.status(400).json({ error: `Invalid exception status. Allowed: ${validExcStatuses.join(", ")}` });
     const updates: any = { updatedAt: new Date() };
     if (status) updates.status = status;
     if (resolution) updates.resolution = resolution;
@@ -4793,6 +4958,7 @@ router.patch("/sessions/:id/exceptions/:excId", async (req: Request, res: Respon
     const [updated] = await db.update(wpExceptionLogTable).set(updates).where(eq(wpExceptionLogTable.id, excId)).returning();
     res.json(updated);
   } catch (err: any) {
+    logger.error({ err }, "Failed to update exception");
     res.status(500).json({ error: "Failed to update exception" });
   }
 });
@@ -5032,6 +5198,7 @@ router.post("/sessions/:id/export-bundle", async (req: Request, res: Response) =
     await wb.xlsx.write(res);
     return res.end();
   } catch (err: any) {
+    logger.error({ err }, "Bundle export failed: ");
     res.status(500).json({ error: "Bundle export failed: " + err.message });
   }
 });
@@ -5182,6 +5349,7 @@ router.get("/sessions/:id/audit-engine", async (req: Request, res: Response) => 
     }).returning();
     return res.json(inserted);
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5197,6 +5365,7 @@ router.patch("/sessions/:id/audit-engine", async (req: Request, res: Response) =
     if (!rows.length) return res.status(404).json({ error: "Audit engine not found — call GET first to auto-create" });
     return res.json(rows[0]);
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5235,6 +5404,7 @@ router.post("/sessions/:id/audit-engine/auto-populate", async (req: Request, res
       return res.json({ message: "Audit engine created and populated", data: inserted });
     }
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5247,6 +5417,7 @@ router.post("/wp-trigger-defs/seed", async (_req: Request, res: Response) => {
     await db.insert(wpTriggerDefsTable).values(DEFAULT_WP_TRIGGERS as any);
     return res.json({ message: `Seeded ${DEFAULT_WP_TRIGGERS.length} WP trigger definitions` });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5257,6 +5428,7 @@ router.get("/wp-trigger-defs", async (_req: Request, res: Response) => {
     const rows = await db.select().from(wpTriggerDefsTable).orderBy(asc(wpTriggerDefsTable.displayOrder));
     return res.json(rows);
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5291,6 +5463,7 @@ router.get("/sessions/:id/wp-triggers", async (req: Request, res: Response) => {
     });
     return res.json(result);
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5319,6 +5492,7 @@ router.post("/sessions/:id/wp-triggers/evaluate", async (req: Request, res: Resp
     }
     return res.json({ message: `Evaluated ${defs.length} WP triggers — ${inserted} created, ${updated} updated` });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5344,6 +5518,7 @@ router.patch("/sessions/:id/wp-triggers/:wpCode", async (req: Request, res: Resp
     }
     return res.json(rows[0]);
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5356,6 +5531,7 @@ router.post("/assertion-linkage/seed", async (_req: Request, res: Response) => {
     await db.insert(assertionLinkageTable).values(DEFAULT_ASSERTION_LINKAGE as any);
     return res.json({ message: `Seeded ${DEFAULT_ASSERTION_LINKAGE.length} assertion linkage records` });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5366,6 +5542,7 @@ router.get("/assertion-linkage", async (_req: Request, res: Response) => {
     const rows = await db.select().from(assertionLinkageTable).orderBy(asc(assertionLinkageTable.displayOrder));
     return res.json(rows);
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5378,6 +5555,7 @@ router.post("/sampling-rules/seed", async (_req: Request, res: Response) => {
     await db.insert(samplingRulesTable).values(DEFAULT_SAMPLING_RULES as any);
     return res.json({ message: `Seeded ${DEFAULT_SAMPLING_RULES.length} sampling rules` });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5413,6 +5591,7 @@ router.get("/sessions/:id/sampling", async (req: Request, res: Response) => {
       context: { riskLevel: risk, performanceMateriality: pm, trivialityThreshold: trivial, samplingMethod, recommendation: `For ${risk} risk engagements using ${samplingMethod}, apply samples above ≥ ${computed[0]?.sampleSizeMin || 30} items for material areas` }
     });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5425,6 +5604,7 @@ router.post("/analytics-defs/seed", async (_req: Request, res: Response) => {
     await db.insert(analyticsEngineTable).values(DEFAULT_ANALYTICS as any);
     return res.json({ message: `Seeded ${DEFAULT_ANALYTICS.length} analytical ratio definitions` });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5435,6 +5615,7 @@ router.get("/analytics-defs", async (_req: Request, res: Response) => {
     const rows = await db.select().from(analyticsEngineTable).orderBy(asc(analyticsEngineTable.displayOrder));
     return res.json(rows);
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5474,6 +5655,7 @@ router.get("/sessions/:id/analytics", async (req: Request, res: Response) => {
 
     return res.json(results);
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5493,6 +5675,7 @@ router.patch("/sessions/:id/analytics/:ratioCode", async (req: Request, res: Res
       return res.json(inserted);
     }
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5518,6 +5701,7 @@ router.get("/sessions/:id/control-matrix", async (req: Request, res: Response) =
     }
     return res.json(rows);
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5529,6 +5713,7 @@ router.post("/sessions/:id/control-matrix", async (req: Request, res: Response) 
     const [inserted] = await db.insert(controlMatrixTable).values({ sessionId, ...req.body }).returning();
     return res.status(201).json(inserted);
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5541,6 +5726,7 @@ router.patch("/sessions/:id/control-matrix/:cmId", async (req: Request, res: Res
     const [updated] = await db.update(controlMatrixTable).set(updates).where(eq(controlMatrixTable.id, cmId)).returning();
     return res.json(updated);
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5551,6 +5737,7 @@ router.delete("/sessions/:id/control-matrix/:cmId", async (req: Request, res: Re
     await db.delete(controlMatrixTable).where(eq(controlMatrixTable.id, parseInt(p(req.params.cmId))));
     return res.json({ deleted: true });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5561,6 +5748,7 @@ router.get("/sessions/:id/evidence", async (req: Request, res: Response) => {
     const rows = await db.select().from(evidenceLogTable).where(eq(evidenceLogTable.sessionId, parseInt(p(req.params.id))));
     return res.json(rows);
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5573,6 +5761,7 @@ router.post("/sessions/:id/evidence", async (req: Request, res: Response) => {
     const [inserted] = await db.insert(evidenceLogTable).values({ sessionId, evidenceId, ...req.body }).returning();
     return res.status(201).json(inserted);
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5583,6 +5772,7 @@ router.patch("/sessions/:id/evidence/:evId", async (req: Request, res: Response)
     const [updated] = await db.update(evidenceLogTable).set(req.body).where(eq(evidenceLogTable.id, parseInt(p(req.params.evId)))).returning();
     return res.json(updated);
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5593,6 +5783,7 @@ router.delete("/sessions/:id/evidence/:evId", async (req: Request, res: Response
     await db.delete(evidenceLogTable).where(eq(evidenceLogTable.id, parseInt(p(req.params.evId))));
     return res.json({ deleted: true });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5603,6 +5794,7 @@ router.get("/sessions/:id/recon", async (req: Request, res: Response) => {
     const rows = await db.select().from(reconEngineTable).where(eq(reconEngineTable.sessionId, parseInt(p(req.params.id))));
     return res.json(rows);
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -5643,6 +5835,7 @@ router.post("/sessions/:id/recon/run", async (req: Request, res: Response) => {
     const allPassed = inserted.every((c: any) => c.passed);
     return res.json({ checks: inserted, allPassed, summary: `${inserted.filter((c: any) => c.passed).length}/${inserted.length} checks passed` });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -6373,6 +6566,7 @@ router.get("/sessions/:id/extraction-report", async (req: Request, res: Response
       fsMappings: fsMappings.slice(0, 50),
     });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -6383,7 +6577,7 @@ router.get("/sessions/:id/journal-imports", async (req: Request, res: Response) 
   try {
     const rows = await db.select().from(wpJournalImportTable).where(eq(wpJournalImportTable.sessionId, sessionId)).orderBy(asc(wpJournalImportTable.entryDate));
     res.json(rows);
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // ── GET FS extraction rows for session ───────────────────────────────────────
@@ -6392,7 +6586,7 @@ router.get("/sessions/:id/fs-extraction", async (req: Request, res: Response) =>
   try {
     const rows = await db.select().from(wpFsExtractionTable).where(eq(wpFsExtractionTable.sessionId, sessionId));
     res.json(rows);
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // ── GET FS mappings for session ───────────────────────────────────────────────
@@ -6401,7 +6595,7 @@ router.get("/sessions/:id/fs-mappings", async (req: Request, res: Response) => {
   try {
     const rows = await db.select().from(wpFsMappingTable).where(eq(wpFsMappingTable.sessionId, sessionId));
     res.json(rows);
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // ── Seed all global reference data in one call
@@ -6426,6 +6620,7 @@ router.post("/seed-audit-engine", async (_req: Request, res: Response) => {
 
     return res.json({ message: "Audit engine seed complete", results });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -6507,6 +6702,7 @@ router.get("/wp-library", async (req: Request, res: Response) => {
 
     return res.json({ total: filtered.length, byFamily, papers: filtered });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -6724,6 +6920,7 @@ router.get("/sessions/:id/wp-library-session", async (req: Request, res: Respons
 
     return res.json({ total: all.length, filtered: filtered.length, byPhase, papers: filtered });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -6747,6 +6944,7 @@ router.patch("/sessions/:id/wp-library-session/:wpCode", async (req: Request, re
 
     return res.json({ message: "WP session record updated", wpCode, status });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -6804,6 +7002,7 @@ router.post("/seed-trigger-rules", async (req: Request, res: Response) => {
     }
     return res.json({ message: "Trigger rules seeded", inserted, updated, total: ISA_TRIGGER_RULES.length });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -6859,14 +7058,14 @@ router.post("/sessions/:id/validate-for-generation", async (req: Request, res: R
     if (!tbFsBalancePass && fsTot > 0) warnings.push(`TB total (${tbTot.toFixed(0)}) differs from FS total (${fsTot.toFixed(0)}) by ${tbFsDifference.toFixed(0)} — verify mapping`);
 
     // ── CHECK 4: Mandatory engagement fields present ───────────────────────
-    const engRows = await db.execute(sql`SELECT client_name, entity_type, financial_year_end, reporting_framework, performance_materiality FROM audit_engine_master WHERE session_id = ${sessionId} LIMIT 1`);
-    const eng = (engRows.rows?.[0] as any) || {};
+    const engRows = await db.select().from(auditEngineMasterTable).where(eq(auditEngineMasterTable.sessionId, sessionId)).limit(1);
+    const eng = (engRows[0] as any) || {};
     const missingVars: string[] = [];
-    if (!eng.client_name) missingVars.push("clientName");
-    if (!eng.entity_type) missingVars.push("entityType");
-    if (!eng.financial_year_end) missingVars.push("financialYearEnd");
-    if (!eng.reporting_framework) missingVars.push("reportingFramework");
-    if (!eng.performance_materiality || eng.performance_materiality === "0") missingVars.push("performanceMateriality");
+    if (!eng.clientName) missingVars.push("clientName");
+    if (!eng.entityType) missingVars.push("entityType");
+    if (!eng.financialYearEnd) missingVars.push("financialYearEnd");
+    if (!eng.reportingFramework) missingVars.push("reportingFramework");
+    if (!eng.performanceMateriality || eng.performanceMateriality === "0") missingVars.push("performanceMateriality");
     const mandatoryVarsPass = missingVars.length === 0;
     if (!mandatoryVarsPass) blockedReasons.push(`Missing mandatory engagement fields: ${missingVars.join(", ")}`);
 
@@ -6923,6 +7122,7 @@ router.post("/sessions/:id/validate-for-generation", async (req: Request, res: R
       },
     });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -7012,6 +7212,7 @@ router.post("/sessions/:id/auto-flag-exceptions", async (req: Request, res: Resp
       medium: exceptions.filter(e => e.severity === "Medium").length,
     }, byType: summary });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -7047,6 +7248,7 @@ router.get("/sessions/:id/isa-exceptions", async (req: Request, res: Response) =
       return (order[a.severity as keyof typeof order] ?? 5) - (order[b.severity as keyof typeof order] ?? 5);
     })});
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -7067,6 +7269,7 @@ router.patch("/sessions/:id/isa-exceptions/:exId/resolve", async (req: Request, 
 
     return res.json({ message: "Exception resolved", exId });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -7075,7 +7278,7 @@ router.patch("/sessions/:id/isa-exceptions/:exId/resolve", async (req: Request, 
 // POST /sessions/:id/lock  — ISA 230 Partner Approval Lock
 // Locks the session audit file — no further edits allowed without EQCR override
 // ─────────────────────────────────────────────────────────────────────────────
-router.post("/sessions/:id/lock", async (req: Request, res: Response) => {
+router.post("/sessions/:id/lock", requireRoles("super_admin", "partner"), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const sessionId = parseInt(p(req.params.id), 10);
     const { lockedBy, lockLevel, lockJustification, archiveRef, eqcrCompleted, eqcrBy } = req.body;
@@ -7113,6 +7316,7 @@ router.post("/sessions/:id/lock", async (req: Request, res: Response) => {
 
     return res.json({ message: "Session locked successfully under ISA 230", sessionId, lockedBy, archiveRef: archiveRef || `ISA230-${sessionId}-${Date.now()}`, retentionEndDate: retentionEnd.toISOString().split("T")[0] });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -7127,6 +7331,7 @@ router.get("/sessions/:id/lock-status", async (req: Request, res: Response) => {
     if (lock.length === 0) return res.json({ locked: false });
     return res.json({ locked: true, lock: lock[0] });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -7512,6 +7717,7 @@ router.post("/sessions/:id/generate-output", async (req: Request, res: Response)
     res.setHeader("X-Job-Id", String(jobId));
     return res.send(fileContent);
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -7527,6 +7733,7 @@ router.get("/sessions/:id/output-jobs", async (req: Request, res: Response) => {
       .orderBy(sql`created_at DESC`);
     return res.json({ total: jobs.length, jobs });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -7569,6 +7776,7 @@ router.get("/sessions/:id/wp-audit-trail", async (req: Request, res: Response) =
     trail.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
     return res.json({ sessionId, total: trail.length, trail });
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -9470,6 +9678,7 @@ router.get("/download-template", async (_req: Request, res: Response) => {
     return res.end(Buffer.from(buf));
     ── End of legacy template generation ──────────────────────────────────── */
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -10092,6 +10301,7 @@ router.get("/download-template-OLD_DO_NOT_USE", async (_req: Request, res: Respo
     await wb.xlsx.write(res);
     res.end();
   } catch (err: any) {
+    logger.error({ err }, "Route error");
     res.status(500).json({ error: err.message });
   }
 });
@@ -10108,7 +10318,7 @@ router.get("/sessions/:sessionId/wp-execution", async (req: Request, res: Respon
       .where(eq(wpExecutionTable.sessionId, sid))
       .orderBy(asc(wpExecutionTable.wpCode));
     res.json(rows);
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // GET  /sessions/:sessionId/wp-execution/:wpCode    — get single execution record
@@ -10120,7 +10330,7 @@ router.get("/sessions/:sessionId/wp-execution/:wpCode", async (req: Request, res
       .where(and(eq(wpExecutionTable.sessionId, sid), eq(wpExecutionTable.wpCode, wpCode)));
     if (!row) return void res.status(404).json({ error: "Not found" });
     res.json(row);
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // PUT  /sessions/:sessionId/wp-execution/:wpCode    — create or update execution record
@@ -10196,11 +10406,11 @@ router.put("/sessions/:sessionId/wp-execution/:wpCode", async (req: Request, res
       [result] = await db.insert(wpExecutionTable).values(payload).returning();
     }
     res.json(result);
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // POST /sessions/:sessionId/wp-execution/:wpCode/sign-off — apply a reviewer sign-off
-router.post("/sessions/:sessionId/wp-execution/:wpCode/sign-off", async (req: Request, res: Response) => {
+router.post("/sessions/:sessionId/wp-execution/:wpCode/sign-off", requireRoles("super_admin", "partner", "senior_manager", "manager"), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const sid = parseInt(p(req.params.sessionId));
     const wpCode = p(req.params.wpCode);
@@ -10238,11 +10448,11 @@ router.post("/sessions/:sessionId/wp-execution/:wpCode/sign-off", async (req: Re
       .where(and(eq(wpExecutionTable.sessionId, sid), eq(wpExecutionTable.wpCode, wpCode)))
       .returning();
     res.json(updated);
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // POST /sessions/:sessionId/wp-execution/:wpCode/lock — lock a WP (ISA 230)
-router.post("/sessions/:sessionId/wp-execution/:wpCode/lock", async (req: Request, res: Response) => {
+router.post("/sessions/:sessionId/wp-execution/:wpCode/lock", requireRoles("super_admin", "partner", "senior_manager"), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const sid = parseInt(p(req.params.sessionId));
     const wpCode = p(req.params.wpCode);
@@ -10271,7 +10481,7 @@ router.post("/sessions/:sessionId/wp-execution/:wpCode/lock", async (req: Reques
       .where(and(eq(wpExecutionTable.sessionId, sid), eq(wpExecutionTable.wpCode, wpCode)))
       .returning();
     res.json(updated);
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // GET /sessions/:sessionId/wp-execution/:wpCode/validate — validate completeness
@@ -10317,7 +10527,7 @@ router.get("/sessions/:sessionId/wp-execution/:wpCode/validate", async (req: Req
       isLocked: row.isLocked,
       status: row.status,
     });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -10355,7 +10565,7 @@ router.get("/sessions/:id/compliance-docs", async (req: Request, res: Response) 
       };
     }
     res.json({ docs: COMPLIANCE_DOC_TYPES.map(t => ({ ...t, ...(statusMap[t.docType] || { status: "pending", hasContent: false }) })) });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // GET /sessions/:id/compliance-docs/:docType/content — full generated content
@@ -10367,11 +10577,11 @@ router.get("/sessions/:id/compliance-docs/:docType/content", async (req: Request
       .where(and(eq(wpComplianceDocTable.sessionId, sessionId), eq(wpComplianceDocTable.docType, docType)));
     if (!docs[0]) return res.status(404).json({ error: "Document not generated yet" });
     res.json(docs[0]);
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // POST /sessions/:id/compliance-docs/:docType/generate — AI-generate compliance document
-router.post("/sessions/:id/compliance-docs/:docType/generate", async (req: Request, res: Response) => {
+router.post("/sessions/:id/compliance-docs/:docType/generate", aiRateLimit, async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(p(req.params.id));
     const docType = req.params.docType;
@@ -10470,8 +10680,8 @@ Return ONLY valid JSON:
       return res.status(400).json({ error: `Unknown docType: ${docType}. Valid types: engagement_letter, independence_confirmation, management_rep_letter, eqcr_checklist, going_concern, secp_ccg` });
     }
 
-    const aiResp = await ai.chat.completions.create({
-      model: "gpt-4o",
+    const aiResp = await ai.client.chat.completions.create({
+      model: ai.model || "gpt-4o",
       messages: [
         { role: "system", content: "You are an expert Pakistani CA generating ISA-compliant audit documents. Return ONLY valid JSON with no markdown fences or extra text." },
         { role: "user", content: prompt },
@@ -10516,7 +10726,7 @@ Return ONLY valid JSON:
 });
 
 // POST /sessions/:id/compliance-docs/:docType/sign — record signature / completion
-router.post("/sessions/:id/compliance-docs/:docType/sign", async (req: Request, res: Response) => {
+router.post("/sessions/:id/compliance-docs/:docType/sign", requireRoles("super_admin", "partner", "senior_manager", "manager"), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const sessionId = parseInt(p(req.params.id));
     const docType = req.params.docType;
@@ -10541,7 +10751,7 @@ router.post("/sessions/:id/compliance-docs/:docType/sign", async (req: Request, 
     }).where(eq(wpComplianceDocTable.id, existing[0].id));
 
     res.json({ success: true, status: newStatus, docType });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // PATCH /sessions/:id/compliance-docs/eqcr_checklist/item — update single EQCR item
@@ -10572,7 +10782,7 @@ router.patch("/sessions/:id/compliance-docs/eqcr_checklist/item", async (req: Re
       completedItems: updated.filter((i: any) => i.status !== "pending").length,
       allComplete: allDone,
     });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // PATCH /sessions/:id/compliance-docs/secp_ccg/item — update single CCG checklist item
@@ -10598,7 +10808,7 @@ router.patch("/sessions/:id/compliance-docs/secp_ccg/item", async (req: Request,
     }).where(eq(wpComplianceDocTable.id, existing[0].id));
 
     res.json({ success: true, totalItems: updated.length, completedItems: updated.filter((i: any) => i.status !== "pending").length });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -10611,7 +10821,7 @@ router.patch("/sessions/:id/compliance-docs/secp_ccg/item", async (req: Request,
 
 router.get("/sessions/:sessionId/audit-chain", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const chains = await db.select().from(wpAuditChainTable).where(eq(wpAuditChainTable.sessionId, sessionId)).orderBy(wpAuditChainTable.fsArea, wpAuditChainTable.riskId);
     const summary = {
       total: chains.length,
@@ -10640,12 +10850,12 @@ router.get("/sessions/:sessionId/audit-chain", async (req: Request, res: Respons
       exceptionsTotal: chains.reduce((s, c) => s + (c.exceptionsFound || 0), 0),
     };
     res.json({ chains, summary });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
-router.post("/sessions/:sessionId/audit-chain/generate", async (req: Request, res: Response) => {
+router.post("/sessions/:sessionId/audit-chain/generate", aiRateLimit, async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const { wpCode, fsArea } = req.body;
     const session = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
     if (!session.length) return res.status(404).json({ error: "Session not found" });
@@ -10891,12 +11101,12 @@ router.post("/sessions/:sessionId/audit-chain/generate", async (req: Request, re
       }
     }
     res.json({ success: true, chainsGenerated: chains.length, areas: targetAreas });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 router.put("/sessions/:sessionId/audit-chain/:chainId", async (req: Request, res: Response) => {
   try {
-    const chainId = parseInt(req.params.chainId);
+    const chainId = parseInt(p(req.params.chainId));
     const updates = req.body;
     if (updates.procedureStatus === "performed" && updates.evidenceIds?.length > 0 && updates.conclusion) {
       updates.chainComplete = true;
@@ -10905,23 +11115,23 @@ router.put("/sessions/:sessionId/audit-chain/:chainId", async (req: Request, res
     await db.update(wpAuditChainTable).set({ ...updates, updatedAt: new Date() }).where(eq(wpAuditChainTable.id, chainId));
     const updated = await db.select().from(wpAuditChainTable).where(eq(wpAuditChainTable.id, chainId));
     res.json({ success: true, chain: updated[0] });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // ── TICK MARK SYSTEM ──
 
 router.get("/sessions/:sessionId/tick-marks", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const marks = await db.select().from(wpTickMarkTable).where(eq(wpTickMarkTable.sessionId, sessionId));
     const usages = await db.select().from(wpTickMarkUsageTable).where(eq(wpTickMarkUsageTable.sessionId, sessionId));
     res.json({ marks, usages, legend: marks.map(m => ({ symbol: m.symbol, meaning: m.meaning, color: m.color, count: usages.filter(u => u.symbol === m.symbol).length })) });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 router.post("/sessions/:sessionId/tick-marks/initialize", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const standardMarks = [
       { symbol: "✓", meaning: "Agreed to source document / verified", color: "#16A34A", category: "verification" },
       { symbol: "✗", meaning: "Exception / discrepancy noted", color: "#DC2626", category: "verification" },
@@ -10943,25 +11153,25 @@ router.post("/sessions/:sessionId/tick-marks/initialize", async (req: Request, r
     }
     const marks = await db.select().from(wpTickMarkTable).where(eq(wpTickMarkTable.sessionId, sessionId));
     res.json({ success: true, marks });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 router.post("/sessions/:sessionId/tick-marks/apply", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const { symbol, wpCode, lineRef, accountCode, amount, appliedBy, evidenceRef, notes } = req.body;
     await db.insert(wpTickMarkUsageTable).values({ sessionId, symbol, wpCode, lineRef, accountCode, amount, appliedBy, evidenceRef, notes });
     const mark = await db.select().from(wpTickMarkTable).where(and(eq(wpTickMarkTable.sessionId, sessionId), eq(wpTickMarkTable.symbol, symbol)));
     if (mark.length) await db.update(wpTickMarkTable).set({ usageCount: (mark[0].usageCount || 0) + 1 }).where(eq(wpTickMarkTable.id, mark[0].id));
     res.json({ success: true });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // ── MULTI-LEVEL REVIEW WORKFLOW WITH CLEARANCE TRACKING ──
 
 router.get("/sessions/:sessionId/review-notes", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const wpCode = req.query.wpCode as string;
     let conditions: any = eq(wpReviewNoteTable.sessionId, sessionId);
     if (wpCode) conditions = and(conditions, eq(wpReviewNoteTable.wpCode, wpCode));
@@ -10983,12 +11193,12 @@ router.get("/sessions/:sessionId/review-notes", async (req: Request, res: Respon
       },
     };
     res.json({ notes, summary });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 router.post("/sessions/:sessionId/review-notes", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const { wpCode, headIndex, reviewLevel, reviewerName, reviewerId, noteType, priority, subject, detail, isaReference, blocksSignOff, blocksExport } = req.body;
     await db.insert(wpReviewNoteTable).values({
       sessionId, wpCode, headIndex, reviewLevel, reviewerName, reviewerId,
@@ -11003,45 +11213,45 @@ router.post("/sessions/:sessionId/review-notes", async (req: Request, res: Respo
       newValue: subject, changedBy: reviewerName, changedByRole: reviewLevel,
     });
     res.json({ success: true });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 router.put("/sessions/:sessionId/review-notes/:noteId/respond", async (req: Request, res: Response) => {
   try {
-    const noteId = parseInt(req.params.noteId);
+    const noteId = parseInt(p(req.params.noteId));
     const { responseBy, responseText } = req.body;
     await db.update(wpReviewNoteTable).set({
       status: "responded", responseBy, responseDate: new Date(), responseText, updatedAt: new Date(),
     }).where(eq(wpReviewNoteTable.id, noteId));
     res.json({ success: true });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 router.put("/sessions/:sessionId/review-notes/:noteId/clear", async (req: Request, res: Response) => {
   try {
-    const noteId = parseInt(req.params.noteId);
+    const noteId = parseInt(p(req.params.noteId));
     const { clearedBy, clearanceNote } = req.body;
     await db.update(wpReviewNoteTable).set({
       status: "cleared", clearedBy, clearedDate: new Date(), clearanceNote, updatedAt: new Date(),
     }).where(eq(wpReviewNoteTable.id, noteId));
     res.json({ success: true });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 router.put("/sessions/:sessionId/review-notes/:noteId/escalate", async (req: Request, res: Response) => {
   try {
-    const noteId = parseInt(req.params.noteId);
+    const noteId = parseInt(p(req.params.noteId));
     const { escalatedTo, escalationReason } = req.body;
     await db.update(wpReviewNoteTable).set({
       status: "escalated", escalatedTo, escalationReason, updatedAt: new Date(),
     }).where(eq(wpReviewNoteTable.id, noteId));
     res.json({ success: true });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 router.get("/sessions/:sessionId/review-workflow-status", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const notes = await db.select().from(wpReviewNoteTable).where(eq(wpReviewNoteTable.sessionId, sessionId));
     const openBlockers = notes.filter(n => (n.blocksSignOff || n.blocksExport) && n.status !== "cleared");
     const levels = ["staff", "senior", "manager", "partner", "eqcr"];
@@ -11062,27 +11272,28 @@ router.get("/sessions/:sessionId/review-workflow-status", async (req: Request, r
       canExport: openBlockers.filter(n => n.blocksExport).length === 0,
       canLock: openBlockers.length === 0,
     });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // ── VERSION CONTROL & AUDIT TRAIL ──
 
 router.get("/sessions/:sessionId/version-history", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const entityType = req.query.entityType as string;
     const entityId = req.query.entityId as string;
     let conditions: any = eq(wpVersionHistoryTable.sessionId, sessionId);
     if (entityType) conditions = and(conditions, eq(wpVersionHistoryTable.entityType, entityType));
     if (entityId) conditions = and(conditions, eq(wpVersionHistoryTable.entityId, entityId));
-    const history = await db.select().from(wpVersionHistoryTable).where(conditions).orderBy(wpVersionHistoryTable.createdAt);
+    const { limit, offset } = parsePagination(req, 100, 500);
+    const history = await db.select().from(wpVersionHistoryTable).where(conditions).orderBy(desc(wpVersionHistoryTable.createdAt)).limit(limit).offset(offset);
     res.json({ history, total: history.length });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 router.post("/sessions/:sessionId/version-history", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const { entityType, entityId, fieldName, changeType, oldValue, newValue, reason, changedBy, changedByRole } = req.body;
     const existing = await db.select().from(wpVersionHistoryTable)
       .where(and(eq(wpVersionHistoryTable.sessionId, sessionId), eq(wpVersionHistoryTable.entityType, entityType), eq(wpVersionHistoryTable.entityId, entityId)));
@@ -11092,22 +11303,22 @@ router.post("/sessions/:sessionId/version-history", async (req: Request, res: Re
       oldValue, newValue, reason, changedBy, changedByRole, isImmutable: true,
     });
     res.json({ success: true, version });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // ── LEAD SCHEDULES ──
 
 router.get("/sessions/:sessionId/lead-schedules", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const schedules = await db.select().from(wpLeadScheduleTable).where(eq(wpLeadScheduleTable.sessionId, sessionId)).orderBy(wpLeadScheduleTable.wpArea);
     res.json({ schedules });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 router.post("/sessions/:sessionId/lead-schedules/generate", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
     if (!tbLines.length) return res.status(400).json({ error: "No trial balance data found. Upload template first." });
     const areaGroups: Record<string, any[]> = {};
@@ -11154,30 +11365,30 @@ router.post("/sessions/:sessionId/lead-schedules/generate", async (req: Request,
       }
     }
     res.json({ success: true, schedulesGenerated: schedules.length, areas: Object.keys(areaGroups) });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 router.put("/sessions/:sessionId/lead-schedules/:scheduleId", async (req: Request, res: Response) => {
   try {
-    const scheduleId = parseInt(req.params.scheduleId);
+    const scheduleId = parseInt(p(req.params.scheduleId));
     await db.update(wpLeadScheduleTable).set({ ...req.body, updatedAt: new Date() }).where(eq(wpLeadScheduleTable.id, scheduleId));
     res.json({ success: true });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // ── FS NOTE MAPPING ──
 
 router.get("/sessions/:sessionId/fs-note-mapping", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const mappings = await db.select().from(wpFsNoteMappingTable).where(eq(wpFsNoteMappingTable.sessionId, sessionId)).orderBy(wpFsNoteMappingTable.noteNo);
     res.json({ mappings });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 router.post("/sessions/:sessionId/fs-note-mapping/generate", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
     if (!tbLines.length) return res.status(400).json({ error: "No trial balance data. Upload template first." });
     const noteGroups: Record<string, any[]> = {};
@@ -11211,14 +11422,14 @@ router.post("/sessions/:sessionId/fs-note-mapping/generate", async (req: Request
     }
     if (mappings.length > 0) await db.insert(wpFsNoteMappingTable).values(mappings);
     res.json({ success: true, notesMapped: mappings.length });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // ── COMPLIANCE VALIDATION ENGINE ──
 
 router.get("/sessions/:sessionId/compliance-gates", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const gates = await db.select().from(wpComplianceGateTable).where(eq(wpComplianceGateTable.sessionId, sessionId)).orderBy(wpComplianceGateTable.category, wpComplianceGateTable.gateCode);
     const summary = {
       total: gates.length,
@@ -11231,12 +11442,12 @@ router.get("/sessions/:sessionId/compliance-gates", async (req: Request, res: Re
       compliancePct: gates.length ? Math.round((gates.filter(g => g.status === "pass" || g.status === "n_a" || g.status === "override").length / gates.length) * 100) : 0,
     };
     res.json({ gates, summary });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 router.post("/sessions/:sessionId/compliance-gates/run", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const session = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
     if (!session.length) return res.status(404).json({ error: "Session not found" });
     const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
@@ -11348,33 +11559,33 @@ router.post("/sessions/:sessionId/compliance-gates/run", async (req: Request, re
       compliancePct: Math.round((gates.filter((g: any) => g.status === "pass").length / gates.length) * 100),
     };
     res.json({ success: true, gates, summary });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 router.put("/sessions/:sessionId/compliance-gates/:gateId/override", async (req: Request, res: Response) => {
   try {
-    const gateId = parseInt(req.params.gateId);
+    const gateId = parseInt(p(req.params.gateId));
     const { overrideBy, overrideReason } = req.body;
     await db.update(wpComplianceGateTable).set({
       status: "override", overrideBy, overrideReason, overrideDate: new Date(), updatedAt: new Date(),
     }).where(eq(wpComplianceGateTable.id, gateId));
     res.json({ success: true });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // ── ISA 530 SAMPLING ENGINE ──
 
 router.get("/sessions/:sessionId/sampling-detail", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const details = await db.select().from(wpSamplingDetailTable).where(eq(wpSamplingDetailTable.sessionId, sessionId)).orderBy(wpSamplingDetailTable.fsArea);
     res.json({ details });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 router.post("/sessions/:sessionId/sampling-detail", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const data = req.body;
     const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
     const varMap: Record<string, string> = {};
@@ -11405,12 +11616,12 @@ router.post("/sessions/:sessionId/sampling-detail", async (req: Request, res: Re
       sampleSize, status: "planned", preparedBy: data.preparedBy,
     });
     res.json({ success: true, recommendedSampleSize: sampleSize });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 router.put("/sessions/:sessionId/sampling-detail/:samplingId", async (req: Request, res: Response) => {
   try {
-    const samplingId = parseInt(req.params.samplingId);
+    const samplingId = parseInt(p(req.params.samplingId));
     const updates = req.body;
     if (updates.itemsTested && updates.exceptionsFound !== undefined) {
       updates.exceptionRate = updates.itemsTested > 0 ? String(updates.exceptionsFound / updates.itemsTested) : "0";
@@ -11427,14 +11638,14 @@ router.put("/sessions/:sessionId/sampling-detail/:samplingId", async (req: Reque
     }
     await db.update(wpSamplingDetailTable).set({ ...updates, updatedAt: new Date() }).where(eq(wpSamplingDetailTable.id, samplingId));
     res.json({ success: true });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // ── ENHANCED TEMPLATE UPLOAD (16-column format) ──
 
 router.post("/sessions/:sessionId/upload-template", upload.single("file"), async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const XLSX = require("xlsx");
     const wb = XLSX.read(req.file.buffer);
@@ -11532,14 +11743,14 @@ router.post("/sessions/:sessionId/upload-template", upload.single("file"), async
         totalRevenue: autoVars.total_revenue,
       },
     });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 // ── AI-POWERED AUDIT CHAIN GENERATION ──
 
 router.post("/sessions/:sessionId/audit-chain/ai-generate", async (req: Request, res: Response) => {
   try {
-    const sessionId = parseInt(req.params.sessionId);
+    const sessionId = parseInt(p(req.params.sessionId));
     const { wpCode, fsArea } = req.body;
     const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
     const varMap: Record<string, string> = {};
@@ -11604,7 +11815,7 @@ Return ONLY the JSON array, no markdown.`;
       await db.insert(wpAuditChainTable).values(chains);
     }
     res.json({ success: true, chainsGenerated: chains.length, chains });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
 export default router;

@@ -1,0 +1,221 @@
+Continue upgrading the existing Working Paper Generator into a complete, production-grade, ISA-compliant statutory audit documentation system and do not stop at partial implementation. Repeatedly inspect the full codebase, identify every gap, weak area, broken flow, missing field, missing template, missing validation, missing linkage, poor UI/UX, incomplete logic, and compliance risk, then fix, improve, and re-test the system in continuous cycles until the whole product is robust, practical, professional, and review-defensible. The final system must support 150+ editable working papers and 400+ editable variables with strong AI assistance, complete audit logic, zero documentation gaps, and a direct-template architecture where TB and GL generation are not required.
+
+Core objective:
+Build a Working Paper Generator where one uploaded standardized Excel template becomes the master dataset and single source of truth for the entire audit file, driving data extraction, editable variables, editable mappings, lead schedules, working paper selection, working paper generation, review workflow, and final export, without requiring separate Trial Balance generation or General Ledger generation steps.
+
+Mandatory end-to-end workflow:
+1. Upload standardized template and supporting files.
+2. Extract and push uploaded data into editable fields automatically.
+3. Classify variables into upload-filled, formula-filled, AI-filled, missing, low-confidence, and user-confirmed.
+4. Allow full variable review, editing, filtering, validation, and lock/unlock control.
+5. Review and edit mappings directly from uploaded template data.
+6. Generate 150+ working papers sequentially and section-wise in editable form.
+7. Allow user manual improvement of each working paper before finalization.
+8. Enable review notes, reviewer clearance, version history, and approval trail.
+9. Export complete working paper file in professional printable format with no missing mandatory content.
+
+Direct-template rules:
+- Do not create a separate TB generation step if the uploaded template already contains trial balance level data.
+- Do not create a synthetic GL generation step unless later built as an optional reference-only feature.
+- Use uploaded template account rows directly for lead schedules, FS mapping, materiality logic, risk linkage, assertion linkage, sampling base, and working paper generation.
+- The uploaded template must act as the direct source for financial data, account codes, account titles, account grouping, balances, prior year figures, lead schedule links, risk tags, assertion mappings, and all other structured fields available in the template.
+- If any field required for working papers is missing from the template, the system must mark it as missing, low-confidence, or AI-assisted, but must not force TB/GL generation.
+- Remove TB and GL tabs from the mandatory workflow, or convert them into optional reference-only views if they already exist.
+- Remove all broken dependencies where working paper generation expects TB or GL generation first.
+- Rewire the full codebase so the uploaded template directly drives 400+ variables and 150+ working papers.
+
+Build the system with these non-negotiable rules:
+- No broken page, button, tab, route, API, save action, or export action.
+- No unnecessary UI redesign; improve only where required for clarity, control, and compliance.
+- Preserve existing good work and improve only where needed.
+- Every field must remain editable until final lock.
+- AI must assist, not override auditor judgment.
+- Every generated output must be practical, readable, and professionally formatted.
+- Every working paper must be capable of manual refinement before final export.
+- System must be able to continue generation paper by paper without data loss.
+- All outputs must be logically linked, cross-referenced, and compliance-mapped.
+- Repeat audit, test, fix, and improve cycles continuously until no significant weakness remains.
+
+Build these modules completely:
+
+A. SESSION / ENGAGEMENT SETUP
+- Create/select engagement.
+- Capture entity name, legal name, NTN, STRN, year-end, period start/end, reporting framework, entity type, industry, audit type, engagement size, currency, applicable standards, continuity indicators, and team assignment.
+- Add roles: preparer, senior, manager, partner, EQCR.
+- Save as master engagement record that drives all downstream logic.
+
+B. UPLOAD MODULE
+- Provide downloadable standardized Excel template.
+- Accept upload of xlsx as primary source and other supporting documents.
+- Read header data, account rows, FS captions, prior year balances, risk tags, lead schedule codes, account groupings, assertion mappings, and other structured content directly from the uploaded template.
+- Store raw uploaded data unchanged.
+- Validate sheet structure, headings, blanks, duplicate account codes, sign conventions, period integrity, mapping integrity, and formula breaks.
+- Show upload status, parsing status, validation status, and error log.
+
+C. DATA EXTRACTION / VARIABLES ENGINE
+- Populate editable variables automatically from upload.
+- Support 400+ variables minimum.
+- Categorize each variable as:
+  1) upload-filled
+  2) formula-filled
+  3) AI-filled
+  4) missing
+  5) low-confidence
+  6) user-confirmed
+- Add filters for all categories.
+- Add confidence score, source tag, last-updated-by, and last-updated-time.
+- Add AI action button to fill only remaining variables using uploaded data, supporting documents, and already confirmed variables.
+- Keep all variables editable before lock.
+- Add “Lock All” only after validation completion.
+- Add completeness meter and mandatory field tracker.
+
+D. VALIDATION ENGINE
+- Validate every critical data point before generation.
+- Check period consistency, balance integrity, mapping completeness, risk coverage, assertion coverage, mandatory disclosure fields, reviewer fields, and working paper trigger completeness.
+- Block final export where critical items are missing.
+- Show precise validation messages, not generic errors.
+
+E. MAPPING / DIRECT DATA FLOW ENGINE
+- Use uploaded template data directly as the base for lead schedules, FS mapping, risk linkage, assertions, sampling population, and working paper section triggers.
+- Map account codes to FS captions, lead schedules, assertions, risks, and working paper sections.
+- Add editable mapping table with dropdowns and mass update support.
+- Ensure every material line item flows into the relevant lead schedule and working paper.
+- Ensure no material balance remains unmapped.
+- If any optional TB/GL view remains in the system, it must only display uploaded template data and must not be a dependency for generation.
+
+F. WORKING PAPER LIBRARY
+- Build 150+ working papers minimum across the complete audit lifecycle, including:
+  engagement acceptance/continuance,
+  independence and ethics,
+  client profile,
+  engagement letter,
+  overall audit strategy,
+  audit plan,
+  materiality,
+  performance materiality,
+  trivial threshold,
+  risk assessment,
+  fraud discussion,
+  laws and regulations,
+  going concern,
+  internal control walkthroughs,
+  IT environment,
+  journal entry testing if user later provides transaction-level data,
+  related parties,
+  subsequent events,
+  representation letter,
+  lead schedules,
+  substantive procedures,
+  analytical review,
+  sampling sheets,
+  completion checklist,
+  disclosure checklist,
+  final review,
+  archiving checklist,
+  and all balance sheet, profit and loss, and disclosure area papers.
+- Organize papers by section, phase, FS area, and audit objective.
+- Include template selection logic based on variables, entity type, framework, risk level, and account balances.
+
+G. WORKING PAPER GENERATION LOGIC
+- Each generated working paper must be fully editable and professionally formatted.
+- Each paper must include, where applicable:
+  working paper code,
+  title,
+  engagement details,
+  period,
+  objective,
+  relevant ISA/reference,
+  risk linkage,
+  assertions,
+  population size in number and amount,
+  sample size in number and amount,
+  sampling basis,
+  procedure steps,
+  work performed,
+  evidence obtained,
+  exceptions noted,
+  variance analysis,
+  conclusion,
+  remarks,
+  prepared by,
+  reviewed by,
+  approved by,
+  dates,
+  tick marks,
+  cross references,
+  review notes,
+  clearance notes.
+- Auto-fill all possible content from uploaded template data, variables, mappings, prior logic, and AI analysis.
+- AI must help draft narration, procedures, observations, exceptions, and conclusions based on selected data, but keep everything editable.
+
+H. AUDIT LOGIC CHAIN
+Embed complete linkage:
+Risk → Assertion → Procedure → Sample → Evidence → Result → Conclusion → Review
+Every working paper must show this chain clearly where relevant.
+No orphan procedure, no unsupported conclusion, no unmapped material balance.
+
+I. AI ASSISTANCE LAYER
+- AI shall help fill missing variables.
+- AI shall recommend relevant working papers based on uploaded template data.
+- AI shall draft procedure text, lead schedules, analytical comments, ratio commentary, sample rationale, exception summaries, conclusion wording, and review suggestions.
+- AI shall identify possible gaps, contradictions, incomplete documentation, or weak conclusions.
+- AI shall never silently invent critical facts; uncertain output must be marked for review.
+- AI suggestions must always be editable and traceable.
+
+J. REVIEW AND CLEARANCE WORKFLOW
+- Add multi-level review: preparer, senior, manager, partner, EQCR if applicable.
+- Add status flow: draft, in progress, prepared, under review, review points raised, revised, cleared, approved, locked, archived.
+- Add review notes, point resolution, cleared-by, cleared-date, and outstanding matters dashboard.
+- Add version history and audit trail for key edits.
+
+K. PRINT / EXPORT / FINAL FILE
+- Professional print preview for each working paper and full file.
+- Export individual papers and full consolidated file.
+- Preserve formatting, pagination, headers, footers, cross references, sign-off boxes, and index.
+- Final export must be suitable for statutory review and third-party inspection.
+- No missing headings, no blank mandatory sections, no unformatted output.
+
+L. UI / UX REQUIREMENTS
+- Keep interface simple, serious, audit-professional, and fast.
+- Tabs/flow should clearly support:
+  Upload → Extraction → Variables → Validation → Mapping → WP Listing → WP Generation → Review → Export
+- Add top and bottom action buttons where needed.
+- Add autosave, progress indicators, section completion status, and warning badges.
+- Add strong filters, search, sort, and bulk actions.
+- Make editable areas visually clear.
+- Show AI-filled vs user-filled vs upload-filled fields distinctly.
+
+M. COMPLIANCE REQUIREMENT
+The system must be designed to support defensible statutory audit documentation aligned with:
+- ISA framework
+- ISQM-1
+- ISQM-2
+- ICAP expectations
+- AOB/QCR expectations
+- Companies Act documentation expectations
+- practical external file review requirements
+This does not mean only labels; embed compliance into structure, mandatory sections, logic chain, review workflow, evidence support, and completion controls.
+
+N. QUALITY CONTROL LOOP
+After every implementation cycle:
+1. scan entire codebase
+2. identify missing items, weak logic, placeholder code, dummy flow, broken save/load, broken data push, broken mapping, and compliance gaps
+3. fix all issues
+4. test all pages and generation flow
+5. improve formatting, direct-template logic, validations, and AI outputs
+6. repeat again until the system is fully mature
+Do not stop at “basic working.” Continue until the generator is practically excellent, complete, and review-ready.
+
+O. SPECIFIC DELIVERY EXPECTATION
+Deliver a Working Paper Generator that can:
+- handle real audit engagements,
+- use the uploaded template as the single source of truth,
+- fill 400+ variables,
+- generate 150+ working papers,
+- keep all outputs editable before lock,
+- support manual improvement by user,
+- maintain traceability and review workflow,
+- produce professional final working papers with no critical gap,
+- and stand ready for statutory body review with strong audit defensibility.
+
+Implement everything directly in the existing project, remove mandatory TB and GL generation dependencies, complete all unfinished flows, and keep repeating the improvement cycle until the whole system reaches near-perfect professional standard under the direct-template model.
