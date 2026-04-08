@@ -8307,53 +8307,142 @@ router.get("/download-template", async (_req: Request, res: Response) => {
     headers.forEach((h, i) => { cellNavy(ws.getRow(8).getCell(i + 1), h); });
     ws.views = [{ state: "frozen", ySplit: 8 }];
 
-    // ── Rows 9-38: Sample data (30 rows) ─────────────────────────────────────
+    // ── Rows 9-93: Comprehensive sample data (85 rows — full COA) ────────────
     // [Line_ID, Statement_Type, FS_Section, Major_Head, Line_Item, Sub_Line_Item, Account_Name, Account_Code, Note_No,
     //  Current_Year, Prior_Year, Debit_Transaction_Value, Credit_Transaction_Value, Normal_Balance,
     //  WP_Area, Risk_Level, Procedure_Scale, AI_GL_Flag, GL_Generation_Priority, Remarks]
     const sampleData: any[][] = [
-      [1,"BS","Assets","Non-Current Assets","Property, plant and equipment","Land","Freehold land","1501","5",6000000,6000000,0,0,"Debit","PPE","Medium","Standard","Yes","Low","Carry forward from prior year; no movement."],
-      [2,"BS","Assets","Non-Current Assets","Property, plant and equipment","Building","Factory building","1510","5",12500000,13200000,150000,850000,"Debit","PPE","Medium","Standard","Yes","Medium","Includes depreciation impact during the year."],
-      [3,"BS","Assets","Non-Current Assets","Property, plant and equipment","Plant and machinery","Production machinery","1520","5",9800000,8450000,2500000,1150000,"Debit","PPE","High","Expanded","Yes","High","Significant additions and depreciation recorded."],
-      [4,"BS","Assets","Non-Current Assets","Intangible assets","ERP software","ERP software","1601","6",420000,500000,0,80000,"Debit","Intangibles","Medium","Standard","No","Low","Amortising intangible asset."],
-      [5,"BS","Assets","Current Assets","Inventories","Raw materials","Raw material inventory","1301","7",4180000,3600000,16500000,15920000,"Debit","Inventory","High","Expanded","Yes","High","Key area for counts and valuation testing."],
-      [6,"BS","Assets","Current Assets","Inventories","Work in progress","WIP inventory","1302","7",2150000,1880000,5400000,5130000,"Debit","Inventory","High","Expanded","Yes","Medium","Requires costing and stage-of-completion reconciliation."],
-      [7,"BS","Assets","Current Assets","Inventories","Finished goods","Finished goods inventory","1303","7",3320000,2950000,12450000,12080000,"Debit","Inventory","High","Expanded","Yes","Medium","Aging review and NRV testing required."],
-      [8,"BS","Assets","Current Assets","Trade debts","Local customers","Trade receivables","1201","8",5875000,4960000,33350000,32435000,"Debit","Receivables","High","Expanded","Yes","High","Collections and subsequent receipts to be reviewed."],
-      [9,"BS","Assets","Current Assets","Advances and deposits","Security deposits","Security deposits","1210","9",450000,450000,0,0,"Debit","Other Assets","Low","Basic","No","Low","Static balance carried forward."],
-      [10,"BS","Assets","Current Assets","Cash and bank balances","Current account","MCB current account","1101","10",1860000,1420000,38900000,38460000,"Debit","Cash and Bank","Medium","Standard","Yes","High","Bank confirmation and reconciliation required."],
-      [11,"BS","Equity","Equity","Share capital","Ordinary shares","Issued share capital","3101","11",10000000,10000000,0,0,"Credit","Equity","Low","Basic","No","Low","No movement during the year."],
-      [12,"BS","Equity","Equity","Reserves","General reserve","General reserve","3201","11",1200000,1000000,0,200000,"Credit","Equity","Low","Basic","No","Low","Appropriation by management."],
-      [13,"BS","Equity","Equity","Retained earnings","Accumulated profit","Retained earnings","3301","11",2840000,2140000,0,700000,"Credit","Equity","Low","Basic","No","Low","Net of dividend paid during the year."],
-      [14,"BS","Liabilities","Non-Current Liabilities","Long-term loans","Term finance","Term finance from HBL","2101","12",3500000,4200000,700000,0,"Credit","Borrowings","High","Expanded","Yes","High","Confirm loan repayment schedule and covenant compliance."],
-      [15,"BS","Liabilities","Non-Current Liabilities","Deferred tax","Deferred tax liability","Deferred tax liability","2201","13",620000,480000,0,140000,"Credit","Taxation","Medium","Standard","No","Low","Calculate temporary difference and effective tax rate."],
-      [16,"BS","Liabilities","Current Liabilities","Trade and other payables","Suppliers","Trade payables","2301","14",980000,760000,760000,980000,"Credit","Payables","Medium","Standard","No","Low","Year-end accruals and cut-off testing required."],
-      [17,"BS","Liabilities","Current Liabilities","Taxation","Income tax payable","Income tax payable","2501","14",650000,540000,540000,650000,"Credit","Taxation","Medium","Standard","No","Low","Reconcile with current tax computation."],
-      [18,"BS","Liabilities","Current Liabilities","Short-term borrowings","Running finance","Running finance","2401","15",1750000,900000,4250000,5100000,"Credit","Borrowings","High","Expanded","Yes","Medium","Obtain bank statement and draw-down schedule."],
-      [19,"P&L","Income","Revenue","Sales","Local sales","Local product sales","5101","16",18200000,15800000,350000,18550000,"Credit","Revenue","High","Expanded","Yes","High","High-risk area; cut-off and completeness testing."],
-      [20,"P&L","Income","Revenue","Sales","Export sales","Export product sales","5102","16",4850000,3960000,50000,4900000,"Credit","Revenue","High","Expanded","Yes","High","Foreign customer sales subject to cut-off review."],
-      [21,"P&L","Income","Other income","Scrap sales","Scrap sales","Scrap sales","5201","17",420000,300000,5000,425000,"Credit","Other Income","Low","Basic","No","Low","Ancillary income stream."],
-      [22,"P&L","Expenses","Cost of Sales","Direct material","Raw material consumed","Raw material consumed","6101","18",14500000,12800000,14500000,0,"Debit","Cost of Sales","High","Expanded","Yes","High","Tie to purchases and inventory movement."],
-      [23,"P&L","Expenses","Cost of Sales","Direct labour","Factory wages","Factory wages","6102","18",3200000,2850000,3200000,0,"Debit","Cost of Sales","High","Expanded","Yes","Medium","Payroll testing required."],
-      [24,"P&L","Expenses","Cost of Sales","Manufacturing overhead","Factory utilities","Factory utilities","6103","18",2150000,1980000,2150000,0,"Debit","Cost of Sales","Medium","Standard","Yes","Medium","Analytical procedures useful."],
-      [25,"P&L","Expenses","Administrative Expenses","Salaries and benefits","Admin salaries","Admin salaries","6201","19",2450000,2240000,2450000,0,"Debit","Operating Expenses","Medium","Standard","Yes","Medium","Monthly payroll analytics to be prepared."],
-      [26,"P&L","Expenses","Administrative Expenses","Utilities","Office utilities","Office utilities","6202","19",340000,315000,340000,0,"Debit","Operating Expenses","Low","Basic","No","Low","Routine expense."],
-      [27,"P&L","Expenses","Administrative Expenses","Depreciation","Depreciation expense","Depreciation expense","6203","19",980000,910000,980000,0,"Debit","PPE","Medium","Standard","No","Low","Link with fixed asset register."],
-      [28,"P&L","Expenses","Selling and Distribution","Freight outward","Delivery expense","Delivery expense","6301","20",560000,490000,560000,0,"Debit","Operating Expenses","Low","Basic","No","Low","Sample of freight invoices may suffice."],
-      [29,"P&L","Expenses","Finance Cost","Markup on borrowings","Bank markup","Markup on term finance","6401","21",870000,795000,870000,0,"Debit","Borrowings","Medium","Standard","No","Low","Recompute finance charges."],
-      [30,"P&L","Expenses","Taxation","Current tax","Current tax expense","Current tax expense","6501","22",1150000,980000,1150000,0,"Debit","Taxation","Medium","Standard","No","Low","Link to tax provision sheet."],
+      // ── BALANCE SHEET: NON-CURRENT ASSETS ────────────────────────────────────
+      [1,"BS","Assets","Non-Current Assets","Property, plant and equipment","Land","Freehold land","1501","5",6000000,6000000,0,0,"Debit","PPE","Low","Basic","No","Low","Freehold land; no depreciation. Verify title deeds."],
+      [2,"BS","Assets","Non-Current Assets","Property, plant and equipment","Land","Leasehold land","1502","5",2400000,2400000,0,0,"Debit","PPE","Low","Basic","No","Low","Leasehold land — confirm lease terms and amortisation policy."],
+      [3,"BS","Assets","Non-Current Assets","Property, plant and equipment","Building","Factory building","1510","5",12500000,13200000,150000,850000,"Debit","PPE","Medium","Standard","Yes","Medium","Factory building including depreciation movement."],
+      [4,"BS","Assets","Non-Current Assets","Property, plant and equipment","Building","Office building","1511","5",4800000,5100000,50000,350000,"Debit","PPE","Medium","Standard","Yes","Medium","Office building; confirm ownership and encumbrances."],
+      [5,"BS","Assets","Non-Current Assets","Property, plant and equipment","Plant and machinery","Production machinery","1520","5",9800000,8450000,2500000,1150000,"Debit","PPE","High","Expanded","Yes","High","Significant additions in current year; physical verification required."],
+      [6,"BS","Assets","Non-Current Assets","Property, plant and equipment","Plant and machinery","Manufacturing equipment","1521","5",5600000,5100000,800000,300000,"Debit","PPE","High","Expanded","Yes","High","Verify invoices and manufacturer completion certificates."],
+      [7,"BS","Assets","Non-Current Assets","Property, plant and equipment","Plant and machinery","Testing equipment","1522","5",1200000,1050000,200000,50000,"Debit","PPE","Medium","Standard","Yes","Medium","Calibration records to be inspected."],
+      [8,"BS","Assets","Non-Current Assets","Property, plant and equipment","Furniture and fixtures","Office furniture","1530","5",650000,700000,0,50000,"Debit","PPE","Low","Basic","No","Low","Routine depreciation; no significant additions."],
+      [9,"BS","Assets","Non-Current Assets","Property, plant and equipment","Office equipment","Computer equipment","1540","5",1100000,980000,250000,130000,"Debit","PPE","Medium","Standard","Yes","Low","New laptops and servers purchased."],
+      [10,"BS","Assets","Non-Current Assets","Property, plant and equipment","Office equipment","Servers and networking","1541","5",850000,720000,180000,50000,"Debit","PPE","Medium","Standard","Yes","Low","Network infrastructure upgrade."],
+      [11,"BS","Assets","Non-Current Assets","Property, plant and equipment","Vehicles","Motor vehicles","1550","5",3200000,2900000,600000,300000,"Debit","PPE","Medium","Standard","Yes","Medium","Inspect registration documents and insurance."],
+      [12,"BS","Assets","Non-Current Assets","Capital work in progress","Capital work in progress","Capital work in progress","1590","5",4500000,2200000,4500000,2200000,"Debit","PPE","High","Expanded","Yes","High","Ongoing plant expansion — verify CWIP schedule and capitalisation."],
+      [13,"BS","Assets","Non-Current Assets","Intangible assets","ERP software","ERP software","1601","6",420000,500000,0,80000,"Debit","Intangibles","Medium","Standard","No","Low","Annual amortisation; confirm useful life assessment."],
+      [14,"BS","Assets","Non-Current Assets","Intangible assets","Patents and trademarks","Patents and trademarks","1602","6",180000,200000,0,20000,"Debit","Intangibles","Low","Basic","No","Low","Amortising at straight-line rate."],
+      [15,"BS","Assets","Non-Current Assets","Long-term investments","Investments in subsidiaries","Investments in subsidiaries","1701","7",5000000,5000000,0,0,"Debit","Other Assets","Medium","Standard","No","Low","Equity method investment; review financial statements of investee."],
+      [16,"BS","Assets","Non-Current Assets","Long-term loans and advances","Advances to employees","Advances to employees","1801","8",320000,280000,120000,80000,"Debit","Other Assets","Low","Basic","No","Low","Staff advances; confirm recoverability."],
+      // ── BALANCE SHEET: CURRENT ASSETS ────────────────────────────────────────
+      [17,"BS","Assets","Current Assets","Inventories","Raw materials","Raw material inventory","1301","9",4180000,3600000,16500000,15920000,"Debit","Inventory","High","Expanded","Yes","High","Physical count required; NRV testing for slow-moving items."],
+      [18,"BS","Assets","Current Assets","Inventories","Work in progress","WIP inventory","1302","9",2150000,1880000,5400000,5130000,"Debit","Inventory","High","Expanded","Yes","Medium","Stage-of-completion assessment and costing reconciliation."],
+      [19,"BS","Assets","Current Assets","Inventories","Finished goods","Finished goods inventory","1303","9",3320000,2950000,12450000,12080000,"Debit","Inventory","High","Expanded","Yes","Medium","Aging review; NRV testing for obsolete stock."],
+      [20,"BS","Assets","Current Assets","Inventories","Stores and spares","Stores inventory","1304","9",980000,850000,2200000,2070000,"Debit","Inventory","Medium","Standard","Yes","Medium","Sample count of high-value items."],
+      [21,"BS","Assets","Current Assets","Inventories","Packing materials","Packing material stock","1305","9",420000,380000,1800000,1760000,"Debit","Inventory","Low","Basic","No","Low","Routine analytical procedures."],
+      [22,"BS","Assets","Current Assets","Trade debts","Local customers","Trade receivables","1201","10",5875000,4960000,33350000,32435000,"Debit","Receivables","High","Expanded","Yes","High","Circularise confirmations; review subsequent receipts."],
+      [23,"BS","Assets","Current Assets","Trade debts","Export customers","Export receivables","1202","10",1640000,1280000,8900000,8540000,"Debit","Receivables","High","Expanded","Yes","High","Review foreign currency exposure and credit terms."],
+      [24,"BS","Assets","Current Assets","Trade debts","Government receivables","Government receivables","1203","10",380000,300000,1200000,1120000,"Debit","Receivables","Medium","Standard","Yes","Medium","Government contract receivables — assess recoverability."],
+      [25,"BS","Assets","Current Assets","Advances and deposits","Advances to suppliers","Advances to suppliers","1401","11",720000,640000,2100000,2020000,"Debit","Other Assets","Medium","Standard","No","Medium","Confirm goods/services received or expected."],
+      [26,"BS","Assets","Current Assets","Advances and deposits","Security deposits","Security deposits","1210","11",450000,450000,0,0,"Debit","Other Assets","Low","Basic","No","Low","Utility and tenancy deposits; verify agreements."],
+      [27,"BS","Assets","Current Assets","Advances and deposits","Prepayments","Prepaid insurance","1211","11",180000,160000,320000,300000,"Debit","Other Assets","Low","Basic","No","Low","Spread over policy term; recalculate prepayment."],
+      [28,"BS","Assets","Current Assets","Advances and deposits","Prepayments","Prepaid rent","1215","11",240000,220000,540000,520000,"Debit","Other Assets","Low","Basic","No","Low","Monthly rent; verify lease agreement."],
+      [29,"BS","Assets","Current Assets","Other receivables","Income tax refundable","Income tax refundable","1220","12",560000,480000,560000,480000,"Debit","Taxation","Medium","Standard","No","Medium","Verify with tax authority records and prior year return."],
+      [30,"BS","Assets","Current Assets","Other receivables","Sales tax refundable","Sales tax refundable","1230","12",320000,280000,320000,280000,"Debit","Taxation","Medium","Standard","No","Medium","Reconcile with FBR portal data."],
+      [31,"BS","Assets","Current Assets","Short-term investments","Treasury bills","Treasury bills","1401","13",2000000,0,2000000,0,"Debit","Other Assets","Medium","Standard","No","Low","Short-duration T-bills; confirm market value."],
+      [32,"BS","Assets","Current Assets","Cash and bank balances","Current account","MCB current account","1101","14",1860000,1420000,38900000,38460000,"Debit","Cash and Bank","Medium","Standard","Yes","High","Obtain bank confirmation; reconcile with bank statement."],
+      [33,"BS","Assets","Current Assets","Cash and bank balances","Savings account","HBL savings account","1102","14",920000,750000,12600000,12430000,"Debit","Cash and Bank","Medium","Standard","Yes","Medium","Bank statement reconciliation required."],
+      [34,"BS","Assets","Current Assets","Cash and bank balances","Cash in hand","Petty cash","1103","14",85000,70000,450000,435000,"Debit","Cash and Bank","Low","Basic","No","Low","Count petty cash at year-end."],
+      [35,"BS","Assets","Current Assets","Cash and bank balances","Foreign currency account","Foreign currency account","1104","14",380000,290000,5200000,5110000,"Debit","Cash and Bank","Medium","Standard","Yes","Medium","Revalue at closing rate; confirm exchange differences."],
+      // ── BALANCE SHEET: EQUITY ──────────────────────────────────────────────────
+      [36,"BS","Equity","Equity","Share capital","Ordinary shares","Issued and paid-up share capital","3101","15",10000000,10000000,0,0,"Credit","Equity","Low","Basic","No","Low","No change in share capital; confirm MOA and share register."],
+      [37,"BS","Equity","Equity","Share capital","Preference shares","Preference share capital","3102","15",2000000,2000000,0,0,"Credit","Equity","Low","Basic","No","Low","Cumulative preference shares; confirm dividend arrears."],
+      [38,"BS","Equity","Equity","Reserves","General reserve","General reserve","3201","15",1200000,1000000,0,200000,"Credit","Equity","Low","Basic","No","Low","Appropriation from profit per AGM resolution."],
+      [39,"BS","Equity","Equity","Reserves","Capital reserve","Capital reserve","3202","15",500000,500000,0,0,"Credit","Equity","Low","Basic","No","Low","Pre-acquisition surplus; confirm nature."],
+      [40,"BS","Equity","Equity","Reserves","Surplus on revaluation of fixed assets","Surplus on revaluation of fixed assets","3210","15",3500000,3800000,300000,0,"Credit","Equity","Medium","Standard","No","Medium","Incremental depreciation on revalued assets charged."],
+      [41,"BS","Equity","Equity","Retained earnings","Accumulated profit","Retained earnings","3301","15",2840000,2140000,0,700000,"Credit","Equity","Medium","Standard","No","Low","Net profit less dividend; reconcile with P&L."],
+      // ── BALANCE SHEET: NON-CURRENT LIABILITIES ────────────────────────────────
+      [42,"BS","Liabilities","Non-Current Liabilities","Long-term loans","Term finance","Term finance from HBL","2101","16",3500000,4200000,700000,0,"Credit","Borrowings","High","Expanded","Yes","High","Confirm repayment schedule and covenant compliance."],
+      [43,"BS","Liabilities","Non-Current Liabilities","Long-term loans","Diminishing musharaka","Diminishing musharaka","2102","16",1800000,2200000,400000,0,"Credit","Borrowings","High","Expanded","Yes","High","Verify Shariah-compliant financing structure."],
+      [44,"BS","Liabilities","Non-Current Liabilities","Long-term loans","Loan from directors","Directors loan","2103","16",1000000,1000000,0,0,"Credit","Borrowings","Medium","Standard","No","Medium","Confirm subordination and terms with board minutes."],
+      [45,"BS","Liabilities","Non-Current Liabilities","Deferred tax","Deferred tax liability","Deferred tax liability","2201","17",620000,480000,0,140000,"Credit","Taxation","Medium","Standard","No","Low","Calculate temporary difference; reconcile with tax computation."],
+      [46,"BS","Liabilities","Non-Current Liabilities","Staff retirement benefits","Gratuity","Gratuity payable","2210","18",840000,720000,0,120000,"Credit","Provisions","Medium","Standard","No","Medium","Actuarial valuation report to be obtained."],
+      [47,"BS","Liabilities","Non-Current Liabilities","Staff retirement benefits","Provident fund","Provident fund payable","2220","18",360000,310000,0,50000,"Credit","Provisions","Low","Basic","No","Low","Confirm fund balance with fund statements."],
+      // ── BALANCE SHEET: CURRENT LIABILITIES ────────────────────────────────────
+      [48,"BS","Liabilities","Current Liabilities","Trade and other payables","Suppliers","Trade payables","2301","19",2480000,2060000,1760000,2180000,"Credit","Payables","High","Expanded","Yes","High","Circularise supplier confirmations; review cut-off."],
+      [49,"BS","Liabilities","Current Liabilities","Trade and other payables","Accrued expenses","Accrued expenses","2302","19",680000,520000,520000,680000,"Credit","Payables","Medium","Standard","No","Medium","Review post year-end invoices for completeness."],
+      [50,"BS","Liabilities","Current Liabilities","Trade and other payables","Advance from customers","Customer advances","2310","19",420000,350000,350000,420000,"Credit","Payables","Medium","Standard","No","Medium","Verify recognition criteria for revenue recognition."],
+      [51,"BS","Liabilities","Current Liabilities","Accrued liabilities","Accrued wages","Accrued wages payable","2320","19",380000,310000,310000,380000,"Credit","Payables","Medium","Standard","No","Low","Match with payroll records and bank transfers post year-end."],
+      [52,"BS","Liabilities","Current Liabilities","Taxation","Income tax payable","Income tax payable","2501","20",650000,540000,540000,650000,"Credit","Taxation","Medium","Standard","No","Low","Reconcile with current tax computation and advance tax."],
+      [53,"BS","Liabilities","Current Liabilities","Taxation","Sales tax payable","Sales tax payable","2510","20",280000,240000,240000,280000,"Credit","Taxation","Medium","Standard","No","Low","Verify with FBR returns and payment receipts."],
+      [54,"BS","Liabilities","Current Liabilities","Taxation","Withholding tax payable","WHT payable","2511","20",140000,120000,120000,140000,"Credit","Taxation","Low","Basic","No","Low","Confirm remittance to FBR."],
+      [55,"BS","Liabilities","Current Liabilities","Short-term borrowings","Running finance","Running finance facility","2401","21",1750000,900000,4250000,5100000,"Credit","Borrowings","High","Expanded","Yes","High","Bank confirmation and drawdown schedule required."],
+      [56,"BS","Liabilities","Current Liabilities","Short-term borrowings","Cash credit","Cash credit facility","2402","21",800000,600000,1200000,1400000,"Credit","Borrowings","High","Expanded","Yes","Medium","Review facility limit and security arrangement."],
+      [57,"BS","Liabilities","Current Liabilities","Current portion of long-term loans","Current maturity of long-term loan","Current maturity of long-term loan","2110","22",700000,700000,700000,700000,"Credit","Borrowings","High","Expanded","Yes","High","Confirm instalment falling due within 12 months."],
+      // ── PROFIT & LOSS: INCOME ──────────────────────────────────────────────────
+      [58,"P&L","Income","Revenue","Sales","Local sales","Local product sales","5101","23",18200000,15800000,350000,18550000,"Credit","Revenue","High","Expanded","Yes","High","Cut-off testing; analytical procedures on monthly trends."],
+      [59,"P&L","Income","Revenue","Sales","Export sales","Export product sales","5102","23",4850000,3960000,50000,4900000,"Credit","Revenue","High","Expanded","Yes","High","Foreign exchange and customs documentation review."],
+      [60,"P&L","Income","Revenue","Sales","Service revenue","Service fee revenue","5103","23",1200000,980000,0,1200000,"Credit","Revenue","High","Expanded","Yes","High","Revenue recognition policy — performance obligation mapping."],
+      [61,"P&L","Income","Other income","Scrap sales","Scrap sales","Scrap and by-product income","5201","24",420000,300000,5000,425000,"Credit","Other Income","Low","Basic","No","Low","Verify scrap disposal records and proceeds."],
+      [62,"P&L","Income","Other income","Interest income","Interest income","Interest income","5202","24",185000,140000,0,185000,"Credit","Other Income","Low","Basic","No","Low","Recalculate on savings balances; reconcile with bank."],
+      [63,"P&L","Income","Other income","Gain on disposal","Gain on disposal of assets","Profit on disposal of assets","5210","24",95000,0,0,95000,"Credit","Other Income","Medium","Standard","No","Low","Inspect disposal records and sale proceeds."],
+      // ── PROFIT & LOSS: COST OF SALES ──────────────────────────────────────────
+      [64,"P&L","Expenses","Cost of Sales","Direct material","Raw material consumed","Cost of raw material consumed","6101","25",14500000,12800000,14500000,0,"Debit","Cost of Sales","High","Expanded","Yes","High","Tie to purchases, opening stock and closing stock."],
+      [65,"P&L","Expenses","Cost of Sales","Direct material","Purchases","Material purchases","6102","25",15200000,13400000,15200000,0,"Debit","Cost of Sales","High","Expanded","Yes","High","Cut-off testing; verify GRNs around year-end."],
+      [66,"P&L","Expenses","Cost of Sales","Direct labour","Factory wages","Direct labour cost","6103","25",3200000,2850000,3200000,0,"Debit","Cost of Sales","High","Expanded","Yes","Medium","Payroll listing and headcount analytics."],
+      [67,"P&L","Expenses","Cost of Sales","Direct labour","Factory salaries","Factory salaries","6104","25",1400000,1250000,1400000,0,"Debit","Cost of Sales","Medium","Standard","Yes","Medium","Confirm with payroll register and EOBI/PESSI returns."],
+      [68,"P&L","Expenses","Cost of Sales","Manufacturing overhead","Factory utilities","Factory overhead — utilities","6105","25",2150000,1980000,2150000,0,"Debit","Cost of Sales","Medium","Standard","Yes","Medium","Analytical procedures; compare with prior year usage."],
+      [69,"P&L","Expenses","Cost of Sales","Manufacturing overhead","Factory rent","Factory overhead — rent","6106","25",960000,880000,960000,0,"Debit","Cost of Sales","Low","Basic","No","Low","Verify lease agreement and monthly rent amount."],
+      [70,"P&L","Expenses","Cost of Sales","Manufacturing overhead","Factory insurance","Factory overhead — insurance","6107","25",380000,340000,380000,0,"Debit","Cost of Sales","Low","Basic","No","Low","Inspect insurance policy schedule."],
+      [71,"P&L","Expenses","Cost of Sales","Manufacturing overhead","Repair and maintenance","Factory overhead — repairs","6108","25",620000,560000,620000,0,"Debit","Cost of Sales","Medium","Standard","Yes","Medium","Sample testing of repair invoices; capitalisation review."],
+      // ── PROFIT & LOSS: ADMINISTRATIVE EXPENSES ────────────────────────────────
+      [72,"P&L","Expenses","Administrative Expenses","Salaries and benefits","Admin salaries","Administrative salaries","6201","26",2450000,2240000,2450000,0,"Debit","Operating Expenses","Medium","Standard","Yes","Medium","Payroll analytics; compare headcount and per-head cost."],
+      [73,"P&L","Expenses","Administrative Expenses","Salaries and benefits","Admin wages","Staff benefits","6202","26",580000,520000,580000,0,"Debit","Operating Expenses","Low","Basic","No","Low","EOBI, PESSI contributions confirmed."],
+      [74,"P&L","Expenses","Administrative Expenses","Utilities","Office utilities","Office expenses","6203","26",340000,315000,340000,0,"Debit","Operating Expenses","Low","Basic","No","Low","Analytical comparison with prior year."],
+      [75,"P&L","Expenses","Administrative Expenses","Utilities","Office rent","Office rent","6204","26",480000,440000,480000,0,"Debit","Operating Expenses","Low","Basic","No","Low","Agree to lease agreement."],
+      [76,"P&L","Expenses","Administrative Expenses","Depreciation","Depreciation expense","Depreciation — plant and machinery","6205","26",980000,910000,980000,0,"Debit","PPE","Medium","Standard","No","Low","Recalculate and tie to fixed asset register."],
+      [77,"P&L","Expenses","Administrative Expenses","Amortisation","Amortisation expense","Amortisation — intangibles","6206","26",100000,90000,100000,0,"Debit","Intangibles","Low","Basic","No","Low","Confirm useful life and straight-line rate."],
+      [78,"P&L","Expenses","Administrative Expenses","Repair and maintenance","Repair and maintenance (admin)","Repair and maintenance","6207","26",260000,220000,260000,0,"Debit","Operating Expenses","Low","Basic","No","Low","Sample of invoices; capitalisation criteria applied."],
+      [79,"P&L","Expenses","Administrative Expenses","Printing and stationery","Printing and stationery","Printing and stationery","6208","26",120000,105000,120000,0,"Debit","Operating Expenses","Low","Basic","No","Low","Analytical review."],
+      [80,"P&L","Expenses","Administrative Expenses","Communication expenses","Communication expenses","Communication expenses","6209","26",180000,155000,180000,0,"Debit","Operating Expenses","Low","Basic","No","Low","Telephone and internet bills; analytical review."],
+      [81,"P&L","Expenses","Administrative Expenses","Advertisement and marketing","Advertisement and marketing","Advertisement and marketing","6210","26",350000,290000,350000,0,"Debit","Operating Expenses","Low","Basic","No","Low","Review marketing invoices and campaign reports."],
+      // ── PROFIT & LOSS: SELLING AND DISTRIBUTION ───────────────────────────────
+      [82,"P&L","Expenses","Selling and Distribution","Freight outward","Delivery expense","Freight and forwarding","6301","27",560000,490000,560000,0,"Debit","Operating Expenses","Low","Basic","No","Low","Sample of freight invoices; analytical procedures."],
+      [83,"P&L","Expenses","Selling and Distribution","Freight outward","Forwarding expense","Distribution expenses","6302","27",220000,190000,220000,0,"Debit","Operating Expenses","Low","Basic","No","Low","Agree to third-party forwarder invoices."],
+      [84,"P&L","Expenses","Selling and Distribution","Travelling and conveyance","Travelling and conveyance","Travelling and conveyance","6303","27",310000,270000,310000,0,"Debit","Operating Expenses","Low","Basic","No","Low","Sample review of travel claims and approvals."],
+      // ── PROFIT & LOSS: FINANCE COST ───────────────────────────────────────────
+      [85,"P&L","Expenses","Finance Cost","Markup on borrowings","Markup on term finance","Mark-up on term finance","6401","28",870000,795000,870000,0,"Debit","Borrowings","Medium","Standard","No","Low","Recompute finance charges per loan schedule."],
+      [86,"P&L","Expenses","Finance Cost","Markup on borrowings","Markup on running finance","Mark-up on running finance","6402","28",340000,280000,340000,0,"Debit","Borrowings","Medium","Standard","No","Low","Reconcile with bank statement interest charges."],
+      [87,"P&L","Expenses","Finance Cost","Markup on borrowings","Bank charges","Bank charges and commission","6410","28",85000,72000,85000,0,"Debit","Borrowings","Low","Basic","No","Low","Agree to bank statement charges schedule."],
+      // ── PROFIT & LOSS: TAXATION ───────────────────────────────────────────────
+      [88,"P&L","Expenses","Taxation","Current tax","Current tax expense","Current tax provision","6501","29",1150000,980000,1150000,0,"Debit","Taxation","High","Expanded","No","Medium","Prepare tax computation; reconcile with effective rate."],
+      [89,"P&L","Expenses","Taxation","Current tax","Deferred tax expense","Deferred tax charge","6502","29",140000,110000,140000,0,"Debit","Taxation","Medium","Standard","No","Low","Reconcile deferred tax movement with balance sheet."],
     ];
 
     for (let i = 0; i < sampleData.length; i++) {
       const row = sampleData[i];
       const r = ws.getRow(9 + i);
       r.height = 18;
-      // Cols A-I: plain (no fill)
       for (let c = 0; c < 9; c++) cellPlain(r.getCell(c + 1), row[c]);
-      // Cols J-M: green editable (indices 9-12)
       for (let c = 9; c <= 12; c++) cellGreen(r.getCell(c + 1), row[c], "#,##0");
-      // Cols N-T: plain (indices 13-19)
       for (let c = 13; c <= 19; c++) cellPlain(r.getCell(c + 1), row[c]);
+    }
+
+    // ── Blank editable rows (rows 94–200) for user data entry ────────────────
+    const BLANK_START = 9 + sampleData.length; // row 98
+    const BLANK_END   = 200;
+    for (let r = BLANK_START; r <= BLANK_END; r++) {
+      const row = ws.getRow(r);
+      row.height = 18;
+      // Line_ID auto-numbered
+      const lineCell = row.getCell(1);
+      lineCell.value = r - 8;
+      lineCell.font  = { size: 10, name: "Calibri", color: { argb: "FFAAAAAA" } };
+      lineCell.alignment = { vertical: "middle" };
+      // Financial value columns green
+      for (let c = 10; c <= 13; c++) {
+        const fc = row.getCell(c);
+        fc.value = null;
+        fc.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2F0D9" } };
+        fc.numFmt = "#,##0";
+        fc.font   = { size: 10, name: "Calibri" };
+        fc.alignment = { vertical: "middle", horizontal: "right" };
+      }
     }
 
     // ── DATA VALIDATIONS (dropdowns) ─────────────────────────────────────────
@@ -8409,8 +8498,8 @@ router.get("/download-template", async (_req: Request, res: Response) => {
       "Small","Medium","Large","Very Large"
     ], "Engagement_Size", "Select the engagement size classification");
 
-    // ── Data row dropdowns (rows 9 to 38) ────────────────────────────────────
-    const DATA_ROWS = "9:38";
+    // ── Data row dropdowns (rows 9 to 200) ───────────────────────────────────
+    const DATA_ROWS = "9:200";
 
     // Col B — Statement_Type
     addDropdown(`B${DATA_ROWS.split(":")[0]}:B${DATA_ROWS.split(":")[1]}`, [
@@ -8682,20 +8771,21 @@ router.get("/download-template", async (_req: Request, res: Response) => {
       prompt: "Select the financial statement note number (1–100)",
     });
 
-    // ── Row 39: Totals ────────────────────────────────────────────────────────
-    const totRow = 39;
-    ws.getRow(totRow).height = 20;
-    const totals = [143330000, 130430000, 171380000, 178410000];
+    // ── Row 201: Totals (formula row below all data) ──────────────────────────
+    const totRow = 201;
+    ws.getRow(totRow).height = 22;
     const tCell = ws.getRow(totRow).getCell(1);
-    tCell.value = "Total";
-    tCell.font = { bold: true, size: 10, name: "Calibri" };
+    tCell.value = "TOTAL";
+    tCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F4E78" } };
+    tCell.font = { bold: true, size: 10, name: "Calibri", color: { argb: "FFFFFFFF" } };
     tCell.alignment = { vertical: "middle" };
     ws.mergeCells(totRow, 1, totRow, 9);
-    // J, K, L, M totals
-    for (let c = 0; c < 4; c++) {
-      const tc = ws.getRow(totRow).getCell(10 + c);
-      tc.value = totals[c];
-      tc.font = { bold: true, size: 10, name: "Calibri" };
+    const totCols = ["J","K","L","M"];
+    for (const col of totCols) {
+      const tc = ws.getRow(totRow).getCell(col);
+      tc.value = { formula: `SUM(${col}9:${col}200)` };
+      tc.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F4E78" } };
+      tc.font  = { bold: true, size: 10, name: "Calibri", color: { argb: "FFFFFFFF" } };
       tc.numFmt = "#,##0";
       tc.alignment = { vertical: "middle", horizontal: "right" };
     }
