@@ -51,17 +51,91 @@ const upload = multer({
 const AUDIT_HEADS = [
   { index: 0, name: "Trial Balance", outputType: "excel", papers: ["TB-Master", "TB-Mapping", "TB-VS-FS-Recon"] },
   { index: 1, name: "General Ledger", outputType: "excel", papers: ["GL-Summary", "GL-Detail", "Lead-Schedules", "Account-Mapping"] },
-  { index: 2, name: "Pre-Planning", outputType: "word", papers: ["A1-Acceptance", "A2-Engagement-Letter", "A3-Independence", "A4-Ethics", "A5-Client-Risk", "A6-KYC-AML"] },
-  { index: 3, name: "Trial Balance & GL", outputType: "word+excel", papers: ["B1-TB-Analysis", "B2-TB-Recon", "B3-GL-Review", "B4-Lead-Schedules"] },
-  { index: 4, name: "Client Documents", outputType: "word", papers: ["C1-Board-Minutes", "C2-Agreements", "C3-Bank-Confirmations", "C4-Legal-Confirmations", "C5-Tax-Certs"] },
-  { index: 5, name: "OB Verification", outputType: "word+excel", papers: ["D1-OB-Verification", "D2-Prior-Year-Review", "D3-OB-Adjustments"] },
-  { index: 6, name: "Planning", outputType: "word", papers: ["E1-Understanding-Entity", "E2-Risk-Assessment", "E3-Fraud-Assessment", "E4-Materiality", "E5-Planning-Analytics", "E6-Audit-Strategy", "E7-Audit-Program"] },
-  { index: 7, name: "Execution", outputType: "word+excel", papers: ["F1-Assets-Testing", "F2-Liabilities-Testing", "F3-Revenue-Testing", "F4-Expense-Testing", "F5-Tax-Procedures", "F6-Related-Parties", "F7-Estimates", "F8-Going-Concern"] },
-  { index: 8, name: "Finalization", outputType: "word", papers: ["G1-Subsequent-Events", "G2-Written-Reps", "G3-Completion-Memo", "G4-Adjustments-Summary"] },
-  { index: 9, name: "Deliverables", outputType: "word+pdf", papers: ["H1-Audit-Report", "H2-Management-Letter", "H3-Financial-Statements"] },
-  { index: 10, name: "EQCR", outputType: "word", papers: ["I1-EQCR-Checklist", "I2-EQCR-Findings"] },
-  { index: 11, name: "Inspection", outputType: "word", papers: ["J1-Inspection-Checklist", "J2-QC-Review"] },
+  { index: 2, name: "Pre-Planning", outputType: "word", papers: ["PP-01", "PP-02", "PP-03", "PP-04", "PP-05", "PP-06", "PP-07"] },
+  { index: 3, name: "Data Intake", outputType: "word+excel", papers: ["DI-01", "DI-04", "DI-05", "DI-06", "DI-07", "DI-08", "DI-09", "DI-10", "DI-11", "DI-12", "DI-13"] },
+  { index: 4, name: "Information Requisition", outputType: "word", papers: ["IR-01", "IR-02", "IR-03", "IR-04", "IR-05", "IR-06"] },
+  { index: 5, name: "OB Verification", outputType: "word+excel", papers: ["OB-01", "OB-02", "OB-03", "OB-04"] },
+  { index: 6, name: "Planning", outputType: "word", papers: ["PL-01", "PL-02", "PL-03", "PL-04", "PL-05", "PL-06", "PL-07", "PL-08", "PL-09", "PL-10", "PL-11"] },
+  { index: 7, name: "Execution", outputType: "word+excel", papers: ["EX-01", "EX-02", "EX-03", "EX-BS-01", "EX-BS-02", "EX-BS-03", "EX-BS-04", "EX-BS-05", "EX-BS-06", "EX-PL-01", "EX-PL-02", "EX-04", "FH-01"] },
+  { index: 8, name: "Evidence & Finalization", outputType: "word", papers: ["EV-01", "EV-02", "EV-03", "FN-01", "FN-02", "FN-03", "FN-04", "FN-05", "FN-06"] },
+  { index: 9, name: "Deliverables", outputType: "word+pdf", papers: ["DL-01", "DL-02"] },
+  { index: 10, name: "QR (EQCR)", outputType: "word", papers: ["QR-01", "QR-02", "QR-03", "QR-04"] },
+  { index: 11, name: "Inspection", outputType: "word", papers: ["IN-01", "IN-02", "IN-03", "IN-04"] },
 ];
+
+const WP_METADATA: Record<string, { name: string; isa: string; phase: string; riskLevel: string; assertions: string; fsArea: string }> = {
+  "PP-01": { name: "Engagement Setup", isa: "ISA 210, ISA 220, ISA 300, ISA 315", phase: "Pre-Planning", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
+  "PP-02": { name: "Entity Understanding", isa: "ISA 315", phase: "Pre-Planning", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
+  "PP-03": { name: "Ethics & Independence", isa: "ISA 220, ISQM 1, ICAP Code of Ethics", phase: "Pre-Planning", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "PP-04": { name: "Acceptance & Continuance", isa: "ISA 210, ISA 220", phase: "Pre-Planning", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "PP-05": { name: "Engagement Letter", isa: "ISA 210", phase: "Pre-Planning", riskLevel: "Low", assertions: "N/A", fsArea: "Engagement Level" },
+  "PP-06": { name: "Completion & Sign-off", isa: "ISA 300", phase: "Pre-Planning", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
+  "PP-07": { name: "Phase Summary", isa: "ISA 300, ISA 230", phase: "Pre-Planning", riskLevel: "Low", assertions: "N/A", fsArea: "Engagement Level" },
+  "DI-01": { name: "Upload & Data Intake", isa: "ISA 500", phase: "Data Intake", riskLevel: "Medium", assertions: "C, E", fsArea: "All FS Areas" },
+  "DI-04": { name: "FS Mapping", isa: "ISA 315, ISA 200", phase: "Data Intake", riskLevel: "Medium", assertions: "C, E, A, V", fsArea: "All FS Areas" },
+  "DI-05": { name: "Analytical Review", isa: "ISA 520", phase: "Data Intake", riskLevel: "High", assertions: "C, E, A, V, R", fsArea: "All FS Areas" },
+  "DI-06": { name: "Materiality Determination", isa: "ISA 320", phase: "Data Intake", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "DI-07": { name: "Risk Assessment", isa: "ISA 315", phase: "Data Intake", riskLevel: "High", assertions: "C, E, A, V, R, P", fsArea: "All FS Areas" },
+  "DI-08": { name: "Audit Population", isa: "ISA 500, ISA 530", phase: "Data Intake", riskLevel: "Medium", assertions: "C, E", fsArea: "All FS Areas" },
+  "DI-09": { name: "Sampling Design", isa: "ISA 530", phase: "Data Intake", riskLevel: "Medium", assertions: "C, E, V", fsArea: "All FS Areas" },
+  "DI-10": { name: "Confirmation Procedures", isa: "ISA 505", phase: "Data Intake", riskLevel: "High", assertions: "E, A", fsArea: "Receivables, Bank" },
+  "DI-11": { name: "Execution Datasets", isa: "ISA 500, ISA 330", phase: "Data Intake", riskLevel: "Medium", assertions: "C, E, V", fsArea: "All FS Areas" },
+  "DI-12": { name: "Reporting – Draft FS", isa: "ISA 700, ISA 200", phase: "Data Intake", riskLevel: "Medium", assertions: "P, R", fsArea: "Financial Statements" },
+  "DI-13": { name: "Data Intake Review Summary", isa: "ISA 300, ISA 230", phase: "Data Intake", riskLevel: "Low", assertions: "N/A", fsArea: "Engagement Level" },
+  "IR-01": { name: "IR Dashboard", isa: "ISA 230, ISA 500", phase: "Information Requisition", riskLevel: "Low", assertions: "C, E", fsArea: "All FS Areas" },
+  "IR-02": { name: "Request Register", isa: "ISA 500, ISA 230", phase: "Information Requisition", riskLevel: "Medium", assertions: "C, E", fsArea: "All FS Areas" },
+  "IR-03": { name: "Client Uploads", isa: "ISA 500, ISA 230", phase: "Information Requisition", riskLevel: "Medium", assertions: "C, E, V", fsArea: "All FS Areas" },
+  "IR-04": { name: "Procedures & Memos", isa: "ISA 230, ISA 300", phase: "Information Requisition", riskLevel: "Medium", assertions: "C, E", fsArea: "All FS Areas" },
+  "IR-05": { name: "Exceptions & Follow-ups", isa: "ISA 500, ISA 230", phase: "Information Requisition", riskLevel: "High", assertions: "C, E, V", fsArea: "All FS Areas" },
+  "IR-06": { name: "Conclusion & Sign-off", isa: "ISA 230, ISA 300", phase: "Information Requisition", riskLevel: "Low", assertions: "N/A", fsArea: "Engagement Level" },
+  "OB-01": { name: "OB Verification Dashboard", isa: "ISA 510", phase: "OB Verification", riskLevel: "High", assertions: "C, E, A", fsArea: "All Balance Sheet Items" },
+  "OB-02": { name: "OB Verification Procedures", isa: "ISA 510, ISA 500", phase: "OB Verification", riskLevel: "High", assertions: "C, E, A, V", fsArea: "All Balance Sheet Items" },
+  "OB-03": { name: "TB Verification", isa: "ISA 510, ISA 520", phase: "OB Verification", riskLevel: "High", assertions: "C, E, A, V", fsArea: "All Balance Sheet Items" },
+  "OB-04": { name: "OB Conclusion & Sign-off", isa: "ISA 510, ISA 230", phase: "OB Verification", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
+  "PL-01": { name: "Financial Statements Overview", isa: "ISA 200, ISA 700", phase: "Planning", riskLevel: "Medium", assertions: "P, R", fsArea: "Financial Statements" },
+  "PL-02": { name: "Entity & Internal Controls", isa: "ISA 315, ISA 265", phase: "Planning", riskLevel: "High", assertions: "C, E, A, V, R, P", fsArea: "Entity Level" },
+  "PL-03": { name: "Risk Assessment", isa: "ISA 315, ISA 330, ISA 570", phase: "Planning", riskLevel: "High", assertions: "C, E, A, V, R, P", fsArea: "All FS Areas" },
+  "PL-04": { name: "Analytical Procedures", isa: "ISA 520", phase: "Planning", riskLevel: "High", assertions: "C, E, A, V, R", fsArea: "All FS Areas" },
+  "PL-05": { name: "Materiality", isa: "ISA 320, ISA 450", phase: "Planning", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "PL-06": { name: "Overall Audit Strategy & Approach", isa: "ISA 300", phase: "Planning", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
+  "PL-07": { name: "Sampling Plan", isa: "ISA 530", phase: "Planning", riskLevel: "Medium", assertions: "C, E, V", fsArea: "All FS Areas" },
+  "PL-08": { name: "Audit Program", isa: "ISA 300, ISA 330", phase: "Planning", riskLevel: "High", assertions: "C, E, A, V, R, P", fsArea: "All FS Areas" },
+  "PL-09": { name: "Specialized Areas", isa: "ISA 550, ISA 540, ISA 600, ISA 620", phase: "Planning", riskLevel: "High", assertions: "C, E, A, V", fsArea: "Estimates, Related Parties, Group" },
+  "PL-10": { name: "TCWG Communication", isa: "ISA 260, ISA 265", phase: "Planning", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
+  "PL-11": { name: "Quality Control", isa: "ISA 220, ISQM 1", phase: "Planning", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "EX-01": { name: "Planning Prerequisites", isa: "ISA 300, ISA 330", phase: "Execution", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
+  "EX-02": { name: "ISA Compliance Status", isa: "ISA 200, ISA 500, ISA 330", phase: "Execution", riskLevel: "High", assertions: "C, E, A, V, R, P", fsArea: "All FS Areas" },
+  "EX-03": { name: "FS Head Working Papers Summary", isa: "ISA 330, ISA 500, ISA 501", phase: "Execution", riskLevel: "High", assertions: "C, E, A, V, R, P", fsArea: "All FS Areas" },
+  "EX-BS-01": { name: "FS Head: Cash and Bank Balances", isa: "ISA 330, ISA 500, ISA 501, ISA 505", phase: "Execution", riskLevel: "High", assertions: "E, A, V", fsArea: "Cash & Bank" },
+  "EX-BS-02": { name: "FS Head: Inventories", isa: "ISA 330, ISA 500, ISA 501", phase: "Execution", riskLevel: "High", assertions: "E, C, V, R", fsArea: "Inventories" },
+  "EX-BS-03": { name: "FS Head: Long Term Borrowings", isa: "ISA 330, ISA 500, ISA 501", phase: "Execution", riskLevel: "High", assertions: "C, E, A, V", fsArea: "Long Term Borrowings" },
+  "EX-BS-04": { name: "FS Head: Property, Plant and Equipment", isa: "ISA 330, ISA 500, ISA 501", phase: "Execution", riskLevel: "High", assertions: "E, C, A, V, R", fsArea: "PPE" },
+  "EX-BS-05": { name: "FS Head: Trade Receivables", isa: "ISA 330, ISA 500, ISA 505", phase: "Execution", riskLevel: "High", assertions: "E, C, A, V, R", fsArea: "Trade Receivables" },
+  "EX-BS-06": { name: "FS Head: Trade and Other Payables", isa: "ISA 330, ISA 500, ISA 501", phase: "Execution", riskLevel: "High", assertions: "C, E, A, V", fsArea: "Trade Payables" },
+  "EX-PL-01": { name: "FS Head: Cost of Sales", isa: "ISA 330, ISA 500, ISA 501", phase: "Execution", riskLevel: "High", assertions: "C, E, A, V", fsArea: "Cost of Sales" },
+  "EX-PL-02": { name: "FS Head: Revenue", isa: "ISA 330, ISA 500, ISA 240", phase: "Execution", riskLevel: "Significant", assertions: "C, E, A, V, R, P", fsArea: "Revenue" },
+  "EX-04": { name: "Journal Entry Testing", isa: "ISA 240, ISA 330", phase: "Execution", riskLevel: "Significant", assertions: "C, E, A, V", fsArea: "All FS Areas" },
+  "FH-01": { name: "FS Heads – Execution Summary", isa: "ISA 330, ISA 500, ISA 501", phase: "FS Heads", riskLevel: "High", assertions: "C, E, A, V, R, P", fsArea: "All FS Areas" },
+  "EV-01": { name: "Evidence – Documents", isa: "ISA 500, ISA 230", phase: "Evidence", riskLevel: "High", assertions: "C, E, V", fsArea: "All FS Areas" },
+  "EV-02": { name: "Evidence – ISA 230 Checklist", isa: "ISA 230", phase: "Evidence", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "EV-03": { name: "Evidence – Stats & Links", isa: "ISA 500, ISA 330", phase: "Evidence", riskLevel: "Medium", assertions: "C, E, V", fsArea: "All FS Areas" },
+  "FN-01": { name: "Finalization – Adjusted Financial Statements", isa: "ISA 700, ISA 450", phase: "Finalization", riskLevel: "High", assertions: "P, R, V", fsArea: "Financial Statements" },
+  "FN-02": { name: "Finalization – Subsequent Events", isa: "ISA 560", phase: "Finalization", riskLevel: "High", assertions: "C, E", fsArea: "Post Balance Sheet" },
+  "FN-03": { name: "Finalization – Going Concern", isa: "ISA 570", phase: "Finalization", riskLevel: "Significant", assertions: "N/A", fsArea: "Engagement Level" },
+  "FN-04": { name: "Finalization – Completion Checklist", isa: "ISA 500, ISA 580, ISA 220", phase: "Finalization", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "FN-05": { name: "Finalization – Audit Summary Memorandum", isa: "ISA 700, ISA 220", phase: "Finalization", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "FN-06": { name: "Finalization – Notes & Disclosures", isa: "ISA 700, ISA 720", phase: "Finalization", riskLevel: "High", assertions: "P, R", fsArea: "Financial Statements" },
+  "DL-01": { name: "Deliverables – Auditor's Report", isa: "ISA 700, ISA 705, ISA 706", phase: "Deliverables", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "DL-02": { name: "Deliverables – Export Package", isa: "ISA 230", phase: "Deliverables", riskLevel: "Low", assertions: "N/A", fsArea: "Engagement Level" },
+  "QR-01": { name: "EQCR Checklist", isa: "ISA 220, ISQM 2", phase: "QR (EQCR)", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "QR-02": { name: "EQCR – AI Summary", isa: "ISA 220", phase: "QR (EQCR)", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
+  "QR-03": { name: "EQCR – Partner Comments", isa: "ISA 220, ISQM 2", phase: "QR (EQCR)", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "QR-04": { name: "EQCR – Signed Reports", isa: "ISA 700, ISA 220", phase: "QR (EQCR)", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+  "IN-01": { name: "Inspection – Archive", isa: "ISQM 1, ISA 230", phase: "Inspection", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
+  "IN-02": { name: "Inspection – Sign-off Status", isa: "ISA 220, ISQM 1", phase: "Inspection", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
+  "IN-03": { name: "Inspection – Phase Completion Summary", isa: "ISQM 1", phase: "Inspection", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
+  "IN-04": { name: "Inspection – Risk & Audit Matters", isa: "ISA 315, ISA 330, ISQM 1", phase: "Inspection", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
+};
 
 const ARRANGED_DATA_TABS = [
   "Entity Profile", "Reporting Metadata", "FS Line Items", "Prior Year Comparatives",
@@ -2909,57 +2983,127 @@ router.post("/sessions/:id/heads/:headIndex/generate", async (req: Request, res:
     const exceptions: string[] = [];
 
     for (const paperCode of papers) {
-      const paperPrompt = `Generate the audit working paper "${paperCode}" for the "${headDef.name}" section.
+      const wpMeta = WP_METADATA[paperCode] || { name: paperCode, isa: "ISA 500", phase: headDef.name, riskLevel: "Medium", assertions: "C, E, V", fsArea: "All FS Areas" };
+      const paperPrompt = `You are a senior audit partner generating a fully professional, ISA-compliant, audit-defensible working paper for a Pakistani CA firm. Generate working paper "${paperCode}" — "${wpMeta.name}" for the "${headDef.name}" phase.
 
-CLIENT: ${session?.clientName || "Unknown"}
-ENTITY TYPE: ${session?.entityType || "Private Limited"}
-YEAR: ${session?.engagementYear || "2024"}
-FRAMEWORK: ${session?.reportingFramework || "IFRS"}
-ENGAGEMENT: ${session?.engagementType?.replace(/_/g, " ") || "Statutory Audit"}
+═══ ENGAGEMENT DETAILS ═══
+Firm: ${session?.firmName || "AuditWise Firm"}
+Client: ${session?.clientName || "Unknown"}
+Engagement Code: ENG-${session?.engagementYear || "2026"}-${String(sessionId).padStart(3, "0")}
+Entity Type: ${session?.entityType || "Private Limited"}
+Financial Year End: ${session?.periodEnd || `30 June ${session?.engagementYear || "2026"}`}
+Period: ${session?.periodStart || "01/07/2025"} to ${session?.periodEnd || "30/06/2026"}
+Tax Year: ${session?.engagementYear || "2026"}
+Reporting Framework: ${session?.reportingFramework || "IFRS"}
+Engagement Type: ${session?.engagementType?.replace(/_/g, " ") || "Statutory Audit"}
 NTN: ${session?.ntn || "N/A"}
-LISTED STATUS: ${session?.entityType === "Public Limited (Listed)" ? "Listed / PIE" : "Unlisted"}
+Listed Status: ${session?.entityType === "Public Limited (Listed)" ? "Listed / PIE Entity" : "Unlisted"}
+WP Phase: ${wpMeta.phase}
+ISA References: ${wpMeta.isa}
+Risk Level: ${wpMeta.riskLevel}
+FS Area: ${wpMeta.fsArea}
+Assertions: ${wpMeta.assertions}
 
-ENGAGEMENT VARIABLES:
+═══ ENGAGEMENT VARIABLES ═══
 ${varSummary}
 
-TRIAL BALANCE SUMMARY:
-${smartChunk(tbSummary, 4000)}
+═══ TRIAL BALANCE SUMMARY ═══
+${smartChunk(tbSummary, 3000)}
 
-REQUIREMENTS:
-1. Follow ISA standards applicable in Pakistan (ICAP adopted)
-2. Reference specific account balances from the TB
-3. Include proper assertions, procedures, and conclusions
-4. Use professional audit language
-5. Include cross-references to other working papers where relevant
-6. Flag any exceptions or findings
+═══ MANDATORY STRUCTURE ═══
+Generate a COMPLETE, SPECIFIC, NON-GENERIC working paper with ALL of the following sections. Every field must reference actual client data, account balances, or ISA-specific procedures. No placeholder text allowed.
 
-Return JSON:
+Return ONLY valid JSON with this exact structure:
 {
   "paper_code": "${paperCode}",
-  "paper_name": string,
-  "content": string (full working paper text with proper sections),
-  "exceptions": [string],
-  "cross_references": [string]
+  "paper_name": "${wpMeta.name}",
+  "version": "v1.0",
+  "status": "Draft",
+  "objective": "Specific, measurable ISA-aligned objective for this working paper referencing the client and FS area. Minimum 3 sentences.",
+  "risk_assertion_table": [
+    {
+      "risk_id": "R001",
+      "risk_description": "Specific risk description referencing client's business or industry",
+      "risk_type": "Inherent | Control | Fraud",
+      "fs_area": "Specific FS line item or area",
+      "assertions_impacted": "E, C, V (use: Existence=E, Completeness=C, Accuracy=A, Valuation=V, Rights&Obligations=R, Presentation=P)",
+      "risk_level": "Low | Medium | High | Significant",
+      "risk_register_ref": "PL-03 or DI-07"
+    }
+  ],
+  "procedures_table": [
+    {
+      "proc_id": "P001",
+      "nature": "Test of Control | Substantive | Analytical Review | Inquiry | Observation | Inspection | Confirmation",
+      "description": "Detailed specific audit procedure referencing client data, account names, balances",
+      "isa_reference": "ISA XXX para XX",
+      "performed_by": "Staff | Senior | Manager",
+      "planned_date": "During fieldwork",
+      "status": "Planned | In Progress | Complete | Exception"
+    }
+  ],
+  "testing_results": {
+    "population_description": "Description of population tested with reference to TB balance or GL entries",
+    "population_size_pkr": "PKR amount or count",
+    "sampling_method": "MUS | Random | Haphazard | Judgmental | 100% (per ISA 530)",
+    "sample_size": "Number of items",
+    "items_tested": "Number tested",
+    "exceptions_identified": 0,
+    "exception_rate_pct": "0%",
+    "exceptions_detail": ["List of any exceptions found, or 'No exceptions noted'"],
+    "tb_cross_ref": "Account code and name from TB",
+    "gl_cross_ref": "GL account reference"
+  },
+  "evidence_table": [
+    {
+      "evidence_id": "E001",
+      "type": "External | Internal | Analytical | Third-Party",
+      "source": "Source of evidence (e.g., Bank confirmation, Management representation, Invoice)",
+      "reliability": "High | Medium | Low",
+      "linked_procedure": "P001",
+      "description": "What the evidence confirms"
+    }
+  ],
+  "auditor_judgement": "Minimum 4-sentence professional narrative covering: interpretation of results, professional judgment applied, any contradictions or anomalies, corroboration with other audit areas. Must be specific to this WP and client.",
+  "conclusion": {
+    "status": "Satisfactory | Satisfactory with Exception | Unsatisfactory | Not Applicable",
+    "basis": "Specific basis for conclusion referencing procedures performed and evidence obtained",
+    "impact_on_opinion": "No impact | Qualified | Emphasis of Matter | Other Matter",
+    "further_actions": "None required | Specific follow-up actions if any",
+    "misstatements_identified": "None | Description of uncorrected/corrected misstatements per ISA 450"
+  },
+  "action_points": [
+    {
+      "issue_id": "AP001",
+      "description": "Specific action or issue if any",
+      "risk_impact": "Low | Medium | High",
+      "assigned_to": "Manager",
+      "deadline": "Before sign-off",
+      "status": "Open | Closed | Monitoring"
+    }
+  ],
+  "cross_references": ["${paperCode} → Related WP codes that this paper cross-references"],
+  "exceptions": ["List of audit exceptions or findings, or empty array if none"]
 }`;
 
       try {
         const resp = await ai.client.chat.completions.create({
           model: ai.model,
           messages: [
-            { role: "system", content: "You are a senior auditor generating ISA-compliant working papers for Pakistan audits. Return valid JSON only." },
+            { role: "system", content: `You are a Big-4 trained senior audit partner generating 100% ISA-compliant, ISQM-1 compliant, audit-defensible working papers for Pakistan (ICAP) audits. You are an expert in ISA 200-720, ISQM 1 & 2, Companies Act 2017 Pakistan, and IFRS/IAS. Every working paper you generate must be fully specific to the client, non-generic, and inspection-ready. Return ONLY valid JSON. No markdown, no explanation.` },
             { role: "user", content: paperPrompt },
           ],
-          max_tokens: 4000, temperature: 0.3,
+          max_tokens: 5000, temperature: 0.2,
           response_format: { type: "json_object" },
-        }, { signal: AbortSignal.timeout(30000) });
+        }, { signal: AbortSignal.timeout(45000) });
 
         const raw = JSON.parse(resp.choices[0]?.message?.content || "{}");
 
         const [doc] = await db.insert(wpHeadDocumentsTable).values({
           sessionId, headId: head.id,
           paperCode: raw.paper_code || paperCode,
-          paperName: raw.paper_name || paperCode,
-          content: raw.content || "",
+          paperName: raw.paper_name || wpMeta.name,
+          content: JSON.stringify(raw),
           outputFormat: headDef.outputType.split("+")[0],
           status: "generated",
           generatedAt: new Date(),
@@ -3108,17 +3252,18 @@ router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Re
               const resp = await ai.client.chat.completions.create({
                 model: ai.model,
                 messages: [
-                  { role: "system", content: "You are a senior auditor generating ISA-compliant working papers for Pakistan audits. Return valid JSON only." },
-                  { role: "user", content: `Generate the audit working paper "${paperCode}" for the "${headDef.name}" section.\n\nCLIENT: ${session.clientName || "Unknown"}\nENTITY TYPE: ${session.entityType || "Private Limited"}\nYEAR: ${session.engagementYear || "2024"}\nFRAMEWORK: ${session.reportingFramework || "IFRS"}\n\nVARIABLES:\n${smartChunk(varSummary, 3000)}\n\nTRIAL BALANCE:\n${smartChunk(tbSummary, 3000)}\n\nReturn JSON:\n{"paper_code":"${paperCode}","paper_name":string,"content":string,"exceptions":[string],"cross_references":[string]}` },
+                  { role: "system", content: `You are a Big-4 trained senior audit partner generating 100% ISA-compliant, ISQM-1 compliant, audit-defensible working papers for Pakistan (ICAP) audits. Return ONLY valid JSON.` },
+                  { role: "user", content: (() => { const m = WP_METADATA[paperCode] || { name: paperCode, isa: "ISA 500", phase: headDef.name, riskLevel: "Medium", assertions: "C, E, V", fsArea: "All FS Areas" }; return `Generate working paper "${paperCode}" — "${m.name}" for the "${headDef.name}" phase.\n\nCLIENT: ${session.clientName || "Unknown"}\nENGAGEMENT: ENG-${session.engagementYear || "2026"}-${String(sessionId).padStart(3,"0")}\nENTITY TYPE: ${session.entityType || "Private Limited"}\nYEAR: ${session.engagementYear || "2026"}\nFRAMEWORK: ${session.reportingFramework || "IFRS"}\nISA REFS: ${m.isa}\nRISK LEVEL: ${m.riskLevel}\nASSERTIONS: ${m.assertions}\nFS AREA: ${m.fsArea}\n\nVARIABLES:\n${smartChunk(varSummary, 2500)}\n\nTRIAL BALANCE:\n${smartChunk(tbSummary, 2500)}\n\nReturn JSON: {"paper_code":"${paperCode}","paper_name":"${m.name}","version":"v1.0","status":"Draft","objective":"string","risk_assertion_table":[{"risk_id":"R001","risk_description":"string","risk_type":"Inherent|Control|Fraud","fs_area":"string","assertions_impacted":"E,C,V","risk_level":"High","risk_register_ref":"PL-03"}],"procedures_table":[{"proc_id":"P001","nature":"Substantive","description":"string","isa_reference":"ISA 330","performed_by":"Senior","planned_date":"During fieldwork","status":"Planned"}],"testing_results":{"population_description":"string","population_size_pkr":"string","sampling_method":"MUS","sample_size":"string","items_tested":"string","exceptions_identified":0,"exception_rate_pct":"0%","exceptions_detail":["No exceptions noted"],"tb_cross_ref":"string","gl_cross_ref":"string"},"evidence_table":[{"evidence_id":"E001","type":"External","source":"string","reliability":"High","linked_procedure":"P001","description":"string"}],"auditor_judgement":"string","conclusion":{"status":"Satisfactory","basis":"string","impact_on_opinion":"No impact","further_actions":"None required","misstatements_identified":"None"},"action_points":[{"issue_id":"AP001","description":"string","risk_impact":"Low","assigned_to":"Manager","deadline":"Before sign-off","status":"Open"}],"cross_references":["string"],"exceptions":[]}`; })() },
                 ],
-                max_tokens: 4000, temperature: 0.3,
+                max_tokens: 5000, temperature: 0.2,
                 response_format: { type: "json_object" },
-              }, { signal: AbortSignal.timeout(30000) });
+              }, { signal: AbortSignal.timeout(45000) });
               const raw = JSON.parse(resp.choices[0]?.message?.content || "{}");
+              const m2 = WP_METADATA[paperCode] || { name: paperCode };
               await db.insert(wpHeadDocumentsTable).values({
                 sessionId, headId: head.id,
-                paperCode: raw.paper_code || paperCode, paperName: raw.paper_name || paperCode,
-                content: raw.content || "", outputFormat: headDef.outputType.split("+")[0],
+                paperCode: raw.paper_code || paperCode, paperName: raw.paper_name || m2.name,
+                content: JSON.stringify(raw), outputFormat: headDef.outputType.split("+")[0],
                 status: "generated", generatedAt: new Date(),
               });
             } catch (paperErr) {
@@ -3333,8 +3478,38 @@ const DOCX_NAVY  = "0F3460";
 const DOCX_BLUE  = "1E3A8A";
 const DOCX_SLATE = "475569";
 const DOCX_LIGHTBG = "EFF6FF";
+const DOCX_GREEN = "15803D";
+const DOCX_AMBER = "B45309";
+const DOCX_RED   = "B91C1C";
 
-function dxFirmHeader(firmName: string, clientName: string, docTitle: string, period: string, ntn: string, isaRef: string): (Paragraph | Table)[] {
+function dxCell(text: string, opts: { bold?: boolean; color?: string; bg?: string; size?: number; width?: number; widthType?: (typeof WidthType)[keyof typeof WidthType] } = {}): TableCell {
+  return new TableCell({
+    width: opts.width ? { size: opts.width, type: opts.widthType || WidthType.PERCENTAGE } : undefined,
+    shading: opts.bg ? { fill: opts.bg, type: ShadingType.SOLID } : undefined,
+    children: [new Paragraph({ children: [new TextRun({ text, bold: opts.bold || false, color: opts.color || "1E293B", size: opts.size || 18, font: "Calibri" })] })],
+    borders: { top: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, bottom: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, left: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, right: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 } },
+    margins: { top: 60, bottom: 60, left: 80, right: 80 },
+  });
+}
+
+function dxTable(headers: string[], rows: string[][], colWidths?: number[]): Table {
+  const headerRow = new TableRow({
+    children: headers.map((h, i) => dxCell(h, { bold: true, color: "FFFFFF", bg: DOCX_BLUE, width: colWidths?.[i], widthType: WidthType.PERCENTAGE })),
+    tableHeader: true,
+  });
+  const dataRows = rows.map(row =>
+    new TableRow({
+      children: row.map((cell, i) => dxCell(cell || "—", { width: colWidths?.[i], widthType: WidthType.PERCENTAGE })),
+    })
+  );
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [headerRow, ...dataRows],
+  });
+}
+
+function dxFirmHeader(firmName: string, clientName: string, docTitle: string, period: string, ntn: string, isaRef: string, extra?: { wpCode?: string; version?: string; riskLevel?: string; assertions?: string; phase?: string; fsArea?: string }): (Paragraph | Table)[] {
+  const riskColor = extra?.riskLevel === "Significant" || extra?.riskLevel === "High" ? DOCX_RED : extra?.riskLevel === "Medium" ? DOCX_AMBER : DOCX_GREEN;
   return [
     new Paragraph({
       children: [new TextRun({ text: firmName, bold: true, size: 32, color: DOCX_NAVY, font: "Calibri" })],
@@ -3357,36 +3532,35 @@ function dxFirmHeader(firmName: string, clientName: string, docTitle: string, pe
     }),
     new Paragraph({ text: "", spacing: { after: 120 } }),
     new Paragraph({
-      children: [new TextRun({ text: docTitle.toUpperCase(), bold: true, size: 28, color: DOCX_BLUE, font: "Calibri" })],
+      children: [new TextRun({ text: "AUDIT WORKING PAPERS", bold: true, size: 24, color: DOCX_SLATE, font: "Calibri" })],
       alignment: AlignmentType.CENTER,
-      spacing: { after: 120 },
+      spacing: { after: 60 },
     }),
-    // Metadata table
-    new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: [
-        new TableRow({ children: [
-          new TableCell({ width: { size: 25, type: WidthType.PERCENTAGE }, shading: { fill: "1E3A8A", type: ShadingType.SOLID }, children: [new Paragraph({ children: [new TextRun({ text: "Client:", bold: true, color: "FFFFFF", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
-          new TableCell({ width: { size: 75, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: clientName, size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, color: "E2E8F0" }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
-        ]}),
-        new TableRow({ children: [
-          new TableCell({ shading: { fill: "1E3A8A", type: ShadingType.SOLID }, children: [new Paragraph({ children: [new TextRun({ text: "Period:", bold: true, color: "FFFFFF", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
-          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: period, size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, color: "E2E8F0" }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
-        ]}),
-        new TableRow({ children: [
-          new TableCell({ shading: { fill: "1E3A8A", type: ShadingType.SOLID }, children: [new Paragraph({ children: [new TextRun({ text: "NTN:", bold: true, color: "FFFFFF", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
-          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: ntn || "N/A", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, color: "E2E8F0" }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
-        ]}),
-        new TableRow({ children: [
-          new TableCell({ shading: { fill: "1E3A8A", type: ShadingType.SOLID }, children: [new Paragraph({ children: [new TextRun({ text: "ISA Ref:", bold: true, color: "FFFFFF", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
-          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: isaRef || "—", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, color: "E2E8F0" }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
-        ]}),
-        new TableRow({ children: [
-          new TableCell({ shading: { fill: "1E3A8A", type: ShadingType.SOLID }, children: [new Paragraph({ children: [new TextRun({ text: "Prepared:", bold: true, color: "FFFFFF", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
-          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: new Date().toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" }), size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
-        ]}),
+    new Paragraph({
+      children: [new TextRun({ text: docTitle.toUpperCase(), bold: true, size: 30, color: DOCX_BLUE, font: "Calibri" })],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 160 },
+    }),
+    // 2-column metadata table: left column = label, right column = value
+    dxTable(
+      ["Field", "Details"],
+      [
+        ["Client", clientName],
+        ["Period", period],
+        ["NTN / STRN", ntn || "N/A"],
+        ["WP Reference", extra?.wpCode || "—"],
+        ["WP Version", extra?.version || "v1.0"],
+        ["Phase", extra?.phase || docTitle],
+        ["ISA References", isaRef || "—"],
+        ["Risk Level", extra?.riskLevel || "—"],
+        ["FS Area / Scope", extra?.fsArea || "—"],
+        ["Assertions Covered", extra?.assertions || "—"],
+        ["Generated", new Date().toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" })],
+        ["Status", "DRAFT — For Review"],
+        ["CONFIDENTIAL", "For Audit Use Only — ISA / ISQM-1 Compliant"],
       ],
-    }),
+      [30, 70]
+    ),
     new Paragraph({ text: "", spacing: { after: 240 } }),
   ];
 }
@@ -3427,33 +3601,161 @@ function dxFooter(firmName: string): Paragraph {
   });
 }
 
-function parseDocxContent(content: string, clientName: string): Paragraph[] {
-  const paras: Paragraph[] = [];
+function parseDocxContent(content: string, _clientName: string): (Paragraph | Table)[] {
+  // Try to parse as structured JSON first
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && (parsed.objective || parsed.procedures_table || parsed.risk_assertion_table)) {
+      return parseStructuredWP(parsed);
+    }
+  } catch {}
+  // Fallback: parse as plain text
+  const paras: (Paragraph | Table)[] = [];
   const lines = (content || "").split("\n");
-  let inSignOff = false;
-
   for (const rawLine of lines) {
     const line = rawLine.trim();
     if (!line) { paras.push(new Paragraph({ text: "", spacing: { after: 80 } })); continue; }
-
-    // Section headings: lines starting with ##, all-caps lines, or numbered like "1." "A."
-    if (line.startsWith("##") || line.startsWith("**") && line.endsWith("**") || /^[A-Z ]{10,}$/.test(line) || /^\d+\.\s+[A-Z]/.test(line) || /^[A-Z]\.\s+[A-Z]/.test(line)) {
-      const clean = line.replace(/^#+\s*/, "").replace(/\*\*/g, "");
-      paras.push(dxSection(clean));
+    if (line.startsWith("##") || (line.startsWith("**") && line.endsWith("**")) || /^[A-Z ]{10,}$/.test(line) || /^\d+\.\s+[A-Z]/.test(line)) {
+      paras.push(dxSection(line.replace(/^#+\s*/, "").replace(/\*\*/g, "")));
       continue;
     }
-    // Bullet points
     if (line.startsWith("- ") || line.startsWith("• ") || line.startsWith("* ")) {
       paras.push(dxBullet(line.replace(/^[-•*]\s+/, "")));
       continue;
     }
-    // Sign-off / Prepared by rows
-    if (/^(prepared|reviewed|approved|signature)/i.test(line)) {
-      inSignOff = true;
-    }
     paras.push(dxBody(line));
   }
   return paras;
+}
+
+function parseStructuredWP(wp: any): (Paragraph | Table)[] {
+  const out: (Paragraph | Table)[] = [];
+  const sp = (n = 160) => new Paragraph({ text: "", spacing: { after: n } });
+
+  // ── 1. Objective ──
+  if (wp.objective) {
+    out.push(dxSection("1.  OBJECTIVE"));
+    out.push(dxBody(wp.objective));
+    out.push(sp());
+  }
+
+  // ── 2. Risk & Assertion Linkage Table ──
+  if (wp.risk_assertion_table?.length) {
+    out.push(dxSection("2.  RISK & ASSERTION LINKAGE  (ISA 315 / ISA 330)"));
+    out.push(dxTable(
+      ["Risk ID", "Risk Description", "Type", "FS Area", "Assertions", "Risk Level", "Register Ref"],
+      wp.risk_assertion_table.map((r: any) => [r.risk_id, r.risk_description, r.risk_type, r.fs_area, r.assertions_impacted, r.risk_level, r.risk_register_ref]),
+      [7, 28, 10, 14, 12, 10, 11]
+    ));
+    out.push(sp());
+  }
+
+  // ── 3. Procedures Table ──
+  if (wp.procedures_table?.length) {
+    out.push(dxSection("3.  AUDIT PROCEDURES PERFORMED  (ISA 330)"));
+    out.push(dxTable(
+      ["Proc ID", "Nature", "Description", "ISA Ref", "By", "Date", "Status"],
+      wp.procedures_table.map((p: any) => [p.proc_id, p.nature, p.description, p.isa_reference, p.performed_by, p.planned_date, p.status]),
+      [7, 13, 35, 12, 8, 12, 13]
+    ));
+    out.push(sp());
+  }
+
+  // ── 4. Testing & Results ──
+  if (wp.testing_results) {
+    const tr = wp.testing_results;
+    out.push(dxSection("4.  TESTING & RESULTS  (ISA 530 / ISA 500)"));
+    out.push(dxTable(
+      ["Parameter", "Detail"],
+      [
+        ["Population Description", tr.population_description || "—"],
+        ["Population Size (PKR)", tr.population_size_pkr || "—"],
+        ["Sampling Method", tr.sampling_method || "—"],
+        ["Sample Size", tr.sample_size || "—"],
+        ["Items Tested", tr.items_tested || "—"],
+        ["Exceptions Identified", String(tr.exceptions_identified ?? "0")],
+        ["Exception Rate", tr.exception_rate_pct || "0%"],
+        ["TB Cross-Reference", tr.tb_cross_ref || "—"],
+        ["GL Cross-Reference", tr.gl_cross_ref || "—"],
+      ],
+      [35, 65]
+    ));
+    if (tr.exceptions_detail?.length) {
+      out.push(sp(80));
+      out.push(dxBody("Exception Details:"));
+      for (const exc of tr.exceptions_detail) {
+        out.push(dxBullet(exc));
+      }
+    }
+    out.push(sp());
+  }
+
+  // ── 5. Evidence Documentation ──
+  if (wp.evidence_table?.length) {
+    out.push(dxSection("5.  EVIDENCE DOCUMENTATION  (ISA 500 / ISA 230)"));
+    out.push(dxTable(
+      ["Evid ID", "Type", "Source", "Reliability", "Linked Proc", "Description"],
+      wp.evidence_table.map((e: any) => [e.evidence_id, e.type, e.source, e.reliability, e.linked_procedure, e.description]),
+      [8, 12, 18, 10, 10, 42]
+    ));
+    out.push(sp());
+  }
+
+  // ── 6. Auditor's Judgement ──
+  if (wp.auditor_judgement) {
+    out.push(dxSection("6.  ANALYSIS & AUDITOR'S JUDGEMENT  (ISA 230)"));
+    out.push(dxBody(wp.auditor_judgement));
+    out.push(sp());
+  }
+
+  // ── 7. Conclusion ──
+  if (wp.conclusion) {
+    const c = wp.conclusion;
+    out.push(dxSection("7.  CONCLUSION  (ISA 700 / ISA 450)"));
+    out.push(dxTable(
+      ["Field", "Detail"],
+      [
+        ["Conclusion Status", c.status || "—"],
+        ["Basis of Conclusion", c.basis || "—"],
+        ["Impact on Audit Opinion", c.impact_on_opinion || "No impact"],
+        ["Further Actions Required", c.further_actions || "None"],
+        ["Misstatements Identified", c.misstatements_identified || "None"],
+      ],
+      [30, 70]
+    ));
+    out.push(sp());
+  }
+
+  // ── 8. Action Points ──
+  if (wp.action_points?.length) {
+    out.push(dxSection("8.  ACTION POINTS & FOLLOW-UPS"));
+    out.push(dxTable(
+      ["Issue ID", "Description", "Risk Impact", "Assigned To", "Deadline", "Status"],
+      wp.action_points.map((a: any) => [a.issue_id, a.description, a.risk_impact, a.assigned_to, a.deadline, a.status]),
+      [8, 40, 10, 12, 15, 10]
+    ));
+    out.push(sp());
+  }
+
+  // ── 9. Cross-References ──
+  if (wp.cross_references?.length) {
+    out.push(dxSection("9.  CROSS-REFERENCES"));
+    for (const ref of wp.cross_references) {
+      out.push(dxBullet(ref));
+    }
+    out.push(sp());
+  }
+
+  // ── 10. Exceptions ──
+  if (wp.exceptions?.length) {
+    out.push(dxSection("10. EXCEPTIONS & FINDINGS"));
+    for (const exc of wp.exceptions) {
+      out.push(dxBullet(exc));
+    }
+    out.push(sp());
+  }
+
+  return out;
 }
 
 router.post("/sessions/:id/heads/:headIndex/export", async (req: Request, res: Response) => {
@@ -3754,49 +4056,91 @@ router.post("/sessions/:id/heads/:headIndex/export", async (req: Request, res: R
     }
 
     // ── HEADS 2-11: WORD / WORD+EXCEL / WORD+PDF output ──────────────────────
-    const isaRefs: Record<number, string> = {
-      2: "ISA 200, 210, 220", 3: "ISA 200–240", 4: "ISA 500, 505, 580",
-      5: "ISA 510", 6: "ISA 300, 315, 320", 7: "ISA 330, 500–580",
-      8: "ISA 560, 570, 580", 9: "ISA 700–720", 10: "ISA 220", 11: "ISQM 1",
+    const headIsaRefs: Record<number, string> = {
+      2: "ISA 200, ISA 210, ISA 220, ISA 300, ISA 315",
+      3: "ISA 200, ISA 315, ISA 320, ISA 500, ISA 505, ISA 520, ISA 530",
+      4: "ISA 230, ISA 300, ISA 500",
+      5: "ISA 510, ISA 520, ISA 230",
+      6: "ISA 220, ISA 260, ISA 265, ISA 300, ISA 315, ISA 320, ISA 330, ISA 450, ISA 530, ISA 540, ISA 550, ISQM 1",
+      7: "ISA 240, ISA 330, ISA 500, ISA 501, ISA 505, ISA 530",
+      8: "ISA 230, ISA 450, ISA 500, ISA 560, ISA 570, ISA 580, ISA 700, ISA 720",
+      9: "ISA 700, ISA 705, ISA 706, ISA 720, ISA 230",
+      10: "ISA 220, ISQM 2",
+      11: "ISQM 1, ISA 220, ISA 230, ISA 315, ISA 330",
     };
 
-    const docSections: any[] = [
-      ...dxFirmHeader(firmName, clientName, headDef.name, period, ntn, isaRefs[headIndex] || ""),
-    ];
+    // Per-document pages — each WP gets its own full-page header + content + sign-off
+    const docSections: any[] = [];
+    let firstDoc = true;
 
     for (const doc of documents) {
-      if (docSections.length > dxFirmHeader(firmName, clientName, headDef.name, period, ntn, isaRefs[headIndex] || "").length) {
+      if (!firstDoc) {
         docSections.push(new Paragraph({ children: [new PageBreak()] }));
       }
-      // Working paper title
+      firstDoc = false;
+
+      // Per-WP metadata from the stored content
+      let wpData: any = {};
+      try { wpData = JSON.parse(doc.content || "{}"); } catch {}
+      const meta = WP_METADATA[doc.paperCode] || WP_METADATA[doc.paperCode.replace(/-\d+$/, "")] || null;
+
+      // Per-WP header with full metadata
+      docSections.push(...dxFirmHeader(firmName, clientName, headDef.name, period, ntn, meta?.isa || headIsaRefs[headIndex] || "", {
+        wpCode: doc.paperCode,
+        version: wpData.version || "v1.0",
+        riskLevel: meta?.riskLevel || "Medium",
+        assertions: meta?.assertions || "C, E, A, V",
+        phase: meta?.phase || headDef.name,
+        fsArea: meta?.fsArea || "All FS Areas",
+      }));
+
+      // WP title bar
       docSections.push(new Paragraph({
         children: [
-          new TextRun({ text: `${doc.paperCode}:  `, bold: true, size: 24, color: DOCX_SLATE, font: "Calibri" }),
-          new TextRun({ text: doc.paperName || "", bold: true, size: 24, color: DOCX_NAVY, font: "Calibri" }),
+          new TextRun({ text: `${doc.paperCode}  `, bold: true, size: 26, color: DOCX_SLATE, font: "Calibri" }),
+          new TextRun({ text: `${doc.paperName || meta?.name || ""}`, bold: true, size: 26, color: DOCX_NAVY, font: "Calibri" }),
         ],
         heading: HeadingLevel.HEADING_1,
-        spacing: { after: 200 },
+        spacing: { before: 160, after: 200 },
         border: { bottom: { style: BorderStyle.SINGLE, color: DOCX_BLUE, size: 8 } },
       }));
-      // Content
+
+      // Structured content (10 sections)
       docSections.push(...parseDocxContent(doc.content || "", clientName));
-      // Sign-off table
-      docSections.push(new Paragraph({ text: "", spacing: { before: 400 } }));
+
+      // ── 5-Level Sign-Off Table (ISQM-1 / ISA 220 compliant) ──────────────
+      docSections.push(new Paragraph({ text: "", spacing: { before: 480 } }));
+      docSections.push(dxSection("SIGN-OFF & REVIEW  (ISQM-1 / ISA 220)"));
+      const levels = ["Staff Preparer", "Senior Auditor", "Audit Manager", "Engagement Partner", "EQCR Reviewer"];
       docSections.push(new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         rows: [
-          new TableRow({ children: [
-            new TableCell({ width: { size: 33, type: WidthType.PERCENTAGE }, shading: { fill: "F1F5F9", type: ShadingType.SOLID }, children: [new Paragraph({ children: [new TextRun({ text: "Prepared By", bold: true, size: 18, color: DOCX_BLUE, font: "Calibri" })] })], borders: { top: { style: BorderStyle.SINGLE, color: "E2E8F0" }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
-            new TableCell({ width: { size: 34, type: WidthType.PERCENTAGE }, shading: { fill: "F1F5F9", type: ShadingType.SOLID }, children: [new Paragraph({ children: [new TextRun({ text: "Reviewed By", bold: true, size: 18, color: DOCX_BLUE, font: "Calibri" })] })], borders: { top: { style: BorderStyle.SINGLE, color: "E2E8F0" }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
-            new TableCell({ width: { size: 33, type: WidthType.PERCENTAGE }, shading: { fill: "F1F5F9", type: ShadingType.SOLID }, children: [new Paragraph({ children: [new TextRun({ text: "Approved By", bold: true, size: 18, color: DOCX_BLUE, font: "Calibri" })] })], borders: { top: { style: BorderStyle.SINGLE, color: "E2E8F0" }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
-          ]}),
-          new TableRow({ children: [
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Name: ___________________", size: 18, font: "Calibri" })], spacing: { after: 80 } }), new Paragraph({ children: [new TextRun({ text: "Signature: _______________", size: 18, font: "Calibri" })], spacing: { after: 80 } }), new Paragraph({ children: [new TextRun({ text: "Date: ___________________", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Name: ___________________", size: 18, font: "Calibri" })], spacing: { after: 80 } }), new Paragraph({ children: [new TextRun({ text: "Signature: _______________", size: 18, font: "Calibri" })], spacing: { after: 80 } }), new Paragraph({ children: [new TextRun({ text: "Date: ___________________", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Name: ___________________", size: 18, font: "Calibri" })], spacing: { after: 80 } }), new Paragraph({ children: [new TextRun({ text: "Signature: _______________", size: 18, font: "Calibri" })], spacing: { after: 80 } }), new Paragraph({ children: [new TextRun({ text: "Date: ___________________", size: 18, font: "Calibri" })] })], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }),
-          ]}),
+          new TableRow({
+            tableHeader: true,
+            children: levels.map(l => new TableCell({
+              shading: { fill: DOCX_BLUE, type: ShadingType.SOLID },
+              children: [new Paragraph({ children: [new TextRun({ text: l, bold: true, color: "FFFFFF", size: 17, font: "Calibri" })] })],
+              borders: { top: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, bottom: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, left: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, right: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 } },
+              margins: { top: 60, bottom: 60, left: 80, right: 80 },
+            })),
+          }),
+          new TableRow({
+            children: levels.map(() => new TableCell({
+              children: [
+                new Paragraph({ children: [new TextRun({ text: "Name: ___________________________", size: 17, font: "Calibri" })], spacing: { after: 80 } }),
+                new Paragraph({ children: [new TextRun({ text: "Signature: ______________________", size: 17, font: "Calibri" })], spacing: { after: 80 } }),
+                new Paragraph({ children: [new TextRun({ text: "Date: ___________________________", size: 17, font: "Calibri" })], spacing: { after: 80 } }),
+                new Paragraph({ children: [new TextRun({ text: "Conclusion: ☐ Sat  ☐ Sat w/Exc  ☐ Unsat", size: 16, font: "Calibri", color: DOCX_SLATE })], spacing: { after: 80 } }),
+                new Paragraph({ children: [new TextRun({ text: "Comments: _______________________", size: 17, font: "Calibri" })] }),
+              ],
+              borders: { top: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, bottom: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, left: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, right: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 } },
+              margins: { top: 80, bottom: 80, left: 80, right: 80 },
+            })),
+          }),
         ],
       }));
+      docSections.push(new Paragraph({ text: "", spacing: { after: 200 } }));
+      docSections.push(dxBody("⚠  This working paper is LOCKED after Engagement Partner sign-off. Any amendment requires EQCR re-review per ISQM 1."));
     }
 
     docSections.push(dxFooter(firmName));
