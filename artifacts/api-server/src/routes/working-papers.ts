@@ -498,15 +498,16 @@ router.patch("/sessions/:id/status", async (req: Request, res: Response) => {
     const id = parseInt(p(req.params.id));
     if (isNaN(id)) return res.status(400).json({ error: "Invalid session ID" });
     const { status } = req.body;
-    const validStatuses = ["upload", "extraction", "data_sheet", "arranged_data", "variables", "generation", "export", "completed"];
+    const validStatuses = ["upload", "extraction", "data_sheet", "arranged_data", "variables", "wp_listing", "generation", "export", "completed"];
     if (!validStatuses.includes(status)) return res.status(400).json({ error: "Invalid status" });
 
     const validTransitions: Record<string, string[]> = {
       upload: ["extraction"],
-      extraction: ["data_sheet", "arranged_data", "upload"],
+      extraction: ["data_sheet", "arranged_data", "upload", "variables"],
       data_sheet: ["arranged_data", "variables", "extraction"],
       arranged_data: ["variables", "data_sheet"],
-      variables: ["generation"],
+      variables: ["wp_listing", "generation"],
+      wp_listing: ["generation"],
       generation: ["export"],
       export: ["completed", "generation"],
     };
@@ -2622,7 +2623,7 @@ router.post("/sessions/:id/variables/lock-all", async (req: Request, res: Respon
       await db.update(wpHeadsTable).set({ status: "ready", updatedAt: new Date() }).where(eq(wpHeadsTable.id, heads[0].id));
     }
 
-    await db.update(wpSessionsTable).set({ status: "generation" as any, updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
+    await db.update(wpSessionsTable).set({ status: "wp_listing" as any, updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
     res.json({ success: true, locked: vars.length });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to lock variables" });
