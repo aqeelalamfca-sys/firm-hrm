@@ -8445,331 +8445,376 @@ router.get("/download-template", async (_req: Request, res: Response) => {
       }
     }
 
-    // ── DATA VALIDATIONS (dropdowns) ─────────────────────────────────────────
-    // Helper to apply a dropdown list to a cell address
-    function addDropdown(addr: string, values: string[], title: string, msg: string) {
+    // ── Hidden "Lists" sheet — ALL dropdown values stored here ───────────────
+    // All dropdowns use range references → no 255-char Excel inline limit.
+    const wsList = wb.addWorksheet("Lists");
+    wsList.state = "veryHidden";
+
+    // ─── Column catalogue (each array = one column in Lists sheet) ────────────
+    const lineItems = [
+      // Balance Sheet — Assets
+      "Property, plant and equipment","Intangible assets","Long-term investments",
+      "Long-term loans and advances","Capital work in progress",
+      "Right-of-use assets",
+      // Balance Sheet — Current Assets
+      "Inventories","Trade debts","Advances and deposits","Other receivables",
+      "Short-term investments","Cash and bank balances",
+      // Balance Sheet — Equity
+      "Share capital","Reserves","Retained earnings","Accumulated losses",
+      "Surplus on revaluation of fixed assets","Unappropriated profit",
+      // Balance Sheet — Non-Current Liabilities
+      "Long-term loans","Lease liabilities","Deferred tax liability","Deferred tax asset",
+      "Staff retirement benefits","Long-term deposits","Other non-current liabilities",
+      // Balance Sheet — Current Liabilities
+      "Trade and other payables","Accrued liabilities","Advance from customers",
+      "Taxation","Short-term borrowings","Current portion of long-term loans",
+      "Unclaimed dividends","Other current liabilities",
+      // P&L — Income
+      "Sales","Export sales","Service revenue","Contract revenue",
+      "Scrap sales","By-product sales","Other income","Dividend income",
+      "Gain on disposal of assets","Interest income","Rental income",
+      "Exchange gain","Miscellaneous income",
+      // P&L — Expenses
+      "Direct material","Direct labour","Manufacturing overhead",
+      "Cost of goods sold","Salaries and benefits","Wages",
+      "Utilities","Rent and rates","Depreciation","Amortisation",
+      "Repair and maintenance","Printing and stationery",
+      "Communication expenses","Advertisement and marketing",
+      "Freight outward","Traveling and conveyance",
+      "Legal and professional charges","Audit fee",
+      "Insurance","Security charges","Postage and courier",
+      "Markup on borrowings","Bank charges and commission","Exchange loss",
+      "Current tax","Deferred tax expense","Prior year tax",
+    ];
+
+    const subLineItems = [
+      // PPE sub-items
+      "Land","Freehold land","Leasehold land",
+      "Building","Factory building","Office building","Warehouse",
+      "Plant and machinery","Production machinery","Manufacturing equipment",
+      "Testing equipment","Packing machinery","Generator",
+      "Furniture and fixtures","Office furniture","Lab furniture",
+      "Office equipment","Computer equipment","Servers and networking",
+      "IT hardware","Printers and scanners",
+      "Vehicles","Motor vehicles","Fork lifts","Company cars",
+      "Capital work in progress","Plant under installation",
+      // Intangibles
+      "ERP software","Accounting software","CRM software",
+      "Patents and trademarks","Licenses and franchises","Goodwill",
+      // Investments
+      "Investments in subsidiaries","Investments in associates",
+      "Available-for-sale investments","Held-to-maturity investments",
+      // Inventories
+      "Raw materials","Work in progress","Finished goods",
+      "Stores and spares","Packing materials","Goods in transit",
+      // Receivables
+      "Local customers","Export customers","Government receivables",
+      "Related party receivables","Doubtful debts provision",
+      // Advances
+      "Security deposits","Prepaid insurance","Prepaid rent",
+      "Prepaid expenses","Advances to suppliers","Staff advances",
+      "Advance tax","Income tax refundable","Sales tax refundable",
+      // Cash
+      "Current account","Savings account","Cash in hand",
+      "Foreign currency account","Fixed deposit","Treasury bills",
+      // Equity
+      "Ordinary shares","Preference shares","Issued and paid-up capital",
+      "General reserve","Capital reserve","Revenue reserve",
+      "Accumulated profit","Accumulated loss",
+      "Surplus on revaluation of fixed assets",
+      // LT Liabilities
+      "Term finance","Diminishing musharaka","Loan from directors",
+      "Lease liability — buildings","Lease liability — equipment",
+      "Deferred tax liability","Deferred tax asset",
+      "Gratuity","Provident fund","EOBI payable",
+      // Current Liabilities
+      "Suppliers","Trade creditors","Accrued expenses",
+      "Accrued wages","Other payables","Advance from customers",
+      "Income tax payable","Sales tax payable","Withholding tax payable",
+      "Federal excise duty payable","Running finance","Cash credit",
+      "Short-term loan","Current maturity of long-term loan",
+      // Revenue
+      "Local sales","Export sales","Service fee","Contract revenue",
+      "Scrap sales","By-product sales",
+      // Other Income
+      "Interest income","Gain on disposal","Rental income",
+      "Exchange gain","Dividend received","Miscellaneous income",
+      // CoS
+      "Raw material consumed","Material purchases","Freight inward",
+      "Factory wages","Factory salaries",
+      "Factory utilities","Factory rent","Factory insurance","Factory repairs",
+      // Expenses
+      "Admin salaries","Admin wages","Staff benefits","EOBI contribution",
+      "Office utilities","Office rent","Office insurance",
+      "Depreciation expense","Amortisation expense",
+      "Repair and maintenance","Printing and stationery",
+      "Telephone and internet","Advertisement","Marketing expenses",
+      "Delivery expense","Forwarding expense","Travelling","Conveyance",
+      "Legal charges","Audit fee","Professional fee",
+      "Bank markup","Running finance markup","Bank charges and commission",
+      "Current tax expense","Prior year tax","Deferred tax charge","Deferred tax income",
+    ];
+
+    const accountNames = [
+      // PPE
+      "Freehold land","Leasehold land","Factory building","Office building","Warehouse",
+      "Production machinery","Manufacturing equipment","Testing equipment","Packing machinery",
+      "Generator set","Office furniture","Computer equipment","Servers and networking",
+      "IT hardware","Printers","Motor vehicles","Fork lifts","Company cars",
+      "Capital work in progress — plant expansion",
+      // Intangibles
+      "ERP software","Accounting software","CRM software",
+      "Accounting software","Patents and trademarks","Licenses and franchises",
+      // Investments
+      "Investment in subsidiary — 100%","Investment in associate — 25%",
+      // Current Assets
+      "Raw material inventory","WIP inventory","Finished goods inventory",
+      "Stores inventory","Packing material stock","Goods in transit",
+      "Trade receivables — domestic","Trade receivables — export",
+      "Government contract receivables",
+      "Security deposits — utilities","Security deposits — tenancy",
+      "Prepaid insurance","Prepaid rent","Advance income tax",
+      "Income tax refundable","Sales tax refundable",
+      "MCB current account","HBL current account","UBL savings account",
+      "Petty cash fund","Foreign currency account","Treasury bills — 3 months",
+      // Equity
+      "Issued and paid-up share capital","Preference share capital",
+      "General reserve","Capital reserve","Revenue reserve",
+      "Retained earnings","Accumulated losses","Revaluation surplus",
+      // LT Liabilities
+      "Term finance — HBL","Diminishing musharaka — Meezan","Directors loan",
+      "Lease liability — factory building","Lease liability — equipment",
+      "Deferred tax liability","Deferred tax asset",
+      "Gratuity payable","Provident fund payable",
+      // Current Liabilities
+      "Trade payables — domestic","Trade payables — import",
+      "Accrued salaries","Accrued expenses","Customer advances",
+      "Income tax payable","Sales tax payable","WHT payable","FED payable",
+      "Running finance facility","Cash credit facility",
+      "Current maturity of term finance",
+      // Revenue
+      "Sales revenue — local","Sales revenue — export","Service fee revenue",
+      "Contract revenue","Scrap and by-product income","Miscellaneous income",
+      // Other Income
+      "Interest income — bank","Profit on disposal of assets",
+      "Rental income","Dividend received","Exchange gain",
+      // CoS
+      "Cost of raw material consumed","Material purchases","Freight inward",
+      "Direct labour cost","Factory wages","Factory salaries",
+      "Factory overhead — electricity","Factory overhead — gas",
+      "Factory overhead — rent","Factory overhead — insurance",
+      "Factory overhead — repairs and maintenance",
+      // Admin
+      "Administrative salaries","Staff benefits — admin",
+      "Office electricity and utilities","Office rent",
+      "Depreciation — buildings","Depreciation — plant and machinery",
+      "Depreciation — vehicles","Amortisation — intangibles",
+      "Repair and maintenance — office","Printing and stationery",
+      "Telephone and internet","Advertisement and marketing",
+      "Legal and professional charges","Audit fee",
+      // Selling
+      "Freight and forwarding","Distribution expense",
+      "Travelling and conveyance","Export expenses",
+      // Finance
+      "Mark-up on term finance","Mark-up on running finance",
+      "Bank charges and commission","Exchange loss",
+      // Tax
+      "Current tax provision","Prior year tax adjustment",
+      "Deferred tax charge","Deferred tax income",
+    ];
+
+    const accountCodes = [
+      "1101","1102","1103","1104","1105","1106",
+      "1201","1202","1203","1204","1205","1210","1211","1215","1220","1230","1240","1250",
+      "1301","1302","1303","1304","1305","1310","1320",
+      "1401","1402","1403","1410","1420","1430","1440","1450",
+      "1501","1502","1510","1511","1512","1520","1521","1522","1523","1524",
+      "1530","1531","1540","1541","1542","1550","1551","1560","1570","1580","1590","1591",
+      "1601","1602","1603","1610","1620","1630",
+      "1701","1702","1710","1720",
+      "1801","1802","1810","1820",
+      "2101","2102","2103","2104","2110","2120","2130",
+      "2201","2202","2210","2220","2230",
+      "2301","2302","2303","2310","2320","2330","2340","2350","2360",
+      "2401","2402","2410","2420","2430",
+      "2501","2502","2510","2511","2512","2520",
+      "3101","3102","3110","3120",
+      "3201","3202","3203","3210","3220","3230","3240",
+      "3301","3302","3310","3320",
+      "5101","5102","5103","5104","5110","5120","5130",
+      "5201","5202","5203","5210","5220","5230","5240","5250",
+      "6101","6102","6103","6104","6110","6111","6112","6113","6114","6120","6130","6140",
+      "6201","6202","6203","6204","6210","6211","6212","6213","6220","6221",
+      "6230","6231","6240","6241","6250","6260","6270","6280","6290",
+      "6301","6302","6303","6310","6320","6330",
+      "6401","6402","6403","6410","6420",
+      "6501","6502","6503","6510","6520",
+    ];
+
+    // All categorical dropdown columns (F onwards in Lists sheet)
+    const statementTypes   = ["BS","P&L","OCI","EQ","CF","Notes"];
+    const fsSections       = [
+      "Assets","Equity","Liabilities","Income","Expenses","OCI",
+      "Notes to Accounts","Statement of Changes in Equity","Cash Flow",
+    ];
+    const majorHeads       = [
+      // Balance Sheet
+      "Non-Current Assets","Current Assets",
+      "Equity",
+      "Non-Current Liabilities","Current Liabilities",
+      // P&L
+      "Revenue","Other Income","Cost of Sales","Gross Profit",
+      "Administrative Expenses","Selling and Distribution",
+      "Finance Cost","Taxation","Other Expenses",
+      // OCI / EQ / CF
+      "Other Comprehensive Income",
+      "Share Capital and Reserves",
+      "Operating Activities","Investing Activities","Financing Activities",
+    ];
+    const normalBalances   = ["Debit","Credit"];
+    const wpAreas          = [
+      // Balance Sheet areas
+      "PPE","Intangibles","CWIP","Right-of-Use Assets","Long-term Investments",
+      "Inventory","Receivables","Advances and Deposits","Cash and Bank",
+      "Other Assets","Short-term Investments",
+      // Equity & Liabilities
+      "Equity","Borrowings","Lease Liabilities","Deferred Tax",
+      "Payables","Accrued Liabilities","Customer Advances",
+      "Taxation","Staff Retirement Benefits","Provisions",
+      // P&L areas
+      "Revenue","Cost of Sales","Operating Expenses",
+      "Other Income","Finance Cost",
+      // Special areas
+      "Related Party Transactions","Going Concern",
+      "Contingencies and Commitments","Subsequent Events",
+    ];
+    const riskLevels       = ["High","Medium","Low","Not Applicable"];
+    const procedureScales  = ["Expanded","Standard","Basic","Nil"];
+    const aiGlFlags        = ["Yes","No"];
+    const glPriorities     = ["High","Medium","Low"];
+    const companyTypes     = [
+      "Private Limited Company","Public Limited Company",
+      "Listed Company","Unlisted Public Company",
+      "Sole Proprietorship","Partnership","LLP",
+      "Trust","NGO / NPO","Government Entity",
+      "Branch Office","Liaison Office","Other",
+    ];
+    const industries       = [
+      "Manufacturing","Textile","Trading","Services",
+      "Financial Services","Banking","Insurance","Leasing",
+      "Real Estate","Construction","Healthcare","Pharmaceuticals",
+      "Technology","Telecoms","Education","Agriculture","Energy","Oil and Gas",
+      "Mining","Transport and Logistics","Hospitality","Retail","Other",
+    ];
+    const frameworks       = [
+      "IFRS (Full)","IFRS for SMEs","IAS","GAAP",
+      "IFAS","Companies Act 2017 (Pakistan)",
+      "NBFCs Regulations","Insurance Ordinance","Banking Companies Ordinance","Other",
+    ];
+    const auditTypes       = [
+      "Statutory Audit","Tax Audit","Internal Audit",
+      "Special Purpose Audit","Review Engagement",
+      "Agreed Upon Procedures","Compilation","Due Diligence",
+      "Forensic Audit","Regulatory Inspection",
+    ];
+    const currencies       = [
+      "PKR","USD","EUR","GBP","AED","SAR","JPY","CNY","CHF","CAD","AUD","Other",
+    ];
+    const engagementSizes  = ["Small","Medium","Large","Very Large","Listed Entity"];
+    const noteNumbers      = Array.from({ length: 100 }, (_, i) => String(i + 1));
+
+    // ── Write all columns to Lists sheet ──────────────────────────────────────
+    const listCols: string[][] = [
+      lineItems,        // A
+      subLineItems,     // B
+      accountNames,     // C
+      accountCodes,     // D
+      noteNumbers,      // E
+      statementTypes,   // F
+      fsSections,       // G
+      majorHeads,       // H
+      normalBalances,   // I
+      wpAreas,          // J
+      riskLevels,       // K
+      procedureScales,  // L
+      aiGlFlags,        // M
+      glPriorities,     // N
+      companyTypes,     // O
+      industries,       // P
+      frameworks,       // Q
+      auditTypes,       // R
+      currencies,       // S
+      engagementSizes,  // T
+    ];
+
+    const maxListRows = Math.max(...listCols.map(c => c.length));
+    for (let r = 0; r < maxListRows; r++) {
+      const row = wsList.getRow(r + 1);
+      listCols.forEach((col, ci) => {
+        if (col[r] !== undefined) row.getCell(ci + 1).value = col[r];
+      });
+    }
+
+    // ── Helper: add validation via Lists sheet range reference ────────────────
+    function addListDropdown(
+      addr: string, col: string, len: number, title: string, msg: string
+    ) {
       (ws as any).dataValidations.add(addr, {
         type: "list",
         allowBlank: true,
-        formulae: [`"${values.join(",")}"`],
+        formulae: [`Lists!$${col}$1:$${col}$${len}`],
         showErrorMessage: true,
         errorStyle: "warning",
         errorTitle: `Invalid ${title}`,
-        error: `Please select a valid value: ${values.join(", ")}`,
+        error: `Please select a value from the ${title} list`,
         showInputMessage: true,
         promptTitle: title,
         prompt: msg,
       });
     }
 
-    // ── Engagement profile dropdowns ──────────────────────────────────────────
-
-    // Row 5 E: Company_Type
-    addDropdown("E5", [
-      "Private Company","Public Company","Listed Company",
-      "Sole Proprietorship","Partnership","Trust","NGO","Other"
-    ], "Company_Type", "Select the legal type of the entity");
-
-    // Row 5 H: Industry
-    addDropdown("H5", [
-      "Manufacturing","Trading","Services","Financial Services",
-      "Real Estate","Healthcare","Technology","Education","Agriculture","Energy","Other"
-    ], "Industry", "Select the primary industry sector");
-
-    // Row 5 K: Reporting_Framework
-    addDropdown("K5", [
-      "IFRS","IFRS for SMEs","GAAP","IFAS","Companies Act 2017","Other"
-    ], "Reporting_Framework", "Select the applicable financial reporting framework");
-
-    // Row 6 B: Audit_Type
-    addDropdown("B6", [
-      "Statutory Audit","Tax Audit","Internal Audit",
-      "Special Purpose Audit","Review Engagement",
-      "Agreed Upon Procedures","Compilation"
-    ], "Audit_Type", "Select the type of engagement");
-
-    // Row 6 E: Currency
-    addDropdown("E6", [
-      "PKR","USD","EUR","GBP","AED","SAR","JPY","CNY","Other"
-    ], "Currency", "Select the functional currency of the entity");
-
-    // Row 6 H: Engagement_Size
-    addDropdown("H6", [
-      "Small","Medium","Large","Very Large"
-    ], "Engagement_Size", "Select the engagement size classification");
+    // ── Engagement profile dropdowns (rows 5-6) ───────────────────────────────
+    addListDropdown("E5", "O", companyTypes.length,   "Company_Type",        "Select the legal entity type");
+    addListDropdown("H5", "P", industries.length,     "Industry",            "Select the primary industry sector");
+    addListDropdown("K5", "Q", frameworks.length,     "Reporting_Framework", "Select the applicable financial reporting framework");
+    addListDropdown("B6", "R", auditTypes.length,     "Audit_Type",          "Select the type of engagement");
+    addListDropdown("E6", "S", currencies.length,     "Currency",            "Select the functional/presentation currency");
+    addListDropdown("H6", "T", engagementSizes.length,"Engagement_Size",     "Select the engagement size classification");
 
     // ── Data row dropdowns (rows 9 to 200) ───────────────────────────────────
     const DATA_ROWS = "9:200";
-
-    // Col B — Statement_Type
-    addDropdown(`B${DATA_ROWS.split(":")[0]}:B${DATA_ROWS.split(":")[1]}`, [
-      "BS","P&L","OCI","EQ","CF"
-    ], "Statement_Type", "BS=Balance Sheet, P&L=Profit & Loss, OCI=Other Comprehensive Income, EQ=Equity, CF=Cash Flow");
-
-    // Col C — FS_Section
-    addDropdown(`C${DATA_ROWS.split(":")[0]}:C${DATA_ROWS.split(":")[1]}`, [
-      "Assets","Equity","Liabilities","Income","Expenses","OCI","Notes"
-    ], "FS_Section", "Select the financial statement section this line belongs to");
-
-    // Col D — Major_Head
-    addDropdown(`D${DATA_ROWS.split(":")[0]}:D${DATA_ROWS.split(":")[1]}`, [
-      "Non-Current Assets","Current Assets",
-      "Equity",
-      "Non-Current Liabilities","Current Liabilities",
-      "Revenue","Other income",
-      "Cost of Sales","Gross Profit",
-      "Administrative Expenses","Selling and Distribution",
-      "Finance Cost","Taxation","Other Expenses"
-    ], "Major_Head", "Select the major classification head for this line item");
-
-    // Col N — Normal_Balance
-    addDropdown(`N${DATA_ROWS.split(":")[0]}:N${DATA_ROWS.split(":")[1]}`, [
-      "Debit","Credit"
-    ], "Normal_Balance", "Select the normal balance side for this account");
-
-    // Col O — WP_Area
-    addDropdown(`O${DATA_ROWS.split(":")[0]}:O${DATA_ROWS.split(":")[1]}`, [
-      "PPE","Intangibles","Inventory","Receivables","Cash and Bank",
-      "Other Assets","Equity","Borrowings","Payables","Taxation",
-      "Revenue","Cost of Sales","Operating Expenses","Other Income","Provisions"
-    ], "WP_Area", "Select the audit working paper area this line maps to");
-
-    // Col P — Risk_Level
-    addDropdown(`P${DATA_ROWS.split(":")[0]}:P${DATA_ROWS.split(":")[1]}`, [
-      "High","Medium","Low"
-    ], "Risk_Level", "Select the assessed risk level for this account");
-
-    // Col Q — Procedure_Scale
-    addDropdown(`Q${DATA_ROWS.split(":")[0]}:Q${DATA_ROWS.split(":")[1]}`, [
-      "Expanded","Standard","Basic"
-    ], "Procedure_Scale", "Select the extent of audit procedures to be applied");
-
-    // Col R — AI_GL_Flag
-    addDropdown(`R${DATA_ROWS.split(":")[0]}:R${DATA_ROWS.split(":")[1]}`, [
-      "Yes","No"
-    ], "AI_GL_Flag", "Yes = AI should generate detailed GL transactions for this account");
-
-    // Col S — GL_Generation_Priority
-    addDropdown(`S${DATA_ROWS.split(":")[0]}:S${DATA_ROWS.split(":")[1]}`, [
-      "High","Medium","Low"
-    ], "GL_Generation_Priority", "Select the priority order for GL transaction generation");
-
-    // ── Hidden "Lists" sheet for long-list dropdowns (E, F, G) ───────────────
-    // Excel inline formula is capped at 255 chars; use a sheet range instead.
-    const wsList = wb.addWorksheet("Lists");
-    wsList.state = "veryHidden";
-
-    const lineItems = [
-      "Property, plant and equipment","Intangible assets","Long-term investments",
-      "Long-term loans and advances","Capital work in progress",
-      "Inventories","Trade debts","Advances and deposits","Other receivables",
-      "Short-term investments","Cash and bank balances",
-      "Share capital","Reserves","Retained earnings","Surplus on revaluation",
-      "Long-term loans","Lease liabilities","Deferred tax","Staff retirement benefits",
-      "Trade and other payables","Accrued liabilities","Taxation",
-      "Short-term borrowings","Current portion of long-term loans",
-      "Sales","Export sales","Scrap sales","Other income","Dividend income",
-      "Direct material","Direct labour","Manufacturing overhead",
-      "Salaries and benefits","Utilities","Rent and rates","Depreciation",
-      "Amortisation","Repair and maintenance","Printing and stationery",
-      "Communication expenses","Advertisement and marketing",
-      "Freight outward","Traveling and conveyance",
-      "Markup on borrowings","Bank charges","Exchange loss",
-      "Current tax","Deferred tax expense",
-    ];
-
-    const subLineItems = [
-      "Land","Building","Plant and machinery","Furniture and fixtures",
-      "Office equipment","IT equipment","Vehicles","Machinery under installation",
-      "Capital work in progress",
-      "ERP software","Patents and trademarks","Licenses and franchises",
-      "Raw materials","Work in progress","Finished goods","Stores and spares",
-      "Packing materials",
-      "Local customers","Export customers","Government receivables",
-      "Security deposits","Prepayments","Advances to suppliers",
-      "Current account","Savings account","Cash in hand","Foreign currency account",
-      "Ordinary shares","Preference shares",
-      "General reserve","Capital reserve","Revenue reserve",
-      "Accumulated profit","Accumulated loss",
-      "Surplus on revaluation of fixed assets",
-      "Term finance","Diminishing musharaka","Loan from directors",
-      "Deferred tax liability","Deferred tax asset",
-      "Gratuity","Provident fund",
-      "Suppliers","Accrued expenses","Other payables","Advance from customers",
-      "Income tax payable","Sales tax payable","Withholding tax payable",
-      "Running finance","Short-term loan","Cash credit",
-      "Current maturity of long-term loan",
-      "Local sales","Export sales","Service revenue","Contract revenue",
-      "Scrap sales","By-product sales",
-      "Interest income","Gain on disposal","Rental income",
-      "Raw material consumed","Purchases","Freight inward",
-      "Factory wages","Factory salaries",
-      "Factory utilities","Factory rent","Factory insurance",
-      "Admin salaries","Admin wages",
-      "Office utilities","Office rent","Office insurance",
-      "Depreciation expense","Amortisation expense",
-      "Delivery expense","Forwarding expense",
-      "Bank markup","Mark-up on running finance",
-      "Current tax expense","Prior year tax adjustment",
-      "Deferred tax income","Deferred tax charge",
-    ];
-
-    const accountNames = [
-      "Freehold land","Leasehold land","Factory building","Office building",
-      "Production machinery","Manufacturing equipment","Testing equipment",
-      "Office furniture","Computer equipment","Servers and networking",
-      "Motor vehicles","Fork lifts","Capital work in progress",
-      "ERP software","Accounting software",
-      "Raw material inventory","WIP inventory","Finished goods inventory",
-      "Stores inventory","Packing material stock",
-      "Trade receivables","Export receivables",
-      "Security deposits","Prepaid insurance","Prepaid rent",
-      "Advances to suppliers","Staff advances",
-      "Current bank account","Savings bank account",
-      "Petty cash","Foreign currency account",
-      "Issued and paid-up share capital","Ordinary share capital",
-      "General reserve","Capital reserve",
-      "Retained earnings","Accumulated losses",
-      "Revaluation surplus",
-      "Term finance from bank","Diminishing musharaka","Directors loan",
-      "Deferred tax liability","Deferred tax asset",
-      "Gratuity payable","Provident fund payable",
-      "Trade payables","Accrued expenses","Customer advances",
-      "Income tax payable","Sales tax payable","WHT payable",
-      "Running finance facility","Cash credit facility",
-      "Sales revenue","Export revenue","Service fee revenue",
-      "Scrap and by-product income","Miscellaneous income",
-      "Profit on disposal of assets","Interest income",
-      "Cost of raw material consumed","Material purchases",
-      "Direct labour cost","Factory wages","Factory salaries",
-      "Factory overhead — utilities","Factory overhead — rent",
-      "Factory overhead — insurance","Factory overhead — repairs",
-      "Administrative salaries","Staff benefits",
-      "Office expenses","Printing and stationery",
-      "Depreciation — buildings","Depreciation — plant and machinery",
-      "Depreciation — vehicles","Amortisation — intangibles",
-      "Freight and forwarding","Distribution expenses",
-      "Mark-up on term finance","Mark-up on running finance",
-      "Bank charges and commission",
-      "Current tax provision","Deferred tax charge","Deferred tax income",
-    ];
-
-    // Account codes — standard chart of accounts (Pakistani CA firm)
-    const accountCodes = [
-      // Cash & Bank (11xx)
-      "1101","1102","1103","1104","1105",
-      // Trade Receivables (12xx)
-      "1201","1202","1203","1210","1211","1215","1220","1230","1240",
-      // Inventories (13xx)
-      "1301","1302","1303","1304","1305","1310","1320",
-      // Advances & Deposits (14xx)
-      "1401","1402","1410","1420","1430",
-      // PPE (15xx)
-      "1501","1502","1510","1511","1520","1521","1530","1540","1550","1560","1570","1580","1590",
-      // Intangibles (16xx)
-      "1601","1602","1610","1620",
-      // Long-term Investments (17xx)
-      "1701","1710",
-      // Long-term Loans & Deposits (18xx)
-      "1801","1810",
-      // Long-term Liabilities (21xx)
-      "2101","2102","2110","2120",
-      // Deferred Tax & Provisions (22xx)
-      "2201","2202","2210","2220",
-      // Trade & Other Payables (23xx)
-      "2301","2302","2310","2320","2330","2340","2350",
-      // Short-term Borrowings (24xx)
-      "2401","2410","2420",
-      // Current Tax (25xx)
-      "2501","2510",
-      // Share Capital (31xx)
-      "3101","3102","3110",
-      // Reserves (32xx)
-      "3201","3202","3210","3220","3230",
-      // Retained Earnings (33xx)
-      "3301","3310",
-      // Revenue (51xx)
-      "5101","5102","5103","5110","5120",
-      // Other Income (52xx)
-      "5201","5202","5210","5220","5230",
-      // Cost of Sales (61xx)
-      "6101","6102","6103","6104","6110","6120","6130",
-      // Admin & Gen Expenses (62xx)
-      "6201","6202","6203","6204","6210","6220","6230","6240","6250","6260",
-      // Selling & Distribution (63xx)
-      "6301","6302","6310","6320",
-      // Finance Cost (64xx)
-      "6401","6402","6410","6420",
-      // Taxation (65xx)
-      "6501","6502","6510",
-    ];
-
-    // Note numbers 1–100 (col E of Lists sheet)
-    const noteNumbers = Array.from({ length: 100 }, (_, i) => i + 1);
-
-    // Write lists to hidden sheet (A=Line_Item, B=Sub_Line_Item, C=Account_Name, D=Account_Code, E=Note_No)
-    const maxRows = Math.max(lineItems.length, subLineItems.length, accountNames.length, accountCodes.length, noteNumbers.length);
-    for (let r = 0; r < maxRows; r++) {
-      const row = wsList.getRow(r + 1);
-      if (lineItems[r])    row.getCell(1).value = lineItems[r];
-      if (subLineItems[r]) row.getCell(2).value = subLineItems[r];
-      if (accountNames[r]) row.getCell(3).value = accountNames[r];
-      if (accountCodes[r]) row.getCell(4).value = accountCodes[r];
-      if (noteNumbers[r])  row.getCell(5).value = noteNumbers[r];
-    }
-
     const D0 = DATA_ROWS.split(":")[0];
     const D1 = DATA_ROWS.split(":")[1];
 
-    // Col E — Line_Item  (range reference to Lists!$A$1:$A$N)
-    (ws as any).dataValidations.add(`E${D0}:E${D1}`, {
-      type: "list", allowBlank: true,
-      formulae: [`Lists!$A$1:$A${lineItems.length}`],
-      showErrorMessage: true, errorStyle: "warning",
-      errorTitle: "Invalid Line_Item", error: "Please select or type a valid line item",
-      showInputMessage: true, promptTitle: "Line_Item",
-      prompt: "Select from the list or type a custom value",
-    });
+    addListDropdown(`B${D0}:B${D1}`, "F", statementTypes.length,  "Statement_Type",
+      "BS=Balance Sheet · P&L=Profit & Loss · OCI=Other Comprehensive Income · EQ=Equity · CF=Cash Flow");
+    addListDropdown(`C${D0}:C${D1}`, "G", fsSections.length,      "FS_Section",
+      "Select the financial statement section for this line item");
+    addListDropdown(`D${D0}:D${D1}`, "H", majorHeads.length,      "Major_Head",
+      "Select the major classification head (e.g. Non-Current Assets, Revenue)");
+    addListDropdown(`N${D0}:N${D1}`, "I", normalBalances.length,  "Normal_Balance",
+      "Debit = asset/expense account · Credit = liability/income/equity account");
+    addListDropdown(`O${D0}:O${D1}`, "J", wpAreas.length,         "WP_Area",
+      "Select the audit working paper area this account maps to");
+    addListDropdown(`P${D0}:P${D1}`, "K", riskLevels.length,      "Risk_Level",
+      "High = significant risk area · Medium = moderate · Low = routine · N/A = excluded");
+    addListDropdown(`Q${D0}:Q${D1}`, "L", procedureScales.length, "Procedure_Scale",
+      "Expanded = full substantive + controls · Standard = standard procedures · Basic = analytical only");
+    addListDropdown(`R${D0}:R${D1}`, "M", aiGlFlags.length,       "AI_GL_Flag",
+      "Yes = AI will generate detailed GL transactions for this account");
+    addListDropdown(`S${D0}:S${D1}`, "N", glPriorities.length,    "GL_Generation_Priority",
+      "Priority order for GL transaction generation");
 
-    // Col F — Sub_Line_Item
-    (ws as any).dataValidations.add(`F${D0}:F${D1}`, {
-      type: "list", allowBlank: true,
-      formulae: [`Lists!$B$1:$B${subLineItems.length}`],
-      showErrorMessage: true, errorStyle: "warning",
-      errorTitle: "Invalid Sub_Line_Item", error: "Please select or type a valid sub-line",
-      showInputMessage: true, promptTitle: "Sub_Line_Item",
-      prompt: "Select from the list or type a custom value",
-    });
-
-    // Col G — Account_Name
-    (ws as any).dataValidations.add(`G${D0}:G${D1}`, {
-      type: "list", allowBlank: true,
-      formulae: [`Lists!$C$1:$C${accountNames.length}`],
-      showErrorMessage: true, errorStyle: "warning",
-      errorTitle: "Invalid Account_Name", error: "Please select or type a valid account name",
-      showInputMessage: true, promptTitle: "Account_Name",
-      prompt: "Select from the list or type a custom account name",
-    });
-
-    // Col H — Account_Code
-    (ws as any).dataValidations.add(`H${D0}:H${D1}`, {
-      type: "list", allowBlank: true,
-      formulae: [`Lists!$D$1:$D${accountCodes.length}`],
-      showErrorMessage: true, errorStyle: "warning",
-      errorTitle: "Invalid Account_Code", error: "Please select a valid account code",
-      showInputMessage: true, promptTitle: "Account_Code",
-      prompt: "Select from the standard chart of accounts or enter a custom code",
-    });
-
-    // Col I — Note_No (1–100 via hidden sheet, avoids 255-char inline limit)
-    (ws as any).dataValidations.add(`I${D0}:I${D1}`, {
-      type: "list", allowBlank: true,
-      formulae: [`Lists!$E$1:$E${noteNumbers.length}`],
-      showErrorMessage: true, errorStyle: "warning",
-      errorTitle: "Invalid Note_No", error: "Please select a note number between 1 and 100",
-      showInputMessage: true, promptTitle: "Note_No",
-      prompt: "Select the financial statement note number (1–100)",
-    });
+    // Col E — Line_Item  (Lists!A)
+    addListDropdown(`E${D0}:E${D1}`, "A", lineItems.length,    "Line_Item",    "Select the financial statement line item");
+    // Col F — Sub_Line_Item  (Lists!B)
+    addListDropdown(`F${D0}:F${D1}`, "B", subLineItems.length, "Sub_Line_Item","Select the sub-classification or asset category");
+    // Col G — Account_Name  (Lists!C)
+    addListDropdown(`G${D0}:G${D1}`, "C", accountNames.length, "Account_Name", "Select the specific account name from the chart of accounts");
+    // Col H — Account_Code  (Lists!D)
+    addListDropdown(`H${D0}:H${D1}`, "D", accountCodes.length, "Account_Code", "Select the account code from the standard CoA");
+    // Col I — Note_No  (Lists!E)
+    addListDropdown(`I${D0}:I${D1}`, "E", noteNumbers.length,  "Note_No",      "Select the financial statement note number (1–100)");
 
     // ── Row 201: Totals (formula row below all data) ──────────────────────────
     const totRow = 201;
