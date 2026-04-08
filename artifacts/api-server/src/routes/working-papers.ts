@@ -834,7 +834,7 @@ router.post("/sessions/:id/coa/populate", async (req: Request, res: Response) =>
         max_tokens: 4000,
         temperature: 0.1,
         response_format: { type: "json_object" },
-      }, { signal: AbortSignal.timeout(25000) });
+      }, { signal: AbortSignal.timeout(120000) });
       const parsed = JSON.parse(resp.choices[0]?.message?.content || "{}");
       const accounts = parsed.accounts || [];
       rows = accounts.map((a: any, idx: number) => ({
@@ -3175,7 +3175,7 @@ Return ONLY valid JSON (no markdown, no extra text) with this EXACT complete str
           ],
           max_tokens: 5000, temperature: 0.2,
           response_format: { type: "json_object" },
-        }, { signal: AbortSignal.timeout(45000) });
+        }, { signal: AbortSignal.timeout(180000) });
 
         const raw = JSON.parse(resp.choices[0]?.message?.content || "{}");
 
@@ -3287,7 +3287,7 @@ router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Re
             ],
             max_tokens: 4000, temperature: 0.2,
             response_format: { type: "json_object" },
-          }, { signal: AbortSignal.timeout(25000) });
+          }, { signal: AbortSignal.timeout(120000) });
           const tbData = JSON.parse(tbResp.choices[0]?.message?.content || "{}");
           if (tbData.lines && tbData.lines.length > 0) {
             for (const line of tbData.lines) {
@@ -3311,7 +3311,7 @@ router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Re
             ],
             max_tokens: 4000, temperature: 0.3,
             response_format: { type: "json_object" },
-          }, { signal: AbortSignal.timeout(25000) });
+          }, { signal: AbortSignal.timeout(120000) });
           const glData = JSON.parse(glResp.choices[0]?.message?.content || "{}");
           const docs = glData.documents || [{ paper_code: "GL", paper_name: "General Ledger", content: glData.content || "General Ledger generated" }];
           for (const doc of docs) {
@@ -3337,7 +3337,7 @@ router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Re
                 ],
                 max_tokens: 5000, temperature: 0.2,
                 response_format: { type: "json_object" },
-              }, { signal: AbortSignal.timeout(45000) });
+              }, { signal: AbortSignal.timeout(180000) });
               const raw = JSON.parse(resp.choices[0]?.message?.content || "{}");
               const m2 = WP_METADATA[paperCode] || { name: paperCode };
               await db.insert(wpHeadDocumentsTable).values({
@@ -3379,6 +3379,10 @@ router.post("/sessions/:id/heads/auto-process-all", async (req: Request, res: Re
       } catch (headErr: any) {
         logger.error({ err: headErr }, `Auto-process failed for head ${hi}`);
         results.push({ headIndex: hi, headName: AUDIT_HEADS[hi]?.name, action: "failed", error: headErr.message });
+        // Revert stuck in_progress head back to ready so user can retry
+        try {
+          await db.update(wpHeadsTable).set({ status: "ready", updatedAt: new Date() }).where(and(eq(wpHeadsTable.id, head.id), eq(wpHeadsTable.status, "in_progress")));
+        } catch {}
         // Still try to unlock next so pipeline continues
         const nextHi = hi + 1;
         if (nextHi < AUDIT_HEADS.length) {

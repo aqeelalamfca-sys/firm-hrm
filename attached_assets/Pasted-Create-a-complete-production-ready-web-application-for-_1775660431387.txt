@@ -1,0 +1,321 @@
+Create a complete, production-ready web application for audit working paper selection based on company type in Pakistan.
+
+## Project Requirements
+
+Build a single-page application (HTML/CSS/JS) that:
+
+### 1. Company Type Selection (Variables)
+Allow the user to select ONE or MORE of the following company types (checkboxes):
+
+- Listed Company (PSX Main Board)
+- GEM Board Company
+- Private Limited Company (Pvt Ltd)
+- Single Member Company (SMC)
+- Association of Persons (AOP) / Partnership
+- Bank / DFI (Development Financial Institution)
+- Islamic Bank / Islamic Window
+- Modaraba
+- Leasing Company
+- Insurance Company (Life / Non-Life)
+- NGO / Section 42 Company / Donor Funded
+- SME (Small & Medium Enterprise)
+- Public Sector / Government Entity
+- Construction / Real Estate Company
+
+### 2. Working Papers Database
+
+Create a JavaScript object containing ALL working papers from the list below. Each working paper must have:
+
+- `id`: Unique identifier (e.g., "WP001")
+- `phase`: Main phase (e.g., "Pre-Engagement", "Planning", "Risk Assessment", etc.)
+- `name`: Working paper name
+- `applicableTo`: Array of company type IDs where this WP is REQUIRED
+- `optionalFor`: Array of company type IDs where this WP is OPTIONAL (null if mandatory for all)
+
+### 3. Complete Working Papers List (132+ items)
+
+Here is the master list. Mark each with applicable company types:
+
+**PRE-ENGAGEMENT (Always required for ALL company types)**
+1. Client acceptance checklist
+2. Independence confirmation
+3. Engagement letter
+4. Engagement team appointment & briefing
+5. Initial planning meeting minutes
+6. Understanding of company type mapping
+
+**PLANNING - Required for ALL**
+7. Audit Strategy & Planning Memorandum
+8. Materiality Computation
+9. Performance Materiality & Posting Threshold
+10. Understanding the Entity (ISA 315)
+11. Overall Audit Program
+12. Key Accounting Estimates (ISA 540)
+13. IT Systems Understanding
+14. Going Concern - Initial Assessment
+15. Related Party Planning
+16. Laws & Regulations Planning (ISA 250)
+17. Journal Entry Testing Plan (ISA 240)
+18. Sampling Strategy Memo
+19. Component / Branch Audit Planning
+
+**PLANNING - Company type specific**
+20. PSX / GEM Board Listing Compliance Planning → applicableTo: ["listed", "gem"]
+21. Code of Corporate Governance (CCG) 2019 compliance plan → applicableTo: ["listed"]
+22. Single Member Company specific considerations → applicableTo: ["smc"]
+23. SBP Prudential Regulations compliance plan → applicableTo: ["bank", "islamic_bank"]
+24. SECP NBFC / Leasing / Modaraba compliance plan → applicableTo: ["modaraba", "leasing"]
+25. SECP Insurance Rules compliance plan → applicableTo: ["insurance"]
+26. Partnership Act 1932 compliance plan → applicableTo: ["aop"]
+
+**RISK ASSESSMENT - Required for ALL**
+27. Overall Risk Assessment
+28. Fraud Risk Assessment (ISA 240)
+29. Significant Risk Documentation
+30. Account-Level Risk Register
+31. Revenue Recognition Risk (IFRS 15)
+32. Management Override Risk
+33. Going Concern Risk Factors
+34. Related Party Risk Assessment
+35. Compliance Risk Assessment
+36. IT Risk Assessment
+37. Group Audit Risk Summary
+38. Service Organization Risk Review
+
+**RISK ASSESSMENT - Company type specific**
+39. PSX whistleblower & vigilance mechanism review → applicableTo: ["listed"]
+40. Dividend distribution risk assessment → applicableTo: ["listed"]
+41. SBP banking regulatory compliance risk → applicableTo: ["bank", "islamic_bank"]
+42. NBFC / Leasing / Modaraba specific regulatory risk → applicableTo: ["modaraba", "leasing"]
+43. Insurance compliance risk → applicableTo: ["insurance"]
+44. Partnership unlimited liability risk → applicableTo: ["aop"]
+
+**ANALYTICAL PROCEDURES - Required for ALL**
+45. Preliminary Analytical Review
+46. Ratio Analysis & Industry Benchmarking
+47. Revenue Trend & Disaggregation Analysis
+48. Expense Completeness Analytics
+49. Final Analytical Review
+50. Gross Margin Analysis
+51. Working Capital Analytics
+52. Cash Flow Analytical Review
+53. Segment / Branch Performance Review
+54. Budget vs Actual / Prior Year Variance
+
+**INTERNAL CONTROLS - Required for ALL**
+55. Controls Walkthrough - Revenue Cycle
+56. Controls Walkthrough - Procure-to-Pay
+57. Controls Walkthrough - Payroll
+58. Controls Walkthrough - IT General Controls
+59. Control Deficiencies & MMADs
+60. Controls Walkthrough - Treasury / Cash
+61. Controls Walkthrough - Inventory
+62. Controls Walkthrough - Fixed Assets
+63. Controls Walkthrough - Financial Close
+64. Design & Implementation Testing Summary
+65. Tests of Controls - Operating Effectiveness
+
+**INTERNAL CONTROLS - Company type specific**
+66. PSX mandatory internal audit function review → applicableTo: ["listed"]
+67. SMC director-manager segregation assessment → applicableTo: ["smc"]
+
+**SUBSTANTIVE - ASSETS - Required for ALL**
+68. Cash & Bank - Confirmation & Reconciliation
+69. Trade Receivables - Confirmation & Aging
+70. Inventory - Physical Count & Valuation
+71. PPE - Roll-Forward & Depreciation Test
+72. Investments - Valuation & Classification
+73. Prepayments & Other Receivables
+74. Intangible Assets & Impairment
+75. Right-of-Use Assets & Lease Liabilities
+76. Long-Term Deposits & Advances
+77. Intercompany Balances - Assets
+
+**SUBSTANTIVE - ASSETS - Company type specific**
+78. Biological Assets & Agriculture → applicableTo: ["construction"] (optional: agricultural companies)
+79. Islamic financing assets testing → applicableTo: ["islamic_bank"]
+80. Leasing assets testing → applicableTo: ["leasing"]
+81. Modaraba specific assets → applicableTo: ["modaraba"]
+
+**SUBSTANTIVE - LIABILITIES & EQUITY - Required for ALL**
+82. Trade Payables - Confirmation & Reconciliation
+83. Accrued Liabilities & Provisions
+84. Borrowings & Loans - Confirmation
+85. Lease Liabilities (IFRS 16)
+86. Current & Deferred Tax Liabilities
+87. Related Party Payables
+88. Intercompany Balances - Liabilities
+89. Share Capital & Reserves
+90. Retained Earnings & Dividend
+91. Other Liabilities
+92. Contingent Liabilities Register
+93. Equity Reconciliation
+
+**SUBSTANTIVE - LIABILITIES - Company type specific**
+94. Certificates of Investment / Sukuk liabilities → applicableTo: ["modaraba", "islamic_bank"]
+95. Insurance policyholder liabilities → applicableTo: ["insurance"]
+96. Bank customer deposits testing → applicableTo: ["bank", "islamic_bank"]
+
+**SUBSTANTIVE - INCOME STATEMENT - Required for ALL**
+97. Revenue Testing (IFRS 15)
+98. Cost of Sales & Inventory Movement
+99. Operating Expenses - Completeness & Cut-off
+100. Payroll & Employee Benefits
+101. Finance Cost & Interest
+102. Other Income
+103. Depreciation & Amortization
+104. Impairment Losses
+105. Tax Expense & Effective Rate Reconciliation
+106. Exceptional & Unusual Items
+
+**SUBSTANTIVE - INCOME STATEMENT - Company type specific**
+107. Islamic bank income testing → applicableTo: ["islamic_bank"]
+108. Insurance premium revenue & claims testing → applicableTo: ["insurance"]
+
+**SUBSTANTIVE - ESTIMATES - Required for ALL**
+109. Expected Credit Losses (IFRS 9) → applicableTo: ["bank", "islamic_bank", "modaraba", "leasing"]
+110. Inventory Provision / NRV Assessment
+111. Useful Life / Residual Value Review
+112. Provision Estimation Review (IAS 37)
+113. Deferred Tax Estimate Review
+114. Actuarial Assessment Review (IAS 19)
+115. Sensitivity Analysis & Management Bias Review
+
+**ESTIMATES - Company type specific**
+116. Insurance actuarial reserves review → applicableTo: ["insurance"]
+117. Modaraba management fee & profit distribution → applicableTo: ["modaraba"]
+
+**RELATED PARTIES & COMPLIANCE - Required for ALL**
+118. Related Party Transactions (ISA 550)
+119. Compliance with Laws & Regulations (ISA 250)
+120. SECP & FBR Regulatory Filings Review
+121. Litigation & Claims Review
+122. Minutes Review - Board / AGM / Committees
+123. Connected Persons / Directors Interest Review
+124. Sanctions / AML / Beneficial Ownership
+125. Contractual Compliance & Loan Covenants
+126. Insurance Coverage Review
+
+**COMPLIANCE - Company type specific**
+127. ESG / Grant / Donor / Section-42 Compliance → applicableTo: ["ngo"]
+128. PSX Listing Regulations compliance → applicableTo: ["listed"]
+129. SBP Prudential Regulations → applicableTo: ["bank", "islamic_bank"]
+130. SECP NBFC / Leasing / Modaraba Regulations → applicableTo: ["modaraba", "leasing"]
+131. SECP Insurance Rules 2017 → applicableTo: ["insurance"]
+132. GEM Board listing conditions → applicableTo: ["gem"]
+133. Partnership Act 1932 compliance → applicableTo: ["aop"]
+
+**AUDIT EVIDENCE & MISSTATEMENTS - Required for ALL**
+134. Audit Evidence - Sufficiency & Appropriateness
+135. Unadjusted Misstatements Schedule (ISA 450)
+136. Summary of Audit Differences
+137. Management Communication - Control Deficiencies
+138. Communication with Those Charged with Governance
+
+**SUBSEQUENT EVENTS & GOING CONCERN - Required for ALL**
+139. Subsequent Events Review
+140. Going Concern Conclusion
+
+**MANAGEMENT REPRESENTATIONS - Required for ALL**
+141. Management Representation Letter (standard)
+142. SMC member representation letter → applicableTo: ["smc"]
+143. Partnership representation from all partners → applicableTo: ["aop"]
+
+**OVERALL REVIEW & OPINION - Required for ALL**
+144. Overall Conclusion & Opinion Memo
+145. Draft Audit Report
+146. PSX specified audit report format → applicableTo: ["listed"]
+
+**COMPLETION & ARCHIVING - Required for ALL**
+147. Completion Checklist (ISA 230)
+148. Subsequent Changes to Audit Documentation Log
+149. Final Indexing & Cross-Reference Check
+150. Version Control & Lockdown Log
+151. Document Retention Access Control
+152. File Handover / Delivery Record
+153. Post-Issuance Amendment Register
+
+**SPECIALIZED - Required conditionally**
+154. Group Audit Instructions → applicableTo: ["listed", "bank", "insurance"] (if group)
+155. Component Auditor Review → applicableTo: ["listed", "bank", "insurance"] (if group)
+156. Using the Work of Internal Audit → applicableTo: ["listed", "bank", "insurance"]
+157. Using an Auditor's Expert → applicableTo: ["bank", "insurance", "modaraba"]
+158. Service Organization / SOC Review → if outsourced IT
+159. Opening Balances Review → first-year audits only
+160. First-Year Audit Transition Memo → first-year audits only
+161. Interim Review Procedures → interim audits only
+162. Consolidation Review → applicableTo: ["listed", "bank"] (group parent)
+163. Donor / Grant / NGO Compliance WP → applicableTo: ["ngo"]
+164. Public Sector / IPSAS Adjustments → applicableTo: ["public_sector"]
+165. Construction / Long-term Contracts WP → applicableTo: ["construction"]
+166. Capital Adequacy (CAR) Testing → applicableTo: ["bank", "islamic_bank", "insurance"]
+167. Simplified Materiality Framework → applicableTo: ["gem", "sme"]
+
+### 4. Application Features
+
+The web application must have:
+
+**Input Section:**
+- Checkbox grid for all 14 company types (as listed above)
+- "Select All" and "Clear All" buttons
+- Real-time update on selection change
+
+**Output Section - Two Views:**
+
+**View 1: Summary Dashboard**
+- Total required working papers count
+- Breakdown by phase (Pre-Engagement, Planning, Risk Assessment, etc.)
+- Missing papers count (by company type selection)
+
+**View 2: Detailed Table**
+- Sortable/filterable table with columns:
+  - ID
+  - Phase
+  - Working Paper Name
+  - Status (Required / Optional / Not Applicable)
+  - Applicable To (human-readable list of company types)
+
+**View 3: Export Functionality**
+- Button to export selected working papers to CSV
+- Button to print as checklist
+
+### 5. User Interface Requirements
+
+- Clean, professional design (suitable for audit firms)
+- Responsive (works on desktop and tablet)
+- Dark/light mode toggle (nice to have)
+- Progress indicator showing completion percentage
+- Search/filter by working paper name or phase
+
+### 6. Logic Rules
+
+- If user selects NO company types → show "Please select at least one company type"
+- If a working paper's `applicableTo` matches ANY selected company type → Status = "Required"
+- If a working paper is marked as "Required for ALL" → Status = "Required" regardless of selection
+- If a working paper has no match but is not universal → Status = "Not Applicable"
+- Some working papers have `optionalFor` - show as "Optional" if only optional conditions met
+
+### 7. Data Persistence (Bonus)
+
+- Save user's company type selection in localStorage
+- Load saved selection on page refresh
+
+### 8. Code Quality
+
+- Use vanilla HTML/CSS/JS (no external frameworks required, but Tailwind CSS is acceptable)
+- Fully commented code
+- Mobile-friendly CSS grid/flexbox
+- No console errors
+
+### 9. Output Format
+
+Provide a single HTML file with embedded <style> and <script> that I can copy and run immediately in any browser or Replit.
+
+### 10. Testing
+
+After building, the application should correctly show:
+- A Listed Bank requires ~150+ working papers
+- A standalone SMC requires ~80 working papers (excluding group/consolidation/PSX items)
+- An NGO requires specific donor/grant compliance papers
+
+Build this complete application now.

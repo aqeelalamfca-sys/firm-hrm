@@ -1,0 +1,167 @@
+#,Phase,Working Paper / Document,Present in File?,File Reference,Applicable Company Type (Pakistan)
+1,Pre-Engagement,Client acceptance checklist,No,N/A,All
+2,Pre-Engagement,Independence confirmation,No,N/A,All
+3,Pre-Engagement,Engagement letter,No,N/A,All
+4,Pre-Engagement,Engagement team appointment & briefing,No,N/A,All
+5,Pre-Engagement,Initial planning meeting minutes,No,N/A,All
+6,Pre-Engagement,Understanding of company type (Listed / Pvt / SMC / AOP / NGO),No,N/A,All
+7,Pre-Engagement,Applicable regulatory framework mapping (SECP / PSX / SBP / SEC / FBR),No,N/A,All
+8,Planning - Strategy & Materiality,Audit Strategy & Planning Memorandum,Yes,B3,All
+9,Planning - Strategy & Materiality,Materiality Computation (Overall / Performance / Trivial),Yes,B2,All
+10,Planning - Strategy & Materiality,Performance Materiality & Posting Threshold,Yes,B12,All
+11,Planning - Strategy & Materiality,Understanding the Entity (ISA 315),Yes,B3,All
+12,Planning - Strategy & Materiality,Overall Audit Program,Yes,B4,All
+13,Planning - Strategy & Materiality,Key Accounting Estimates (ISA 540),Yes,B5,All
+14,Planning - Strategy & Materiality,IT Systems Understanding,Yes,B6,All
+15,Planning - Strategy & Materiality,Going Concern - Initial Assessment,Yes,B7,All
+16,Planning - Strategy & Materiality,Related Party Planning,Yes,B8,All
+17,Planning - Strategy & Materiality,Laws & Regulations Planning (ISA 250),Yes,B9,All
+18,Planning - Strategy & Materiality,Journal Entry Testing Plan (ISA 240),Yes,B10,All
+19,Planning - Strategy & Materiality,Sampling Strategy Memo,Yes,B11,All
+20,Planning - Strategy & Materiality,Component / Branch Audit Planning,Yes,B13,Group / Branch audits
+21,Planning - Strategy & Materiality,PSX / GEM Board Listing Compliance Planning,No,N/A,Listed + GEM Board companies
+22,Planning - Strategy & Materiality,Code of Corporate Governance (CCG) 2019 compliance plan,No,N/A,Listed companies
+23,Planning - Strategy & Materiality,Single Member Company (SMC) specific considerations,No,N/A,SMC only
+24,Risk Assessment,Overall Risk Assessment (Entity-level),Yes,C1,All
+25,Risk Assessment,Fraud Risk Assessment (ISA 240),Yes,C2,All
+26,Risk Assessment,Significant Risk Documentation,Yes,C3,All
+27,Risk Assessment,Account-Level Risk Register,Yes,C4,All
+28,Risk Assessment,Revenue Recognition Risk (IFRS 15),Yes,C5,All
+29,Risk Assessment,Management Override Risk,Yes,C6,All
+30,Risk Assessment,Going Concern Risk Factors,Yes,C7,All
+31,Risk Assessment,Related Party Risk Assessment,Yes,C8,All
+32,Risk Assessment,Compliance Risk Assessment,Yes,C9,All
+33,Risk Assessment,IT Risk Assessment,Yes,C10,All
+34,Risk Assessment,Group Audit Risk Summary,Yes,C11,Group audits
+35,Risk Assessment,Service Organization Risk Review,Yes,C12,Outsourced functions
+36,Risk Assessment,PSX / SECP whistleblower & vigilance mechanism review,No,N/A,Listed companies
+37,Risk Assessment,Dividend distribution risk assessment (legal vs. distributable profits),No,N/A,Listed + large Pvt
+38,Risk Assessment,SBP / Banking regulatory compliance risk (for banks/DFIs),No,N/A,Banks / DFIs / NBFCs
+39,Risk Assessment,SECP NBFC / Leasing / Modaraba specific regulatory risk,No,N/A,NBFC / Leasing / Modaraba
+40,Risk Assessment,Insurance (SECP Insurance Division) compliance risk,No,N/A,Insurance companies
+41,Risk Assessment,Partnership / AOP audit risk considerations (unlimited liability),No,N/A,AOP / Partnership
+42,Analytical Procedures,Preliminary Analytical Review,Yes,D1,All
+43,Analytical Procedures,Ratio Analysis & Industry Benchmarking,Yes,D2,All
+44,Analytical Procedures,Revenue Trend & Disaggregation Analysis,Yes,D3,All
+45,Analytical Procedures,Expense Completeness Analytics,Yes,D4,All
+46,Analytical Procedures,Final Analytical Review,Yes,D5,All
+47,Analytical Procedures,Gross Margin Analysis,Yes,D6,All
+48,Analytical Procedures,Working Capital Analytics,Yes,D7,All
+49,Analytical Procedures,Cash Flow Analytical Review,Yes,D8,All
+50,Analytical Procedures,Segment / Branch Performance Review,Yes,D9,All
+51,Analytical Procedures,Budget vs Actual / Prior Year Variance,Yes,D10,All
+52,Internal Controls,Controls Walkthrough - Revenue Cycle,Yes,E1,All
+53,Internal Controls,Controls Walkthrough - Procure-to-Pay,Yes,E2,All
+54,Internal Controls,Controls Walkthrough - Payroll,Yes,E3,All
+55,Internal Controls,Controls Walkthrough - IT General Controls,Yes,E4,All
+56,Internal Controls,Control Deficiencies & MMADs,Yes,E5,All
+57,Internal Controls,Controls Walkthrough - Treasury / Cash,Yes,E6,All
+58,Internal Controls,Controls Walkthrough - Inventory,Yes,E7,All
+59,Internal Controls,Controls Walkthrough - Fixed Assets,Yes,E8,All
+60,Internal Controls,Controls Walkthrough - Financial Close,Yes,E9,All
+61,Internal Controls,Design & Implementation Testing Summary,Yes,E10,All
+62,Internal Controls,Tests of Controls - Operating Effectiveness,Yes,E11,All
+63,Internal Controls,PSX mandatory internal audit function review (CCG 2019),No,N/A,Listed companies
+64,Internal Controls,SMC director-manager segregation of duties assessment,No,N/A,SMC only
+65,Substantive - Assets,Cash & Bank - Confirmation & Reconciliation,Yes,F1,All
+66,Substantive - Assets,Trade Receivables - Confirmation & Aging,Yes,F2,All
+67,Substantive - Assets,Inventory - Physical Count & Valuation,Yes,F3,All
+68,Substantive - Assets,PPE - Roll-Forward & Depreciation Test,Yes,F4,All
+69,Substantive - Assets,Investments - Valuation & Classification,Yes,F5,All
+70,Substantive - Assets,Prepayments & Other Receivables,Yes,F6,All
+71,Substantive - Assets,Intangible Assets & Impairment,Yes,F7,All
+72,Substantive - Assets,Right-of-Use Assets & Lease Liabilities,Yes,F8,All
+73,Substantive - Assets,Long-Term Deposits & Advances,Yes,F9,All
+74,Substantive - Assets,Intercompany Balances - Assets,Yes,F10,All
+75,Substantive - Assets,Biological Assets & Agriculture,Yes,F11,Agricultural companies
+76,Substantive - Assets,Islamic financing assets (Murabaha / Ijarah / Diminishing Musharaka) - specific testing,No,N/A,Islamic banks / windows
+77,Substantive - Assets,Leasing assets (leased assets / Ijarah Muntahia Bittamleek),No,N/A,Leasing companies / Islamic
+78,Substantive - Assets,Modaraba specific assets (certificates / sukuk / mudaraba funds),No,N/A,Modarabas
+79,Substantive - Liabilities,Trade Payables - Confirmation & Reconciliation,Yes,G1,All
+80,Substantive - Liabilities,Accrued Liabilities & Provisions,Yes,G2 (inferred),All
+81,Substantive - Liabilities,Borrowings & Loans - Confirmation,Yes,G3 (inferred),All
+82,Substantive - Liabilities,Lease Liabilities (IFRS 16),Yes,G4 (inferred),All
+83,Substantive - Liabilities,Current & Deferred Tax Liabilities,Yes,G5 (inferred),All
+84,Substantive - Liabilities,Related Party Payables,Yes,G6 (inferred),All
+85,Substantive - Liabilities,Intercompany Balances - Liabilities,Yes,G7 (inferred),All
+86,Substantive - Equity,Share Capital & Reserves,Yes,G8 (inferred),All
+87,Substantive - Equity,Retained Earnings & Dividend,Yes,G9 (inferred),All
+88,Substantive - Liabilities,Other Liabilities,Yes,G10 (inferred),All
+89,Substantive - Liabilities,Contingent Liabilities Register,Yes,G11 (inferred),All
+90,Substantive - Equity,Equity Reconciliation,Yes,G12 (inferred),All
+91,Substantive - Liabilities,Certificates of Investment / Modaraba certificates / Sukuk liabilities,No,N/A,Modarabas / Islamic
+92,Substantive - Liabilities,Insurance policyholder liabilities / unearned premium reserve,No,N/A,Insurance companies
+93,Substantive - Liabilities,Bank customer deposits / current accounts (SBP prudential),No,N/A,Banks / DFIs
+94,Substantive - Income Statement,Revenue Testing (IFRS 15),Yes,H1,All
+95,Substantive - Income Statement,Cost of Sales & Inventory Movement,Yes,H2,All
+96,Substantive - Income Statement,Operating Expenses - Completeness & Cut-off,Yes,H3,All
+97,Substantive - Income Statement,Payroll & Employee Benefits,Yes,H4,All
+98,Substantive - Income Statement,Finance Cost & Interest,Yes,H5,All
+99,Substantive - Income Statement,Other Income,Yes,H6,All
+100,Substantive - Income Statement,Depreciation & Amortization,Yes,H7,All
+101,Substantive - Income Statement,Impairment Losses,Yes,H8,All
+102,Substantive - Income Statement,Tax Expense & Effective Rate Reconciliation,Yes,H9,All
+103,Substantive - Income Statement,Exceptional & Unusual Items,Yes,H10,All
+104,Substantive - Income Statement,Islamic bank income (Murabaha / Ijarah / Musharaka) vs. conventional,No,N/A,Islamic banks
+105,Substantive - Income Statement,Insurance premium revenue / claims expense testing,No,N/A,Insurance companies
+106,Substantive - Estimates,Expected Credit Losses (IFRS 9),Yes,I1,Banks / DFIs / Leasing / Modarabas
+107,Substantive - Estimates,Inventory Provision / NRV Assessment,Yes,I2,All with inventory
+108,Substantive - Estimates,Useful Life / Residual Value Review,Yes,I3,All
+109,Substantive - Estimates,Provision Estimation Review (IAS 37),Yes,I4,All
+110,Substantive - Estimates,Deferred Tax Estimate Review,Yes,I5,All
+111,Substantive - Estimates,Actuarial Assessment Review (IAS 19),Yes,I6,All with pension/retirement plans
+112,Substantive - Estimates,Sensitivity Analysis & Management Bias Review,Yes,I7,All
+113,Substantive - Estimates,Insurance actuarial reserves (life / non-life) review,No,N/A,Insurance companies
+114,Substantive - Estimates,Modaraba management fee / profit distribution estimate,No,N/A,Modarabas
+115,Related Parties & Compliance,Related Party Transactions (ISA 550),Yes,J1,All
+116,Related Parties & Compliance,Compliance with Laws & Regulations (ISA 250),Yes,J2,All
+117,Related Parties & Compliance,SECP & FBR Regulatory Filings Review,Yes,J3,All
+118,Related Parties & Compliance,Litigation & Claims Review,Yes,J4,All
+119,Related Parties & Compliance,Minutes Review - Board / AGM / Committees,Yes,J5,All with board
+120,Related Parties & Compliance,Connected Persons / Directors Interest Review,Yes,J6,All
+121,Related Parties & Compliance,Sanctions / AML / Beneficial Ownership,Yes,J7,All
+122,Related Parties & Compliance,Contractual Compliance & Loan Covenants,Yes,J8,All
+123,Related Parties & Compliance,Insurance Coverage Review,Yes,J9,All
+124,Related Parties & Compliance,ESG / Grant / Donor / Section-42 Compliance,Yes,J10,NGOs / Section 42 / Donor funded
+125,Related Parties & Compliance,PSX Listing Regulations compliance (Chapter 5, 7, 9, 13),No,N/A,Listed companies
+126,Related Parties & Compliance,SBP Prudential Regulations for banks / DFIs,No,N/A,Banks / DFIs
+127,Related Parties & Compliance,SECP NBFC / Leasing / Modaraba Regulations,No,N/A,NBFC / Leasing / Modaraba
+128,Related Parties & Compliance,SECP Insurance Rules 2017,No,N/A,Insurance companies
+129,Related Parties & Compliance,GEM Board listing conditions & continuous compliance,No,N/A,GEM Board companies
+130,Related Parties & Compliance,Partnership Act 1932 compliance (for AOPs / partnerships),No,N/A,AOP / Partnership
+131,Audit Evidence & Misstatements,Audit Evidence - Sufficiency & Appropriateness,Yes,K1,All
+132,Audit Evidence & Misstatements,Unadjusted Misstatements Schedule (ISA 450),Yes,K2,All
+133,Audit Evidence & Misstatements,Summary of Audit Differences,Yes,K3,All
+134,Audit Evidence & Misstatements,Management Communication - Control Deficiencies,Yes,K4,All
+135,Audit Evidence & Misstatements,Communication with Those Charged with Governance,Yes,K5,All
+136,Subsequent Events & Going Concern,Subsequent Events Review,Yes,K7 (inferred),All
+137,Subsequent Events & Going Concern,Going Concern Conclusion,Yes,K8 (inferred),All
+138,Management Representations,Management Representation Letter,No,N/A,All
+139,Management Representations,SMC member representation letter (single person),No,N/A,SMC only
+140,Management Representations,Partnership / AOP representation from all partners,No,N/A,AOP / Partnership
+141,Overall Review & Opinion,Overall Conclusion & Opinion Memo,Yes,K10 (inferred),All
+142,Overall Review & Opinion,Draft Audit Report (Unmodified/Modified),No,N/A,All
+143,Overall Review & Opinion,PSX / SECP specified audit report format,No,N/A,Listed companies
+144,Completion & Archiving,Completion Checklist (ISA 230),Yes,L1,All
+145,Completion & Archiving,Subsequent Changes to Audit Documentation Log,Yes,L2,All
+146,Completion & Archiving,Final Indexing & Cross-Reference Check,Yes,L3,All
+147,Completion & Archiving,Version Control & Lockdown Log,Yes,L4,All
+148,Completion & Archiving,Document Retention Access Control,Yes,L5,All
+149,Completion & Archiving,File Handover / Delivery Record,Yes,L6,All
+150,Completion & Archiving,Post-Issuance Amendment Register,Yes,L7,All
+151,Specialized - Group Audit,Group Audit Instructions (ISA 600),Yes,M1,Group audits
+152,Specialized - Group Audit,Component Auditor Review,Yes,M2,Group audits
+153,Specialized,Using the Work of Internal Audit (ISA 610),Yes,M3,All with internal audit
+154,Specialized,Using an Auditor's Expert (ISA 620),Yes,M4,All
+155,Specialized,Service Organization / SOC Review (ISA 402),Yes,M5,Outsourced functions
+156,Specialized - First Year,Opening Balances Review (ISA 510),Yes,M6,First-year audits
+157,Specialized - First Year,First-Year Audit Transition Memo,Yes,M7,First-year audits
+158,Specialized - Interim,Interim Review Procedures,Yes,M8,Interim / half-year audits
+159,Specialized - Consolidation,Consolidation / Combined FS Review,Yes,M9,Group / parent companies
+160,Specialized - NGO,Donor / Grant / NGO Compliance WP,Yes,M10,NGOs / Section 42 / donor funded
+161,Specialized - Public Sector,Public Sector / IPSAS Adjustments WP,Yes,M11,Public sector / government
+162,Specialized - Construction,Construction / Long-term Contracts WP,Yes,M12,Construction / real estate
+163,Specialized - Banks / DFIs,Capital adequacy (CAR) & SBP liquidity ratios testing,No,N/A,Banks / DFIs
+164,Specialized - Insurance,Solvency & statutory fund testing (SECP Insurance),No,N/A,Insurance companies
+165,Specialized - Modarabas,Modaraba management fee & profit distribution schedule,No,N/A,Modarabas
+166,Specialized - SMEs / GEM Board,Simplified materiality & reduced disclosure framework,No,N/A,GEM Board / SMEs
