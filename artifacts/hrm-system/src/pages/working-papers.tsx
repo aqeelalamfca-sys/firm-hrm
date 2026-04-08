@@ -365,6 +365,7 @@ export default function WorkingPapers() {
     if (!activeSession) return;
     const approvable = (heads || []).filter((h: any) => h.headIndex >= 2 && (h.status === "validating" || h.status === "review"));
     if (approvable.length === 0) { toast({ title: "No heads to approve" }); return; }
+    if (!window.confirm(`Approve ${approvable.length} audit heads? This action cannot be undone.`)) return;
     try {
       setLoading(true);
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/bulk-approve-heads`, {
@@ -387,6 +388,7 @@ export default function WorkingPapers() {
     if (!activeSession) return;
     const respondedNotes = (reviewNotes || []).filter((n: any) => n.status === "responded");
     if (respondedNotes.length === 0) { toast({ title: "No responded notes to clear" }); return; }
+    if (!window.confirm(`Clear ${respondedNotes.length} responded review notes? This marks them as resolved.`)) return;
     try {
       setLoading(true);
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/bulk-clear-review-notes`, {
@@ -555,6 +557,7 @@ export default function WorkingPapers() {
 
   const handleDeleteFile = async (fileId: number) => {
     if (!activeSession) return;
+    if (!window.confirm("Remove this file from the session?")) return;
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/files/${fileId}`, {
         method: "DELETE", headers,
@@ -1672,6 +1675,7 @@ export default function WorkingPapers() {
     if (!activeSession) return;
     const openExcs = exceptions.filter((e: any) => e.status === "open");
     if (openExcs.length === 0) return;
+    if (!window.confirm(`Resolve all ${openExcs.length} open exceptions? Each will be marked as "Bulk cleared by user".`)) return;
     setLoading(true);
     try {
       for (const exc of openExcs) {
@@ -4249,7 +4253,7 @@ function AuditEngineStage({
       const r = await fetch(`${API_BASE}/working-papers/wp-library?${params}`, { headers: authHdr() });
       const d = await r.json();
       setWpLibrary(d.papers || []);
-    } catch { /* ignore */ } finally { setLibLoading(false); }
+    } catch { toast?.({ title: "Failed to load WP library", variant: "destructive" }); } finally { setLibLoading(false); }
   };
 
   const fetchSessionLibrary = async () => {
@@ -4259,7 +4263,7 @@ function AuditEngineStage({
       const r = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/wp-library-session`, { headers: authHdr() });
       const d = await r.json();
       setSessionLibrary(d.papers || []);
-    } catch { /* ignore */ } finally { setLibLoading(false); }
+    } catch { toast?.({ title: "Failed to load session library", variant: "destructive" }); } finally { setLibLoading(false); }
   };
 
   const seedLibrary = async () => {
@@ -4269,7 +4273,7 @@ function AuditEngineStage({
       const d = await r.json();
       setLibSeedResult(d);
       await fetchWpLibrary();
-    } catch { /* ignore */ } finally { setLibSeeding(false); }
+    } catch { toast?.({ title: "Failed to seed library", variant: "destructive" }); } finally { setLibSeeding(false); }
   };
 
   const activateLibrary = async () => {
@@ -4280,7 +4284,7 @@ function AuditEngineStage({
       const d = await r.json();
       setLibActivationResult(d);
       await fetchSessionLibrary();
-    } catch { /* ignore */ } finally { setLibActivating(false); }
+    } catch { toast?.({ title: "Failed to activate library", variant: "destructive" }); } finally { setLibActivating(false); }
   };
 
   const updateSessionWp = async (wpCode: string, payload: any) => {
@@ -4312,7 +4316,7 @@ function AuditEngineStage({
           setSessionLibrary(d2.papers || []);
         } finally { setLibActivating(false); }
       }
-    } catch { /* ignore */ } finally { setLibLoading(false); }
+    } catch { toast?.({ title: "Failed to load library", variant: "destructive" }); } finally { setLibLoading(false); }
   };
 
   useEffect(() => {
@@ -4343,7 +4347,7 @@ function AuditEngineStage({
       const d = await r.json();
       setExceptions(d.exceptions || []);
       setExcCounts(d.counts || {});
-    } catch { /* ignore */ } finally { setExcLoading(false); }
+    } catch { toast?.({ title: "Failed to load exceptions", variant: "destructive" }); } finally { setExcLoading(false); }
   };
 
   const runExceptionScan = async () => {
@@ -4354,7 +4358,7 @@ function AuditEngineStage({
       const d = await r.json();
       setExcScanResult(d);
       await fetchExceptions();
-    } catch { /* ignore */ } finally { setExcScanning(false); }
+    } catch { toast?.({ title: "Exception scan failed", variant: "destructive" }); } finally { setExcScanning(false); }
   };
 
   const resolveException = async (exId: number, note: string) => {
@@ -4390,7 +4394,7 @@ function AuditEngineStage({
       });
       const d = await r.json();
       setValidation(d);
-    } catch { /* ignore */ } finally { setValidating(false); }
+    } catch { toast?.({ title: "Validation failed", variant: "destructive" }); } finally { setValidating(false); }
   };
 
   const generateOutput = async () => {
@@ -4433,7 +4437,7 @@ function AuditEngineStage({
       const r = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/output-jobs`, { headers: authHdr() });
       const d = await r.json();
       setOutputJobs(d.jobs || []);
-    } catch { /* ignore */ }
+    } catch { toast?.({ title: "Failed to load output jobs", variant: "destructive" }); }
   };
 
   useEffect(() => { if (activeEngineTab === "generate") { runValidation(); fetchOutputJobs(); } }, [activeEngineTab]);
@@ -4454,11 +4458,12 @@ function AuditEngineStage({
       const r = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/lock-status`, { headers: authHdr() });
       const d = await r.json();
       setLockStatus(d);
-    } catch { /* ignore */ } finally { setLockLoading(false); }
+    } catch { toast?.({ title: "Failed to load lock status", variant: "destructive" }); } finally { setLockLoading(false); }
   };
 
   const lockSession = async () => {
     if (!session?.id || !lockForm.lockedBy) return;
+    if (!window.confirm("Lock this session? Once locked, no further edits can be made without admin override.")) return;
     setLocking(true);
     try {
       const r = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/lock`, {
@@ -4469,7 +4474,7 @@ function AuditEngineStage({
       const d = await r.json();
       setLockResult(d);
       await fetchLockStatus();
-    } catch { /* ignore */ } finally { setLocking(false); }
+    } catch { toast?.({ title: "Lock session failed", variant: "destructive" }); } finally { setLocking(false); }
   };
 
   const fetchAuditTrail = async () => {
@@ -4479,7 +4484,7 @@ function AuditEngineStage({
       const r = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/wp-audit-trail`, { headers: authHdr() });
       const d = await r.json();
       setAuditTrail(d.trail || []);
-    } catch { /* ignore */ } finally { setTrailLoading(false); }
+    } catch { toast?.({ title: "Failed to load audit trail", variant: "destructive" }); } finally { setTrailLoading(false); }
   };
 
   useEffect(() => { if (activeEngineTab === "lock") { fetchLockStatus(); fetchAuditTrail(); } }, [activeEngineTab]);
@@ -10750,7 +10755,10 @@ function AuditChainStage({ chains, summary, loading, leadSchedules, fsNoteMappin
 
       {activeSubTab === "lead_schedule" && (
         <div className="space-y-3">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            {onExportCsv && (leadSchedules || []).length > 0 && (
+              <button onClick={() => onExportCsv((leadSchedules || []).map((ls: any) => ({ Ref: ls.scheduleRef, WPArea: ls.wpArea, MajorHead: ls.majorHead, NoteNo: ls.noteNo, OpeningBalance: ls.openingBalance, ClosingBalance: ls.closingBalance, Variance: ls.variance, VariancePct: ls.variancePct, Risk: ls.riskLevel, Status: ls.status })), `lead_schedules_${session?.clientName || "export"}.csv`)} className="px-3 py-1.5 text-xs bg-slate-100 rounded-lg hover:bg-slate-200"><Download className="w-3 h-3 inline mr-1" />Export CSV</button>
+            )}
             <button onClick={onGenerateLeadSchedules} disabled={isaLoading} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50">
               {isaLoading ? <Loader2 className="w-3 h-3 animate-spin inline mr-1" /> : <Table2 className="w-3 h-3 inline mr-1" />}Generate Lead Schedules
             </button>
@@ -10797,7 +10805,10 @@ function AuditChainStage({ chains, summary, loading, leadSchedules, fsNoteMappin
 
       {activeSubTab === "fs_notes" && (
         <div className="space-y-3">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            {onExportCsv && (fsNoteMappings || []).length > 0 && (
+              <button onClick={() => onExportCsv((fsNoteMappings || []).map((nm: any) => ({ NoteNo: nm.noteNo, Title: nm.noteTitle, CurrentYear: nm.totalCY, PriorYear: nm.totalPY, Variance: nm.variance, Status: nm.disclosureStatus, Accounts: (nm.tbAccountCodes || []).join("; ") })), `fs_note_mappings_${session?.clientName || "export"}.csv`)} className="px-3 py-1.5 text-xs bg-slate-100 rounded-lg hover:bg-slate-200"><Download className="w-3 h-3 inline mr-1" />Export CSV</button>
+            )}
             <button onClick={onGenerateFsNotes} disabled={isaLoading} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50">
               {isaLoading ? <Loader2 className="w-3 h-3 animate-spin inline mr-1" /> : <BookOpen className="w-3 h-3 inline mr-1" />}Generate FS Note Mapping
             </button>
@@ -11162,6 +11173,11 @@ function ReviewQCStage({ reviewNotes, reviewSummary, complianceGates, compliance
       {/* ── ISA 530 SAMPLING ── */}
       {activeSubTab === "sampling" && (
         <div className="space-y-3">
+          {onExportCsv && (samplingDetails || []).length > 0 && (
+            <div className="flex justify-end">
+              <button onClick={() => onExportCsv((samplingDetails || []).map((sd: any) => ({ WPCode: sd.wpCode, Area: sd.fsArea, Method: sd.samplingMethod, PopulationSize: sd.populationSize, PopulationValuePKR: sd.populationValuePkr, SampleSize: sd.sampleSize, ItemsTested: sd.itemsTested, Exceptions: sd.exceptionsFound, Conclusion: sd.conclusion || "pending", Status: sd.status })), `sampling_details_${session?.clientName || "export"}.csv`)} className="px-3 py-1.5 text-xs bg-slate-100 rounded-lg hover:bg-slate-200"><Download className="w-3 h-3 inline mr-1" />Export CSV</button>
+            </div>
+          )}
           {(samplingDetails || []).length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl border">
               <Calculator className="w-12 h-12 text-slate-300 mx-auto mb-3" />
