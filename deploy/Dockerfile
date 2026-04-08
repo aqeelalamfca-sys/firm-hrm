@@ -25,6 +25,7 @@ FROM node:24-slim AS production
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/artifacts/api-server/dist ./dist
+COPY --from=builder /app/artifacts/api-server/src/templates ./templates
 COPY --from=builder /app/artifacts/hrm-system/dist/public ./dist/public
 COPY --from=builder /app/package.json ./
 # Explicitly install externalized native/large packages that esbuild doesn't bundle

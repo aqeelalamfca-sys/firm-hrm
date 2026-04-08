@@ -7602,49 +7602,65 @@ function parseOneSheetAuditTemplate(wb: XLSX.WorkBook): ParsedTemplateResult {
 
   const allRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as any[][];
 
-  // ── Detect format by looking for metadata pattern in rows 5-6 ───────────
+  // ── Detect format: legacy (engagement headers in rows 5-6, data headers row 8)
+  //    vs compact (title row 1, data headers row 2, no engagement rows) ──────
   const row5 = allRows[4] || [];
   const row6 = allRows[5] || [];
   const row8 = allRows[7] || [];
 
-  const isOneSheetFormat = (
+  const hasLegacyEngagementRows = (
     String(row5[0]).toLowerCase().includes("entity") ||
-    String(row5[0]).toLowerCase().includes("entity_name") ||
+    String(row5[0]).toLowerCase().includes("entity_name")
+  );
+
+  const isOneSheetFormat = (
+    hasLegacyEngagementRows ||
     String(row8[0]).toLowerCase().includes("line_id") ||
-    String(row8[1]).toLowerCase().includes("statement")
+    String(row8[1]).toLowerCase().includes("statement") ||
+    allRows.some((r, i) => i <= 3 && r && String(r[0]).toLowerCase().replace(/_/g, "").includes("lineid"))
   );
 
   // ── Extract metadata ─────────────────────────────────────────────────────
-  // Template layout: Label in col A/D/G/J/M, value in B/E/H/K/N (0-indexed 1/4/7/10/13)
-  let yearEndVal = row5[13];
-  let yearEndStr = "";
-  if (typeof yearEndVal === "number") {
-    // Excel serial date → JS date
-    const d = new Date(Math.round((yearEndVal - 25569) * 86400 * 1000));
-    yearEndStr = d.toISOString().split("T")[0];
+  // Legacy template: Label in col A/D/G/J/M, value in B/E/H/K/N (0-indexed 1/4/7/10/13)
+  // Compact template: no engagement rows — metadata stays as session defaults
+  let meta: ParsedTemplateMeta;
+  if (hasLegacyEngagementRows) {
+    let yearEndVal = row5[13];
+    let yearEndStr = "";
+    if (typeof yearEndVal === "number") {
+      const d = new Date(Math.round((yearEndVal - 25569) * 86400 * 1000));
+      yearEndStr = d.toISOString().split("T")[0];
+    } else {
+      yearEndStr = String(yearEndVal || "").trim();
+    }
+
+    meta = {
+      entityName:         String(row5[1]  || "").trim(),
+      companyType:        String(row5[4]  || "").trim(),
+      industry:           String(row5[7]  || "").trim(),
+      reportingFramework: String(row5[10] || "").trim(),
+      yearEnd:            yearEndStr,
+      auditType:          String(row6[1]  || "").trim(),
+      currency:           String(row6[4]  || "PKR").trim(),
+      engagementSize:     String(row6[7]  || "").trim(),
+    };
+
+    if (!meta.entityName) errors.push("Entity_Name is missing from engagement profile (row 5, col B).");
+    if (!meta.reportingFramework) warnings.push("Reporting_Framework not found — defaulting to IFRS.");
+    if (!meta.yearEnd) warnings.push("Year_End not found in engagement profile (row 5, col N).");
   } else {
-    yearEndStr = String(yearEndVal || "").trim();
+    meta = {
+      entityName: "", companyType: "", industry: "",
+      reportingFramework: "", yearEnd: "",
+      auditType: "", currency: "PKR", engagementSize: "",
+    };
+    warnings.push("Compact template detected — engagement metadata will be taken from session defaults.");
   }
 
-  const meta: ParsedTemplateMeta = {
-    entityName:         String(row5[1]  || "").trim(),
-    companyType:        String(row5[4]  || "").trim(),
-    industry:           String(row5[7]  || "").trim(),
-    reportingFramework: String(row5[10] || "").trim(),
-    yearEnd:            yearEndStr,
-    auditType:          String(row6[1]  || "").trim(),
-    currency:           String(row6[4]  || "PKR").trim(),
-    engagementSize:     String(row6[7]  || "").trim(),
-  };
-
-  if (!meta.entityName) errors.push("Entity_Name is missing from engagement profile (row 5, col B).");
-  if (!meta.reportingFramework) warnings.push("Reporting_Framework not found — defaulting to IFRS.");
-  if (!meta.yearEnd) warnings.push("Year_End not found in engagement profile (row 5, col N).");
-
   // ── Find header row ─────────────────────────────────────────────────────
-  // Headers should be in row 8 (index 7), look for Line_ID in col A
+  // Legacy: row 8 (index 7). Compact: row 2 (index 1). Search rows 0-12.
   let headerRowIdx = 7;
-  for (let i = 5; i <= Math.min(12, allRows.length - 1); i++) {
+  for (let i = 0; i <= Math.min(12, allRows.length - 1); i++) {
     const r = allRows[i];
     if (r && String(r[0]).toLowerCase().replace(/_/g, "").includes("lineid")) { headerRowIdx = i; break; }
     if (r && String(r[0]).toLowerCase().includes("line_id")) { headerRowIdx = i; break; }
@@ -7760,7 +7776,7 @@ function parseOneSheetAuditTemplate(wb: XLSX.WorkBook): ParsedTemplateResult {
     });
   }
 
-  if (rows.length === 0) errors.push("No financial data rows found in the template (expected from row 9 onward).");
+  if (rows.length === 0) errors.push("No financial data rows found in the template (expected after the header row).");
 
   return { meta, rows, errors, warnings, isOneSheetFormat, sheetUsed };
 }
@@ -8754,7 +8770,26 @@ async function autoFillVariablesFromTemplate(
 // ── Download Excel upload template (ExcelJS — real demo data + cell protection) ──
 router.get("/download-template", async (_req: Request, res: Response) => {
   try {
-    // ── Exact replica of user-provided "Financial_Data_Upload" master template ──
+    const fs = await import("fs");
+    const nodePath = await import("path");
+    const TEMPLATE_NAME = "Financial_Data_Upload_Template.xlsx";
+    const candidatePaths = [
+      nodePath.join(__dirname, "templates", TEMPLATE_NAME),
+      nodePath.join(__dirname, "..", "templates", TEMPLATE_NAME),
+      nodePath.resolve("templates", TEMPLATE_NAME),
+      nodePath.resolve("artifacts/api-server/src/templates", TEMPLATE_NAME),
+      nodePath.resolve("src/templates", TEMPLATE_NAME),
+    ];
+    let filePath = candidatePaths.find(fp => fs.existsSync(fp)) || "";
+    if (!filePath) {
+      return res.status(404).json({ error: "Template file not found on server." });
+    }
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", 'attachment; filename="Financial_Data_Upload_Template.xlsx"');
+    const stream = fs.createReadStream(filePath);
+    stream.pipe(res);
+    return;
+    /* ── Legacy programmatic template generation (kept for reference) ────────
     const wb = new ExcelJS.Workbook();
     wb.creator = "Alam & Aulakh Chartered Accountants";
     wb.created = new Date();
@@ -9415,6 +9450,7 @@ router.get("/download-template", async (_req: Request, res: Response) => {
     res.setHeader("Content-Disposition", 'attachment; filename="Financial_Data_Upload_Template.xlsx"');
     res.setHeader("Content-Length", buf.byteLength);
     return res.end(Buffer.from(buf));
+    ── End of legacy template generation ──────────────────────────────────── */
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
