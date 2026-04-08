@@ -595,3 +595,58 @@ label[for],
     transform: none;
   }
 }
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .no-print,
+  nav,
+  aside,
+  footer,
+  button,
+  [role="navigation"],
+  .scrollbar-thin::-webkit-scrollbar {
+    display: none !important;
+  }
+  .wp-print-container {
+    background: white !important;
+    min-height: auto !important;
+  }
+  .wp-print-container * {
+    box-shadow: none !important;
+  }
+  .wp-print-container .rounded-xl,
+  .wp-print-container .rounded-2xl,
+  .wp-print-container .rounded-lg {
+    border-radius: 0 !important;
+  }
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+  table th,
+  table td {
+    border: 1px solid #999 !important;
+    padding: 4px 6px !important;
+    font-size: 9pt !important;
+  }
+  table th {
+    background: #f0f0f0 !important;
+    font-weight: bold !important;
+  }
+  .page-break {
+    page-break-after: always;
+  }
+  @page {
+    margin: 15mm 20mm 15mm 25mm;
+    size: A4;
+  }
+  a[href]::after {
+    content: none !important;
+  }
+}

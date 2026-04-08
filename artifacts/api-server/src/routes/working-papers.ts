@@ -11660,31 +11660,53 @@ router.post("/sessions/:sessionId/upload-template", upload.single("file"), async
 
     const dataRows = rows.slice(headerIdx + 1).filter((r: any[]) => r[colMap["Line_ID"] ?? 0]);
     const tbInserts: any[] = [];
+    const leadScheduleInserts: any[] = [];
     for (const row of dataRows) {
       const get = (col: string) => row[colMap[col] ?? -1] ?? "";
       const cy = parseFloat(get("Current_Year") || "0");
       const py = parseFloat(get("Prior_Year") || "0");
+      const debitVal = parseFloat(get("Debit_Transaction_Value") || "0");
+      const creditVal = parseFloat(get("Credit_Transaction_Value") || "0");
+      const stType = String(get("Statement_Type"));
+      const fsSection = String(get("FS_Section"));
+      const majorHead = String(get("Major_Head"));
+      const noteNo = String(get("Note_No"));
+      const wpArea = String(get("WP_Area"));
+      const riskLevel = String(get("Risk_Level"));
+
       tbInserts.push({
         sessionId,
-        accountCode: String(get("Account_Code")),
-        accountName: String(get("Account_Name")),
-        lineItem: String(get("Line_Item")),
-        subLineItem: String(get("Sub_Line_Item")),
-        statementType: String(get("Statement_Type")),
-        fsSection: String(get("FS_Section")),
-        majorHead: String(get("Major_Head")),
-        noteNo: String(get("Note_No")),
-        amount: String(cy),
-        currentYear: String(cy),
-        priorYear: String(py),
-        debitValue: String(parseFloat(get("Debit_Transaction_Value") || "0")),
-        creditValue: String(parseFloat(get("Credit_Transaction_Value") || "0")),
-        normalBalance: String(get("Normal_Balance")),
-        wpArea: String(get("WP_Area")),
-        riskLevel: String(get("Risk_Level")),
+        accountCode: String(get("Account_Code") || get("Line_ID")),
+        accountName: String(get("Account_Name") || get("Line_Item")),
+        classification: fsSection || stType,
+        fsLineMapping: majorHead || fsSection,
+        debit: String(debitVal),
+        credit: String(creditVal),
+        balance: String(cy),
+        priorYearBalance: String(py),
         source: "template_upload",
-        confidence: 100,
+        confidence: "100",
+        exceptionNote: noteNo ? `Note ${noteNo}` : null,
       });
+
+      if (wpArea) {
+        leadScheduleInserts.push({
+          sessionId,
+          wpArea,
+          wpCode: `LS-${wpArea.replace(/\s+/g, "-").substring(0, 10).toUpperCase()}`,
+          scheduleRef: `LS-${String(get("Line_ID") || get("Account_Code"))}`,
+          fsSection: stType,
+          majorHead,
+          lineItem: String(get("Line_Item") || get("Account_Name")),
+          noteNo,
+          closingBalance: String(cy),
+          priorYear: String(py),
+          variance: String(cy - py),
+          variancePct: py !== 0 ? String(((cy - py) / Math.abs(py) * 100).toFixed(2)) : "0",
+          riskLevel: riskLevel || "medium",
+          status: "draft",
+        });
+      }
     }
 
     await db.delete(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
@@ -11695,27 +11717,36 @@ router.post("/sessions/:sessionId/upload-template", upload.single("file"), async
       }
     }
 
+    if (leadScheduleInserts.length > 0) {
+      await db.delete(wpLeadScheduleTable).where(eq(wpLeadScheduleTable.sessionId, sessionId));
+      const batchSize = 50;
+      for (let i = 0; i < leadScheduleInserts.length; i += batchSize) {
+        await db.insert(wpLeadScheduleTable).values(leadScheduleInserts.slice(i, i + batchSize));
+      }
+    }
+
     const file = await db.insert(wpUploadedFilesTable).values({
-      sessionId, category: "trial_balance", subcategory: "template",
+      sessionId, category: "trial_balance", format: "excel",
+      fileName: `template_${Date.now()}.xlsx`,
       originalName: req.file.originalname, mimeType: req.file.mimetype,
-      sizeBytes: req.file.size, status: "completed",
+      fileSize: req.file.size, isValid: true,
     }).returning();
 
-    const bsTotal = tbInserts.filter(t => t.statementType === "BS").reduce((s, t) => s + parseFloat(t.amount || "0"), 0);
-    const plTotal = tbInserts.filter(t => t.statementType === "PL").reduce((s, t) => s + parseFloat(t.amount || "0"), 0);
+    const bsTotal = tbInserts.filter(t => t.classification?.includes("Asset") || t.classification?.includes("Liabilit") || t.classification?.includes("Equity")).length;
+    const plTotal = tbInserts.filter(t => t.classification?.includes("Revenue") || t.classification?.includes("Expense") || t.classification?.includes("Income")).length;
     const autoVars: Record<string, string> = {
-      total_assets: String(tbInserts.filter(t => t.fsSection === "Assets").reduce((s, t) => s + parseFloat(t.amount || "0"), 0)),
-      total_liabilities: String(tbInserts.filter(t => t.fsSection === "Liabilities").reduce((s, t) => s + parseFloat(t.amount || "0"), 0)),
-      total_equity: String(tbInserts.filter(t => t.fsSection === "Equity").reduce((s, t) => s + parseFloat(t.amount || "0"), 0)),
-      total_revenue: String(tbInserts.filter(t => t.statementType === "PL" && (t.fsSection === "Revenue" || t.majorHead?.includes("Revenue"))).reduce((s, t) => s + Math.abs(parseFloat(t.amount || "0")), 0)),
-      total_expenses: String(Math.abs(plTotal)),
+      total_assets: String(tbInserts.filter(t => t.classification?.includes("Asset")).reduce((s, t) => s + parseFloat(t.balance || "0"), 0)),
+      total_liabilities: String(tbInserts.filter(t => t.classification?.includes("Liabilit")).reduce((s, t) => s + parseFloat(t.balance || "0"), 0)),
+      total_equity: String(tbInserts.filter(t => t.classification?.includes("Equity")).reduce((s, t) => s + parseFloat(t.balance || "0"), 0)),
+      total_revenue: String(tbInserts.filter(t => t.classification?.includes("Revenue") || t.fsLineMapping?.includes("Revenue")).reduce((s, t) => s + Math.abs(parseFloat(t.balance || "0")), 0)),
+      total_expenses: String(tbInserts.filter(t => t.classification?.includes("Expense") || t.classification?.includes("Cost")).reduce((s, t) => s + Math.abs(parseFloat(t.balance || "0")), 0)),
     };
     for (const [code, val] of Object.entries(autoVars)) {
       const existing = await db.select().from(wpVariablesTable).where(and(eq(wpVariablesTable.sessionId, sessionId), eq(wpVariablesTable.variableCode, code)));
       if (existing.length) {
-        await db.update(wpVariablesTable).set({ currentValue: val, lastUpdatedBy: "template_auto" }).where(eq(wpVariablesTable.id, existing[0].id));
+        await db.update(wpVariablesTable).set({ autoFilledValue: val, finalValue: val, sourceType: "template", confidence: "100" }).where(eq(wpVariablesTable.id, existing[0].id));
       } else {
-        await db.insert(wpVariablesTable).values({ sessionId, variableCode: code, currentValue: val, defaultValue: val, lastUpdatedBy: "template_auto" });
+        await db.insert(wpVariablesTable).values({ sessionId, variableCode: code, category: "Financial", variableName: code.replace(/_/g, " "), autoFilledValue: val, finalValue: val, sourceType: "template", confidence: "100" });
       }
     }
 
@@ -11726,17 +11757,18 @@ router.post("/sessions/:sessionId/upload-template", upload.single("file"), async
       changedBy: "system", changedByRole: "system",
     });
 
-    const wpAreas = [...new Set(tbInserts.map(t => t.wpArea).filter(Boolean))];
-    const riskAreas = tbInserts.filter(t => t.riskLevel === "High").map(t => t.wpArea).filter(Boolean);
+    const wpAreas = [...new Set(leadScheduleInserts.map(t => t.wpArea).filter(Boolean))];
+    const riskAreas = leadScheduleInserts.filter(t => t.riskLevel === "high" || t.riskLevel === "High").map(t => t.wpArea).filter(Boolean);
 
     res.json({
       success: true,
       summary: {
         totalLines: tbInserts.length,
-        bsLines: tbInserts.filter(t => t.statementType === "BS").length,
-        plLines: tbInserts.filter(t => t.statementType === "PL").length,
-        cfLines: tbInserts.filter(t => t.statementType === "CF").length,
-        notesLines: tbInserts.filter(t => t.statementType === "Notes").length,
+        bsLines: bsTotal,
+        plLines: plTotal,
+        cfLines: tbInserts.filter(t => t.classification?.includes("Cash")).length,
+        notesLines: tbInserts.filter(t => t.exceptionNote).length,
+        leadSchedules: leadScheduleInserts.length,
         wpAreas, highRiskAreas: [...new Set(riskAreas)],
         autoMappedVariables: Object.keys(autoVars),
         totalAssets: autoVars.total_assets,
@@ -11815,6 +11847,228 @@ Return ONLY the JSON array, no markdown.`;
       await db.insert(wpAuditChainTable).values(chains);
     }
     res.json({ success: true, chainsGenerated: chains.length, chains });
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
+});
+
+// ── BULK OPERATIONS ──
+
+router.post("/sessions/:id/bulk-approve-heads", requireRoles("manager", "senior_manager", "partner", "super_admin"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+    const { headIds } = req.body;
+    if (!Array.isArray(headIds) || headIds.length === 0) return res.status(400).json({ error: "headIds array required" });
+    const now = new Date();
+    let approved = 0;
+    for (const hId of headIds) {
+      const id = parseInt(hId);
+      if (isNaN(id)) continue;
+      await db.update(wpHeadsTable).set({ status: "approved", approvedAt: now, approvedBy: req.user?.id }).where(and(eq(wpHeadsTable.id, id), eq(wpHeadsTable.sessionId, sessionId)));
+      approved++;
+    }
+    res.json({ success: true, approved });
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
+});
+
+router.post("/sessions/:id/bulk-clear-review-notes", requireRoles("manager", "senior_manager", "partner", "super_admin"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+    const { noteIds, clearanceNote } = req.body;
+    if (!Array.isArray(noteIds) || noteIds.length === 0) return res.status(400).json({ error: "noteIds array required" });
+    const now = new Date();
+    let cleared = 0;
+    for (const nId of noteIds) {
+      const id = parseInt(nId);
+      if (isNaN(id)) continue;
+      await db.update(wpReviewNoteTable).set({ status: "cleared", clearedBy: req.user?.name || "system", clearedDate: now, clearanceNote: clearanceNote || "Bulk cleared" }).where(and(eq(wpReviewNoteTable.id, id), eq(wpReviewNoteTable.sessionId, sessionId)));
+      cleared++;
+    }
+    res.json({ success: true, cleared });
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
+});
+
+router.post("/sessions/:id/bulk-apply-tick-marks", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+    const { tickMarkId, entries } = req.body;
+    if (!tickMarkId || !Array.isArray(entries) || entries.length === 0) return res.status(400).json({ error: "tickMarkId and entries array required" });
+    const tickMark = (await db.select().from(wpTickMarkTable).where(and(eq(wpTickMarkTable.id, parseInt(tickMarkId)), eq(wpTickMarkTable.sessionId, sessionId))))[0];
+    if (!tickMark) return res.status(404).json({ error: "Tick mark not found" });
+    const inserts = entries.map((e: any) => ({
+      sessionId,
+      tickMarkId: tickMark.id,
+      symbol: tickMark.symbol,
+      wpCode: e.wpCode || "",
+      lineRef: e.lineRef || null,
+      accountCode: e.accountCode || null,
+      amount: e.amount ? String(e.amount) : null,
+      appliedBy: e.appliedBy || "system",
+      evidenceRef: e.evidenceRef || null,
+      notes: e.notes || null,
+    }));
+    if (inserts.length > 0) await db.insert(wpTickMarkUsageTable).values(inserts);
+    await db.update(wpTickMarkTable).set({ usageCount: (tickMark.usageCount || 0) + inserts.length }).where(eq(wpTickMarkTable.id, tickMark.id));
+    res.json({ success: true, applied: inserts.length });
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
+});
+
+// ── SESSION DUPLICATION ──
+
+router.post("/sessions/:id/duplicate", requireRoles("super_admin", "partner", "manager", "senior_manager"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const srcId = parseInt(p(req.params.id));
+    if (isNaN(srcId)) return res.status(400).json({ error: "Invalid session ID" });
+    const src = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, srcId)))[0];
+    if (!src) return res.status(404).json({ error: "Session not found" });
+    const { clientName, engagementYear } = req.body;
+    const newSession = await db.insert(wpSessionsTable).values({
+      clientId: src.clientId,
+      clientName: clientName || src.clientName,
+      engagementYear: engagementYear || String(parseInt(src.engagementYear || "2025") + 1),
+      entityType: src.entityType,
+      ntn: src.ntn, strn: src.strn,
+      periodStart: src.periodStart, periodEnd: src.periodEnd,
+      reportingFramework: src.reportingFramework,
+      engagementType: src.engagementType,
+      engagementContinuity: "recurring",
+      auditFirmName: src.auditFirmName, auditFirmLogo: src.auditFirmLogo,
+      preparerId: req.user?.id, preparerName: req.user?.name,
+      status: "upload",
+      createdBy: req.user?.id,
+    }).returning();
+    const newId = newSession[0].id;
+    const srcVars = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, srcId));
+    if (srcVars.length > 0) {
+      const varInserts = srcVars.map(v => ({
+        sessionId: newId,
+        variableCode: v.variableCode,
+        category: v.category,
+        variableName: v.variableName,
+        autoFilledValue: null as string | null,
+        userEditedValue: null as string | null,
+        finalValue: null as string | null,
+        sourceType: "carried_forward",
+        confidence: "0",
+        reviewStatus: "pending",
+        isLocked: false,
+        versionNo: 1,
+      }));
+      const batchSize = 50;
+      for (let i = 0; i < varInserts.length; i += batchSize) {
+        await db.insert(wpVariablesTable).values(varInserts.slice(i, i + batchSize));
+      }
+    }
+    const srcWpLib = await db.select().from(wpLibrarySessionTable).where(eq(wpLibrarySessionTable.sessionId, srcId));
+    if (srcWpLib.length > 0) {
+      const libInserts = srcWpLib.map(w => ({
+        sessionId: newId,
+        wpCode: w.wpCode,
+        wpTitle: w.wpTitle,
+        wpPhase: w.wpPhase,
+        wpCategory: w.wpCategory,
+        isaReference: w.isaReference,
+        triggerReason: "Carried forward from prior year",
+        mandatoryFlag: w.mandatoryFlag,
+        status: "Pending",
+        outputFormat: w.outputFormat,
+        reviewerLevel: w.reviewerLevel,
+        autoGenerateFlag: w.autoGenerateFlag,
+      }));
+      const batchSize = 50;
+      for (let i = 0; i < libInserts.length; i += batchSize) {
+        await db.insert(wpLibrarySessionTable).values(libInserts.slice(i, i + batchSize));
+      }
+    }
+    await db.insert(wpVersionHistoryTable).values({
+      sessionId: newId, entityType: "session", entityId: String(newId),
+      version: 1, changeType: "duplicate",
+      newValue: JSON.stringify({ sourceSessionId: srcId, sourceClient: src.clientName, sourceYear: src.engagementYear }),
+      changedBy: req.user?.name || "system", changedByRole: req.user?.role || "system",
+    });
+    res.json({ success: true, session: newSession[0], copiedVariables: srcVars.length, copiedWpLibrary: srcWpLib.length });
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
+});
+
+// ── EXPORT ENDPOINTS FOR ISA PANELS ──
+
+router.get("/sessions/:id/audit-chain/export", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+    const chains = await db.select().from(wpAuditChainTable).where(eq(wpAuditChainTable.sessionId, sessionId));
+    const rows = chains.map(c => ({
+      "WP Code": c.wpCode, "FS Area": c.fsArea, "Risk ID": c.riskId,
+      "Risk Description": c.riskDescription, "Risk Type": c.riskType,
+      "ISA Risk Ref": c.isaRiskRef, "Risk Level": c.riskLevel,
+      "Procedure ID": c.procedureId, "Procedure": c.procedureDescription,
+      "Nature": c.procedureNature, "ISA Ref": c.procedureIsaRef,
+      "Timing": c.procedureTiming, "Status": c.procedureStatus,
+      "Performed By": c.procedurePerformedBy, "Performed Date": c.procedurePerformedDate,
+      "Tick Mark": c.tickMarkCode, "Result": c.resultSummary,
+      "Exceptions": c.exceptionsFound, "Misstatement": c.misstatementAmount,
+      "Conclusion": c.conclusion, "Impact on Opinion": c.impactOnOpinion,
+      "Chain Complete": c.chainComplete ? "Yes" : "No",
+    }));
+    res.json({ data: rows, count: rows.length });
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
+});
+
+router.get("/sessions/:id/review-notes/export", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+    const notes = await db.select().from(wpReviewNoteTable).where(eq(wpReviewNoteTable.sessionId, sessionId));
+    const rows = notes.map(n => ({
+      "WP Code": n.wpCode, "Review Level": n.reviewLevel,
+      "Reviewer": n.reviewerName, "Type": n.noteType,
+      "Priority": n.priority, "Subject": n.subject,
+      "Detail": n.detail, "ISA Ref": n.isaReference,
+      "Status": n.status, "Response By": n.responseBy,
+      "Response": n.responseText, "Cleared By": n.clearedBy,
+      "Blocks Sign-Off": n.blocksSignOff ? "Yes" : "No",
+      "Created": n.createdAt,
+    }));
+    res.json({ data: rows, count: rows.length });
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
+});
+
+router.get("/sessions/:id/compliance-gates/export", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+    const gates = await db.select().from(wpComplianceGateTable).where(eq(wpComplianceGateTable.sessionId, sessionId));
+    const rows = gates.map(g => ({
+      "Gate Code": g.gateCode, "Gate Name": g.gateName,
+      "Category": g.category, "Standard": g.standard,
+      "Check": g.checkDescription, "Type": g.checkType,
+      "Clause Ref": g.clauseRef, "Status": g.status,
+      "Blocking": g.blocking ? "Yes" : "No",
+      "Failure Detail": g.failureDetail,
+      "Remediation": g.remediationAction,
+      "Override By": g.overrideBy, "Override Reason": g.overrideReason,
+      "Phase": g.applicablePhase, "WP Code": g.wpCode,
+    }));
+    res.json({ data: rows, count: rows.length });
+  } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
+});
+
+router.get("/sessions/:id/tick-marks/export", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+    const usages = await db.select().from(wpTickMarkUsageTable).where(eq(wpTickMarkUsageTable.sessionId, sessionId));
+    const marks = await db.select().from(wpTickMarkTable).where(eq(wpTickMarkTable.sessionId, sessionId));
+    const markMap = new Map(marks.map(m => [m.id, m]));
+    const rows = usages.map(u => ({
+      "Symbol": u.symbol, "Meaning": markMap.get(u.tickMarkId!)?.meaning || "",
+      "WP Code": u.wpCode, "Line Ref": u.lineRef,
+      "Account Code": u.accountCode, "Amount": u.amount,
+      "Applied By": u.appliedBy, "Applied At": u.appliedAt,
+      "Evidence Ref": u.evidenceRef, "Notes": u.notes,
+    }));
+    res.json({ data: rows, count: rows.length, legend: marks.map(m => ({ symbol: m.symbol, meaning: m.meaning, color: m.color, category: m.category, usageCount: m.usageCount })) });
   } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 

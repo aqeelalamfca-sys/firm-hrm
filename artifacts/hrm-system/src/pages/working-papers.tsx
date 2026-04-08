@@ -253,6 +253,27 @@ export default function WorkingPapers() {
     return () => window.removeEventListener("keydown", handleKeyboard);
   }, [activeSession, stage]);
 
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  useEffect(() => {
+    const goOff = () => setIsOffline(true);
+    const goOn = () => setIsOffline(false);
+    window.addEventListener("offline", goOff);
+    window.addEventListener("online", goOn);
+    return () => { window.removeEventListener("offline", goOff); window.removeEventListener("online", goOn); };
+  }, []);
+
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!editingVar || !editValue || !activeSession || isOffline) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(async () => {
+      if (editingVar && editValue) {
+        await saveVariableEdit(editingVar);
+      }
+    }, 15000);
+    return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
+  }, [editingVar, editValue, activeSession, isOffline]);
+
   const fetchTeamMembers = async () => {
     try {
       const res = await fetch(`${API_BASE}/working-papers/team-members`, { headers });
@@ -307,6 +328,81 @@ export default function WorkingPapers() {
         return data;
       }
     } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); } finally { setLoading(false); }
+  };
+
+  const duplicateSession = async (sessionId: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${sessionId}/duplicate`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast({ title: "Session duplicated", description: `New session created for ${data.session?.clientName || "client"}` });
+        await fetchSessions();
+      } else {
+        const err = await res.json();
+        toast({ title: "Duplicate failed", description: err.error, variant: "destructive" });
+      }
+    } catch { toast({ title: "Duplicate failed", variant: "destructive" }); }
+    finally { setLoading(false); }
+  };
+
+  const exportToCsv = (rows: any[], filename: string) => {
+    if (!rows || rows.length === 0) { toast({ title: "No data to export" }); return; }
+    const keys = Object.keys(rows[0]);
+    const csvContent = [keys.join(","), ...rows.map(r => keys.map(k => { const v = r[k]; const s = v == null ? "" : String(v); return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s; }).join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: `Exported ${rows.length} rows to ${filename}` });
+  };
+
+  const bulkApproveHeads = async () => {
+    if (!activeSession) return;
+    const approvable = (heads || []).filter((h: any) => h.headIndex >= 2 && (h.status === "validating" || h.status === "review"));
+    if (approvable.length === 0) { toast({ title: "No heads to approve" }); return; }
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/bulk-approve-heads`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ headIds: approvable.map((h: any) => h.id) }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast({ title: `${data.approved} heads approved` });
+        await fetchSession(activeSession.id);
+      } else {
+        const err = await res.json();
+        toast({ title: "Bulk approve failed", description: err.error, variant: "destructive" });
+      }
+    } catch { toast({ title: "Bulk approve failed", variant: "destructive" }); }
+    finally { setLoading(false); }
+  };
+
+  const bulkClearReviewNotes = async () => {
+    if (!activeSession) return;
+    const respondedNotes = (reviewNotes || []).filter((n: any) => n.status === "responded");
+    if (respondedNotes.length === 0) { toast({ title: "No responded notes to clear" }); return; }
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/bulk-clear-review-notes`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ noteIds: respondedNotes.map((n: any) => n.id), clearanceNote: "Bulk cleared — satisfactorily addressed" }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast({ title: `${data.cleared} review notes cleared` });
+        await fetchSession(activeSession.id);
+      } else {
+        const err = await res.json();
+        toast({ title: "Bulk clear failed", description: err.error, variant: "destructive" });
+      }
+    } catch { toast({ title: "Bulk clear failed", variant: "destructive" }); }
+    finally { setLoading(false); }
   };
 
   const createSession = async () => {
@@ -408,8 +504,21 @@ export default function WorkingPapers() {
   const handleUpload = async () => {
     if (!activeSession || uploadFiles.length === 0) return;
 
+    const isXlsExt = (name: string) => { const e = name.split(".").pop()?.toLowerCase(); return e === "xlsx" || e === "xls"; };
+    const templateFiles = uploadFiles.filter(uf => uf.category === "financial_statements" && isXlsExt(uf.file.name));
+    const regularFiles = uploadFiles.filter(uf => !(uf.category === "financial_statements" && isXlsExt(uf.file.name)));
+
+    if (templateFiles.length > 0) {
+      await uploadTemplate(templateFiles[0].file);
+    }
+
+    if (regularFiles.length === 0) {
+      setUploadFiles([]);
+      return;
+    }
+
     const errors: string[] = [];
-    for (const uf of uploadFiles) {
+    for (const uf of regularFiles) {
       const err = validateFile(uf.file, uf.category);
       if (err) errors.push(`${uf.file.name}: ${err}`);
     }
@@ -422,7 +531,7 @@ export default function WorkingPapers() {
       setLoading(true);
       const formData = new FormData();
       const cats: Record<string, string> = {};
-      for (const uf of uploadFiles) {
+      for (const uf of regularFiles) {
         formData.append("files", uf.file);
         cats[uf.file.name] = uf.category;
       }
@@ -1590,8 +1699,13 @@ export default function WorkingPapers() {
   // ── SESSION LIST ──
   if (!activeSession) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
-        <div className="bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 text-white">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 wp-print-container">
+        {isOffline && (
+          <div className="bg-amber-500 text-white text-center py-1.5 text-xs font-semibold flex items-center justify-center gap-2 no-print">
+            <AlertCircle className="w-3.5 h-3.5" /> You are offline — changes will not be saved until connection is restored
+          </div>
+        )}
+        <div className="bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 text-white no-print">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
@@ -1814,7 +1928,12 @@ export default function WorkingPapers() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
                               <p className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors text-[14px] leading-tight">{s.clientName}</p>
-                              <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all shrink-0 mt-0.5" />
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button onClick={(e) => duplicateSession(s.id, e)} title="Duplicate session for next year" className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-blue-100 transition-all">
+                                  <Layers className="w-3.5 h-3.5 text-blue-500" />
+                                </button>
+                                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all mt-0.5" />
+                              </div>
                             </div>
                             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                               {s.entityType && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-500 font-medium border border-slate-100">{s.entityType}</span>}
@@ -1859,8 +1978,13 @@ export default function WorkingPapers() {
   const stageIndex = STAGES.findIndex(s => s.key === stage);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
-      <div className="bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 wp-print-container">
+      {isOffline && (
+        <div className="bg-amber-500 text-white text-center py-1.5 text-xs font-semibold flex items-center justify-center gap-2 no-print">
+          <AlertCircle className="w-3.5 h-3.5" /> You are offline — changes will not be saved until connection is restored
+        </div>
+      )}
+      <div className="bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 text-white no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="py-4 sm:py-5">
             <div className="flex items-start gap-3 sm:gap-4">
@@ -2193,6 +2317,7 @@ export default function WorkingPapers() {
           autoChainRunning={autoChainRunning}
           autoChainCurrentHead={autoChainCurrentHead}
           onStopChain={stopChain}
+          onBulkApprove={bulkApproveHeads}
           onNext={async () => {
             try {
               const statusRes = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/status`, {
@@ -2229,6 +2354,7 @@ export default function WorkingPapers() {
           onGenerateFsNotes={generateFsNoteMappings}
           onRefresh={() => { fetchAuditChain(); fetchLeadSchedules(); fetchFsNoteMappings(); }}
           isaLoading={isaLoading}
+          onExportCsv={exportToCsv}
         />
       )}
 
@@ -2251,6 +2377,8 @@ export default function WorkingPapers() {
           onInitTickMarks={initTickMarks}
           onRefresh={() => { fetchReviewNotes(); fetchComplianceGates(); fetchTickMarks(); fetchVersionHistory(); fetchSamplingDetails(); }}
           isaLoading={isaLoading}
+          onBulkClearNotes={bulkClearReviewNotes}
+          onExportCsv={exportToCsv}
         />
       )}
 
@@ -6563,7 +6691,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
   );
 }
 
-function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, onExport, onAutoProcessAll, onResolveException, loading, onRefresh, autoChainRunning, autoChainCurrentHead, onStopChain, onNext }: any) {
+function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, onExport, onAutoProcessAll, onResolveException, loading, onRefresh, autoChainRunning, autoChainCurrentHead, onStopChain, onNext, onBulkApprove }: any) {
   const { toast } = useToast();
   const allExceptions: any[] = exceptions || [];
   const allHeads: any[] = (heads || []).filter((h: any) => h.headIndex >= 2);
@@ -7024,6 +7152,11 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
             {exportableHeads.length > 1 && (
               <Button size="sm" variant="outline" onClick={exportAll} disabled={loading} className="h-7 text-xs border-blue-200 text-blue-700 hover:bg-blue-50">
                 <Download className="w-3 h-3 mr-1" /> Export All ({exportableHeads.length})
+              </Button>
+            )}
+            {onBulkApprove && approvableHeads.length > 0 && (
+              <Button size="sm" variant="outline" onClick={onBulkApprove} disabled={loading || approvalInProgress} className="h-7 text-xs border-violet-200 text-violet-700 hover:bg-violet-50">
+                <CheckCheck className="w-3 h-3 mr-1" /> Server Bulk Approve
               </Button>
             )}
           </div>
@@ -10454,12 +10587,15 @@ const FORMAT_LABEL: Record<string, string> = {
 // ═══════════════════════════════════════════════════════════════════════════════
 // ISA AUDIT CHAIN STAGE
 // ═══════════════════════════════════════════════════════════════════════════════
-function AuditChainStage({ chains, summary, loading, leadSchedules, fsNoteMappings, session, onGenerateChain, onUpdateNode, onGenerateLeadSchedules, onGenerateFsNotes, onRefresh, isaLoading }: any) {
+function AuditChainStage({ chains, summary, loading, leadSchedules, fsNoteMappings, session, onGenerateChain, onUpdateNode, onGenerateLeadSchedules, onGenerateFsNotes, onRefresh, isaLoading, onExportCsv }: any) {
   const [activeSubTab, setActiveSubTab] = useState<"chain" | "lead_schedule" | "fs_notes">("chain");
   const [expandedArea, setExpandedArea] = useState<string | null>(null);
   const [expandedNode, setExpandedNode] = useState<number | null>(null);
+  const [chainSearch, setChainSearch] = useState("");
+  const allChains = chains || [];
+  const filteredChains = chainSearch ? allChains.filter((c: any) => [c.fsArea, c.procedureDescription, c.procedureId, c.procedureIsaRef, c.riskLevel].some(f => f && String(f).toLowerCase().includes(chainSearch.toLowerCase()))) : allChains;
   const areaGroups: Record<string, any[]> = {};
-  (chains || []).forEach((c: any) => {
+  filteredChains.forEach((c: any) => {
     if (!areaGroups[c.fsArea]) areaGroups[c.fsArea] = [];
     areaGroups[c.fsArea].push(c);
   });
@@ -10476,6 +10612,9 @@ function AuditChainStage({ chains, summary, loading, leadSchedules, fsNoteMappin
         </div>
         <div className="flex gap-2">
           <button onClick={onRefresh} className="px-3 py-1.5 text-xs bg-slate-100 rounded-lg hover:bg-slate-200"><RefreshCw className="w-3 h-3 inline mr-1" />Refresh</button>
+          {onExportCsv && allChains.length > 0 && (
+            <button onClick={() => onExportCsv(allChains.map((c: any) => ({ Area: c.fsArea, ProcedureID: c.procedureId, Description: c.procedureDescription, ISA_Ref: c.procedureIsaRef, Risk: c.riskLevel, Status: c.procedureStatus, Nature: c.procedureNature, Timing: c.procedureTiming, Conclusion: c.conclusion || "", Exceptions: c.exceptionsFound || 0 })), `audit_chains_${session?.clientName || "export"}.csv`)} className="px-3 py-1.5 text-xs bg-slate-100 rounded-lg hover:bg-slate-200"><Download className="w-3 h-3 inline mr-1" />Export CSV</button>
+          )}
           <button onClick={() => onGenerateChain(undefined, false)} disabled={loading} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50">
             {loading ? <Loader2 className="w-3 h-3 animate-spin inline mr-1" /> : <Zap className="w-3 h-3 inline mr-1" />}Generate Chains
           </button>
@@ -10484,6 +10623,13 @@ function AuditChainStage({ chains, summary, loading, leadSchedules, fsNoteMappin
           </button>
         </div>
       </div>
+
+      {allChains.length > 5 && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input type="text" value={chainSearch} onChange={e => setChainSearch(e.target.value)} placeholder="Search by area, procedure, ISA ref, risk level..." className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none" />
+        </div>
+      )}
 
       {summary && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -10688,14 +10834,19 @@ function AuditChainStage({ chains, summary, loading, leadSchedules, fsNoteMappin
 // ═══════════════════════════════════════════════════════════════════════════════
 // REVIEW & QC STAGE
 // ═══════════════════════════════════════════════════════════════════════════════
-function ReviewQCStage({ reviewNotes, reviewSummary, complianceGates, complianceGateSummary, tickMarks, tickMarkLegend, versionHistory, samplingDetails, session, onAddReviewNote, onRespondToNote, onClearNote, onRunComplianceValidation, onInitTickMarks, onRefresh, isaLoading }: any) {
+function ReviewQCStage({ reviewNotes, reviewSummary, complianceGates, complianceGateSummary, tickMarks, tickMarkLegend, versionHistory, samplingDetails, session, onAddReviewNote, onRespondToNote, onClearNote, onRunComplianceValidation, onInitTickMarks, onRefresh, isaLoading, onBulkClearNotes, onExportCsv }: any) {
   const [activeSubTab, setActiveSubTab] = useState<"review" | "compliance" | "tick_marks" | "version" | "sampling">("review");
   const [showAddNote, setShowAddNote] = useState(false);
   const [noteForm, setNoteForm] = useState({ reviewLevel: "senior", reviewerName: "", subject: "", detail: "", noteType: "query", priority: "medium", blocksSignOff: false });
   const [responseText, setResponseText] = useState("");
   const [respondingTo, setRespondingTo] = useState<number | null>(null);
+  const [reviewSearch, setReviewSearch] = useState("");
+  const [versionSearch, setVersionSearch] = useState("");
   const statusColors: Record<string, string> = { open: "bg-red-100 text-red-700", responded: "bg-blue-100 text-blue-700", cleared: "bg-emerald-100 text-emerald-700", deferred: "bg-slate-100 text-slate-600", escalated: "bg-amber-100 text-amber-700" };
   const gateStatusColors: Record<string, string> = { pass: "bg-emerald-100 text-emerald-700", fail: "bg-red-100 text-red-700", pending: "bg-slate-100 text-slate-600", warning: "bg-amber-100 text-amber-700", override: "bg-violet-100 text-violet-700", n_a: "bg-slate-50 text-slate-400" };
+
+  const filteredNotes = reviewSearch ? (reviewNotes || []).filter((n: any) => [n.subject, n.detail, n.reviewerName, n.status, n.reviewLevel, n.wpCode].some((f: any) => f && String(f).toLowerCase().includes(reviewSearch.toLowerCase()))) : (reviewNotes || []);
+  const filteredVersionHistory = versionSearch ? (versionHistory || []).filter((v: any) => [v.entityType, v.entityId, v.changeType, v.fieldName, v.newValue, v.changedBy].some((f: any) => f && String(f).toLowerCase().includes(versionSearch.toLowerCase()))) : (versionHistory || []);
 
   return (
     <div className="space-y-4 p-4 max-w-7xl mx-auto">
@@ -10704,7 +10855,9 @@ function ReviewQCStage({ reviewNotes, reviewSummary, complianceGates, compliance
           <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-violet-600" /> Review & Quality Control</h2>
           <p className="text-sm text-slate-500 mt-0.5">Multi-level review, compliance validation, tick marks, version control</p>
         </div>
-        <button onClick={onRefresh} className="px-3 py-1.5 text-xs bg-slate-100 rounded-lg hover:bg-slate-200"><RefreshCw className="w-3 h-3 inline mr-1" />Refresh</button>
+        <div className="flex gap-2">
+          <button onClick={onRefresh} className="px-3 py-1.5 text-xs bg-slate-100 rounded-lg hover:bg-slate-200"><RefreshCw className="w-3 h-3 inline mr-1" />Refresh</button>
+        </div>
       </div>
 
       <div className="flex gap-1 bg-slate-100 p-1 rounded-lg overflow-x-auto">
@@ -10743,16 +10896,31 @@ function ReviewQCStage({ reviewNotes, reviewSummary, complianceGates, compliance
             </div>
           )}
 
-          <div className="flex items-center justify-between">
-            <div className="flex gap-1">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex gap-1 flex-wrap">
               {["Staff", "Senior", "Manager", "Partner", "EQCR"].map(level => (
                 <span key={level} className="text-[10px] px-2 py-1 rounded bg-violet-50 text-violet-700 border border-violet-200">{level}: {reviewSummary?.byLevel?.[level.toLowerCase()] || 0}</span>
               ))}
             </div>
-            <button onClick={() => setShowAddNote(!showAddNote)} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700">
-              <Plus className="w-3 h-3 inline mr-1" />Add Review Note
-            </button>
+            <div className="flex gap-1.5">
+              {onExportCsv && (reviewNotes || []).length > 0 && (
+                <button onClick={() => onExportCsv((reviewNotes || []).map((n: any) => ({ Level: n.reviewLevel, Reviewer: n.reviewerName, Status: n.status, Priority: n.priority, Subject: n.subject, Detail: n.detail, WPCode: n.wpCode || "", BlocksSignOff: n.blocksSignOff ? "Yes" : "No", Response: n.responseText || "", ClearedBy: n.clearedBy || "" })), `review_notes_${session?.clientName || "export"}.csv`)} className="px-3 py-1.5 text-xs bg-slate-100 rounded-lg hover:bg-slate-200"><Download className="w-3 h-3 inline mr-1" />Export CSV</button>
+              )}
+              {onBulkClearNotes && reviewSummary?.responded > 0 && (
+                <button onClick={onBulkClearNotes} className="px-3 py-1.5 text-xs bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200"><CheckCheck className="w-3 h-3 inline mr-1" />Bulk Clear Responded</button>
+              )}
+              <button onClick={() => setShowAddNote(!showAddNote)} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700">
+                <Plus className="w-3 h-3 inline mr-1" />Add Review Note
+              </button>
+            </div>
           </div>
+
+          {(reviewNotes || []).length > 3 && (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input type="text" value={reviewSearch} onChange={e => setReviewSearch(e.target.value)} placeholder="Search notes by subject, reviewer, status, WP code..." className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none" />
+            </div>
+          )}
 
           {showAddNote && (
             <div className="bg-white rounded-xl border p-4 space-y-3">
@@ -10781,13 +10949,13 @@ function ReviewQCStage({ reviewNotes, reviewSummary, complianceGates, compliance
           )}
 
           <div className="space-y-2">
-            {(reviewNotes || []).length === 0 ? (
+            {filteredNotes.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-xl border">
                 <ClipboardCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500 font-medium">No review notes yet</p>
-                <p className="text-sm text-slate-400 mt-1">Add review notes for multi-level quality control</p>
+                <p className="text-slate-500 font-medium">{reviewSearch ? "No matching review notes" : "No review notes yet"}</p>
+                <p className="text-sm text-slate-400 mt-1">{reviewSearch ? "Try a different search term" : "Add review notes for multi-level quality control"}</p>
               </div>
-            ) : (reviewNotes || []).map((note: any) => (
+            ) : filteredNotes.map((note: any) => (
               <div key={note.id} className={cn("bg-white rounded-xl border p-4", note.blocksSignOff && note.status !== "cleared" ? "border-red-300 bg-red-50/30" : "")}>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -10854,9 +11022,14 @@ function ReviewQCStage({ reviewNotes, reviewSummary, complianceGates, compliance
                 </div>
               </div>
             )}
-            <button onClick={onRunComplianceValidation} disabled={isaLoading} className="px-4 py-2 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50">
-              {isaLoading ? <Loader2 className="w-3 h-3 animate-spin inline mr-1" /> : <Shield className="w-3 h-3 inline mr-1" />}Run Compliance Validation
-            </button>
+            <div className="flex gap-2">
+              {onExportCsv && (complianceGates || []).length > 0 && (
+                <button onClick={() => onExportCsv((complianceGates || []).map((g: any) => ({ Category: g.category, Gate: g.gateName, ClauseRef: g.clauseRef, Status: g.status, Blocking: g.blocking ? "Yes" : "No", Description: g.checkDescription || "", FailureDetail: g.failureDetail || "" })), `compliance_gates_${session?.clientName || "export"}.csv`)} className="px-3 py-1.5 text-xs bg-slate-100 rounded-lg hover:bg-slate-200"><Download className="w-3 h-3 inline mr-1" />Export CSV</button>
+              )}
+              <button onClick={onRunComplianceValidation} disabled={isaLoading} className="px-4 py-2 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50">
+                {isaLoading ? <Loader2 className="w-3 h-3 animate-spin inline mr-1" /> : <Shield className="w-3 h-3 inline mr-1" />}Run Compliance Validation
+              </button>
+            </div>
           </div>
 
           {(complianceGates || []).length === 0 ? (
@@ -10906,7 +11079,10 @@ function ReviewQCStage({ reviewNotes, reviewSummary, complianceGates, compliance
       {/* ── TICK MARKS ── */}
       {activeSubTab === "tick_marks" && (
         <div className="space-y-3">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            {onExportCsv && (tickMarks || []).length > 0 && (
+              <button onClick={() => onExportCsv((tickMarks || []).map((tm: any) => ({ Symbol: tm.symbol, Meaning: tm.meaning, Category: tm.category, Color: tm.color || "", UsageCount: tm.usageCount || 0 })), `tick_marks_${session?.clientName || "export"}.csv`)} className="px-3 py-1.5 text-xs bg-slate-100 rounded-lg hover:bg-slate-200"><Download className="w-3 h-3 inline mr-1" />Export CSV</button>
+            )}
             <button onClick={onInitTickMarks} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700">
               <Plus className="w-3 h-3 inline mr-1" />Initialize Standard Tick Marks
             </button>
@@ -10941,20 +11117,26 @@ function ReviewQCStage({ reviewNotes, reviewSummary, complianceGates, compliance
       {/* ── VERSION HISTORY / AUDIT TRAIL ── */}
       {activeSubTab === "version" && (
         <div className="space-y-3">
-          {(versionHistory || []).length === 0 ? (
+          {(versionHistory || []).length > 5 && (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input type="text" value={versionSearch} onChange={e => setVersionSearch(e.target.value)} placeholder="Search audit trail by entity, change type, field, user..." className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none" />
+            </div>
+          )}
+          {filteredVersionHistory.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl border">
               <Clock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 font-medium">No audit trail entries yet</p>
-              <p className="text-sm text-slate-400 mt-1">Changes are logged automatically as you work</p>
+              <p className="text-slate-500 font-medium">{versionSearch ? "No matching entries" : "No audit trail entries yet"}</p>
+              <p className="text-sm text-slate-400 mt-1">{versionSearch ? "Try a different search term" : "Changes are logged automatically as you work"}</p>
             </div>
           ) : (
             <div className="bg-white rounded-xl border overflow-hidden">
               <div className="px-4 py-2 bg-slate-50 border-b flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-700">IMMUTABLE AUDIT TRAIL (ISA 230)</span>
-                <span className="text-[10px] text-slate-500">{(versionHistory || []).length} entries</span>
+                <span className="text-[10px] text-slate-500">{filteredVersionHistory.length} entries</span>
               </div>
               <div className="divide-y max-h-96 overflow-y-auto">
-                {(versionHistory || []).slice().reverse().map((vh: any) => (
+                {filteredVersionHistory.slice().reverse().map((vh: any) => (
                   <div key={vh.id} className="px-4 py-2.5 flex items-start gap-3">
                     <div className={cn("w-2 h-2 rounded-full mt-1.5 shrink-0", vh.changeType === "create" ? "bg-emerald-500" : vh.changeType === "delete" ? "bg-red-500" : vh.changeType === "lock" ? "bg-violet-500" : "bg-blue-500")} />
                     <div className="flex-1 min-w-0">

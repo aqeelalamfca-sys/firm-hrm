@@ -46,6 +46,7 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - **Pakistan Tax Calculator**: Publicly accessible page with 10 tabs covering AI analysis, income tax, WHT, sales tax, property, vehicle, investment, rental, and rate tables (Finance Act 2025).
 - **Law-Integrated AI Tax Engine**: Accepts various document uploads (PDF, image, Excel, CSV) for AI analysis using GPT-4o vision. It incorporates a comprehensive Pakistan tax law knowledge base (ITO 2001, Sales Tax Act 1990, Provincial Sales Tax, Federal Excise Act 2005, Finance Act 2025) to provide structured JSON output including legal citations, compliance checks, and tax exposure.
 - **Working Papers Wizard**: A 3-section wizard for Upload, Configure (entity/firm details, engagement team, deadlines, financial statements, sales tax, variables), and Output (AI analysis, GL & TB generation, working papers, export). Autosaves drafts to local storage.
+    - **Frontend UX Enhancements**: Auto-routing of Excel template uploads through ISA processing endpoint, bulk approve heads and bulk clear review notes (server-side with RBAC), search/filter in Audit Chain, Review Notes, and Version History tabs, CSV export for audit chains/compliance gates/tick marks/review notes, 15-second auto-save timer for variable edits, session duplication button (carry forward to next year), print-optimized CSS with @media print rules, and offline connectivity indicator.
 
 ## External Dependencies
 
