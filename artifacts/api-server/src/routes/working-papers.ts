@@ -18,6 +18,7 @@ import {
   wpTriggerRulesTable, wpValidationResultTable, wpExceptionsTable,
   wpSessionLockTable, wpOutputJobTable,
   wpExecutionTable,
+  wpComplianceDocTable,
 } from "@workspace/db";
 import { WP_LIBRARY, type WpLibraryEntry } from "../data/wp-library-seed";
 import { VARIABLE_DEFINITIONS, EXTRACTION_FIELD_TO_VARIABLE_MAP, VARIABLE_GROUPS, DEPENDENCY_RULES, PRIMARY_VARIABLE_CODES, SECONDARY_VARIABLE_CODES } from "../data/variable-definitions";
@@ -70,6 +71,7 @@ const AUDIT_HEADS = [
     "EX-04", "FH-01",
     "EX-IC-01", "EX-IC-02",
     "EX-EST-01", "EX-EST-02",
+    "GC-01",
     "M3", "M4", "M5", "M8",
     "M10", "M11", "M12", "M13", "M14", "M15", "M16",
   ] },
@@ -77,6 +79,7 @@ const AUDIT_HEADS = [
     "EV-01", "EV-02", "EV-03",
     "FN-01", "FN-02", "FN-03", "FN-04", "FN-05", "FN-06",
     "FN-07", "FN-08", "FN-09", "FN-10", "FN-11", "FN-12",
+    "SECP-F29", "SECP-FA", "CCG-01",
     "M9",
   ] },
   { index: 9, name: "Deliverables", outputType: "word+pdf", papers: ["DL-01", "DL-02", "DL-03", "DL-04", "DL-05", "DL-06", "DL-07"] },
@@ -208,6 +211,10 @@ const WP_METADATA: Record<string, WpMeta> = {
   "DL-05": { name: "Partnership / AOP Representation from All Partners", isa: "ISA 580, Partnership Act 1932", phase: "Deliverables", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level", applicableTo: ["aop"] },
   "DL-06": { name: "Draft Audit Report (Unmodified / Modified)", isa: "ISA 700, ISA 705, ISA 706", phase: "Deliverables", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
   "DL-07": { name: "PSX / SECP Specified Audit Report Format", isa: "ISA 700, PSX Regulations", phase: "Deliverables", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level", applicableTo: ["listed"] },
+  "GC-01": { name: "Going Concern Assessment (ISA 570)", isa: "ISA 570, IAS 1.25-26", phase: "Execution", riskLevel: "High", assertions: "N/A", fsArea: "Financial Statements" },
+  "SECP-F29": { name: "SECP Form 29 Compliance Review", isa: "Companies Act 2017 s.155, SECP BO Regulations 2018", phase: "Evidence & Finalization", riskLevel: "Medium", assertions: "C, E", fsArea: "Governance / Directors" },
+  "SECP-FA": { name: "SECP Form A (Annual Return) Compliance", isa: "Companies Act 2017 s.130, SECP Regulations", phase: "Evidence & Finalization", riskLevel: "Medium", assertions: "C, E, P", fsArea: "Governance / Share Register" },
+  "CCG-01": { name: "CCG 2019 Corporate Governance Checklist", isa: "CCG 2019 (SECP), Companies Act 2017 s.192", phase: "Evidence & Finalization", riskLevel: "Medium", assertions: "C, E, P", fsArea: "Governance", applicableTo: ["listed", "gem"] },
   "QR-01": { name: "EQCR Checklist", isa: "ISA 220, ISQM 2", phase: "QR (EQCR)", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
   "QR-02": { name: "EQCR – AI Summary", isa: "ISA 220", phase: "QR (EQCR)", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
   "QR-03": { name: "EQCR – Partner Comments", isa: "ISA 220, ISQM 2", phase: "QR (EQCR)", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
@@ -10300,6 +10307,287 @@ router.get("/sessions/:sessionId/wp-execution/:wpCode/validate", async (req: Req
       isLocked: row.isLocked,
       status: row.status,
     });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPLIANCE DOCUMENT ENGINE
+// Fix 1: EQCR Review Checklist (ISA 220, ISQM 2)
+// Fix 2: Management Representation Letter (ISA 580)
+// Fix 3: Engagement Letter + Signing Workflow (ISA 210)
+// Fix 4: Independence Confirmation (ISA 220, ISQM 1, ICAP CoE)
+// Fix 5: ISA 570 Going Concern standalone WP
+// Fix 6: SECP Form 29/A + CCG 2019 Compliance WPs
+// ═══════════════════════════════════════════════════════════════════════════
+
+const COMPLIANCE_DOC_TYPES = [
+  { docType: "engagement_letter",         docCode: "PP-05", isa: "ISA 210",                          label: "Engagement Letter" },
+  { docType: "independence_confirmation", docCode: "PP-09", isa: "ISA 220, ISQM 1, ICAP CoE",        label: "Independence Confirmation" },
+  { docType: "management_rep_letter",     docCode: "DL-03", isa: "ISA 580",                          label: "Management Representation Letter" },
+  { docType: "eqcr_checklist",            docCode: "QR-01", isa: "ISA 220, ISQM 2",                  label: "EQCR Review Checklist" },
+  { docType: "going_concern",             docCode: "GC-01", isa: "ISA 570, IAS 1.25-26",              label: "Going Concern Assessment" },
+  { docType: "secp_ccg",                  docCode: "SECP-F29", isa: "Companies Act 2017, CCG 2019",  label: "SECP/CCG Compliance Review" },
+];
+
+// GET /sessions/:id/compliance-docs — fetch all compliance doc statuses
+router.get("/sessions/:id/compliance-docs", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    const docs = await db.select().from(wpComplianceDocTable).where(eq(wpComplianceDocTable.sessionId, sessionId));
+    const statusMap: Record<string, any> = {};
+    for (const doc of docs) {
+      statusMap[doc.docType] = {
+        id: doc.id, docCode: doc.docCode, status: doc.status,
+        generatedAt: doc.generatedAt, signatoryName: doc.signatoryName,
+        signatoryDesignation: doc.signatoryDesignation, signingDate: doc.signingDate,
+        checklistItems: doc.checklistItems, checklistCompletedAt: doc.checklistCompletedAt,
+        version: doc.version, notes: doc.notes, hasContent: !!doc.generatedContent,
+      };
+    }
+    res.json({ docs: COMPLIANCE_DOC_TYPES.map(t => ({ ...t, ...(statusMap[t.docType] || { status: "pending", hasContent: false }) })) });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /sessions/:id/compliance-docs/:docType/content — full generated content
+router.get("/sessions/:id/compliance-docs/:docType/content", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    const docType = req.params.docType;
+    const docs = await db.select().from(wpComplianceDocTable)
+      .where(and(eq(wpComplianceDocTable.sessionId, sessionId), eq(wpComplianceDocTable.docType, docType)));
+    if (!docs[0]) return res.status(404).json({ error: "Document not generated yet" });
+    res.json(docs[0]);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /sessions/:id/compliance-docs/:docType/generate — AI-generate compliance document
+router.post("/sessions/:id/compliance-docs/:docType/generate", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    const docType = req.params.docType;
+
+    const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    const ai = await getAIClient();
+    if (!ai) return res.status(503).json({ error: "AI service not configured. Add API key in Settings." });
+
+    const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+    const varMap = Object.fromEntries(variables.map(v => [v.variableCode, v.finalValue || v.extractedValue || ""]));
+
+    const engCode = `ENG-${session.engagementYear || "2026"}-${String(sessionId).padStart(3, "0")}`;
+    const clientName = session.clientName || "Client";
+    const firmName = session.firmName || "Alam & Aulakh Chartered Accountants";
+    const period = session.periodStart && session.periodEnd ? `${session.periodStart} to ${session.periodEnd}` : `FY ${session.engagementYear}`;
+    const isListed = (session.entityType || "").toLowerCase().includes("listed");
+    const isPIE = isListed;
+
+    let prompt = "";
+    let docCode = "";
+
+    if (docType === "engagement_letter") {
+      docCode = "PP-05";
+      prompt = `You are a senior Pakistani CA generating an ISA 210-compliant Engagement Letter.
+FIRM: ${firmName} | CLIENT: ${clientName} | ENTITY TYPE: ${session.entityType || "Private Limited"}
+NTN: ${session.ntn || "N/A"} | ENGAGEMENT: ${engCode} | PERIOD: ${period}
+FRAMEWORK: ${session.reportingFramework || "IFRS"} | TYPE: ${(session.engagementType || "statutory_audit").replace(/_/g, " ")}
+PARTNER: ${varMap["engagement_partner"] || "_______________"} | MANAGER: ${varMap["engagement_manager"] || "_______________"}
+
+Generate a complete Engagement Letter per ISA 210 and ICAP requirements. Return ONLY valid JSON:
+{"letterDate":"ISO date","addressee":"Board of Directors / Management","salutation":"Dear Sirs,","purpose":"[paragraph]","engagementScope":"[paragraph — scope per ISA 200, 210]","responsibilitiesOfAuditor":["[6-8 ISA-referenced items]"],"responsibilitiesOfManagement":["[6-8 Companies Act/ISA referenced items]"],"inherentLimitations":"[ISA 200.A51 limitations paragraph]","reportingFramework":"[paragraph]","reportExpected":"[type of report and timing]","feesArrangement":"[fee structure to be agreed]","confidentiality":"[ISA 200 confidentiality paragraph]","otherMatters":["ISQM 1 quality statement","ICAP code compliance","Files accessible to SECP/ICAP inspectors"],"terminationClause":"[paragraph]","agreementInstruction":"Please sign and return the enclosed copy to confirm acceptance of these terms.","signingBlock":{"firmName":"${firmName}","partnerName":"${varMap["engagement_partner"] || "_______________"}","partnerDesignation":"Partner","icapMembership":"FCA/ACA ICAP","date":"To be signed","clientSigningBlock":{"name":"_______________","designation":"Director / CEO","onBehalfOf":"${clientName}","date":"To be signed"}},"isaReferences":["ISA 200","ISA 210","ISA 220","ISA 300","ISQM 1","Companies Act 2017 s.246","ICAP Code of Ethics"]}`;
+
+    } else if (docType === "independence_confirmation") {
+      docCode = "PP-09";
+      prompt = `You are a senior Pakistani CA generating a complete ISA 220 / ICAP Code of Ethics Independence Confirmation.
+FIRM: ${firmName} | CLIENT: ${clientName} | ENTITY TYPE: ${session.entityType || "Private Limited"}
+PIE/LISTED: ${isPIE ? "YES — Enhanced requirements apply" : "NO"} | ENGAGEMENT: ${engCode} | PERIOD: ${period}
+PARTNER: ${varMap["engagement_partner"] || "_______________"} | EQCR: ${varMap["eqcr_partner"] || (isPIE ? "Required" : "N/A")}
+
+Generate per ISA 220.14-22, ISQM 1.26-28, ICAP CoE Part 4A/4B. Return ONLY valid JSON:
+{"declarationDate":"ISO date","declarationTitle":"Independence Declaration and Confirmation","preamble":"[purpose and regulatory basis]","independenceStandard":"${isPIE ? "Section 291 ICAP CoE — PIE enhanced requirements" : "Section 290 ICAP CoE"}","threatsIdentified":[{"threatType":"Self-interest","description":"Financial interests, loans, business relationships","safeguard":"None identified","residualRisk":"Acceptable"},{"threatType":"Self-review","description":"Prior period services, preparation of records","safeguard":"None identified","residualRisk":"Acceptable"},{"threatType":"Advocacy","description":"Legal proceedings, negotiations","safeguard":"None identified","residualRisk":"Acceptable"},{"threatType":"Familiarity","description":"Long association, close relationships","safeguard":"${isPIE ? "Partner rotation — 5 years per ISQM 1" : "Reviewed annually"}","residualRisk":"Acceptable"},{"threatType":"Intimidation","description":"Threats by management","safeguard":"None identified","residualRisk":"Acceptable"}],"prohibitedRelationships":"[financial interests, loans, business relationships checked]","nonAuditServices":"[list any non-audit services and independence assessment]","rotationStatus":"${isPIE ? "Partner rotation compliance confirmed per ISQM 1.34(c)" : "Rotation reviewed — not mandatory for non-PIE"}","confirmationStatement":"We confirm that the engagement team is independent with respect to ${clientName} for the period ${period} and no relationships exist that would compromise objectivity.","teamMemberDeclarations":[{"role":"Engagement Partner","name":"${varMap["engagement_partner"] || "_______________"}","declaration":"I confirm my independence. No threats identified.","date":"To be signed","signature":"_______________"},{"role":"Engagement Manager","name":"${varMap["engagement_manager"] || "_______________"}","declaration":"I confirm my independence. No threats identified.","date":"To be signed","signature":"_______________"},{"role":"EQCR Partner","name":"${varMap["eqcr_partner"] || "_______________"}","declaration":"I confirm independence as EQCR reviewer. No threats identified.","date":"To be signed","signature":"_______________"}],"partnerConclusionStatement":"Based on this assessment, the engagement team including the EQCR reviewer is independent of ${clientName} for the audit period ${period}.","isaReferences":["ISA 200.14","ISA 220.14-22","ISQM 1.26-28","ICAP CoE Part 4A","ICAP CoE Part 4B"]}`;
+
+    } else if (docType === "management_rep_letter") {
+      docCode = "DL-03";
+      const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+      const totalAssets = tbLines.filter(l => (l.classification || "").toLowerCase().includes("asset")).reduce((s, l) => s + (parseFloat(String(l.balance)) || 0), 0);
+      prompt = `You are a Big-4 senior partner generating an ISA 580-compliant Management Representation Letter (from management TO the auditor).
+FIRM: ${firmName} | CLIENT: ${clientName} | ENTITY TYPE: ${session.entityType || "Private Limited"}
+ENGAGEMENT: ${engCode} | PERIOD: ${period} | FRAMEWORK: ${session.reportingFramework || "IFRS"}
+TOTAL ASSETS: PKR ${totalAssets.toLocaleString() || "per FS"} | PARTNER: ${varMap["engagement_partner"] || "_______________"}
+GOING CONCERN FLAG: ${varMap["going_concern_flag"] || "false"} | RELATED PARTIES FLAG: ${varMap["related_party_flag"] || "false"}
+FRAUD RISK FLAG: ${varMap["fraud_risk_flag"] || "false"} | MODIFIED OPINION: ${varMap["modified_opinion_flag"] || "false"}
+
+Return ONLY valid JSON:
+{"letterDate":"ISO date","addressee":"${firmName}","salutation":"Dear Sirs,","openingStatement":"[opening — management of ${clientName} providing this letter in connection with your audit of our financial statements for ${period}]","generalRepresentations":["We have fulfilled our responsibility for preparation of financial statements per ${session.reportingFramework || "IFRS"} and Companies Act 2017.","We have provided all information relevant to the audit including all related party relationships and transactions.","All transactions have been recorded in accounting records and reflected in the financial statements.","We have disclosed all known or suspected fraud or error affecting the entity.","The effects of uncorrected misstatements are immaterial both individually and in aggregate.","We acknowledge responsibility for design, implementation and maintenance of internal controls.","The financial statements are free from material misstatement including omissions.","All assets and liabilities are properly included in the financial statements."],"specificRepresentations":[{"area":"Going Concern","representation":"${varMap["going_concern_flag"] === "true" ? "We have disclosed all going concern uncertainties and our plans to address them." : "The going concern basis is appropriate. No material uncertainties regarding ability to continue as going concern exist."}","isaRef":"ISA 570.16"},{"area":"Related Parties","representation":"${varMap["related_party_flag"] === "true" ? "We have disclosed all related party relationships and transactions per IAS 24 on arm's length terms." : "No related party relationships or transactions beyond those disclosed in financial statements exist."}","isaRef":"ISA 550.26"},{"area":"Litigation & Claims","representation":"We have disclosed all actual or possible litigation and claims whether or not discussed with legal counsel.","isaRef":"ISA 501.12"},{"area":"Contingencies","representation":"All known actual or contingent liabilities have been properly accrued or disclosed per IAS 37.","isaRef":"ISA 501"},{"area":"Subsequent Events","representation":"No events occurring subsequent to the balance sheet date require adjustment or disclosure beyond those already addressed.","isaRef":"ISA 560.9"},{"area":"Laws & Regulations","representation":"We have disclosed all instances of non-compliance or suspected non-compliance with laws and regulations.","isaRef":"ISA 250.16"},{"area":"Estimates","representation":"Significant assumptions in accounting estimates are reasonable and reflect management intent and ability to carry out specific courses of action.","isaRef":"ISA 540.13"},{"area":"Taxation","representation":"All taxation matters are properly provided for. All returns filed and amounts paid or provided. No pending tax assessments not disclosed.","isaRef":"ISA 250, IAS 12"}],"fraudRepresentations":["We have disclosed our assessment of fraud risk to the auditor.","We have no knowledge of any actual, suspected or alleged fraud affecting the entity.","We have disclosed all information regarding fraud or suspected fraud."],"closingStatement":"This letter has been prepared with full knowledge that you will rely upon it in issuing your auditor's report.","signingBlock":{"onBehalfOf":"${clientName}","signatories":[{"name":"_______________","designation":"Chief Executive Officer","date":"To be signed","signature":"_______________"},{"name":"_______________","designation":"Chief Financial Officer","date":"To be signed","signature":"_______________"}]},"isaReferences":["ISA 580","ISA 570","ISA 550","ISA 501","ISA 560","ISA 250","ISA 540","ISA 240"]}`;
+
+    } else if (docType === "eqcr_checklist") {
+      docCode = "QR-01";
+      prompt = `You are generating a complete ISQM 2 / ISA 220-compliant EQCR Checklist for a Pakistani CA firm.
+FIRM: ${firmName} | CLIENT: ${clientName} | ENTITY TYPE: ${session.entityType || "Private Limited"}
+PIE/LISTED: ${isPIE ? "YES — EQCR mandatory" : "NO — at firm discretion"} | ENGAGEMENT: ${engCode} | PERIOD: ${period}
+PARTNER: ${varMap["engagement_partner"] || "N/A"} | EQCR REVIEWER: ${varMap["eqcr_partner"] || "To be assigned"}
+
+Generate 30+ item EQCR checklist per ISQM 2.34-35 and ISA 220.34. Return ONLY valid JSON:
+{"checklistTitle":"Engagement Quality Control Review Checklist","isqmReference":"ISQM 2 (Effective Dec 2022), ISA 220 (Revised), ICAP SQCS","reviewerDetails":{"eqcrReviewerName":"${varMap["eqcr_partner"] || "_______________"}","qualifications":"FCA/ACA ICAP","independenceConfirmed":false,"reviewStartDate":"","reviewEndDate":""},"sections":[{"sectionCode":"S1","sectionTitle":"Independence & Ethics","items":[{"code":"S1-01","description":"Confirm engagement partner and all team members declared independence per ISA 220.14 and ICAP Code of Ethics","isaRef":"ISA 220.14, ISQM 1.26","status":"pending","comment":""},{"code":"S1-02","description":"Verify no prohibited financial interests, loans or business relationships exist with ${clientName}","isaRef":"ICAP CoE Part 4A","status":"pending","comment":""},{"code":"S1-03","description":"Confirm partner rotation requirements met (5-year rule for PIE entities per ISQM 1.34(c))","isaRef":"ISQM 1.34(c)","status":"${isPIE ? "pending" : "n_a"}","comment":"${isPIE ? "" : "N/A — non-PIE entity"}"},{"code":"S1-04","description":"Verify no non-audit services that impair independence were performed","isaRef":"ICAP CoE 290/291","status":"pending","comment":""},{"code":"S1-05","description":"Confirm EQCR reviewer is not a member of the engagement team per ISQM 2.16","isaRef":"ISQM 2.16","status":"pending","comment":""}]},{"sectionCode":"S2","sectionTitle":"Risk Assessment & Planning","items":[{"code":"S2-01","description":"Review that significant risks identified and documented per ISA 315.26","isaRef":"ISA 315.26, ISA 220.33(a)","status":"pending","comment":""},{"code":"S2-02","description":"Confirm materiality determined and documented with appropriate basis per ISA 320","isaRef":"ISA 320.10-11","status":"pending","comment":""},{"code":"S2-03","description":"Review overall audit strategy and plan consistent with risk assessment per ISA 300","isaRef":"ISA 300.7-10","status":"pending","comment":""},{"code":"S2-04","description":"Verify going concern assessment adequate and documented per ISA 570","isaRef":"ISA 570.10-16","status":"pending","comment":""},{"code":"S2-05","description":"Confirm fraud risk assessment documented including management override per ISA 240.24","isaRef":"ISA 240.24-27","status":"pending","comment":""}]},{"sectionCode":"S3","sectionTitle":"Execution & Evidence","items":[{"code":"S3-01","description":"Review audit procedures appropriate and responsive to assessed risks per ISA 330","isaRef":"ISA 330.4-6, ISA 220.33(b)","status":"pending","comment":""},{"code":"S3-02","description":"Confirm sufficient appropriate audit evidence obtained for all significant risks per ISA 500","isaRef":"ISA 500.6","status":"pending","comment":""},{"code":"S3-03","description":"Review key judgments and estimates challenged and documented per ISA 540","isaRef":"ISA 540.13-19","status":"pending","comment":""},{"code":"S3-04","description":"Verify related party transactions identified and appropriately tested per ISA 550","isaRef":"ISA 550.12-22","status":"pending","comment":""},{"code":"S3-05","description":"Review sampling methodology and sample size adequate per ISA 530","isaRef":"ISA 530.6-8","status":"pending","comment":""},{"code":"S3-06","description":"Confirm analytical procedures results plausible and unexplained variances resolved per ISA 520","isaRef":"ISA 520.5","status":"pending","comment":""},{"code":"S3-07","description":"Review external confirmations received and exceptions followed up per ISA 505","isaRef":"ISA 505.8-14","status":"pending","comment":""},{"code":"S3-08","description":"Verify Laws and Regulations review complete per ISA 250","isaRef":"ISA 250.14-16","status":"pending","comment":""}]},{"sectionCode":"S4","sectionTitle":"Financial Reporting & Disclosures","items":[{"code":"S4-01","description":"Review financial statements for compliance with ${session.reportingFramework || "IFRS"} and Companies Act 2017","isaRef":"ISA 700.14, ISA 220.33(c)","status":"pending","comment":""},{"code":"S4-02","description":"Confirm all significant disclosures adequate and complete","isaRef":"ISA 700.17-19","status":"pending","comment":""},{"code":"S4-03","description":"Verify presentation and classification of items in financial statements","isaRef":"IAS 1, ISA 700","status":"pending","comment":""},{"code":"S4-04","description":"Review comparative figures and prior year adjustments correctly stated","isaRef":"ISA 710","status":"pending","comment":""},{"code":"S4-05","description":"Confirm other information (directors report) consistent with financial statements per ISA 720","isaRef":"ISA 720","status":"pending","comment":""}]},{"sectionCode":"S5","sectionTitle":"Completion & Conclusions","items":[{"code":"S5-01","description":"Review completion memorandum and confirm overall audit conclusion appropriate per ISA 220.33(d)","isaRef":"ISA 220.33(d), ISA 230","status":"pending","comment":""},{"code":"S5-02","description":"Confirm summary of uncorrected misstatements communicated to management per ISA 450","isaRef":"ISA 450.12-14","status":"pending","comment":""},{"code":"S5-03","description":"Verify Management Representation Letter obtained signed and complete per ISA 580","isaRef":"ISA 580.14-16","status":"pending","comment":""},{"code":"S5-04","description":"Review subsequent events procedures and confirm cut-off appropriate per ISA 560","isaRef":"ISA 560.6-9","status":"pending","comment":""},{"code":"S5-05","description":"Confirm going concern conclusion and required disclosures or modifications per ISA 570","isaRef":"ISA 570.17-25","status":"pending","comment":""},{"code":"S5-06","description":"Review all significant review notes resolved before sign-off per ISA 220.29","isaRef":"ISA 220.29-30","status":"pending","comment":""}]},{"sectionCode":"S6","sectionTitle":"Audit Report","items":[{"code":"S6-01","description":"Review audit report for compliance with ISA 700/701/705/706 requirements","isaRef":"ISA 700, ISA 701","status":"pending","comment":""},{"code":"S6-02","description":"Confirm Key Audit Matters appropriately identified and described per ISA 701","isaRef":"ISA 701.9-12","status":"${isPIE ? "pending" : "n_a"}","comment":"${isPIE ? "" : "N/A — KAMs required for PIE entities only"}"},{"code":"S6-03","description":"Verify any modification to opinion appropriate and adequately explained per ISA 705","isaRef":"ISA 705","status":"pending","comment":""},{"code":"S6-04","description":"Confirm Emphasis of Matter or Other Matter paragraphs meet ISA 706 requirements if included","isaRef":"ISA 706","status":"pending","comment":""},{"code":"S6-05","description":"Review format dating and signature of audit report comply with ICAP requirements","isaRef":"ISA 700.43-51, ICAP","status":"pending","comment":""}]},{"sectionCode":"S7","sectionTitle":"File Completeness & Archiving","items":[{"code":"S7-01","description":"Confirm working paper file complete and adequately documents basis for auditors report per ISA 230","isaRef":"ISA 230.8-9, ISQM 1.44","status":"pending","comment":""},{"code":"S7-02","description":"Verify all working papers properly cross-referenced to audit report and financial statements","isaRef":"ISA 230.8","status":"pending","comment":""},{"code":"S7-03","description":"Confirm archiving completed within 60 days of auditors report date per ISA 230.14","isaRef":"ISA 230.14, ISQM 1.44(b)","status":"pending","comment":""},{"code":"S7-04","description":"Review file for retention of original documents and evidence per firm quality policy","isaRef":"ISQM 1.44(c)","status":"pending","comment":""}]}],"overallConclusion":{"status":"pending","narrative":"Based on my review I [am satisfied / am not yet satisfied] that sufficient appropriate audit evidence has been obtained and the proposed opinion is appropriate.","outstandingMatters":[],"eqcrReviewerSignature":"_______________","eqcrReviewerDate":"To be signed"}}`;
+
+    } else if (docType === "going_concern") {
+      docCode = "GC-01";
+      const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+      const totalAssets = tbLines.filter(l => (l.classification || "").toLowerCase().includes("asset")).reduce((s, l) => s + (parseFloat(String(l.balance)) || 0), 0);
+      const totalLiab = tbLines.filter(l => (l.classification || "").toLowerCase().includes("liabilit")).reduce((s, l) => s + (parseFloat(String(l.balance)) || 0), 0);
+      const equity = totalAssets - totalLiab;
+      prompt = `You are a Big-4 senior audit partner generating a complete ISA 570 Going Concern Assessment working paper for a Pakistani CA firm.
+FIRM: ${firmName} | CLIENT: ${clientName} | ENTITY TYPE: ${session.entityType || "Private Limited"}
+ENGAGEMENT: ${engCode} | PERIOD: ${period} | FRAMEWORK: ${session.reportingFramework || "IFRS"}
+GOING CONCERN FLAG: ${varMap["going_concern_flag"] || "false"} | TOTAL ASSETS: PKR ${totalAssets.toLocaleString()}
+EQUITY: PKR ${equity.toLocaleString()} | REVENUE: ${varMap["revenue_cy"] || "N/A"} | NET PROFIT: ${varMap["net_profit_cy"] || "N/A"}
+INTEREST COVERAGE: ${varMap["interest_coverage_ratio"] || "N/A"} | CURRENT RATIO: ${varMap["current_ratio"] || "N/A"}
+DEBT TO EQUITY: ${varMap["debt_to_equity_ratio"] || "N/A"}
+
+Return ONLY valid JSON:
+{"wpCode":"GC-01","wpTitle":"Going Concern Assessment — ISA 570","engagementCode":"${engCode}","client":"${clientName}","period":"${period}","preparedBy":"${varMap["engagement_manager"] || "_______________"}","preparedDate":"During fieldwork","reviewedBy":"${varMap["engagement_partner"] || "_______________"}","reviewedDate":"Before sign-off","objective":"To evaluate whether the going concern basis of accounting used in preparation of the financial statements is appropriate per ISA 570 and to determine implications for the audit report.","isaReference":"ISA 570 (Revised), IAS 1.25-26, Companies Act 2017","managementAssessmentPeriod":"12 months from balance sheet date","financialIndicators":[{"indicator":"Current Ratio","value":"${varMap["current_ratio"] || "N/A"}","threshold":"≥1.0x acceptable","assessment":"${parseFloat(varMap["current_ratio"] || "2") >= 1 ? "Satisfactory" : "Concern — below 1.0x"}","risk":"${parseFloat(varMap["current_ratio"] || "2") >= 1 ? "Low" : "High"}"},{"indicator":"Debt-to-Equity","value":"${varMap["debt_to_equity_ratio"] || "N/A"}","threshold":"≤2.0x acceptable","assessment":"Review required","risk":"Medium"},{"indicator":"Interest Coverage","value":"${varMap["interest_coverage_ratio"] || "N/A"}","threshold":"≥1.5x critical","assessment":"${parseFloat(varMap["interest_coverage_ratio"] || "3") >= 1.5 ? "Satisfactory" : "Material Uncertainty"}","risk":"${parseFloat(varMap["interest_coverage_ratio"] || "3") >= 1.5 ? "Low" : "High"}"},{"indicator":"Net Profit","value":"${varMap["net_profit_cy"] || "N/A"}","threshold":"Positive preferred","assessment":"${parseFloat(varMap["net_profit_cy"] || "1") > 0 ? "Profitable" : "Loss position — review required"}","risk":"${parseFloat(varMap["net_profit_cy"] || "1") > 0 ? "Low" : "High"}"},{"indicator":"Equity Position","value":"PKR ${equity.toLocaleString()}","threshold":"Positive equity required","assessment":"${equity > 0 ? "Positive equity" : "Capital erosion — material concern"}","risk":"${equity > 0 ? "Low" : "High"}"}],"operationalIndicators":[{"indicator":"Ability to meet debt repayments","assessment":"Obtain loan schedules and confirm upcoming repayments vs cash projections","risk":"Medium"},{"indicator":"Key management intent to support","assessment":"Obtain written confirmation from directors of intent to continue","risk":"Low"},{"indicator":"Significant contracts in pipeline","assessment":"Verify forward order book and revenue pipeline","risk":"Medium"},{"indicator":"Regulatory or legal proceedings","assessment":"Review any regulatory notices or pending litigation","risk":"Low"}],"managementPlans":{"reviewed":${varMap["going_concern_flag"] === "true"},"plansObtained":"Obtain management business plan for 12+ months from balance sheet date","cashFlowForecast":"Obtain and review 12-month cash flow forecast","assessmentOfPlans":"Evaluate feasibility of management plans including assumptions"},"auditProcedures":[{"proc":"GC-P01","description":"Obtain and review management going concern assessment covering 12+ months from balance sheet date","isaRef":"ISA 570.12","status":"Planned"},{"proc":"GC-P02","description":"Obtain 12-month cash flow forecast and assess key assumptions for reasonableness","isaRef":"ISA 570.16(a)","status":"Planned"},{"proc":"GC-P03","description":"Inquire management regarding known or probable events beyond 12 months","isaRef":"ISA 570.14","status":"Planned"},{"proc":"GC-P04","description":"Review bank loan agreements for covenant compliance and renegotiation status","isaRef":"ISA 570.16","status":"Planned"},{"proc":"GC-P05","description":"Review subsequent events for going concern implications per ISA 560","isaRef":"ISA 570.16(f)","status":"Planned"},{"proc":"GC-P06","description":"Obtain written representations from management on going concern assessment","isaRef":"ISA 570.16(e)","status":"Planned"},{"proc":"GC-P07","description":"Evaluate adequacy of going concern disclosures in notes to financial statements","isaRef":"ISA 570.19-22","status":"Planned"},{"proc":"GC-P08","description":"Consider implications for audit opinion — no issue / emphasis of matter / material uncertainty / adverse or disclaimer","isaRef":"ISA 570.23-25, ISA 705","status":"Planned"}],"conclusion":{"gcBasisAppropriate":${varMap["going_concern_flag"] !== "true"},"materialUncertaintyExists":${varMap["going_concern_flag"] === "true"},"conclusionNarrative":"${varMap["going_concern_flag"] === "true" ? "Material uncertainty identified. Additional procedures required. Consider adequacy of disclosure and opinion implications per ISA 570.23." : "Based on procedures performed the going concern basis is appropriate. No material uncertainty exists requiring disclosure or modification to the audit report."}","implicationForReport":"${varMap["going_concern_flag"] === "true" ? "Material Uncertainty Related to Going Concern paragraph required per ISA 570.22" : "No modification required on going concern grounds"}","preparedBy":"${varMap["engagement_manager"] || "_______________"}","partnerSignOff":"${varMap["engagement_partner"] || "_______________"}","signOffDate":"Before audit report"}}`;
+
+    } else if (docType === "secp_ccg") {
+      docCode = "SECP-F29";
+      prompt = `You are a senior Pakistani CA generating SECP Form 29, Form A, and CCG 2019 compliance review working papers.
+FIRM: ${firmName} | CLIENT: ${clientName} | ENTITY TYPE: ${session.entityType || "Private Limited"}
+IS LISTED/PIE: ${isPIE ? "YES — CCG 2019 fully applicable" : "NO — basic Companies Act requirements"} | NTN: ${session.ntn || "N/A"}
+ENGAGEMENT: ${engCode} | PERIOD: ${period}
+
+Return ONLY valid JSON:
+{"wpTitle":"SECP Statutory Filings and CCG 2019 Compliance Review","client":"${clientName}","period":"${period}","engagementCode":"${engCode}","form29Review":{"wpCode":"SECP-F29","title":"SECP Form 29 — Directors and Beneficial Owners Compliance","legalBasis":"Companies Act 2017 Section 155; SECP (Filing of Beneficial Owners) Regulations 2018","objective":"Verify Form 29 filed with SECP and directors register is current and accurate","procedures":[{"proc":"F29-01","description":"Obtain latest Form 29 filing confirmation from SECP eService portal","status":"Planned","finding":""},{"proc":"F29-02","description":"Verify all current directors listed on Form 29 with correct names CNICs and designation","status":"Planned","finding":""},{"proc":"F29-03","description":"Confirm changes to directors reported within 14 days per Companies Act 2017 s.155(2)","status":"Planned","finding":""},{"proc":"F29-04","description":"Review Beneficial Owners Register — verify UBOs with 25%+ shareholding identified and filed per BO Regulations","status":"Planned","finding":""},{"proc":"F29-05","description":"Confirm CEO/MD appointment on file with SECP and valid","status":"Planned","finding":""},{"proc":"F29-06","description":"Verify Company Secretary appointment filed per Companies Act 2017","status":"Planned","finding":""}],"finding":"To be completed during fieldwork","conclusion":"To be concluded after fieldwork"},"formAReview":{"wpCode":"SECP-FA","title":"SECP Form A — Annual Return Compliance","legalBasis":"Companies Act 2017 Section 130; SECP Regulations","objective":"Verify Annual Return filed within prescribed time limits","procedures":[{"proc":"FA-01","description":"Obtain copy of last filed Form A from SECP eService portal","status":"Planned","finding":""},{"proc":"FA-02","description":"Verify Form A filed within 30 days of AGM or 6 months of year-end if no AGM","status":"Planned","finding":""},{"proc":"FA-03","description":"Confirm share capital in Form A agrees to company share register","status":"Planned","finding":""},{"proc":"FA-04","description":"Verify list of shareholders and percentage holdings matches share register","status":"Planned","finding":""},{"proc":"FA-05","description":"Confirm registered office address in Form A agrees to company records","status":"Planned","finding":""},{"proc":"FA-06","description":"Verify any default in filing — confirm penalty paid or regularized","status":"Planned","finding":""}],"finding":"To be completed during fieldwork","conclusion":"To be concluded after fieldwork"},"ccg2019Review":{"wpCode":"CCG-01","title":"CCG 2019 — Corporate Governance Compliance Checklist","legalBasis":"Listed Companies (Code of Corporate Governance) Regulations 2019 (CCG 2019)","applicability":"${isPIE ? "Fully applicable — listed entity" : "Not mandatory — non-listed entity. Basic Companies Act 2017 governance requirements apply."}","checklistItems":${isPIE ? `[{"code":"CCG-01","provision":"Reg.3","description":"Minimum one-third independent directors on board","status":"pending","finding":""},{"code":"CCG-02","provision":"Reg.4","description":"Chairman is non-executive and not the CEO/MD","status":"pending","finding":""},{"code":"CCG-03","provision":"Reg.5","description":"Audit Committee established with majority independent directors","status":"pending","finding":""},{"code":"CCG-04","provision":"Reg.6","description":"Audit Committee charter adopted and meetings held at least quarterly","status":"pending","finding":""},{"code":"CCG-05","provision":"Reg.7","description":"HR and Remuneration Committee established with majority non-executive directors","status":"pending","finding":""},{"code":"CCG-06","provision":"Reg.9","description":"Risk Management Committee established and risk management policy adopted","status":"pending","finding":""},{"code":"CCG-07","provision":"Reg.10","description":"Board meetings — minimum 4 per year with required quorum","status":"pending","finding":""},{"code":"CCG-08","provision":"Reg.11","description":"Directors training program — all directors completed required hours","status":"pending","finding":""},{"code":"CCG-09","provision":"Reg.12","description":"Statement of Ethics and Business Practices adopted and circulated","status":"pending","finding":""},{"code":"CCG-10","provision":"Reg.13","description":"Internal audit function established with qualified head","status":"pending","finding":""},{"code":"CCG-11","provision":"Reg.14","description":"External auditor is on SECP approved panel","status":"pending","finding":""},{"code":"CCG-12","provision":"Reg.15","description":"Related party transactions policy adopted and all RPTs pre-approved by Audit Committee","status":"pending","finding":""},{"code":"CCG-13","provision":"Reg.16","description":"Insider trading policy adopted and closed periods enforced","status":"pending","finding":""},{"code":"CCG-14","provision":"Reg.17","description":"Corporate Governance Report included in Annual Report per CCG 2019","status":"pending","finding":""},{"code":"CCG-15","provision":"Reg.18","description":"CEO and CFO certification of financial statements obtained per CCG 2019","status":"pending","finding":""},{"code":"CCG-16","provision":"Reg.19","description":"Auditor did not provide prohibited non-audit services","status":"pending","finding":""},{"code":"CCG-17","provision":"Reg.20","description":"Dividend policy disclosed and consistently applied","status":"pending","finding":""}]` : `[{"code":"CCG-NA","provision":"N/A","description":"CCG 2019 not applicable to non-listed entities","status":"n_a","finding":"Not applicable"}]`},"overallConclusion":"${isPIE ? "To be concluded after completing all items" : "CCG 2019 not applicable"}"},"overallFinding":"To be completed after fieldwork","preparedBy":"${varMap["engagement_manager"] || "_______________"}","reviewedBy":"${varMap["engagement_partner"] || "_______________"}","isaReferences":["ISA 250 Laws and Regulations","Companies Act 2017","CCG 2019","SECP Regulations"]}`;
+    } else {
+      return res.status(400).json({ error: `Unknown docType: ${docType}. Valid types: engagement_letter, independence_confirmation, management_rep_letter, eqcr_checklist, going_concern, secp_ccg` });
+    }
+
+    const aiResp = await ai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: "You are an expert Pakistani CA generating ISA-compliant audit documents. Return ONLY valid JSON with no markdown fences or extra text." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.15,
+      max_tokens: 4000,
+      response_format: { type: "json_object" },
+    });
+
+    const raw = JSON.parse(aiResp.choices[0].message.content || "{}");
+
+    const existing = await db.select().from(wpComplianceDocTable)
+      .where(and(eq(wpComplianceDocTable.sessionId, sessionId), eq(wpComplianceDocTable.docType, docType)));
+
+    const checklistFlat = docType === "eqcr_checklist" && raw.sections
+      ? (raw.sections as any[]).flatMap((s: any) => s.items || [])
+      : docType === "secp_ccg" && raw.ccg2019Review?.checklistItems
+        ? raw.ccg2019Review.checklistItems
+        : undefined;
+
+    if (existing[0]) {
+      await db.update(wpComplianceDocTable).set({
+        generatedContent: raw, generatedAt: new Date(), docCode,
+        status: "generated", version: (existing[0].version || 1) + 1, updatedAt: new Date(),
+        ...(checklistFlat ? { checklistItems: checklistFlat } : {}),
+        isaReference: (raw.isaReferences || []).join(", "),
+      }).where(eq(wpComplianceDocTable.id, existing[0].id));
+    } else {
+      await db.insert(wpComplianceDocTable).values({
+        sessionId, docType, docCode, status: "generated",
+        generatedContent: raw, generatedAt: new Date(), version: 1,
+        ...(checklistFlat ? { checklistItems: checklistFlat } : {}),
+        isaReference: (raw.isaReferences || []).join(", "),
+      });
+    }
+
+    res.json({ success: true, docType, docCode, content: raw });
+  } catch (err: any) {
+    logger.error({ err }, "Compliance doc generation failed");
+    res.status(500).json({ error: "Generation failed: " + err.message });
+  }
+});
+
+// POST /sessions/:id/compliance-docs/:docType/sign — record signature / completion
+router.post("/sessions/:id/compliance-docs/:docType/sign", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    const docType = req.params.docType;
+    const { signatoryName, signatoryDesignation, signingDate, notes, action } = req.body;
+    // action: "sign" | "reject" | "mark_sent"
+
+    const existing = await db.select().from(wpComplianceDocTable)
+      .where(and(eq(wpComplianceDocTable.sessionId, sessionId), eq(wpComplianceDocTable.docType, docType)));
+    if (!existing[0]) return res.status(404).json({ error: "Document not generated yet. Generate the document first." });
+
+    const newStatus = action === "reject" ? "rejected" : action === "mark_sent" ? "sent_to_client" : "signed";
+
+    await db.update(wpComplianceDocTable).set({
+      status: newStatus,
+      signatoryName: signatoryName || existing[0].signatoryName,
+      signatoryDesignation: signatoryDesignation || existing[0].signatoryDesignation,
+      signingDate: signingDate || new Date().toISOString().split("T")[0],
+      ...(action !== "mark_sent" ? { signedAt: new Date() } : {}),
+      ...(action === "reject" ? { rejectionReason: notes } : {}),
+      notes: notes || existing[0].notes,
+      updatedAt: new Date(),
+    }).where(eq(wpComplianceDocTable.id, existing[0].id));
+
+    res.json({ success: true, status: newStatus, docType });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// PATCH /sessions/:id/compliance-docs/eqcr_checklist/item — update single EQCR item
+router.patch("/sessions/:id/compliance-docs/eqcr_checklist/item", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    const { itemCode, status, comment } = req.body;
+
+    const existing = await db.select().from(wpComplianceDocTable)
+      .where(and(eq(wpComplianceDocTable.sessionId, sessionId), eq(wpComplianceDocTable.docType, "eqcr_checklist")));
+    if (!existing[0]) return res.status(404).json({ error: "EQCR checklist not generated yet" });
+
+    const items = (existing[0].checklistItems as any[]) || [];
+    const updated = items.map((item: any) =>
+      item.code === itemCode ? { ...item, status, comment, reviewedAt: new Date().toISOString() } : item
+    );
+    const allDone = updated.length > 0 && updated.every((i: any) => i.status !== "pending");
+
+    await db.update(wpComplianceDocTable).set({
+      checklistItems: updated,
+      ...(allDone ? { checklistCompletedAt: new Date(), status: "completed" } : {}),
+      updatedAt: new Date(),
+    }).where(eq(wpComplianceDocTable.id, existing[0].id));
+
+    res.json({
+      success: true,
+      totalItems: updated.length,
+      completedItems: updated.filter((i: any) => i.status !== "pending").length,
+      allComplete: allDone,
+    });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// PATCH /sessions/:id/compliance-docs/secp_ccg/item — update single CCG checklist item
+router.patch("/sessions/:id/compliance-docs/secp_ccg/item", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    const { itemCode, status, finding } = req.body;
+
+    const existing = await db.select().from(wpComplianceDocTable)
+      .where(and(eq(wpComplianceDocTable.sessionId, sessionId), eq(wpComplianceDocTable.docType, "secp_ccg")));
+    if (!existing[0]) return res.status(404).json({ error: "SECP/CCG document not generated yet" });
+
+    const items = (existing[0].checklistItems as any[]) || [];
+    const updated = items.map((item: any) =>
+      item.code === itemCode ? { ...item, status, finding, reviewedAt: new Date().toISOString() } : item
+    );
+    const allDone = updated.length > 0 && updated.every((i: any) => i.status !== "pending");
+
+    await db.update(wpComplianceDocTable).set({
+      checklistItems: updated,
+      ...(allDone ? { checklistCompletedAt: new Date(), status: "completed" } : {}),
+      updatedAt: new Date(),
+    }).where(eq(wpComplianceDocTable.id, existing[0].id));
+
+    res.json({ success: true, totalItems: updated.length, completedItems: updated.filter((i: any) => i.status !== "pending").length });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 

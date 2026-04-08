@@ -948,3 +948,38 @@ export const wpOutputJobTable = pgTable("wp_output_job", {
   metadata: text("metadata"),                               // JSON: phase counts, family breakdown etc.
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// ── Compliance Document Engine ─────────────────────────────────────────────────
+// ISA 210 Engagement Letter, ISA 220/ISQM-2 Independence + EQCR,
+// ISA 570 Going Concern, ISA 580 Management Rep Letter,
+// SECP Form 29/A, CCG 2019
+export const wpComplianceDocTable = pgTable("wp_compliance_doc", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  // engagement_letter | independence_confirmation | management_rep_letter
+  // eqcr_checklist | going_concern | secp_ccg
+  docType: text("doc_type").notNull(),
+  docCode: text("doc_code").notNull(),        // PP-05 | PP-09 | DL-03 | QR-01 | GC-01 | SECP-F29
+  isaReference: text("isa_reference"),
+  generatedContent: jsonb("generated_content"),
+  generatedAt: timestamp("generated_at"),
+  generatedBy: text("generated_by"),
+  version: integer("version").default(1),
+  // pending | generated | sent_to_client | signed | rejected | completed | superseded
+  status: text("status").default("pending"),
+  signatoryName: text("signatory_name"),
+  signatoryDesignation: text("signatory_designation"),
+  signingDate: text("signing_date"),
+  signedBy: text("signed_by"),
+  signedAt: timestamp("signed_at"),
+  rejectionReason: text("rejection_reason"),
+  // EQCR: [{code,description,isa,status:pass|fail|na,comment,reviewedAt}]
+  checklistItems: jsonb("checklist_items"),
+  checklistCompletedAt: timestamp("checklist_completed_at"),
+  checklistCompletedBy: text("checklist_completed_by"),
+  // Independence: [{memberId,name,role,confirmed,confirmedAt,threats,safeguards}]
+  teamMemberConfirmations: jsonb("team_member_confirmations"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});

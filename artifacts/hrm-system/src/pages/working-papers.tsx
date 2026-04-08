@@ -197,6 +197,9 @@ export default function WorkingPapers() {
   const [exceptions, setExceptions] = useState<any[]>([]);
   const [downloadingHeads, setDownloadingHeads] = useState<Set<number>>(new Set());
   const [downloadedHeads, setDownloadedHeads] = useState<Set<number>>(new Set());
+  const [complianceDocs, setComplianceDocs] = useState<any[]>([]);
+  const [complianceLoading, setComplianceLoading] = useState<string | null>(null);
+  const [showCompliancePanel, setShowCompliancePanel] = useState(false);
   const [activeTab, setActiveTab] = useState("");
   const [editingVar, setEditingVar] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -267,6 +270,7 @@ export default function WorkingPapers() {
       if (res.ok) {
         const data = await res.json();
         setActiveSession(data);
+        fetchComplianceDocs(id);
         return data;
       }
     } catch {} finally { setLoading(false); }
@@ -1243,6 +1247,61 @@ export default function WorkingPapers() {
     }
   };
 
+  // ── Compliance Document actions ─────────────────────────────────────────────
+  const fetchComplianceDocs = async (sessionId?: number) => {
+    const sid = sessionId || activeSession?.id;
+    if (!sid) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${sid}/compliance-docs`, { headers });
+      if (res.ok) { const data = await res.json(); setComplianceDocs(data.docs || []); }
+    } catch {}
+  };
+
+  const generateComplianceDoc = async (docType: string) => {
+    if (!activeSession) return;
+    setComplianceLoading(docType);
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/compliance-docs/${docType}/generate`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: "{}",
+      });
+      if (res.ok) {
+        toast({ title: "Document generated successfully" });
+        await fetchComplianceDocs();
+      } else {
+        const err = await res.json();
+        toast({ title: "Generation failed", description: err.error, variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: "Generation failed", description: e.message, variant: "destructive" });
+    } finally { setComplianceLoading(null); }
+  };
+
+  const signComplianceDoc = async (docType: string, sigData: { signatoryName: string; signatoryDesignation: string; signingDate: string; notes?: string; action: "sign" | "reject" | "mark_sent" }) => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/compliance-docs/${docType}/sign`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(sigData),
+      });
+      if (res.ok) { toast({ title: "Status updated" }); await fetchComplianceDocs(); }
+      else { const err = await res.json(); toast({ title: "Failed", description: err.error, variant: "destructive" }); }
+    } catch {}
+  };
+
+  const updateChecklistItem = async (docType: "eqcr_checklist" | "secp_ccg", itemCode: string, status: string, comment: string) => {
+    if (!activeSession) return;
+    const url = docType === "eqcr_checklist"
+      ? `${API_BASE}/working-papers/sessions/${activeSession.id}/compliance-docs/eqcr_checklist/item`
+      : `${API_BASE}/working-papers/sessions/${activeSession.id}/compliance-docs/secp_ccg/item`;
+    try {
+      const res = await fetch(url, {
+        method: "PATCH", headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ itemCode, status, comment, finding: comment }),
+      });
+      if (res.ok) { const data = await res.json(); if (data.allComplete) toast({ title: "Checklist complete!" }); await fetchComplianceDocs(); }
+      else { const err = await res.json(); toast({ title: "Update failed", description: err.error, variant: "destructive" }); }
+    } catch {}
+  };
+
   const fetchExceptions = async () => {
     if (!activeSession) return;
     try {
@@ -1907,10 +1966,15 @@ export default function WorkingPapers() {
           onExportQuick={exportQuick}
           exportingQuick={exportingQuick}
           onResolveException={resolveException}
-          onRefresh={() => { fetchSession(activeSession.id); fetchExceptions(); }}
+          onRefresh={() => { fetchSession(activeSession.id); fetchExceptions(); fetchComplianceDocs(); }}
           loading={loading}
           downloadingHeads={downloadingHeads}
           downloadedHeads={downloadedHeads}
+          complianceDocs={complianceDocs}
+          complianceLoading={complianceLoading}
+          onGenerateComplianceDoc={generateComplianceDoc}
+          onSignComplianceDoc={signComplianceDoc}
+          onUpdateChecklistItem={updateChecklistItem}
         />
       )}
 
@@ -10061,7 +10125,268 @@ const FORMAT_LABEL: Record<string, string> = {
   "word": "DOCX", "excel": "XLSX", "word+excel": "DOCX+XLSX", "word+pdf": "DOCX+PDF",
 };
 
-function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle, onExportQuick, exportingQuick, onResolveException, onRefresh, loading, downloadingHeads, downloadedHeads }: any) {
+// ─── Compliance Documents Panel ──────────────────────────────────────────────
+function ComplianceDocsPanel({ docs, complianceLoading, onGenerate, onSign, onUpdateItem, session }: any) {
+  const [expandedDoc, setExpandedDoc] = useState<string | null>(null);
+  const [sigForm, setSigForm] = useState<Record<string, { name: string; designation: string; date: string; notes: string }>>({});
+  const [checklistFilter, setChecklistFilter] = useState<Record<string, string>>({});
+
+  const isListed = (session?.entityType || "").toLowerCase().includes("listed");
+
+  const DOC_CONFIG: Record<string, { icon: string; color: string; border: string; bg: string; sigLabel?: string }> = {
+    engagement_letter:         { icon: "📋", color: "text-blue-700",   border: "border-blue-200",   bg: "bg-blue-50",    sigLabel: "Client (Director/CEO)" },
+    independence_confirmation: { icon: "🛡️", color: "text-violet-700", border: "border-violet-200", bg: "bg-violet-50" },
+    management_rep_letter:     { icon: "✍️", color: "text-indigo-700", border: "border-indigo-200", bg: "bg-indigo-50",  sigLabel: "CEO/CFO" },
+    eqcr_checklist:            { icon: "☑️", color: "text-emerald-700",border: "border-emerald-200",bg: "bg-emerald-50" },
+    going_concern:             { icon: "⚠️", color: "text-amber-700",  border: "border-amber-200",  bg: "bg-amber-50" },
+    secp_ccg:                  { icon: "🏛️", color: "text-rose-700",   border: "border-rose-200",   bg: "bg-rose-50" },
+  };
+
+  const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
+    pending:        { label: "Pending",        cls: "bg-slate-100 text-slate-600" },
+    generated:      { label: "Generated",      cls: "bg-blue-100 text-blue-700" },
+    sent_to_client: { label: "Sent to Client", cls: "bg-amber-100 text-amber-700" },
+    signed:         { label: "Signed ✓",       cls: "bg-emerald-100 text-emerald-700" },
+    completed:      { label: "Complete ✓",     cls: "bg-emerald-100 text-emerald-700" },
+    rejected:       { label: "Rejected",       cls: "bg-red-100 text-red-700" },
+  };
+
+  const sigf = (dt: string) => sigForm[dt] || { name: "", designation: "", date: new Date().toISOString().split("T")[0], notes: "" };
+  const setSigf = (dt: string, f: any) => setSigForm(p => ({ ...p, [dt]: { ...sigf(dt), ...f } }));
+
+  const itemStatusColor: Record<string, string> = {
+    pass:    "bg-emerald-100 text-emerald-700",
+    fail:    "bg-red-100 text-red-700",
+    n_a:     "bg-slate-100 text-slate-500",
+    pending: "bg-amber-100 text-amber-700",
+  };
+
+  const completedCount = (docs || []).filter((d: any) => ["signed", "completed"].includes(d.status)).length;
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+            <span>Compliance Documents</span>
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{completedCount}/{(docs || []).length} complete</span>
+          </h3>
+          <p className="text-xs text-slate-500 mt-0.5">ISA 210 · ISA 220 · ISA 570 · ISA 580 · ISQM 2 · CCG 2019</p>
+        </div>
+      </div>
+
+      {/* Doc cards */}
+      <div className="grid grid-cols-1 gap-3">
+        {(docs || []).map((doc: any) => {
+          const cfg = DOC_CONFIG[doc.docType] || { icon: "📄", color: "text-slate-700", border: "border-slate-200", bg: "bg-slate-50" };
+          const badge = STATUS_BADGE[doc.status] || { label: doc.status, cls: "bg-slate-100 text-slate-600" };
+          const isExpanded = expandedDoc === doc.docType;
+          const isChecklist = doc.docType === "eqcr_checklist" || doc.docType === "secp_ccg";
+          const items: any[] = doc.checklistItems || [];
+          const doneItems = items.filter((i: any) => i.status !== "pending").length;
+          const filterVal = checklistFilter[doc.docType] || "all";
+
+          return (
+            <div key={doc.docType} className={`border rounded-xl overflow-hidden ${cfg.border}`}>
+              {/* Card header row */}
+              <div className={`flex items-center justify-between px-4 py-3 ${cfg.bg} cursor-pointer`}
+                onClick={() => setExpandedDoc(isExpanded ? null : doc.docType)}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-lg">{cfg.icon}</span>
+                  <div className="min-w-0">
+                    <p className={`text-sm font-semibold truncate ${cfg.color}`}>{doc.label}</p>
+                    <p className="text-xs text-slate-500">{doc.isa} · {doc.docCode}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {isChecklist && items.length > 0 && (
+                    <span className="text-xs text-slate-500">{doneItems}/{items.length}</span>
+                  )}
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+                  <span className={`text-slate-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}>▾</span>
+                </div>
+              </div>
+
+              {isExpanded && (
+                <div className="border-t border-slate-100 bg-white px-4 py-3 space-y-3">
+                  {/* Generate button */}
+                  {doc.status === "pending" || !doc.hasContent ? (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-2">
+                        {doc.docType === "engagement_letter" && "Generate a complete ISA 210-compliant Engagement Letter with signing blocks for partner and client."}
+                        {doc.docType === "independence_confirmation" && "Generate ISA 220/ICAP CoE Independence Confirmation with per-team-member declarations."}
+                        {doc.docType === "management_rep_letter" && "Generate ISA 580-compliant Management Representation Letter with all required representations."}
+                        {doc.docType === "eqcr_checklist" && "Generate a 30+ item ISQM 2 / ISA 220 EQCR Checklist with sections for Independence, Risk, Execution, FS Reporting, Completion, Audit Report, and Archiving."}
+                        {doc.docType === "going_concern" && "Generate ISA 570 Going Concern Assessment WP with financial indicators, procedures, and audit conclusion."}
+                        {doc.docType === "secp_ccg" && `Generate SECP Form 29, Form A compliance review, and ${isListed ? "CCG 2019 full governance checklist (listed entity)" : "CCG 2019 applicability note (non-listed entity)"}.`}
+                      </p>
+                      <button
+                        onClick={() => onGenerate(doc.docType)}
+                        disabled={complianceLoading === doc.docType}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-60 transition-colors"
+                      >
+                        {complianceLoading === doc.docType ? (
+                          <><span className="animate-spin">⟳</span> Generating with AI…</>
+                        ) : (
+                          <><span>✨</span> Generate with AI</>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        onClick={() => onGenerate(doc.docType)}
+                        disabled={complianceLoading === doc.docType}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-200 disabled:opacity-60 transition-colors"
+                      >
+                        {complianceLoading === doc.docType ? <span className="animate-spin">⟳</span> : "↺"} Regenerate
+                      </button>
+                      {doc.generatedAt && (
+                        <span className="text-xs text-slate-400 self-center">v{doc.version} · {new Date(doc.generatedAt).toLocaleDateString("en-GB")}</span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* EQCR / SECP Checklist view */}
+                  {isChecklist && items.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-slate-700">
+                          Checklist Items — {doneItems}/{items.length} reviewed
+                        </p>
+                        <select
+                          value={filterVal}
+                          onChange={e => setChecklistFilter(p => ({ ...p, [doc.docType]: e.target.value }))}
+                          className="text-xs border border-slate-200 rounded px-1.5 py-0.5 bg-white"
+                        >
+                          <option value="all">All items</option>
+                          <option value="pending">Pending only</option>
+                          <option value="pass">Pass</option>
+                          <option value="fail">Fail</option>
+                          <option value="n_a">N/A</option>
+                        </select>
+                      </div>
+                      <div className="max-h-72 overflow-y-auto space-y-1.5 pr-1">
+                        {items
+                          .filter((item: any) => filterVal === "all" || item.status === filterVal)
+                          .map((item: any) => (
+                            <div key={item.code} className="border border-slate-100 rounded-lg p-2.5 bg-slate-50">
+                              <div className="flex items-start gap-2">
+                                <span className={`text-xs font-bold px-1.5 py-0.5 rounded shrink-0 ${itemStatusColor[item.status] || itemStatusColor.pending}`}>
+                                  {item.status?.toUpperCase() || "PENDING"}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs text-slate-800 leading-snug">{item.description}</p>
+                                  <p className="text-[10px] text-slate-400 mt-0.5">{item.code} · {item.isaRef}</p>
+                                  {item.comment && <p className="text-[10px] text-slate-500 mt-1 italic">{item.comment}</p>}
+                                </div>
+                              </div>
+                              {item.status === "pending" && (
+                                <div className="flex gap-1.5 mt-2">
+                                  {["pass", "fail", "n_a"].map(s => (
+                                    <button key={s}
+                                      onClick={() => onUpdateItem(doc.docType, item.code, s, "")}
+                                      className={`px-2 py-0.5 text-[11px] font-medium rounded ${
+                                        s === "pass" ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" :
+                                        s === "fail" ? "bg-red-100 text-red-700 hover:bg-red-200" :
+                                        "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                      } transition-colors`}
+                                    >{s === "n_a" ? "N/A" : s.toUpperCase()}</button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Signing workflow — for letter-type docs */}
+                  {!isChecklist && doc.hasContent && (
+                    <div className="border border-slate-200 rounded-lg p-3 bg-slate-50 space-y-2.5">
+                      <p className="text-xs font-semibold text-slate-700">
+                        {doc.docType === "independence_confirmation" ? "Record Confirmation" : "Record Signature"}
+                        {cfg.sigLabel && <span className="font-normal text-slate-500"> — {cfg.sigLabel}</span>}
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Signatory Name</label>
+                          <input
+                            value={sigf(doc.docType).name}
+                            onChange={e => setSigf(doc.docType, { name: e.target.value })}
+                            placeholder="Full name"
+                            className="w-full mt-0.5 border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Designation</label>
+                          <input
+                            value={sigf(doc.docType).designation}
+                            onChange={e => setSigf(doc.docType, { designation: e.target.value })}
+                            placeholder={doc.docType === "engagement_letter" ? "Director / CEO" : "Partner / Manager"}
+                            className="w-full mt-0.5 border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Date</label>
+                          <input
+                            type="date"
+                            value={sigf(doc.docType).date}
+                            onChange={e => setSigf(doc.docType, { date: e.target.value })}
+                            className="w-full mt-0.5 border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Notes (optional)</label>
+                          <input
+                            value={sigf(doc.docType).notes}
+                            onChange={e => setSigf(doc.docType, { notes: e.target.value })}
+                            placeholder="Any additional notes"
+                            className="w-full mt-0.5 border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2 flex-wrap">
+                        {doc.docType === "engagement_letter" && (
+                          <button
+                            onClick={() => onSign(doc.docType, { ...sigf(doc.docType), signatoryName: sigf(doc.docType).name, signatoryDesignation: sigf(doc.docType).designation, signingDate: sigf(doc.docType).date, action: "mark_sent" })}
+                            className="px-3 py-1.5 text-xs font-medium bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors"
+                          >📤 Mark as Sent to Client</button>
+                        )}
+                        <button
+                          onClick={() => onSign(doc.docType, { signatoryName: sigf(doc.docType).name, signatoryDesignation: sigf(doc.docType).designation, signingDate: sigf(doc.docType).date, notes: sigf(doc.docType).notes, action: "sign" })}
+                          disabled={!sigf(doc.docType).name}
+                          className="px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                        >✓ Record Signature</button>
+                        <button
+                          onClick={() => onSign(doc.docType, { signatoryName: sigf(doc.docType).name, signatoryDesignation: sigf(doc.docType).designation, signingDate: sigf(doc.docType).date, notes: sigf(doc.docType).notes, action: "reject" })}
+                          className="px-3 py-1.5 text-xs font-medium bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                        >✗ Reject / Re-issue</button>
+                      </div>
+                      {/* Show current signed status */}
+                      {doc.signatoryName && (
+                        <div className="pt-1.5 border-t border-slate-200">
+                          <p className="text-[10px] text-slate-500">
+                            Last action: <span className="font-medium text-slate-700">{doc.signatoryName}</span>
+                            {doc.signatoryDesignation && ` (${doc.signatoryDesignation})`}
+                            {doc.signingDate && ` · ${doc.signingDate}`}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle, onExportQuick, exportingQuick, onResolveException, onRefresh, loading, downloadingHeads, downloadedHeads, complianceDocs, complianceLoading, onGenerateComplianceDoc, onSignComplianceDoc, onUpdateChecklistItem }: any) {
   const dlSet: Set<number> = downloadingHeads || new Set();
   const dledSet: Set<number> = downloadedHeads || new Set();
   const wpHeads = (heads || []).filter((h: any) => h.headIndex >= 0);
@@ -10129,6 +10454,42 @@ function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle,
           </div>
         </div>
       </div>
+
+      {/* ── Compliance Documents Panel ── */}
+      {(complianceDocs || []).length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-gradient-to-r from-indigo-700 to-indigo-800 px-5 py-4 flex items-center gap-3">
+            <span className="text-slate-200 text-lg">📁</span>
+            <div>
+              <h2 className="font-semibold text-white text-sm">Compliance Documents</h2>
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                Engagement Letter · Independence Confirmation · Management Rep Letter · EQCR Checklist · Going Concern · SECP/CCG
+              </p>
+            </div>
+          </div>
+          <div className="p-4">
+            <ComplianceDocsPanel
+              docs={complianceDocs}
+              complianceLoading={complianceLoading}
+              onGenerate={onGenerateComplianceDoc}
+              onSign={onSignComplianceDoc}
+              onUpdateItem={onUpdateChecklistItem}
+              session={session}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Show generate compliance docs prompt if none exist */}
+      {(!complianceDocs || complianceDocs.length === 0) && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 flex items-start gap-3">
+          <span className="text-2xl">📁</span>
+          <div>
+            <p className="text-sm font-semibold text-indigo-800">Compliance Documents not loaded</p>
+            <p className="text-xs text-indigo-600 mt-1">Refresh the page or return to a previous stage and come back. Documents for Engagement Letter, EQCR, Management Rep Letter, Independence, Going Concern, and SECP/CCG will appear here once the session is loaded.</p>
+          </div>
+        </div>
+      )}
 
       {/* ── 4 Quick Export Cards ── */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
