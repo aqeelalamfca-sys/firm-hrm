@@ -21,21 +21,17 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
-// Pipeline: Upload → Data Extraction → Trial Balance → General Ledger → WP Listing → WP Generation → Export
+// Pipeline: Upload → Data Extraction → WP Listing → WP Generation → Export
 const STAGES = [
-  { key: "upload",        label: "Upload",         icon: Upload,        phase: "facts",    desc: "Template & Supporting Documents" },
-  { key: "extraction",    label: "Data Extraction",icon: Sparkles,      phase: "facts",    desc: "Template Filled + AI Filled variables — inline review, exceptions & confirmation" },
-  { key: "tb_generation", label: "Trial Balance",  icon: BarChart2,     phase: "judgment", desc: "AI-generated fully balanced Trial Balance – Zero Difference" },
-  { key: "gl_generation", label: "General Ledger", icon: GitMerge,      phase: "judgment", desc: "Transaction-wise GL – Fully reconciled with TB" },
+  { key: "upload",        label: "Upload",         icon: Upload,        phase: "facts",    desc: "Download the financial data template, fill it in, and upload the completed file" },
+  { key: "extraction",    label: "Data Extraction",icon: Sparkles,      phase: "facts",    desc: "Template-parsed variables — inline review, AI fill, exceptions & confirmation" },
   { key: "wp_listing",    label: "WP Listing",     icon: ClipboardList, phase: "output",   desc: "AI-recommended WP selection — choose which papers to generate" },
   { key: "generation",    label: "WP Generation",  icon: FileCheck,     phase: "output",   desc: "Sequential AI generation of all WP sections (ISA Compliant)" },
-  { key: "export",        label: "Export",         icon: Download,      phase: "output",   desc: "TB Excel · GL Excel · WP Excel · WP Word" },
+  { key: "export",        label: "Export",         icon: Download,      phase: "output",   desc: "WP Excel · WP Word · Full Audit Bundle" },
 ] as const;
 
 const FILE_CATEGORIES = [
   { value: "financial_statements", label: "Financial Statements", format: "Excel (.xlsx)" },
-  { value: "trial_balance", label: "Trial Balance", format: "Excel (.xlsx)" },
-  { value: "general_ledger", label: "General Ledger", format: "Excel (.xlsx)" },
   { value: "bank_statement", label: "Bank Statement", format: "Excel (.xlsx)" },
   { value: "sales_tax_return", label: "Sales Tax Return", format: "PDF" },
   { value: "tax_notice", label: "Tax Notice / Assessment", format: "PDF" },
@@ -44,7 +40,7 @@ const FILE_CATEGORIES = [
   { value: "other", label: "Other Document", format: "Any" },
 ];
 
-const EXCEL_CATEGORIES = ["financial_statements", "trial_balance", "general_ledger", "bank_statement"];
+const EXCEL_CATEGORIES = ["financial_statements", "bank_statement"];
 const PDF_CATEGORIES = ["sales_tax_return", "tax_notice", "annexure"];
 
 const HEAD_COLORS: Record<string, string> = {
@@ -152,8 +148,8 @@ export default function WorkingPapers() {
     variables:    "extraction",
     generation:   "generation",
     wp_listing:   "wp_listing",
-    gl_generation:"gl_generation",
-    tb_generation:"tb_generation",
+    gl_generation:"wp_listing",
+    tb_generation:"wp_listing",
     extraction:   "extraction",
     upload:       "upload",
     export:       "export",
@@ -840,10 +836,15 @@ export default function WorkingPapers() {
         method: "POST", headers: { ...headers, "Content-Type": "application/json" },
       });
       if (res.ok) {
-        toast({ title: "Variables locked, generation unlocked" });
+        toast({ title: "Variables locked — processing financial data", description: "Preparing your data for WP selection…" });
+        // Silently generate TB/GL in background — no UI stage shown
+        fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/generate-tb-gl`, {
+          method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+        }).catch(() => {});
         await fetchSession(activeSession.id);
         await fetchExceptions();
-        setStage("generation");
+        fetchWpTriggers();
+        setStage("wp_listing");
       } else {
         const err = await res.json();
         if (err.missing?.length > 0) {
@@ -1127,12 +1128,12 @@ export default function WorkingPapers() {
   };
 
   const [exportingQuick, setExportingQuick] = useState<string | null>(null);
-  const exportQuick = async (jobType: "tb_excel" | "gl_excel" | "wp_excel" | "wp_word") => {
+  const exportQuick = async (jobType: "wp_excel" | "wp_word" | "full_bundle") => {
     if (!activeSession || exportingQuick) return;
     setExportingQuick(jobType);
     try {
       const ext = jobType === "wp_word" ? "docx" : "xlsx";
-      const label = { tb_excel: "TB", gl_excel: "GL", wp_excel: "WP_Index", wp_word: "WP_Index" }[jobType];
+      const label = { wp_excel: "WP_Index", wp_word: "WP_Index", full_bundle: "Bundle" }[jobType];
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/generate-output`, {
         method: "POST", headers,
         body: JSON.stringify({ jobType, triggeredBy: "User" }),
@@ -1422,7 +1423,7 @@ export default function WorkingPapers() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {sessions.map((s: any) => {
-                  const stageOrder = ["upload","extraction","tb_generation","gl_generation","wp_listing","generation","export"];
+                  const stageOrder = ["upload","extraction","wp_listing","generation","export"];
                   const stageIdx = stageOrder.indexOf(s.status);
                   const progressPct = stageIdx < 0 ? 0 : Math.round(((stageIdx + 1) / stageOrder.length) * 100);
                   const isDone = s.status === "completed" || s.status === "exported";
@@ -1531,9 +1532,8 @@ export default function WorkingPapers() {
 
           {/* Phase strip */}
           <div className="hidden sm:flex items-center gap-0 pt-2 pb-0 text-[9px] font-bold uppercase tracking-widest">
-            {([ 
+            {([
               { label: "Facts", keys: ["upload","extraction"] as string[], color: "blue" },
-              { label: "Audit Judgment", keys: ["tb_generation","gl_generation"] as string[], color: "violet" },
               { label: "Defensible Output", keys: ["wp_listing","generation","export"] as string[], color: "emerald" },
             ]).map((ph, pi) => {
               const phaseStages = STAGES.filter(s => ph.keys.includes(s.key));
@@ -1547,7 +1547,7 @@ export default function WorkingPapers() {
                   <span className={cn(
                     "px-1",
                     isCurrentPhase
-                      ? ph.color === "blue" ? "text-blue-300" : ph.color === "violet" ? "text-violet-300" : "text-emerald-300"
+                      ? ph.color === "blue" ? "text-blue-300" : "text-emerald-300"
                       : isPastPhase ? "text-slate-500" : "text-slate-600"
                   )}>{ph.label}</span>
                 </div>
@@ -1579,17 +1579,11 @@ export default function WorkingPapers() {
                   onClick={() => {
                     setStage(s.key);
                     if (s.key === "extraction") {
-                      // If no variables yet but files are uploaded, auto-run parse + fill pipeline
                       if (variables.length === 0 && (activeSession?.files?.length ?? 0) > 0) {
                         handleExtractData();
                       } else {
                         fetchVariables();
-                        fetchCoaData();
                       }
-                    }
-                    if (s.key === "tb_generation" || s.key === "gl_generation") {
-                      fetchCoaData();
-                      if (!auditMaster) { fetchAuditMaster(); fetchSampling(); fetchAnalytics(); fetchControlMatrix(); fetchEvidence(); }
                     }
                     if (s.key === "wp_listing") { fetchWpTriggers(); fetchSession(activeSession.id); }
                     if (s.key === "generation" || s.key === "export") { fetchSession(activeSession.id); fetchExceptions(); }
@@ -1612,15 +1606,13 @@ export default function WorkingPapers() {
           <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest shrink-0">Engine</span>
           <span className="text-white/10">|</span>
           {[
-            { step: "Upload",          phase: "facts",    active: stage === "upload" },
-            { step: "Data Extraction", phase: "facts",    active: stage === "extraction" },
-            { step: "Trial Balance",   phase: "judgment", active: stage === "tb_generation" },
-            { step: "General Ledger",  phase: "judgment", active: stage === "gl_generation" },
-            { step: "WP Listing",      phase: "output",   active: stage === "wp_listing" },
-            { step: "WP Generation",   phase: "output",   active: stage === "generation" },
-            { step: "Export",          phase: "output",   active: stage === "export" },
+            { step: "Upload",          phase: "facts",  active: stage === "upload" },
+            { step: "Data Extraction", phase: "facts",  active: stage === "extraction" },
+            { step: "WP Listing",      phase: "output", active: stage === "wp_listing" },
+            { step: "WP Generation",   phase: "output", active: stage === "generation" },
+            { step: "Export",          phase: "output", active: stage === "export" },
           ].map((item, idx) => {
-            const stageOrder = ["upload","extraction","tb_generation","gl_generation","wp_listing","generation","export"];
+            const stageOrder = ["upload","extraction","wp_listing","generation","export"];
             const pastIdx = stageOrder.indexOf(stage);
             const isPast = pastIdx > idx;
             return (
@@ -1636,7 +1628,7 @@ export default function WorkingPapers() {
             );
           })}
           <span className="text-white/10 ml-1">|</span>
-          <span className="text-[10px] text-slate-600 italic shrink-0 hidden lg:block">Template provides FACTS → AI converts FACTS into AUDIT JUDGMENT → System produces DEFENSIBLE WORKING PAPERS</span>
+          <span className="text-[10px] text-slate-600 italic shrink-0 hidden lg:block">Template provides FACTS → System produces DEFENSIBLE WORKING PAPERS</span>
         </div>
       </div>
 
@@ -1746,40 +1738,7 @@ export default function WorkingPapers() {
         />
       )}
 
-      {/* TAB 3 — Trial Balance */}
-      {stage === "tb_generation" && (
-        <TbGenerationStage
-          coaData={coaData}
-          tbGlProgress={tbGlProgress}
-          onGenerateTbGl={generateTbGl}
-          onPopulate={populateCoa}
-          onUpdate={updateCoaRow}
-          onValidate={validateCoa}
-          onApprove={approveCoa}
-          onRefresh={fetchCoaData}
-          onRunRecon={runRecon}
-          reconResults={reconResults}
-          loading={coaLoading || loading}
-          session={activeSession}
-          onNext={() => setStage("gl_generation")}
-        />
-      )}
-
-      {/* TAB 6 — General Ledger */}
-      {stage === "gl_generation" && (
-        <GlGenerationStage
-          auditMaster={auditMaster}
-          tbGlProgress={tbGlProgress}
-          onGenerateTbGl={generateTbGl}
-          reconResults={reconResults}
-          onRunRecon={runRecon}
-          loading={auditMasterLoading || loading}
-          session={activeSession}
-          onNext={() => { fetchWpTriggers(); fetchSession(activeSession.id); setStage("wp_listing"); }}
-        />
-      )}
-
-      {/* TAB 5 — WP Listing */}
+      {/* TAB 3 — WP Listing */}
       {stage === "wp_listing" && (
         <WpListingStage
           heads={heads}
@@ -1792,15 +1751,13 @@ export default function WorkingPapers() {
         />
       )}
 
-      {/* TAB 6 — WP Generation */}
+      {/* TAB 4 — WP Generation */}
       {stage === "generation" && (
         <GenerationStage
           heads={heads}
           session={activeSession}
           exceptions={exceptions}
           onGenerate={generateHead}
-          onGenerateTbGl={generateTbGl}
-          tbGlProgress={tbGlProgress}
           onApprove={approveHead}
           onExport={exportHead}
           onAutoProcessAll={autoProcessAll}
@@ -5810,9 +5767,10 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
   );
 }
 
-function GenerationStage({ heads, session, exceptions, onGenerate, onGenerateTbGl, tbGlProgress, onApprove, onExport, onAutoProcessAll, onResolveException, loading, onRefresh, autoChainRunning, autoChainCurrentHead, onStopChain }: any) {
+function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, onExport, onAutoProcessAll, onResolveException, loading, onRefresh, autoChainRunning, autoChainCurrentHead, onStopChain }: any) {
   const allExceptions: any[] = exceptions || [];
-  const allHeads: any[] = heads || [];
+  // Heads 0 (TB) and 1 (GL) are generated silently; show only WP heads from index 2
+  const allHeads: any[] = (heads || []).filter((h: any) => h.headIndex >= 2);
   const [approvalInProgress, setApprovalInProgress] = useState(false);
   const [expandedHead, setExpandedHead] = useState<number | null>(null);
 
@@ -5871,104 +5829,8 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onGenerateTbG
     }
   };
 
-  const tbGlStages: { stage: string; status: "pending" | "ok" | "warn" | "fail"; detail: string }[] =
-    tbGlProgress?.stages || [];
-
-  const stageStatusIcon = (s: string) => {
-    if (s === "ok") return <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />;
-    if (s === "warn") return <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />;
-    if (s === "fail") return <X className="w-4 h-4 text-red-500 shrink-0" />;
-    if (tbGlProgress?.running) return <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />;
-    return <div className="w-4 h-4 rounded-full border-2 border-slate-200 shrink-0" />;
-  };
-
   return (
     <div className="space-y-5">
-
-      {/* ── Unified TB & GL Engine Panel ────────────────────────────────── */}
-      <div className={cn(
-        "rounded-xl border overflow-hidden transition-all",
-        tbGlProgress?.result?.status === "complete" ? "border-emerald-200 bg-emerald-50/30" :
-        tbGlProgress?.result?.status === "complete_with_warnings" ? "border-amber-200 bg-amber-50/20" :
-        tbGlProgress?.result?.status === "error" ? "border-red-200 bg-red-50/20" :
-        "border-blue-200 bg-blue-50/20"
-      )}>
-        <div className="px-4 py-3.5 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center shrink-0 shadow-sm">
-              <Play className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <p className="font-semibold text-slate-900 text-sm">Generate TB & GL</p>
-              <p className="text-[11px] text-slate-500">Full pipeline: CoA Mapping → Trial Balance → General Ledger → 3-Way Reconciliation</p>
-            </div>
-          </div>
-          <Button
-            onClick={onGenerateTbGl}
-            disabled={loading || tbGlProgress?.running}
-            className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white shadow-sm text-sm font-medium shrink-0"
-          >
-            {tbGlProgress?.running
-              ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Generating...</>
-              : tbGlProgress?.result
-              ? <><RefreshCw className="w-4 h-4 mr-2" /> Re-generate</>
-              : <><Play className="w-4 h-4 mr-2" /> Generate TB & GL</>
-            }
-          </Button>
-        </div>
-
-        {(tbGlProgress?.running || tbGlStages.length > 0) && (
-          <div className="border-t border-slate-100 px-4 py-3 bg-white/60">
-            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-              {(tbGlStages.length > 0
-                ? tbGlStages
-                : ["Input Extraction","Trial Balance","General Ledger","Reconciliation","Enforcement Check"].map(s => ({ stage: s, status: "pending" as const, detail: "Waiting..." }))
-              ).map((s: any, idx: number) => (
-                <div key={idx} className="flex items-center gap-2 flex-1 min-w-0">
-                  {stageStatusIcon(s.status)}
-                  <div className="min-w-0 flex-1">
-                    <p className={cn("text-xs font-medium truncate",
-                      s.status === "ok" ? "text-emerald-700" :
-                      s.status === "fail" ? "text-red-600" :
-                      s.status === "warn" ? "text-amber-700" : "text-slate-500"
-                    )}>
-                      {s.stage}
-                    </p>
-                    {s.detail && s.detail !== "Waiting..." && (
-                      <p className="text-[10px] text-slate-400 truncate leading-tight">{s.detail}</p>
-                    )}
-                  </div>
-                  {idx < 4 && <div className="hidden sm:block w-5 h-px bg-slate-200 shrink-0 mx-1" />}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tbGlProgress?.result && (
-          <div className="border-t border-slate-100 px-4 py-3 bg-white/40 grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="text-center">
-              <p className="text-lg font-bold text-slate-900">{tbGlProgress.result.tb?.lineCount ?? "—"}</p>
-              <p className="text-[10px] text-slate-500">TB Accounts</p>
-            </div>
-            <div className="text-center">
-              <p className={cn("text-lg font-bold", tbGlProgress.result.tb?.balanced ? "text-emerald-600" : "text-red-600")}>
-                {tbGlProgress.result.tb?.balanced ? "Balanced ✓" : "Imbalanced ✗"}
-              </p>
-              <p className="text-[10px] text-slate-500">TB Status</p>
-            </div>
-            <div className="text-center">
-              <p className="text-lg font-bold text-slate-900">{tbGlProgress.result.gl?.accounts ?? "—"}</p>
-              <p className="text-[10px] text-slate-500">GL Accounts</p>
-            </div>
-            <div className="text-center">
-              <p className="text-lg font-bold text-slate-900">{tbGlProgress.result.gl?.entries ?? "—"}</p>
-              <p className="text-[10px] text-slate-500">GL Entries</p>
-            </div>
-          </div>
-        )}
-      </div>
-      {/* ── End Unified Panel ───────────────────────────────────────────── */}
 
       {/* ── Auto-chain progress banner ──────────────────────────────────── */}
       {autoChainRunning && (
@@ -9510,9 +9372,11 @@ function ReviewStage({ heads, session, exceptions, onApprove, onResolveException
 function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle, onExportQuick, exportingQuick, onResolveException, onRefresh, loading, downloadingHeads, downloadedHeads }: any) {
   const dlSet: Set<number> = downloadingHeads || new Set();
   const dledSet: Set<number> = downloadedHeads || new Set();
-  const completedHeads = (heads || []).filter((h: any) => ["approved", "exported", "completed"].includes(h.status));
+  // Exclude TB (headIndex 0) and GL (headIndex 1) from the export list — generated silently
+  const wpHeads = (heads || []).filter((h: any) => h.headIndex >= 2);
+  const completedHeads = wpHeads.filter((h: any) => ["approved", "exported", "completed"].includes(h.status));
   const openExceptions = (exceptions || []).filter((e: any) => e.status === "open");
-  const totalHeads = (heads || []).length;
+  const totalHeads = wpHeads.length;
   const exportPct = totalHeads > 0 ? Math.round((completedHeads.length / totalHeads) * 100) : 0;
   const [exportingAll, setExportingAll] = useState(false);
 
@@ -9525,8 +9389,6 @@ function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle,
   };
 
   const QUICK_EXPORTS = [
-    { key: "tb_excel",  label: "Trial Balance",     ext: ".xlsx", icon: FileText,  color: "blue",   desc: "All TB lines with classifications, debit/credit, confidence" },
-    { key: "gl_excel",  label: "General Ledger",    ext: ".xlsx", icon: Layers,    color: "violet", desc: "Source GL entries with narrations, vouchers, running balances" },
     { key: "wp_excel",  label: "WP Index (Excel)",  ext: ".xlsx", icon: FileCheck, color: "emerald",desc: "Working paper listing — phases, status, prepared/approved by" },
     { key: "wp_word",   label: "WP Index (Word)",   ext: ".docx", icon: FileText,  color: "indigo", desc: "ISA-formatted Word document suitable for physical audit file" },
   ] as const;
@@ -9583,7 +9445,7 @@ function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle,
           <Download className="w-5 h-5 text-slate-300 shrink-0" />
           <div>
             <h2 className="font-semibold text-white text-sm">Quick Document Export</h2>
-            <p className="text-[11px] text-slate-400 mt-0.5">Download individual output files — TB Excel · GL Excel · WP Excel · WP Word</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Download working paper output files — WP Index (Excel) · WP Index (Word)</p>
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4">
@@ -9659,7 +9521,7 @@ function ExportStage({ heads, session, exceptions, onExportHead, onExportBundle,
               )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {(heads || []).map((head: any) => {
+              {wpHeads.map((head: any) => {
                 const canExport = ["approved", "exported", "completed"].includes(head.status);
                 const isDownloading = dlSet.has(head.headIndex);
                 const isDownloaded = dledSet.has(head.headIndex);

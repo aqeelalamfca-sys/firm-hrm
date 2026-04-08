@@ -1,0 +1,198 @@
+✅ ULTIMATE MASTER PROMPT — WORKING PAPER FORMAT UPGRADE
+
+Prompt:
+
+Scan the entire working paper system and upgrade the format to a fully professional, ISA-compliant, audit-defensible documentation framework without changing core structure or existing data.
+
+Enhance every working paper (PP, DI, IR, OB, PL, EX, EV, FN, DL, QR, IN) to include the following mandatory standardized structure and compliance layers, ensuring consistency across all 73+ working papers:
+
+1. STANDARD HEADER (ENHANCED)
+Firm Name, Client Name, Engagement Code, Financial Year
+WP Reference (auto-coded), Version Control (v1, v2…), Status
+Prepared By / Reviewed By / Approved By (with timestamps & user IDs)
+ISA References (auto-linked to procedures)
+Risk Level Tag (Low / Medium / High / Significant Risk)
+FS Area Tag + Assertions (C, E, A, V, R, P)
+2. OBJECTIVE (REFINED)
+Rewrite to be ISA-aligned, specific, and measurable
+Auto-link objective with:
+Risk identified (ISA 315)
+Planned response (ISA 330)
+3. RISK & ASSERTION LINKAGE (NEW SECTION – MANDATORY)
+
+Add structured table:
+
+Risk Description
+Risk Type (Inherent / Control / Fraud)
+FS Area
+Assertions Impacted
+Risk Level
+Link to Risk Register (PL-03 / DI-07)
+4. PROCEDURES PERFORMED (UPGRADE)
+
+Convert generic bullet points into:
+
+Structured procedures table:
+Procedure ID
+Nature (Test of Control / Substantive / Analytical)
+Description
+ISA Reference
+Performed By
+Date
+Status (Done / Pending / Exception)
+
+Ensure:
+
+Each procedure maps to a risk and assertion
+No generic procedures allowed
+5. TESTING & RESULTS (NEW CORE SECTION)
+
+Add detailed testing layer:
+
+Population Size
+Sampling Method (ISA 530)
+Sample Size
+Items Tested
+Exceptions Identified
+Exception Rate %
+
+Include:
+
+Hyperlink to supporting documents
+Cross-reference to GL/TB
+6. EVIDENCE DOCUMENTATION (ISA 500 / 230 COMPLIANT)
+
+Add structured evidence table:
+
+Evidence ID
+Type (External/Internal/Analytical)
+Source
+Reliability Level
+Linked Procedure
+File Link
+
+Ensure:
+
+Every conclusion is backed by evidence
+No orphan conclusions allowed
+7. ANALYSIS & AUDITOR JUDGEMENT (NEW – CRITICAL)
+
+Add narrative block:
+
+Interpretation of results
+Professional judgment applied
+Contradictions or anomalies
+Corroboration with other audit areas
+8. CONCLUSION (STANDARDIZED & CONTROLLED)
+
+Replace current free text with:
+
+Dropdown Conclusion:
+Satisfactory
+Satisfactory with Exception
+Unsatisfactory
+Not Applicable
+Mandatory fields:
+Basis of conclusion
+Impact on audit opinion
+Further actions required
+9. ACTION POINTS (ENHANCED TRACKING)
+
+Convert into structured tracker:
+
+Issue ID
+Description
+Risk Impact
+Assigned To
+Deadline
+Status
+
+Auto-link to:
+
+Review Notes
+Finalization checklist
+10. SIGN-OFF & REVIEW LAYER (ISQM-1 / ISA 220)
+
+Upgrade sign-off to:
+
+Multi-level approvals:
+Staff → Senior → Manager → Partner → EQCR
+Each level:
+Conclusion override option
+Review comments log
+
+Add:
+
+Lock after Partner sign-off
+Audit trail (who changed what & when)
+11. CROSS-REFERENCING SYSTEM (CRITICAL FIX)
+
+Implement:
+
+Auto WP linking (e.g., DI-06 → PL-05 → EX-BS-01)
+TB ↔ GL ↔ FS ↔ WP linkage
+Clickable references across all working papers
+12. FORMATTING & PROFESSIONAL DESIGN
+
+Upgrade UI/format:
+
+Clean Big4-style layout
+Section separators
+Consistent fonts (Inter / professional audit style)
+Color-coded status:
+Green = Complete
+Yellow = In Progress
+Red = Pending / Risk
+13. AUTOMATION & AI INTEGRATION
+
+Ensure:
+
+AI auto-fills:
+Risks
+Procedures
+Conclusions (as draft only)
+All fields remain editable
+AI suggestions clearly tagged “DRAFT”
+14. COMPLIANCE GATES (STRICT)
+
+Add system-level controls:
+
+No WP marked complete unless:
+Procedures executed
+Evidence attached
+Conclusion selected
+No audit finalization unless:
+ISA 230 documentation complete
+ISA 580 signed
+Misstatements cleared (ISA 450)
+15. CONSISTENCY RULE
+
+Apply this format uniformly across:
+
+All phases (Pre-Planning to Inspection)
+All FS heads
+All templates
+FINAL INSTRUCTION
+
+Scan entire system → identify missing elements → upgrade all working papers → recheck → auto-fix inconsistencies → repeat until:
+
+“100% ISA-compliant, professionally formatted, audit-defensible working paper system achieved — no gaps, no duplication, no generic content.”
+
+Do not redesign structure unnecessarily. Only enhance, standardize, and strengthen.
+
+🔍 Key Observations from Your File (Why This Prompt Works)
+
+From your uploaded working papers:
+
+Structure is good but basic
+Missing:
+Risk–procedure–conclusion linkage
+Evidence mapping
+Testing details
+Assertion-level audit logic
+Many sections show:
+“Not populated / pending” → no enforcement layer
+Conclusions are generic and repetitive
+No audit trail / review hierarchy / EQCR logic
+
+👉 This prompt directly fixes all those gaps and upgrades it to inspection-ready level (QCR / ISQM-1 compliant).
