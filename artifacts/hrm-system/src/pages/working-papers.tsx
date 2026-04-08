@@ -3047,14 +3047,11 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
     return raw;
   };
 
-  // Format currency values
+  // Format currency values — full amounts with comma separators (no M/K/B abbreviation)
   const fmt = (v: string) => {
     const n = Number(v);
     if (isNaN(n) || v === "") return "—";
-    if (Math.abs(n) >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + "B";
-    if (Math.abs(n) >= 1_000_000)     return (n / 1_000_000).toFixed(2) + "M";
-    if (Math.abs(n) >= 1_000)         return (n / 1_000).toFixed(1) + "K";
-    return n.toLocaleString();
+    return n.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   };
 
   // Small read-only field display
@@ -3081,10 +3078,10 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
     const pyV = fmt(py);
     const empty = cyV === "—" && pyV === "—";
     return (
-      <div className={cn("grid grid-cols-3 text-[11px] py-1 border-b border-slate-50", empty && "opacity-40", indent && "pl-4")}>
-        <span className="text-slate-600 font-medium">{label}</span>
-        <span className={cn("text-right font-mono", cyV !== "—" ? "text-slate-800 font-semibold" : "text-slate-300")}>{cyV}</span>
-        <span className={cn("text-right font-mono text-slate-500", pyV !== "—" ? "" : "text-slate-300")}>{pyV}</span>
+      <div className={cn("grid py-1 border-b border-slate-50", empty && "opacity-40", indent ? "pl-4" : "")} style={{ gridTemplateColumns: "1fr auto auto" }}>
+        <span className="text-[11px] text-slate-600 font-medium pr-2 truncate">{label}</span>
+        <span className={cn("text-right font-mono text-[10px] tabular-nums w-32 pl-2", cyV !== "—" ? "text-slate-800 font-semibold" : "text-slate-300")}>{cyV}</span>
+        <span className={cn("text-right font-mono text-[10px] tabular-nums w-28 pl-2 text-slate-500", pyV !== "—" ? "" : "text-slate-300")}>{pyV}</span>
       </div>
     );
   };
@@ -3302,10 +3299,10 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
             </p>
 
             {/* Column headers */}
-            <div className="grid grid-cols-3 text-[9px] font-bold text-slate-400 uppercase tracking-wide pb-1 border-b border-slate-200 mb-1">
+            <div className="grid pb-1 border-b border-slate-200 mb-1 text-[9px] font-bold text-slate-400 uppercase tracking-wide" style={{ gridTemplateColumns: "1fr auto auto" }}>
               <span>Line</span>
-              <span className="text-right">CY {session?.engagementYear || ""}</span>
-              <span className="text-right">PY {session?.engagementYear ? Number(session.engagementYear) - 1 : ""}</span>
+              <span className="text-right w-32 pl-2">CY {session?.engagementYear || ""}</span>
+              <span className="text-right w-28 pl-2">PY {session?.engagementYear ? Number(session.engagementYear) - 1 : ""}</span>
             </div>
 
             {/* ── Balance Sheet ── */}
