@@ -1796,6 +1796,7 @@ export default function WorkingPapers() {
         <ExtractionStage
           data={extractionData}
           session={activeSession}
+          variables={variables}
           onRefreshVariables={() => { fetchVariables(); fetchCoaData(); }}
           onRerun={handleExtractData}
           onAiFill={handleAiFill}
@@ -3030,12 +3031,64 @@ function TemplateParsedPanel({ result, onClear }: { result: any; onClear: () => 
   );
 }
 
-function ExtractionStage({ data, session, onRefreshVariables, onRerun, onAiFill, onOpenAiSettings, loading, confidenceBadge, onNext }: any) {
+function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun, onAiFill, onOpenAiSettings, loading, confidenceBadge, onNext }: any) {
   const extractionData = data?.data || session?.extractionData;
   const stats = data?.stats;
-  const [showRawResults, setShowRawResults] = useState(false);
 
   const hasFlags = extractionData?.flags && extractionData.flags.length > 0;
+
+  // Helper: look up a variable's finalValue by code from the variables array
+  const varVal = (code: string): string => {
+    const found = (variables || []).find((v: any) => v.variableCode === code);
+    const raw = found?.finalValue;
+    if (!raw || raw === "N/A" || raw.trim() === "") return "";
+    return raw;
+  };
+
+  // Format currency values
+  const fmt = (v: string) => {
+    const n = Number(v);
+    if (isNaN(n) || v === "") return "—";
+    if (Math.abs(n) >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + "B";
+    if (Math.abs(n) >= 1_000_000)     return (n / 1_000_000).toFixed(2) + "M";
+    if (Math.abs(n) >= 1_000)         return (n / 1_000).toFixed(1) + "K";
+    return n.toLocaleString();
+  };
+
+  // Small read-only field display
+  const F = ({ label, value, source }: { label: string; value: string | undefined; source?: "form" | "template" }) => {
+    const v = value || "";
+    const empty = !v;
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+          {label}
+          {source === "form"     && <span className="text-[8px] text-blue-400 font-normal normal-case tracking-normal">📝</span>}
+          {source === "template" && <span className="text-[8px] text-teal-400 font-normal normal-case tracking-normal">📋</span>}
+        </span>
+        <span className={cn("text-[12px] font-medium leading-tight", empty ? "text-slate-300 italic" : "text-slate-800")}>
+          {v || "—"}
+        </span>
+      </div>
+    );
+  };
+
+  // Financial row inside the balance sheet / P&L grid
+  const FinRow = ({ label, cy, py, indent = false }: { label: string; cy: string; py: string; indent?: boolean }) => {
+    const cyV = fmt(cy);
+    const pyV = fmt(py);
+    const empty = cyV === "—" && pyV === "—";
+    return (
+      <div className={cn("grid grid-cols-3 text-[11px] py-1 border-b border-slate-50", empty && "opacity-40", indent && "pl-4")}>
+        <span className="text-slate-600 font-medium">{label}</span>
+        <span className={cn("text-right font-mono", cyV !== "—" ? "text-slate-800 font-semibold" : "text-slate-300")}>{cyV}</span>
+        <span className={cn("text-right font-mono text-slate-500", pyV !== "—" ? "" : "text-slate-300")}>{pyV}</span>
+      </div>
+    );
+  };
+
+  const templateVarsFilled = (variables || []).filter((v: any) => TEMPLATE_VARS.has(v.variableCode) && v.finalValue && v.finalValue.trim() !== "" && v.finalValue !== "N/A").length;
+  const formVarsFilled     = (variables || []).filter((v: any) => FORM_VARS.has(v.variableCode) && v.finalValue && v.finalValue.trim() !== "" && v.finalValue !== "N/A").length;
 
   return (
     <div className="space-y-4">
@@ -3050,19 +3103,12 @@ function ExtractionStage({ data, session, onRefreshVariables, onRerun, onAiFill,
             <p className="font-semibold text-sm text-slate-900">Data Extraction Results</p>
             <p className="text-[11px] text-slate-400 mt-0.5">
               {stats
-                ? `${stats.files} file${stats.files !== 1 ? "s" : ""} · ${stats.sheets} sheet${stats.sheets !== 1 ? "s" : ""} · ${stats.pages} page${stats.pages !== 1 ? "s" : ""} scanned — data pushed to variables below`
-                : extractionData
-                ? "Extraction complete — data pushed to variables below"
-                : "Template variables loaded below — use AI Filled to complete all remaining fields"}
+                ? `${stats.files} file${stats.files !== 1 ? "s" : ""} · ${stats.sheets} sheet${stats.sheets !== 1 ? "s" : ""} · ${stats.pages} page${stats.pages !== 1 ? "s" : ""} scanned`
+                : "Review extracted data below — proceed to Variables when ready"}
             </p>
           </div>
         </div>
         <div className="flex gap-2 shrink-0 flex-wrap">
-          {extractionData && (
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowRawResults(v => !v)}>
-              <Eye className="w-3 h-3 mr-1" /> {showRawResults ? "Hide" : "Show"} Raw Results
-            </Button>
-          )}
           <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onRerun} disabled={loading}>
             <RefreshCw className={cn("w-3 h-3 mr-1", loading && "animate-spin")} /> Re-extract from Template
           </Button>
@@ -3078,19 +3124,38 @@ function ExtractionStage({ data, session, onRefreshVariables, onRerun, onAiFill,
               : <><Sparkles className="w-3 h-3 mr-1" /> AI Filled</>
             }
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0 text-slate-400 hover:text-violet-600"
-            onClick={onOpenAiSettings}
-            title="Configure AI provider and API key"
-          >
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-400 hover:text-violet-600" onClick={onOpenAiSettings} title="Configure AI provider">
             <Settings className="w-3.5 h-3.5" />
           </Button>
         </div>
       </div>
 
-      {/* ── Flags warning (always visible if present) ── */}
+      {/* ── Source summary pills ── */}
+      <div className="flex flex-wrap gap-2">
+        <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
+          <span className="text-blue-600 text-sm">📝</span>
+          <div>
+            <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wide">Form Data</p>
+            <p className="text-[11px] text-blue-600">{formVarsFilled} engagement fields populated</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-lg px-3 py-1.5">
+          <span className="text-teal-600 text-sm">📋</span>
+          <div>
+            <p className="text-[10px] font-bold text-teal-700 uppercase tracking-wide">Template Data</p>
+            <p className="text-[11px] text-teal-600">{templateVarsFilled} financial variables populated</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-1.5">
+          <span className="text-purple-600 text-sm">⚙️</span>
+          <div>
+            <p className="text-[10px] font-bold text-purple-700 uppercase tracking-wide">System / AI</p>
+            <p className="text-[11px] text-purple-600">Remaining variables pending AI fill</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Flags warning ── */}
       {hasFlags && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
           <h3 className="text-xs font-semibold text-amber-800 mb-2 flex items-center gap-1.5">
@@ -3106,50 +3171,194 @@ function ExtractionStage({ data, session, onRefreshVariables, onRerun, onAiFill,
         </div>
       )}
 
-      {/* ── Raw AI results — collapsible ── */}
-      {showRawResults && extractionData && (
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
-            <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Raw AI Extraction Output</span>
+      {/* ════════════════════════════════════════════════════════
+          SECTION A — FORM DATA (from engagement creation form)
+      ════════════════════════════════════════════════════════ */}
+      <div className="bg-white border border-blue-100 rounded-xl overflow-hidden">
+        {/* Header */}
+        <div className="px-5 py-3 bg-blue-50/60 border-b border-blue-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-base">📝</span>
+            <div>
+              <p className="text-sm font-semibold text-blue-900">Form Data</p>
+              <p className="text-[10px] text-blue-500">Captured at engagement creation — maps directly to variables</p>
+            </div>
           </div>
-          <div className="p-4 space-y-4">
-            {extractionData.entity && (
-              <div>
-                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Entity Profile</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
-                  {Object.entries(extractionData.entity).filter(([, v]) => v && typeof v !== "object").map(([k, v]) => (
-                    <div key={k} className="flex items-baseline gap-1.5">
-                      <span className="text-[11px] text-slate-400 capitalize shrink-0">{k.replace(/_/g, " ")}:</span>
-                      <span className="text-xs font-medium text-slate-800 truncate">{String(v)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {extractionData.confidence_scores && (
-              <div>
-                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Confidence Scores</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                  {Object.entries(extractionData.confidence_scores).map(([k, v]) => {
-                    const n = Number(v);
-                    return (
-                      <div key={k} className="flex items-center gap-2 bg-slate-50 rounded-lg p-2 border border-slate-100">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] text-slate-500 capitalize truncate">{k.replace(/_/g, " ")}</p>
-                          <div className="w-full h-1 bg-slate-200 rounded-full mt-1 overflow-hidden">
-                            <div className={cn("h-full rounded-full", n >= 85 ? "bg-emerald-500" : n >= 70 ? "bg-amber-500" : "bg-red-500")} style={{ width: `${Math.min(n, 100)}%` }} />
-                          </div>
-                        </div>
-                        {confidenceBadge(n)}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
+          <span className="text-[9px] font-bold bg-blue-100 text-blue-600 rounded-full px-2 py-0.5 uppercase tracking-wide">{formVarsFilled} fields</span>
         </div>
-      )}
+
+        <div className="p-5 space-y-5">
+
+          {/* Entity Details */}
+          <div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+              <span className="inline-block w-3 h-px bg-slate-300" /> Entity Details
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+              <F label="Entity Name"     value={session?.clientName}          source="form" />
+              <F label="Legal Form"      value={session?.entityType || varVal("entity_legal_form")} source="form" />
+              <F label="NTN"             value={session?.ntn || varVal("ntn")} source="form" />
+              <F label="STRN"            value={session?.strn || varVal("strn")} source="form" />
+              <F label="Industry Sector" value={varVal("industry_sector")}     source="form" />
+              <F label="Provinces"       value={varVal("provinces_of_operation")} source="form" />
+              <F label="Company Law"     value={varVal("applicable_company_law")} source="form" />
+            </div>
+          </div>
+
+          <div className="border-t border-slate-100" />
+
+          {/* Reporting Period */}
+          <div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+              <span className="inline-block w-3 h-px bg-slate-300" /> Reporting Period & Framework
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-4">
+              <F label="Engagement Year"     value={String(session?.engagementYear || "")} source="form" />
+              <F label="Period Start"        value={session?.periodStart || varVal("reporting_period_start")} source="form" />
+              <F label="Period End"          value={session?.periodEnd   || varVal("reporting_period_end")}   source="form" />
+              <F label="Framework"           value={session?.reportingFramework || varVal("reporting_framework")} source="form" />
+              <F label="Currency"            value={varVal("functional_currency") || "PKR"} source="form" />
+            </div>
+          </div>
+
+          <div className="border-t border-slate-100" />
+
+          {/* Engagement Setup */}
+          <div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+              <span className="inline-block w-3 h-px bg-slate-300" /> Engagement Setup
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+              <F label="Engagement Type"    value={session?.engagementType || varVal("engagement_type")} source="form" />
+              <F label="Continuity"         value={session?.engagementContinuity || varVal("recurring_engagement")} source="form" />
+              <F label="Audit Firm"         value={session?.auditFirmName || varVal("firm_name")} source="form" />
+              <F label="ICAP Reg."          value={varVal("firm_icap_registration")} source="form" />
+              <F label="Materiality Basis"  value={varVal("materiality_basis")} source="form" />
+              <F label="Tax Rate (%)"       value={varVal("applicable_tax_rate")} source="form" />
+              <F label="Super Tax (%)"      value={varVal("super_tax_rate")} source="form" />
+              <F label="Procedure Depth"    value={varVal("audit_procedure_depth")} source="form" />
+            </div>
+          </div>
+
+          <div className="border-t border-slate-100" />
+
+          {/* Engagement Team */}
+          <div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+              <span className="inline-block w-3 h-px bg-slate-300" /> Engagement Team
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+              <F label="Partner (Preparer)"  value={session?.preparerName  || varVal("engagement_partner")}  source="form" />
+              <F label="Manager (Reviewer)"  value={session?.reviewerName  || varVal("engagement_manager")}  source="form" />
+              <F label="Approver"            value={session?.approverName  || varVal("approver")}             source="form" />
+              <F label="Signing City"        value={varVal("signing_city")} source="form" />
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* ════════════════════════════════════════════════════════
+          SECTION B — TEMPLATE DATA (from uploaded Excel file)
+      ════════════════════════════════════════════════════════ */}
+      <div className="bg-white border border-teal-100 rounded-xl overflow-hidden">
+        {/* Header */}
+        <div className="px-5 py-3 bg-teal-50/60 border-b border-teal-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-base">📋</span>
+            <div>
+              <p className="text-sm font-semibold text-teal-900">Template Data</p>
+              <p className="text-[10px] text-teal-500">Extracted from uploaded Excel template — CY/PY financials + TB structure</p>
+            </div>
+          </div>
+          <span className="text-[9px] font-bold bg-teal-100 text-teal-600 rounded-full px-2 py-0.5 uppercase tracking-wide">{templateVarsFilled} variables</span>
+        </div>
+
+        <div className="p-5 space-y-5">
+
+          {/* TB Stats row */}
+          <div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+              <span className="inline-block w-3 h-px bg-slate-300" /> Trial Balance Statistics
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-4">
+              <F label="TB Lines"           value={varVal("tb_line_count")}                source="template" />
+              <F label="Total Debit"        value={fmt(varVal("tb_total_period_debit"))}   source="template" />
+              <F label="Total Credit"       value={fmt(varVal("tb_total_period_credit"))}  source="template" />
+              <F label="Opening Balance"    value={fmt(varVal("tb_opening_balance_aggregate"))} source="template" />
+              <F label="Closing Balance"    value={fmt(varVal("tb_closing_balance_aggregate"))} source="template" />
+            </div>
+          </div>
+
+          <div className="border-t border-slate-100" />
+
+          {/* Financial Statement — CY vs PY grid */}
+          <div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+              <span className="inline-block w-3 h-px bg-slate-300" /> Financial Statements Summary
+              <span className="ml-auto text-[8px] font-normal normal-case tracking-normal text-slate-300">Values in {varVal("functional_currency") || "PKR"}</span>
+            </p>
+
+            {/* Column headers */}
+            <div className="grid grid-cols-3 text-[9px] font-bold text-slate-400 uppercase tracking-wide pb-1 border-b border-slate-200 mb-1">
+              <span>Line</span>
+              <span className="text-right">CY {session?.engagementYear || ""}</span>
+              <span className="text-right">PY {session?.engagementYear ? Number(session.engagementYear) - 1 : ""}</span>
+            </div>
+
+            {/* ── Balance Sheet ── */}
+            <p className="text-[9px] font-semibold text-indigo-500 mt-3 mb-1 uppercase tracking-widest">Balance Sheet</p>
+            <FinRow label="Total Assets"              cy={varVal("cy_total_assets")}                py={varVal("py_total_assets")} />
+            <FinRow label="  Non-Current Assets"      cy={varVal("cy_non_current_assets")}          py={varVal("py_non_current_assets")} indent />
+            <FinRow label="  Current Assets"          cy={varVal("cy_current_assets")}              py={varVal("py_current_assets")} indent />
+            <FinRow label="  Fixed Assets (PPE)"      cy={varVal("cy_fixed_assets")}                py={varVal("py_fixed_assets")} indent />
+            <FinRow label="  Inventory"               cy={varVal("cy_inventory")}                   py={varVal("py_inventory")} indent />
+            <FinRow label="  Trade Receivables"       cy={varVal("cy_trade_receivables")}           py={varVal("py_trade_receivables")} indent />
+            <FinRow label="  Cash & Bank"             cy={varVal("cy_cash_and_bank")}               py={varVal("py_cash_and_bank")} indent />
+            <FinRow label="Total Equity"              cy={varVal("cy_total_equity")}                py={varVal("py_total_equity")} />
+            <FinRow label="  Share Capital"           cy={varVal("cy_share_capital_fs")}            py={varVal("py_share_capital_fs")} indent />
+            <FinRow label="  Retained Earnings"       cy={varVal("cy_retained_earnings")}           py={varVal("py_retained_earnings")} indent />
+            <FinRow label="Total Liabilities"         cy={varVal("cy_total_liabilities")}           py={varVal("py_total_liabilities")} />
+            <FinRow label="  Non-Current Liabilities" cy={varVal("cy_non_current_liabilities")}     py={varVal("py_non_current_liabilities")} indent />
+            <FinRow label="  Current Liabilities"     cy={varVal("cy_current_liabilities")}         py={varVal("py_current_liabilities")} indent />
+            <FinRow label="  Trade Payables"          cy={varVal("cy_trade_payables")}              py={varVal("py_trade_payables")} indent />
+            <FinRow label="  Taxation Payable"        cy={varVal("cy_taxation_payable")}            py={varVal("py_taxation_payable")} indent />
+
+            {/* ── P&L ── */}
+            <p className="text-[9px] font-semibold text-emerald-600 mt-4 mb-1 uppercase tracking-widest">Profit & Loss</p>
+            <FinRow label="Revenue"                   cy={varVal("cy_revenue")}                     py={varVal("py_revenue")} />
+            <FinRow label="Cost of Sales"             cy={varVal("cy_cost_of_sales")}               py={varVal("py_cost_of_sales")} />
+            <FinRow label="Gross Profit"              cy={varVal("cy_gross_profit")}                py={varVal("py_gross_profit")} />
+            <FinRow label="  Admin Expenses"          cy={varVal("cy_admin_expenses")}              py={varVal("py_admin_expenses")} indent />
+            <FinRow label="  Selling & Dist. Exp."    cy={varVal("cy_selling_distribution_expenses")} py={varVal("py_selling_distribution_expenses")} indent />
+            <FinRow label="  Finance Cost"            cy={varVal("cy_finance_cost")}                py={varVal("py_finance_cost")} indent />
+            <FinRow label="  Other Income"            cy={varVal("cy_other_income")}                py={varVal("py_other_income")} indent />
+            <FinRow label="Profit Before Tax"         cy={varVal("cy_profit_before_tax")}           py={varVal("py_profit_before_tax")} />
+            <FinRow label="Tax Expense"               cy={varVal("cy_tax_expense")}                 py={varVal("py_tax_expense")} />
+            <FinRow label="Profit After Tax"          cy={varVal("cy_profit_after_tax")}            py={varVal("py_profit_after_tax")} />
+            <FinRow label="Total Comprehensive Income" cy={varVal("cy_total_comprehensive_income")} py={varVal("py_total_comprehensive_income")} />
+
+            {/* ── Cash Flow ── */}
+            <p className="text-[9px] font-semibold text-blue-500 mt-4 mb-1 uppercase tracking-widest">Cash Flows</p>
+            <FinRow label="Operating Activities"      cy={varVal("cy_operating_cash_flow")}         py={varVal("py_operating_cash_flow")} />
+            <FinRow label="Investing Activities"      cy={varVal("cy_investing_cash_flow")}         py={varVal("py_investing_cash_flow")} />
+            <FinRow label="Financing Activities"      cy={varVal("cy_financing_cash_flow")}         py={varVal("py_financing_cash_flow")} />
+          </div>
+
+          {/* Accounting policies row */}
+          <div className="border-t border-slate-100 pt-4">
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+              <span className="inline-block w-3 h-px bg-slate-300" /> Accounting Policies
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
+              <F label="Inventory Valuation"     value={varVal("inventory_valuation_method")} source="template" />
+              <F label="Depreciation Method"     value={varVal("depreciation_method")}        source="template" />
+              <F label="Revenue Recognition"     value={varVal("revenue_recognition_policy")} source="template" />
+            </div>
+          </div>
+
+        </div>
+      </div>
 
       {/* ── Continue to Variables ── */}
       <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center justify-between gap-4">
@@ -3159,13 +3368,10 @@ function ExtractionStage({ data, session, onRefreshVariables, onRerun, onAiFill,
           </div>
           <div>
             <p className="text-sm font-semibold text-slate-900">Variables ready for review</p>
-            <p className="text-xs text-slate-400 mt-0.5">Proceed to the Variables page to review, edit, and lock all engagement fields before WP generation.</p>
+            <p className="text-xs text-slate-400 mt-0.5">Review, edit, and lock all fields in the Variables page before WP generation.</p>
           </div>
         </div>
-        <Button
-          onClick={onNext}
-          className="shrink-0 bg-indigo-600 hover:bg-indigo-700 h-8 text-xs px-4 shadow-sm"
-        >
+        <Button onClick={onNext} className="shrink-0 bg-indigo-600 hover:bg-indigo-700 h-8 text-xs px-4 shadow-sm">
           Continue to Variables <ChevronRight className="w-3.5 h-3.5 ml-1" />
         </Button>
       </div>
