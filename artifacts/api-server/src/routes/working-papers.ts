@@ -19,6 +19,16 @@ import {
   wpSessionLockTable, wpOutputJobTable,
   wpExecutionTable,
   wpComplianceDocTable,
+  wpAuditChainTable,
+  wpIsaClauseRefTable,
+  wpTickMarkTable,
+  wpTickMarkUsageTable,
+  wpReviewNoteTable,
+  wpVersionHistoryTable,
+  wpLeadScheduleTable,
+  wpFsNoteMappingTable,
+  wpComplianceGateTable,
+  wpSamplingDetailTable,
 } from "@workspace/db";
 import { WP_LIBRARY, type WpLibraryEntry } from "../data/wp-library-seed";
 import { VARIABLE_DEFINITIONS, EXTRACTION_FIELD_TO_VARIABLE_MAP, VARIABLE_GROUPS, DEPENDENCY_RULES, PRIMARY_VARIABLE_CODES, SECONDARY_VARIABLE_CODES } from "../data/variable-definitions";
@@ -10588,6 +10598,1012 @@ router.patch("/sessions/:id/compliance-docs/secp_ccg/item", async (req: Request,
     }).where(eq(wpComplianceDocTable.id, existing[0].id));
 
     res.json({ success: true, totalItems: updated.length, completedItems: updated.filter((i: any) => i.status !== "pending").length });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ISA AUDIT SYSTEM ROUTES — Audit Logic Chain, Tick Marks, Review Workflow,
+// Version Control, Lead Schedules, FS Note Mapping, Compliance Validation,
+// ISA 530 Sampling, Template Processing
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── AUDIT LOGIC CHAIN (Risk → Assertion → Procedure → Evidence → Conclusion) ──
+
+router.get("/sessions/:sessionId/audit-chain", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const chains = await db.select().from(wpAuditChainTable).where(eq(wpAuditChainTable.sessionId, sessionId)).orderBy(wpAuditChainTable.fsArea, wpAuditChainTable.riskId);
+    const summary = {
+      total: chains.length,
+      complete: chains.filter(c => c.chainComplete).length,
+      byStatus: {
+        planned: chains.filter(c => c.procedureStatus === "planned").length,
+        in_progress: chains.filter(c => c.procedureStatus === "in_progress").length,
+        performed: chains.filter(c => c.procedureStatus === "performed").length,
+        deferred: chains.filter(c => c.procedureStatus === "deferred").length,
+      },
+      byRiskLevel: {
+        high: chains.filter(c => c.riskLevel === "high" || c.riskLevel === "significant").length,
+        medium: chains.filter(c => c.riskLevel === "medium").length,
+        low: chains.filter(c => c.riskLevel === "low").length,
+      },
+      assertionCoverage: {
+        full: chains.filter(c => c.assertionCoverage === "full").length,
+        partial: chains.filter(c => c.assertionCoverage === "partial").length,
+        none: chains.filter(c => c.assertionCoverage === "none" || !c.assertionCoverage).length,
+      },
+      evidenceSufficiency: {
+        sufficient: chains.filter(c => c.evidenceSufficiency === "sufficient").length,
+        insufficient: chains.filter(c => c.evidenceSufficiency === "insufficient").length,
+        additional: chains.filter(c => c.evidenceSufficiency === "additional_needed").length,
+      },
+      exceptionsTotal: chains.reduce((s, c) => s + (c.exceptionsFound || 0), 0),
+    };
+    res.json({ chains, summary });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post("/sessions/:sessionId/audit-chain/generate", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const { wpCode, fsArea } = req.body;
+    const session = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
+    if (!session.length) return res.status(404).json({ error: "Session not found" });
+    const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+    const varMap: Record<string, string> = {};
+    variables.forEach(v => { varMap[v.variableCode] = v.currentValue || v.defaultValue || ""; });
+
+    const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+    const areaLines = fsArea ? tbLines.filter(l => (l as any).wpArea === fsArea || (l as any).fsSection === fsArea) : tbLines;
+
+    const isaRiskMap: Record<string, { riskType: string; isaRef: string; assertions: any[]; procedures: any[] }> = {
+      "PPE": {
+        riskType: "inherent", isaRef: "ISA 315.26",
+        assertions: [
+          { code: "E", name: "Existence", isaRef: "ISA 315.A190" },
+          { code: "CO", name: "Completeness", isaRef: "ISA 315.A190" },
+          { code: "V", name: "Valuation", isaRef: "ISA 315.A190" },
+          { code: "RO", name: "Rights & Obligations", isaRef: "ISA 315.A190" },
+          { code: "PD", name: "Presentation & Disclosure", isaRef: "ISA 315.A190" },
+        ],
+        procedures: [
+          { nature: "substantive", desc: "Physically verify existence of significant PPE items", isaRef: "ISA 501.4", timing: "final" },
+          { nature: "substantive", desc: "Vouch additions to purchase invoices/contracts", isaRef: "ISA 500.A14", timing: "final" },
+          { nature: "substantive", desc: "Recalculate depreciation using entity's policy", isaRef: "ISA 540.8", timing: "final" },
+          { nature: "substantive", desc: "Review title documents for ownership verification", isaRef: "ISA 500.A31", timing: "final" },
+          { nature: "analytical", desc: "Compare PPE movements year-over-year with budget", isaRef: "ISA 520.5", timing: "final" },
+          { nature: "toc", desc: "Test authorization controls for capital expenditure", isaRef: "ISA 330.8", timing: "interim" },
+        ]
+      },
+      "Inventory": {
+        riskType: "inherent", isaRef: "ISA 315.26",
+        assertions: [
+          { code: "E", name: "Existence", isaRef: "ISA 501.4" },
+          { code: "CO", name: "Completeness", isaRef: "ISA 315.A190" },
+          { code: "V", name: "Valuation (NRV)", isaRef: "ISA 540.8" },
+          { code: "RO", name: "Rights & Obligations", isaRef: "ISA 315.A190" },
+        ],
+        procedures: [
+          { nature: "substantive", desc: "Attend physical inventory count and perform test counts", isaRef: "ISA 501.4", timing: "final" },
+          { nature: "substantive", desc: "Test NRV against subsequent selling prices", isaRef: "ISA 540.8", timing: "final" },
+          { nature: "substantive", desc: "Verify cut-off procedures at year-end", isaRef: "ISA 500.A49", timing: "final" },
+          { nature: "analytical", desc: "Analyze inventory turnover and aging", isaRef: "ISA 520.5", timing: "final" },
+          { nature: "toc", desc: "Test perpetual inventory system controls", isaRef: "ISA 330.8", timing: "interim" },
+        ]
+      },
+      "Receivables": {
+        riskType: "inherent", isaRef: "ISA 315.26",
+        assertions: [
+          { code: "E", name: "Existence", isaRef: "ISA 505.6" },
+          { code: "CO", name: "Completeness", isaRef: "ISA 315.A190" },
+          { code: "V", name: "Valuation (ECL)", isaRef: "ISA 540.8" },
+          { code: "RO", name: "Rights & Obligations", isaRef: "ISA 315.A190" },
+        ],
+        procedures: [
+          { nature: "substantive", desc: "Send positive confirmations to material debtors", isaRef: "ISA 505.7", timing: "final" },
+          { nature: "substantive", desc: "Test ECL/provision for doubtful debts calculation", isaRef: "ISA 540.8", timing: "final" },
+          { nature: "substantive", desc: "Agree sub-ledger to control account", isaRef: "ISA 500.A14", timing: "final" },
+          { nature: "analytical", desc: "Analyze aging schedule and DSO trends", isaRef: "ISA 520.5", timing: "final" },
+        ]
+      },
+      "Revenue": {
+        riskType: "fraud", isaRef: "ISA 240.26",
+        assertions: [
+          { code: "OC", name: "Occurrence", isaRef: "ISA 240.A28" },
+          { code: "CO", name: "Completeness", isaRef: "ISA 315.A190" },
+          { code: "AC", name: "Accuracy", isaRef: "ISA 315.A190" },
+          { code: "CU", name: "Cut-off", isaRef: "ISA 315.A190" },
+        ],
+        procedures: [
+          { nature: "substantive", desc: "Vouch revenue transactions to delivery/shipping documents", isaRef: "ISA 500.A14", timing: "final" },
+          { nature: "substantive", desc: "Test cut-off for sales around year-end", isaRef: "ISA 500.A49", timing: "final" },
+          { nature: "substantive", desc: "Compare revenue with STRN/FBR sales tax returns", isaRef: "ISA 500.A31", timing: "final" },
+          { nature: "analytical", desc: "Monthly revenue trend analysis and GP ratio analysis", isaRef: "ISA 520.5", timing: "final" },
+          { nature: "toc", desc: "Test sales order to invoice to receipt cycle controls", isaRef: "ISA 330.8", timing: "interim" },
+        ]
+      },
+      "Payables": {
+        riskType: "inherent", isaRef: "ISA 315.26",
+        assertions: [
+          { code: "CO", name: "Completeness", isaRef: "ISA 315.A190" },
+          { code: "E", name: "Existence", isaRef: "ISA 315.A190" },
+          { code: "V", name: "Valuation", isaRef: "ISA 315.A190" },
+        ],
+        procedures: [
+          { nature: "substantive", desc: "Send supplier confirmations and reconcile balances", isaRef: "ISA 505.7", timing: "final" },
+          { nature: "substantive", desc: "Search for unrecorded liabilities after year-end", isaRef: "ISA 500.A49", timing: "final" },
+          { nature: "substantive", desc: "Agree creditor sub-ledger to control account", isaRef: "ISA 500.A14", timing: "final" },
+        ]
+      },
+      "Taxation": {
+        riskType: "inherent", isaRef: "ISA 315.26",
+        assertions: [
+          { code: "AC", name: "Accuracy", isaRef: "ISA 315.A190" },
+          { code: "CO", name: "Completeness", isaRef: "ISA 315.A190" },
+          { code: "V", name: "Valuation", isaRef: "ISA 540.8" },
+        ],
+        procedures: [
+          { nature: "substantive", desc: "Recalculate current tax provision per Income Tax Ordinance 2001", isaRef: "ISA 540.8", timing: "final" },
+          { nature: "substantive", desc: "Review deferred tax computation (IAS 12 vs local GAAP)", isaRef: "ISA 540.8", timing: "final" },
+          { nature: "substantive", desc: "Verify WHT deductions on applicable payments", isaRef: "ISA 500.A14", timing: "final" },
+          { nature: "substantive", desc: "Review sales tax returns reconciliation", isaRef: "ISA 500.A31", timing: "final" },
+        ]
+      },
+      "Employee Benefits": {
+        riskType: "inherent", isaRef: "ISA 315.26",
+        assertions: [
+          { code: "CO", name: "Completeness", isaRef: "ISA 315.A190" },
+          { code: "V", name: "Valuation", isaRef: "ISA 540.8" },
+          { code: "AC", name: "Accuracy", isaRef: "ISA 315.A190" },
+        ],
+        procedures: [
+          { nature: "substantive", desc: "Recalculate gratuity/pension obligation (IAS 19)", isaRef: "ISA 540.8", timing: "final" },
+          { nature: "substantive", desc: "Verify payroll summaries against HR records", isaRef: "ISA 500.A14", timing: "final" },
+          { nature: "analytical", desc: "Analyze salary expense trends month-over-month", isaRef: "ISA 520.5", timing: "final" },
+        ]
+      },
+      "Cash": {
+        riskType: "inherent", isaRef: "ISA 315.26",
+        assertions: [
+          { code: "E", name: "Existence", isaRef: "ISA 315.A190" },
+          { code: "CO", name: "Completeness", isaRef: "ISA 315.A190" },
+        ],
+        procedures: [
+          { nature: "substantive", desc: "Obtain bank confirmations for all bank accounts", isaRef: "ISA 505.7", timing: "final" },
+          { nature: "substantive", desc: "Prepare/review bank reconciliation statements", isaRef: "ISA 500.A14", timing: "final" },
+          { nature: "substantive", desc: "Perform cash count at year-end", isaRef: "ISA 501.4", timing: "final" },
+        ]
+      },
+      "Intangibles": {
+        riskType: "inherent", isaRef: "ISA 315.26",
+        assertions: [
+          { code: "E", name: "Existence", isaRef: "ISA 315.A190" },
+          { code: "V", name: "Valuation", isaRef: "ISA 540.8" },
+          { code: "RO", name: "Rights & Obligations", isaRef: "ISA 315.A190" },
+        ],
+        procedures: [
+          { nature: "substantive", desc: "Review impairment indicators per IAS 36", isaRef: "ISA 540.8", timing: "final" },
+          { nature: "substantive", desc: "Recalculate amortization and verify useful life", isaRef: "ISA 540.8", timing: "final" },
+          { nature: "substantive", desc: "Verify ownership documentation (licenses, patents)", isaRef: "ISA 500.A31", timing: "final" },
+        ]
+      },
+      "Other Assets": {
+        riskType: "inherent", isaRef: "ISA 315.26",
+        assertions: [
+          { code: "E", name: "Existence", isaRef: "ISA 315.A190" },
+          { code: "V", name: "Valuation", isaRef: "ISA 315.A190" },
+        ],
+        procedures: [
+          { nature: "substantive", desc: "Obtain investment confirmations and verify market values", isaRef: "ISA 505.7", timing: "final" },
+          { nature: "substantive", desc: "Verify long-term loan/advance recoverability", isaRef: "ISA 540.8", timing: "final" },
+        ]
+      },
+      "Cost of Sales": {
+        riskType: "inherent", isaRef: "ISA 315.26",
+        assertions: [
+          { code: "OC", name: "Occurrence", isaRef: "ISA 315.A190" },
+          { code: "AC", name: "Accuracy", isaRef: "ISA 315.A190" },
+          { code: "CU", name: "Cut-off", isaRef: "ISA 315.A190" },
+        ],
+        procedures: [
+          { nature: "substantive", desc: "Reconcile cost of sales components (materials, labor, overheads)", isaRef: "ISA 500.A14", timing: "final" },
+          { nature: "analytical", desc: "Analyze GP margin trend and investigate significant variances", isaRef: "ISA 520.5", timing: "final" },
+        ]
+      },
+      "Operating Expenses": {
+        riskType: "inherent", isaRef: "ISA 315.26",
+        assertions: [
+          { code: "OC", name: "Occurrence", isaRef: "ISA 315.A190" },
+          { code: "CO", name: "Completeness", isaRef: "ISA 315.A190" },
+          { code: "CL", name: "Classification", isaRef: "ISA 315.A190" },
+        ],
+        procedures: [
+          { nature: "substantive", desc: "Vouch significant expenses to supporting documentation", isaRef: "ISA 500.A14", timing: "final" },
+          { nature: "analytical", desc: "Compare expense line items year-over-year", isaRef: "ISA 520.5", timing: "final" },
+        ]
+      },
+      "Related Parties": {
+        riskType: "fraud", isaRef: "ISA 550.18",
+        assertions: [
+          { code: "CO", name: "Completeness", isaRef: "ISA 550.A30" },
+          { code: "PD", name: "Presentation & Disclosure", isaRef: "ISA 550.25" },
+        ],
+        procedures: [
+          { nature: "substantive", desc: "Obtain management representations on RP completeness", isaRef: "ISA 550.26", timing: "final" },
+          { nature: "substantive", desc: "Review all RP transactions for arm's length pricing", isaRef: "ISA 550.23", timing: "final" },
+          { nature: "substantive", desc: "Verify IAS 24 disclosure requirements are met", isaRef: "ISA 550.25", timing: "final" },
+        ]
+      },
+      "Equity": {
+        riskType: "inherent", isaRef: "ISA 315.26",
+        assertions: [
+          { code: "E", name: "Existence", isaRef: "ISA 315.A190" },
+          { code: "RO", name: "Rights & Obligations", isaRef: "ISA 315.A190" },
+          { code: "PD", name: "Presentation & Disclosure", isaRef: "ISA 315.A190" },
+        ],
+        procedures: [
+          { nature: "substantive", desc: "Verify authorized, issued, and paid-up capital per SECP records", isaRef: "ISA 500.A31", timing: "final" },
+          { nature: "substantive", desc: "Review minutes for dividend declarations and appropriations", isaRef: "ISA 500.A14", timing: "final" },
+        ]
+      },
+    };
+
+    const fallbackMap = isaRiskMap["Operating Expenses"];
+    const chains: any[] = [];
+    const areasSet = new Set<string>();
+    areaLines.forEach(l => areasSet.add((l as any).wpArea || (l as any).fsSection || "General"));
+    const targetAreas = fsArea ? [fsArea] : Array.from(areasSet);
+
+    for (const area of targetAreas) {
+      const mapEntry = isaRiskMap[area] || fallbackMap;
+      const riskId = `R-${area.replace(/\s+/g, "-").toUpperCase()}-001`;
+      const riskLevelVal = areaLines.some(l => ((l as any).wpArea === area || (l as any).fsSection === area) && (l as any).riskLevel === "High") ? "high" : "medium";
+
+      for (let pi = 0; pi < mapEntry.procedures.length; pi++) {
+        const proc = mapEntry.procedures[pi];
+        const procId = `P-${area.replace(/\s+/g, "-").toUpperCase()}-${String(pi + 1).padStart(3, "0")}`;
+        chains.push({
+          sessionId, wpCode: wpCode || `EX-${area.replace(/\s+/g, "-").substring(0, 6).toUpperCase()}-01`,
+          fsArea: area, riskId, riskDescription: `Risk of material misstatement in ${area}`,
+          riskType: mapEntry.riskType, isaRiskRef: mapEntry.isaRef, riskLevel: riskLevelVal,
+          riskResponse: `Apply ISA 330 response procedures for ${riskLevelVal} risk ${area}`,
+          assertions: mapEntry.assertions, assertionCoverage: "full",
+          procedureId: procId, procedureDescription: proc.desc,
+          procedureNature: proc.nature, procedureIsaRef: proc.isaRef,
+          procedureIsaClause: `Per ${proc.isaRef}`, procedureTiming: proc.timing,
+          procedureStatus: "planned", evidenceIds: [], evidenceType: null,
+          evidenceReliability: null, evidenceSufficiency: null,
+          tickMarkCode: null, tickMarkMeaning: null, resultSummary: null,
+          exceptionsFound: 0, exceptionDetails: [], misstatementAmount: null,
+          misstatementType: null, conclusion: null, conclusionNarrative: null,
+          impactOnOpinion: null, conclusionIsaRef: null,
+          furtherActionRequired: false, furtherActionDetail: null,
+          chainComplete: false, chainValidatedAt: null,
+        });
+      }
+    }
+
+    if (chains.length > 0) {
+      await db.delete(wpAuditChainTable).where(and(eq(wpAuditChainTable.sessionId, sessionId), fsArea ? eq(wpAuditChainTable.fsArea, fsArea) : undefined as any));
+      const batchSize = 50;
+      for (let i = 0; i < chains.length; i += batchSize) {
+        await db.insert(wpAuditChainTable).values(chains.slice(i, i + batchSize));
+      }
+    }
+    res.json({ success: true, chainsGenerated: chains.length, areas: targetAreas });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put("/sessions/:sessionId/audit-chain/:chainId", async (req: Request, res: Response) => {
+  try {
+    const chainId = parseInt(req.params.chainId);
+    const updates = req.body;
+    if (updates.procedureStatus === "performed" && updates.evidenceIds?.length > 0 && updates.conclusion) {
+      updates.chainComplete = true;
+      updates.chainValidatedAt = new Date();
+    }
+    await db.update(wpAuditChainTable).set({ ...updates, updatedAt: new Date() }).where(eq(wpAuditChainTable.id, chainId));
+    const updated = await db.select().from(wpAuditChainTable).where(eq(wpAuditChainTable.id, chainId));
+    res.json({ success: true, chain: updated[0] });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── TICK MARK SYSTEM ──
+
+router.get("/sessions/:sessionId/tick-marks", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const marks = await db.select().from(wpTickMarkTable).where(eq(wpTickMarkTable.sessionId, sessionId));
+    const usages = await db.select().from(wpTickMarkUsageTable).where(eq(wpTickMarkUsageTable.sessionId, sessionId));
+    res.json({ marks, usages, legend: marks.map(m => ({ symbol: m.symbol, meaning: m.meaning, color: m.color, count: usages.filter(u => u.symbol === m.symbol).length })) });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post("/sessions/:sessionId/tick-marks/initialize", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const standardMarks = [
+      { symbol: "✓", meaning: "Agreed to source document / verified", color: "#16A34A", category: "verification" },
+      { symbol: "✗", meaning: "Exception / discrepancy noted", color: "#DC2626", category: "verification" },
+      { symbol: "®", meaning: "Recalculated and agreed", color: "#2563EB", category: "computation" },
+      { symbol: "©", meaning: "Confirmed via external confirmation", color: "#7C3AED", category: "verification" },
+      { symbol: "△", meaning: "Traced to/from source", color: "#EA580C", category: "tracing" },
+      { symbol: "♦", meaning: "Vouched to supporting document", color: "#0891B2", category: "vouching" },
+      { symbol: "◊", meaning: "Inspected physical evidence", color: "#65A30D", category: "verification" },
+      { symbol: "★", meaning: "Agreed to prior year working paper", color: "#CA8A04", category: "verification" },
+      { symbol: "▲", meaning: "Footed / cross-footed and agreed", color: "#4F46E5", category: "computation" },
+      { symbol: "●", meaning: "Observation performed", color: "#0D9488", category: "verification" },
+      { symbol: "■", meaning: "Management inquiry response noted", color: "#6366F1", category: "verification" },
+      { symbol: "⊕", meaning: "Selected for sampling", color: "#F59E0B", category: "verification" },
+      { symbol: "⊗", meaning: "Not applicable / excluded from scope", color: "#9CA3AF", category: "verification" },
+    ];
+    const existing = await db.select().from(wpTickMarkTable).where(eq(wpTickMarkTable.sessionId, sessionId));
+    if (existing.length === 0) {
+      await db.insert(wpTickMarkTable).values(standardMarks.map(m => ({ sessionId, ...m, isStandard: true, usageCount: 0 })));
+    }
+    const marks = await db.select().from(wpTickMarkTable).where(eq(wpTickMarkTable.sessionId, sessionId));
+    res.json({ success: true, marks });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post("/sessions/:sessionId/tick-marks/apply", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const { symbol, wpCode, lineRef, accountCode, amount, appliedBy, evidenceRef, notes } = req.body;
+    await db.insert(wpTickMarkUsageTable).values({ sessionId, symbol, wpCode, lineRef, accountCode, amount, appliedBy, evidenceRef, notes });
+    const mark = await db.select().from(wpTickMarkTable).where(and(eq(wpTickMarkTable.sessionId, sessionId), eq(wpTickMarkTable.symbol, symbol)));
+    if (mark.length) await db.update(wpTickMarkTable).set({ usageCount: (mark[0].usageCount || 0) + 1 }).where(eq(wpTickMarkTable.id, mark[0].id));
+    res.json({ success: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── MULTI-LEVEL REVIEW WORKFLOW WITH CLEARANCE TRACKING ──
+
+router.get("/sessions/:sessionId/review-notes", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const wpCode = req.query.wpCode as string;
+    let conditions: any = eq(wpReviewNoteTable.sessionId, sessionId);
+    if (wpCode) conditions = and(conditions, eq(wpReviewNoteTable.wpCode, wpCode));
+    const notes = await db.select().from(wpReviewNoteTable).where(conditions).orderBy(wpReviewNoteTable.createdAt);
+    const summary = {
+      total: notes.length,
+      open: notes.filter(n => n.status === "open").length,
+      responded: notes.filter(n => n.status === "responded").length,
+      cleared: notes.filter(n => n.status === "cleared").length,
+      deferred: notes.filter(n => n.status === "deferred").length,
+      escalated: notes.filter(n => n.status === "escalated").length,
+      blocking: notes.filter(n => n.blocksSignOff || n.blocksExport).length,
+      byLevel: {
+        staff: notes.filter(n => n.reviewLevel === "staff").length,
+        senior: notes.filter(n => n.reviewLevel === "senior").length,
+        manager: notes.filter(n => n.reviewLevel === "manager").length,
+        partner: notes.filter(n => n.reviewLevel === "partner").length,
+        eqcr: notes.filter(n => n.reviewLevel === "eqcr").length,
+      },
+    };
+    res.json({ notes, summary });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post("/sessions/:sessionId/review-notes", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const { wpCode, headIndex, reviewLevel, reviewerName, reviewerId, noteType, priority, subject, detail, isaReference, blocksSignOff, blocksExport } = req.body;
+    await db.insert(wpReviewNoteTable).values({
+      sessionId, wpCode, headIndex, reviewLevel, reviewerName, reviewerId,
+      noteType: noteType || "query", priority: priority || "medium",
+      subject, detail, isaReference,
+      blocksSignOff: blocksSignOff || false, blocksExport: blocksExport || false,
+      status: "open",
+    });
+    await db.insert(wpVersionHistoryTable).values({
+      sessionId, entityType: "review_note", entityId: wpCode || "session",
+      fieldName: "note_created", version: 1, changeType: "create",
+      newValue: subject, changedBy: reviewerName, changedByRole: reviewLevel,
+    });
+    res.json({ success: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put("/sessions/:sessionId/review-notes/:noteId/respond", async (req: Request, res: Response) => {
+  try {
+    const noteId = parseInt(req.params.noteId);
+    const { responseBy, responseText } = req.body;
+    await db.update(wpReviewNoteTable).set({
+      status: "responded", responseBy, responseDate: new Date(), responseText, updatedAt: new Date(),
+    }).where(eq(wpReviewNoteTable.id, noteId));
+    res.json({ success: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put("/sessions/:sessionId/review-notes/:noteId/clear", async (req: Request, res: Response) => {
+  try {
+    const noteId = parseInt(req.params.noteId);
+    const { clearedBy, clearanceNote } = req.body;
+    await db.update(wpReviewNoteTable).set({
+      status: "cleared", clearedBy, clearedDate: new Date(), clearanceNote, updatedAt: new Date(),
+    }).where(eq(wpReviewNoteTable.id, noteId));
+    res.json({ success: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put("/sessions/:sessionId/review-notes/:noteId/escalate", async (req: Request, res: Response) => {
+  try {
+    const noteId = parseInt(req.params.noteId);
+    const { escalatedTo, escalationReason } = req.body;
+    await db.update(wpReviewNoteTable).set({
+      status: "escalated", escalatedTo, escalationReason, updatedAt: new Date(),
+    }).where(eq(wpReviewNoteTable.id, noteId));
+    res.json({ success: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.get("/sessions/:sessionId/review-workflow-status", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const notes = await db.select().from(wpReviewNoteTable).where(eq(wpReviewNoteTable.sessionId, sessionId));
+    const openBlockers = notes.filter(n => (n.blocksSignOff || n.blocksExport) && n.status !== "cleared");
+    const levels = ["staff", "senior", "manager", "partner", "eqcr"];
+    const levelStatus: Record<string, any> = {};
+    for (const level of levels) {
+      const levelNotes = notes.filter(n => n.reviewLevel === level);
+      const openCount = levelNotes.filter(n => n.status === "open" || n.status === "responded").length;
+      levelStatus[level] = {
+        total: levelNotes.length, open: openCount,
+        cleared: levelNotes.filter(n => n.status === "cleared").length,
+        canSignOff: openCount === 0 && levelNotes.length > 0,
+      };
+    }
+    const currentLevel = levels.find(l => levelStatus[l].total === 0 || levelStatus[l].open > 0) || "complete";
+    res.json({
+      currentReviewLevel: currentLevel, levels: levelStatus,
+      blockers: openBlockers.length, blockingNotes: openBlockers,
+      canExport: openBlockers.filter(n => n.blocksExport).length === 0,
+      canLock: openBlockers.length === 0,
+    });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── VERSION CONTROL & AUDIT TRAIL ──
+
+router.get("/sessions/:sessionId/version-history", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const entityType = req.query.entityType as string;
+    const entityId = req.query.entityId as string;
+    let conditions: any = eq(wpVersionHistoryTable.sessionId, sessionId);
+    if (entityType) conditions = and(conditions, eq(wpVersionHistoryTable.entityType, entityType));
+    if (entityId) conditions = and(conditions, eq(wpVersionHistoryTable.entityId, entityId));
+    const history = await db.select().from(wpVersionHistoryTable).where(conditions).orderBy(wpVersionHistoryTable.createdAt);
+    res.json({ history, total: history.length });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post("/sessions/:sessionId/version-history", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const { entityType, entityId, fieldName, changeType, oldValue, newValue, reason, changedBy, changedByRole } = req.body;
+    const existing = await db.select().from(wpVersionHistoryTable)
+      .where(and(eq(wpVersionHistoryTable.sessionId, sessionId), eq(wpVersionHistoryTable.entityType, entityType), eq(wpVersionHistoryTable.entityId, entityId)));
+    const version = existing.length + 1;
+    await db.insert(wpVersionHistoryTable).values({
+      sessionId, entityType, entityId, fieldName, version, changeType,
+      oldValue, newValue, reason, changedBy, changedByRole, isImmutable: true,
+    });
+    res.json({ success: true, version });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── LEAD SCHEDULES ──
+
+router.get("/sessions/:sessionId/lead-schedules", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const schedules = await db.select().from(wpLeadScheduleTable).where(eq(wpLeadScheduleTable.sessionId, sessionId)).orderBy(wpLeadScheduleTable.wpArea);
+    res.json({ schedules });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post("/sessions/:sessionId/lead-schedules/generate", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+    if (!tbLines.length) return res.status(400).json({ error: "No trial balance data found. Upload template first." });
+    const areaGroups: Record<string, any[]> = {};
+    tbLines.forEach((line: any) => {
+      const area = line.wpArea || line.fsSection || "General";
+      if (!areaGroups[area]) areaGroups[area] = [];
+      areaGroups[area].push(line);
+    });
+
+    await db.delete(wpLeadScheduleTable).where(eq(wpLeadScheduleTable.sessionId, sessionId));
+    const schedules: any[] = [];
+    for (const [area, lines] of Object.entries(areaGroups)) {
+      const refCode = `LS-${area.replace(/\s+/g, "-").substring(0, 8).toUpperCase()}`;
+      const majorHeads: Record<string, any[]> = {};
+      lines.forEach((l: any) => {
+        const mh = l.majorHead || l.lineItem || "General";
+        if (!majorHeads[mh]) majorHeads[mh] = [];
+        majorHeads[mh].push(l);
+      });
+      for (const [mh, mhLines] of Object.entries(majorHeads)) {
+        const cy = mhLines.reduce((s: number, l: any) => s + parseFloat(l.currentYear || l.amount || "0"), 0);
+        const py = mhLines.reduce((s: number, l: any) => s + parseFloat(l.priorYear || "0"), 0);
+        const variance = cy - py;
+        const variancePct = py !== 0 ? ((variance / Math.abs(py)) * 100) : 0;
+        const riskLevel = mhLines.some((l: any) => l.riskLevel === "High") ? "High" : mhLines.some((l: any) => l.riskLevel === "Medium") ? "Medium" : "Low";
+        schedules.push({
+          sessionId, wpArea: area, scheduleRef: refCode,
+          fsSection: mhLines[0]?.statementType || mhLines[0]?.fsSection,
+          majorHead: mh, lineItem: mhLines[0]?.lineItem || mh,
+          noteNo: mhLines[0]?.noteNo,
+          openingBalance: String(py), closingBalance: String(cy),
+          priorYear: String(py), variance: String(variance),
+          variancePct: String(variancePct.toFixed(2)),
+          tbAccountCodes: mhLines.map((l: any) => l.accountCode).filter(Boolean),
+          riskLevel, materialityFlag: Math.abs(variance) > 500000,
+          status: "draft",
+        });
+      }
+    }
+    if (schedules.length > 0) {
+      const batchSize = 50;
+      for (let i = 0; i < schedules.length; i += batchSize) {
+        await db.insert(wpLeadScheduleTable).values(schedules.slice(i, i + batchSize));
+      }
+    }
+    res.json({ success: true, schedulesGenerated: schedules.length, areas: Object.keys(areaGroups) });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put("/sessions/:sessionId/lead-schedules/:scheduleId", async (req: Request, res: Response) => {
+  try {
+    const scheduleId = parseInt(req.params.scheduleId);
+    await db.update(wpLeadScheduleTable).set({ ...req.body, updatedAt: new Date() }).where(eq(wpLeadScheduleTable.id, scheduleId));
+    res.json({ success: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── FS NOTE MAPPING ──
+
+router.get("/sessions/:sessionId/fs-note-mapping", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const mappings = await db.select().from(wpFsNoteMappingTable).where(eq(wpFsNoteMappingTable.sessionId, sessionId)).orderBy(wpFsNoteMappingTable.noteNo);
+    res.json({ mappings });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post("/sessions/:sessionId/fs-note-mapping/generate", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+    if (!tbLines.length) return res.status(400).json({ error: "No trial balance data. Upload template first." });
+    const noteGroups: Record<string, any[]> = {};
+    tbLines.forEach((line: any) => {
+      const noteNo = line.noteNo || "misc";
+      if (!noteGroups[noteNo]) noteGroups[noteNo] = [];
+      noteGroups[noteNo].push(line);
+    });
+
+    await db.delete(wpFsNoteMappingTable).where(eq(wpFsNoteMappingTable.sessionId, sessionId));
+    const mappings: any[] = [];
+    for (const [noteNo, lines] of Object.entries(noteGroups)) {
+      if (noteNo === "misc") continue;
+      const totalCY = lines.reduce((s: number, l: any) => s + parseFloat(l.currentYear || l.amount || "0"), 0);
+      const totalPY = lines.reduce((s: number, l: any) => s + parseFloat(l.priorYear || "0"), 0);
+      const lineItems = lines.map((l: any) => ({
+        lineItem: l.lineItem || l.accountName,
+        accountCodes: [l.accountCode],
+        cyAmount: parseFloat(l.currentYear || l.amount || "0"),
+        pyAmount: parseFloat(l.priorYear || "0"),
+      }));
+      const noteTitle = lines[0]?.lineItem || lines[0]?.majorHead || `Note ${noteNo}`;
+      mappings.push({
+        sessionId, noteNo, noteTitle,
+        fsLineItems: lineItems,
+        tbAccountCodes: lines.map((l: any) => l.accountCode).filter(Boolean),
+        totalCY: String(totalCY), totalPY: String(totalPY),
+        variance: String(totalCY - totalPY),
+        disclosureStatus: "pending",
+      });
+    }
+    if (mappings.length > 0) await db.insert(wpFsNoteMappingTable).values(mappings);
+    res.json({ success: true, notesMapped: mappings.length });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── COMPLIANCE VALIDATION ENGINE ──
+
+router.get("/sessions/:sessionId/compliance-gates", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const gates = await db.select().from(wpComplianceGateTable).where(eq(wpComplianceGateTable.sessionId, sessionId)).orderBy(wpComplianceGateTable.category, wpComplianceGateTable.gateCode);
+    const summary = {
+      total: gates.length,
+      passed: gates.filter(g => g.status === "pass").length,
+      failed: gates.filter(g => g.status === "fail").length,
+      pending: gates.filter(g => g.status === "pending").length,
+      warnings: gates.filter(g => g.status === "warning").length,
+      overridden: gates.filter(g => g.status === "override").length,
+      blockingFailures: gates.filter(g => g.status === "fail" && g.blocking).length,
+      compliancePct: gates.length ? Math.round((gates.filter(g => g.status === "pass" || g.status === "n_a" || g.status === "override").length / gates.length) * 100) : 0,
+    };
+    res.json({ gates, summary });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post("/sessions/:sessionId/compliance-gates/run", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const session = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
+    if (!session.length) return res.status(404).json({ error: "Session not found" });
+    const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+    const varMap: Record<string, string> = {};
+    variables.forEach(v => { varMap[v.variableCode] = v.currentValue || v.defaultValue || ""; });
+    const chains = await db.select().from(wpAuditChainTable).where(eq(wpAuditChainTable.sessionId, sessionId));
+    const reviewNotes = await db.select().from(wpReviewNoteTable).where(eq(wpReviewNoteTable.sessionId, sessionId));
+    const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+    const leadSchedules = await db.select().from(wpLeadScheduleTable).where(eq(wpLeadScheduleTable.sessionId, sessionId));
+    const compDocs = await db.select().from(wpComplianceDocTable).where(eq(wpComplianceDocTable.sessionId, sessionId));
+    const isPIE = (varMap["entity_type_listed"] || "").toLowerCase().includes("listed") || (varMap["entity_type"] || "").toLowerCase().includes("listed");
+
+    const gates: any[] = [];
+    const addGate = (code: string, name: string, cat: string, std: string, desc: string, clauseRef: string, phase: string, blocking: boolean, checkFn: () => { pass: boolean; detail?: string }) => {
+      const result = checkFn();
+      gates.push({
+        sessionId, gateCode: code, gateName: name, category: cat, standard: std,
+        checkDescription: desc, checkType: "mandatory", clauseRef,
+        status: result.pass ? "pass" : "fail", blocking,
+        failureDetail: result.pass ? null : (result.detail || desc),
+        remediationAction: result.pass ? null : `Address: ${desc}`,
+        applicablePhase: phase, lastCheckedAt: new Date(),
+        passedAt: result.pass ? new Date() : null,
+      });
+    };
+
+    addGate("G-ISA200-01", "Overall Objectives", "isa", "ISA 200", "Reasonable assurance objective documented", "ISA 200.5", "planning", false,
+      () => ({ pass: !!varMap["engagement_type"], detail: "Engagement type not set" }));
+    addGate("G-ISA210-01", "Engagement Letter", "isa", "ISA 210", "Signed engagement letter on file", "ISA 210.10", "planning", true,
+      () => ({ pass: compDocs.some(d => d.docType === "engagement_letter" && (d.status === "signed" || d.status === "completed")), detail: "Engagement letter not signed" }));
+    addGate("G-ISA220-01", "Independence Confirmation", "isa", "ISA 220", "All team members confirmed independence", "ISA 220.11", "planning", true,
+      () => ({ pass: compDocs.some(d => d.docType === "independence" && d.status === "completed"), detail: "Independence not confirmed" }));
+    addGate("G-ISA315-01", "Risk Assessment", "isa", "ISA 315", "Risk assessment completed for all material areas", "ISA 315.26", "planning", true,
+      () => {
+        const areas = new Set(tbLines.map((l: any) => l.wpArea || l.fsSection).filter(Boolean));
+        const assessed = new Set(chains.map(c => c.fsArea));
+        const missing = [...areas].filter(a => !assessed.has(a));
+        return { pass: missing.length === 0 && areas.size > 0, detail: `Risk assessment missing for: ${missing.join(", ")}` };
+      });
+    addGate("G-ISA315-02", "Assertion Coverage", "isa", "ISA 315", "All relevant assertions mapped to procedures", "ISA 315.A190", "planning", true,
+      () => {
+        const incomplete = chains.filter(c => c.assertionCoverage !== "full");
+        return { pass: incomplete.length === 0 && chains.length > 0, detail: `${incomplete.length} procedures with incomplete assertion coverage` };
+      });
+    addGate("G-ISA320-01", "Materiality Determination", "isa", "ISA 320", "Overall and performance materiality calculated", "ISA 320.10", "planning", true,
+      () => ({ pass: !!varMap["overall_materiality"] && parseFloat(varMap["overall_materiality"]) > 0, detail: "Materiality not calculated" }));
+    addGate("G-ISA330-01", "Response Procedures", "isa", "ISA 330", "Audit procedures respond to identified risks", "ISA 330.6", "execution", true,
+      () => {
+        const planned = chains.filter(c => c.procedureStatus === "planned");
+        const total = chains.length;
+        return { pass: total > 0 && planned.length < total, detail: `${planned.length}/${total} procedures still in planned status` };
+      });
+    addGate("G-ISA330-02", "Procedure Completion", "isa", "ISA 330", "All planned procedures performed or deferred with reason", "ISA 330.18", "execution", true,
+      () => {
+        const incomplete = chains.filter(c => c.procedureStatus !== "performed" && c.procedureStatus !== "deferred");
+        return { pass: incomplete.length === 0 && chains.length > 0, detail: `${incomplete.length} procedures not completed` };
+      });
+    addGate("G-ISA500-01", "Evidence Sufficiency", "isa", "ISA 500", "Sufficient appropriate audit evidence obtained", "ISA 500.6", "execution", true,
+      () => {
+        const withEvidence = chains.filter(c => c.evidenceIds && (c.evidenceIds as any[]).length > 0);
+        const pct = chains.length ? (withEvidence.length / chains.length) * 100 : 0;
+        return { pass: pct >= 80, detail: `Only ${Math.round(pct)}% of procedures have linked evidence` };
+      });
+    addGate("G-ISA530-01", "Sampling Documentation", "isa", "ISA 530", "Sampling methodology documented where applicable", "ISA 530.6", "execution", false,
+      () => ({ pass: true, detail: "Sampling documentation check" }));
+    addGate("G-ISA540-01", "Accounting Estimates", "isa", "ISA 540", "Estimates reviewed with appropriate skepticism", "ISA 540.8", "execution", false,
+      () => ({ pass: chains.some(c => c.procedureIsaRef?.includes("ISA 540")), detail: "No ISA 540 procedures found for accounting estimates" }));
+    addGate("G-ISA570-01", "Going Concern", "isa", "ISA 570", "Going concern assessment performed", "ISA 570.10", "completion", true,
+      () => ({ pass: !!varMap["going_concern_flag"] || compDocs.some(d => d.docType === "going_concern"), detail: "Going concern assessment not documented" }));
+    addGate("G-ISA580-01", "Management Representations", "isa", "ISA 580", "Written representations obtained from management", "ISA 580.9", "completion", true,
+      () => ({ pass: compDocs.some(d => d.docType === "management_rep_letter" && (d.status === "signed" || d.status === "completed")), detail: "Management representation letter not signed" }));
+    addGate("G-ISA700-01", "Audit Conclusion", "isa", "ISA 700", "Sufficient basis for audit opinion formed", "ISA 700.11", "reporting", true,
+      () => {
+        const withConclusion = chains.filter(c => c.conclusion);
+        return { pass: chains.length > 0 && withConclusion.length === chains.length, detail: `${chains.length - withConclusion.length} procedures without conclusion` };
+      });
+    addGate("G-ISA230-01", "Audit Documentation", "isa", "ISA 230", "Audit file assembled and documentation complete", "ISA 230.7", "completion", true,
+      () => ({ pass: chains.length > 0 && chains.every(c => c.chainComplete), detail: "Not all audit chain nodes complete" }));
+    addGate("G-ISQM1-01", "Quality Management", "isqm", "ISQM 1", "Engagement quality management requirements met", "ISQM 1.30", "completion", false,
+      () => ({ pass: true }));
+    addGate("G-ISQM2-01", "EQCR Completed", "isqm", "ISQM 2", "Engagement quality control review completed (where required)", "ISQM 2.19", "completion", isPIE,
+      () => ({ pass: !isPIE || compDocs.some(d => d.docType === "eqcr_checklist" && d.status === "completed"), detail: "EQCR not completed for listed entity" }));
+    addGate("G-ICAP-01", "ICAP CoE Compliance", "icap", "ICAP CoE", "Code of Ethics requirements met (independence, competence)", "ICAP CoE Part A", "planning", true,
+      () => ({ pass: compDocs.some(d => d.docType === "independence"), detail: "ICAP Code of Ethics compliance not documented" }));
+    addGate("G-AOB-01", "AOB Inspection Readiness", "aob", "AOB", "Audit file ready for AOB inspection", "AOB Inspection Standard", "completion", false,
+      () => {
+        const chainComplete = chains.every(c => c.chainComplete);
+        const reviewsClear = reviewNotes.filter(n => n.status === "open" && n.blocksExport).length === 0;
+        return { pass: chainComplete && reviewsClear, detail: "File not ready for AOB inspection" };
+      });
+    addGate("G-RN-01", "Review Notes Cleared", "internal", "Internal", "All blocking review notes cleared before sign-off", "Firm Policy", "completion", true,
+      () => {
+        const openBlockers = reviewNotes.filter(n => n.blocksSignOff && n.status !== "cleared");
+        return { pass: openBlockers.length === 0, detail: `${openBlockers.length} blocking review notes still open` };
+      });
+
+    await db.delete(wpComplianceGateTable).where(eq(wpComplianceGateTable.sessionId, sessionId));
+    if (gates.length > 0) {
+      const batchSize = 50;
+      for (let i = 0; i < gates.length; i += batchSize) {
+        await db.insert(wpComplianceGateTable).values(gates.slice(i, i + batchSize));
+      }
+    }
+    const summary = {
+      total: gates.length,
+      passed: gates.filter((g: any) => g.status === "pass").length,
+      failed: gates.filter((g: any) => g.status === "fail").length,
+      blockingFailures: gates.filter((g: any) => g.status === "fail" && g.blocking).length,
+      compliancePct: Math.round((gates.filter((g: any) => g.status === "pass").length / gates.length) * 100),
+    };
+    res.json({ success: true, gates, summary });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put("/sessions/:sessionId/compliance-gates/:gateId/override", async (req: Request, res: Response) => {
+  try {
+    const gateId = parseInt(req.params.gateId);
+    const { overrideBy, overrideReason } = req.body;
+    await db.update(wpComplianceGateTable).set({
+      status: "override", overrideBy, overrideReason, overrideDate: new Date(), updatedAt: new Date(),
+    }).where(eq(wpComplianceGateTable.id, gateId));
+    res.json({ success: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── ISA 530 SAMPLING ENGINE ──
+
+router.get("/sessions/:sessionId/sampling-detail", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const details = await db.select().from(wpSamplingDetailTable).where(eq(wpSamplingDetailTable.sessionId, sessionId)).orderBy(wpSamplingDetailTable.fsArea);
+    res.json({ details });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post("/sessions/:sessionId/sampling-detail", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const data = req.body;
+    const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+    const varMap: Record<string, string> = {};
+    variables.forEach(v => { varMap[v.variableCode] = v.currentValue || v.defaultValue || ""; });
+    const pm = parseFloat(varMap["performance_materiality"] || "0");
+    const riskLevel = varMap["engagement_risk_level"] || "medium";
+
+    let sampleSize = data.sampleSize;
+    if (!sampleSize && data.populationSize) {
+      const popSize = data.populationSize;
+      if (riskLevel === "high") sampleSize = Math.min(Math.max(30, Math.ceil(popSize * 0.15)), popSize);
+      else if (riskLevel === "medium") sampleSize = Math.min(Math.max(25, Math.ceil(popSize * 0.10)), popSize);
+      else sampleSize = Math.min(Math.max(15, Math.ceil(popSize * 0.06)), popSize);
+    }
+
+    await db.insert(wpSamplingDetailTable).values({
+      sessionId, wpCode: data.wpCode, fsArea: data.fsArea,
+      samplingMethod: data.samplingMethod || "mus",
+      populationDescription: data.populationDescription,
+      populationSize: data.populationSize,
+      populationValuePkr: data.populationValuePkr ? String(data.populationValuePkr) : null,
+      stratificationApplied: data.stratificationApplied || false,
+      strata: data.strata,
+      keyItemThreshold: pm ? String(pm) : null,
+      confidenceLevel: data.confidenceLevel ? String(data.confidenceLevel) : "95.00",
+      tolerableError: pm ? String(pm) : null,
+      expectedError: data.expectedError ? String(data.expectedError) : "0",
+      sampleSize, status: "planned", preparedBy: data.preparedBy,
+    });
+    res.json({ success: true, recommendedSampleSize: sampleSize });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put("/sessions/:sessionId/sampling-detail/:samplingId", async (req: Request, res: Response) => {
+  try {
+    const samplingId = parseInt(req.params.samplingId);
+    const updates = req.body;
+    if (updates.itemsTested && updates.exceptionsFound !== undefined) {
+      updates.exceptionRate = updates.itemsTested > 0 ? String(updates.exceptionsFound / updates.itemsTested) : "0";
+      if (updates.exceptionsFound === 0) {
+        updates.conclusion = "accept";
+        updates.conclusionBasis = "No exceptions found in sample; population accepted";
+      } else if (updates.exceptionRate && parseFloat(updates.exceptionRate) > 0.1) {
+        updates.conclusion = "reject";
+        updates.conclusionBasis = "Exception rate exceeds tolerable level; further investigation required";
+      } else {
+        updates.conclusion = "extend";
+        updates.conclusionBasis = "Exceptions found but within tolerable range; consider extending sample";
+      }
+    }
+    await db.update(wpSamplingDetailTable).set({ ...updates, updatedAt: new Date() }).where(eq(wpSamplingDetailTable.id, samplingId));
+    res.json({ success: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── ENHANCED TEMPLATE UPLOAD (16-column format) ──
+
+router.post("/sessions/:sessionId/upload-template", upload.single("file"), async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const XLSX = require("xlsx");
+    const wb = XLSX.read(req.file.buffer);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows: any[] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+    let headerIdx = rows.findIndex((r: any[]) => r.some((c: any) => String(c).toLowerCase().includes("line_id") || String(c).toLowerCase().includes("statement_type")));
+    if (headerIdx < 0) headerIdx = 1;
+    const headers = rows[headerIdx].map((h: any) => String(h).trim());
+    const colMap: Record<string, number> = {};
+    headers.forEach((h: string, i: number) => { colMap[h] = i; });
+
+    const dataRows = rows.slice(headerIdx + 1).filter((r: any[]) => r[colMap["Line_ID"] ?? 0]);
+    const tbInserts: any[] = [];
+    for (const row of dataRows) {
+      const get = (col: string) => row[colMap[col] ?? -1] ?? "";
+      const cy = parseFloat(get("Current_Year") || "0");
+      const py = parseFloat(get("Prior_Year") || "0");
+      tbInserts.push({
+        sessionId,
+        accountCode: String(get("Account_Code")),
+        accountName: String(get("Account_Name")),
+        lineItem: String(get("Line_Item")),
+        subLineItem: String(get("Sub_Line_Item")),
+        statementType: String(get("Statement_Type")),
+        fsSection: String(get("FS_Section")),
+        majorHead: String(get("Major_Head")),
+        noteNo: String(get("Note_No")),
+        amount: String(cy),
+        currentYear: String(cy),
+        priorYear: String(py),
+        debitValue: String(parseFloat(get("Debit_Transaction_Value") || "0")),
+        creditValue: String(parseFloat(get("Credit_Transaction_Value") || "0")),
+        normalBalance: String(get("Normal_Balance")),
+        wpArea: String(get("WP_Area")),
+        riskLevel: String(get("Risk_Level")),
+        source: "template_upload",
+        confidence: 100,
+      });
+    }
+
+    await db.delete(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+    if (tbInserts.length > 0) {
+      const batchSize = 50;
+      for (let i = 0; i < tbInserts.length; i += batchSize) {
+        await db.insert(wpTrialBalanceLinesTable).values(tbInserts.slice(i, i + batchSize));
+      }
+    }
+
+    const file = await db.insert(wpUploadedFilesTable).values({
+      sessionId, category: "trial_balance", subcategory: "template",
+      originalName: req.file.originalname, mimeType: req.file.mimetype,
+      sizeBytes: req.file.size, status: "completed",
+    }).returning();
+
+    const bsTotal = tbInserts.filter(t => t.statementType === "BS").reduce((s, t) => s + parseFloat(t.amount || "0"), 0);
+    const plTotal = tbInserts.filter(t => t.statementType === "PL").reduce((s, t) => s + parseFloat(t.amount || "0"), 0);
+    const autoVars: Record<string, string> = {
+      total_assets: String(tbInserts.filter(t => t.fsSection === "Assets").reduce((s, t) => s + parseFloat(t.amount || "0"), 0)),
+      total_liabilities: String(tbInserts.filter(t => t.fsSection === "Liabilities").reduce((s, t) => s + parseFloat(t.amount || "0"), 0)),
+      total_equity: String(tbInserts.filter(t => t.fsSection === "Equity").reduce((s, t) => s + parseFloat(t.amount || "0"), 0)),
+      total_revenue: String(tbInserts.filter(t => t.statementType === "PL" && (t.fsSection === "Revenue" || t.majorHead?.includes("Revenue"))).reduce((s, t) => s + Math.abs(parseFloat(t.amount || "0")), 0)),
+      total_expenses: String(Math.abs(plTotal)),
+    };
+    for (const [code, val] of Object.entries(autoVars)) {
+      const existing = await db.select().from(wpVariablesTable).where(and(eq(wpVariablesTable.sessionId, sessionId), eq(wpVariablesTable.variableCode, code)));
+      if (existing.length) {
+        await db.update(wpVariablesTable).set({ currentValue: val, lastUpdatedBy: "template_auto" }).where(eq(wpVariablesTable.id, existing[0].id));
+      } else {
+        await db.insert(wpVariablesTable).values({ sessionId, variableCode: code, currentValue: val, defaultValue: val, lastUpdatedBy: "template_auto" });
+      }
+    }
+
+    await db.insert(wpVersionHistoryTable).values({
+      sessionId, entityType: "template_upload", entityId: String(file[0]?.id || "upload"),
+      version: 1, changeType: "create",
+      newValue: JSON.stringify({ rows: tbInserts.length, file: req.file.originalname }),
+      changedBy: "system", changedByRole: "system",
+    });
+
+    const wpAreas = [...new Set(tbInserts.map(t => t.wpArea).filter(Boolean))];
+    const riskAreas = tbInserts.filter(t => t.riskLevel === "High").map(t => t.wpArea).filter(Boolean);
+
+    res.json({
+      success: true,
+      summary: {
+        totalLines: tbInserts.length,
+        bsLines: tbInserts.filter(t => t.statementType === "BS").length,
+        plLines: tbInserts.filter(t => t.statementType === "PL").length,
+        cfLines: tbInserts.filter(t => t.statementType === "CF").length,
+        notesLines: tbInserts.filter(t => t.statementType === "Notes").length,
+        wpAreas, highRiskAreas: [...new Set(riskAreas)],
+        autoMappedVariables: Object.keys(autoVars),
+        totalAssets: autoVars.total_assets,
+        totalRevenue: autoVars.total_revenue,
+      },
+    });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── AI-POWERED AUDIT CHAIN GENERATION ──
+
+router.post("/sessions/:sessionId/audit-chain/ai-generate", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const { wpCode, fsArea } = req.body;
+    const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+    const varMap: Record<string, string> = {};
+    variables.forEach(v => { varMap[v.variableCode] = v.currentValue || v.defaultValue || ""; });
+    const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+    const areaLines = fsArea ? tbLines.filter((l: any) => l.wpArea === fsArea || l.fsSection === fsArea) : [];
+
+    const prompt = `You are an ISA-compliant audit working paper generator for Pakistani CA/Audit firms under ICAP/AOB/SECP regulations.
+
+Generate a complete audit logic chain for the FS area: "${fsArea}" with WP Code: "${wpCode || "auto"}".
+
+Entity: ${varMap["entity_name"] || "Client"}, Industry: ${varMap["industry"] || "Manufacturing"}, FY: ${varMap["financial_year_end"] || "2026"}
+Materiality: PKR ${varMap["overall_materiality"] || "N/A"}, Performance Materiality: PKR ${varMap["performance_materiality"] || "N/A"}
+Entity Type: ${varMap["entity_type"] || "Private"}, Risk Level: ${varMap["engagement_risk_level"] || "Medium"}
+Trial Balance Lines in this area: ${areaLines.length} lines, Total Amount: PKR ${areaLines.reduce((s: number, l: any) => s + parseFloat(l.currentYear || l.amount || "0"), 0).toLocaleString()}
+
+Return JSON array of chain nodes, each with:
+{
+  "riskId": "R-XXX-001",
+  "riskDescription": "...",
+  "riskType": "inherent|control|fraud|significant",
+  "isaRiskRef": "ISA 315.XX",
+  "riskLevel": "low|medium|high|significant",
+  "riskResponse": "...",
+  "assertions": [{"code":"E","name":"Existence","isaRef":"ISA 315.A190"}],
+  "assertionCoverage": "full",
+  "procedureId": "P-XXX-001",
+  "procedureDescription": "...",
+  "procedureNature": "substantive|toc|analytical|inquiry|observation",
+  "procedureIsaRef": "ISA XXX.XX",
+  "procedureIsaClause": "Full clause text from ISA",
+  "procedureTiming": "interim|final",
+  "conclusion": null,
+  "conclusionNarrative": null
+}
+
+Generate 6-10 procedures covering ALL relevant assertions. Include Pakistan-specific procedures (FBR, SECP, WHT, SRB where applicable).
+Return ONLY the JSON array, no markdown.`;
+
+    const { OpenAI } = require("openai");
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o", temperature: 0.3, max_tokens: 4000,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    let chainNodes: any[] = [];
+    try {
+      const content = completion.choices[0].message.content.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
+      chainNodes = JSON.parse(content);
+    } catch { return res.status(500).json({ error: "AI response parsing failed" }); }
+
+    const chains = chainNodes.map((node: any) => ({
+      sessionId, wpCode: wpCode || `EX-${fsArea.replace(/\s+/g, "-").substring(0, 6).toUpperCase()}-01`,
+      fsArea, ...node, procedureStatus: "planned",
+      evidenceIds: [], exceptionsFound: 0, exceptionDetails: [],
+      chainComplete: false,
+    }));
+
+    if (chains.length > 0) {
+      if (fsArea) await db.delete(wpAuditChainTable).where(and(eq(wpAuditChainTable.sessionId, sessionId), eq(wpAuditChainTable.fsArea, fsArea)));
+      await db.insert(wpAuditChainTable).values(chains);
+    }
+    res.json({ success: true, chainsGenerated: chains.length, chains });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 

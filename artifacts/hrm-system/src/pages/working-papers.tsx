@@ -21,13 +21,15 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
-// Pipeline: Upload → Data Extraction → Variables → WP Listing → WP Generation → Export
+// Pipeline: Upload → Data Extraction → Variables → WP Listing → WP Generation → Audit Chain → Review → Export
 const STAGES = [
   { key: "upload",        label: "Upload",         icon: Upload,              phase: "facts",    desc: "Download the financial data template, fill it in, and upload the completed file" },
   { key: "extraction",    label: "Data Extraction",icon: Sparkles,            phase: "facts",    desc: "Template-parsed variables — inline review, AI fill, exceptions & confirmation" },
   { key: "variables",     label: "Variables",      icon: SlidersHorizontal,   phase: "facts",    desc: "Review and lock all engagement variables before WP generation" },
   { key: "wp_listing",    label: "WP Listing",     icon: ClipboardList,       phase: "output",   desc: "AI-recommended WP selection — choose which papers to generate" },
   { key: "generation",    label: "WP Generation",  icon: FileCheck,           phase: "output",   desc: "Sequential AI generation of all WP sections (ISA Compliant)" },
+  { key: "audit_chain",   label: "Audit Chain",    icon: Shield,              phase: "audit",    desc: "Risk→Assertion→Procedure→Evidence→Conclusion with ISA clause mapping" },
+  { key: "review",        label: "Review & QC",    icon: CheckCircle2,        phase: "audit",    desc: "Multi-level review (Staff→Senior→Manager→Partner→EQCR), compliance gates, tick marks" },
   { key: "export",        label: "Export",         icon: Download,            phase: "output",   desc: "WP Excel · WP Word · Full Audit Bundle" },
 ] as const;
 
@@ -200,6 +202,21 @@ export default function WorkingPapers() {
   const [complianceDocs, setComplianceDocs] = useState<any[]>([]);
   const [complianceLoading, setComplianceLoading] = useState<string | null>(null);
   const [showCompliancePanel, setShowCompliancePanel] = useState(false);
+  const [auditChains, setAuditChains] = useState<any[]>([]);
+  const [auditChainSummary, setAuditChainSummary] = useState<any>(null);
+  const [auditChainLoading, setAuditChainLoading] = useState(false);
+  const [reviewNotes, setReviewNotes] = useState<any[]>([]);
+  const [reviewSummary, setReviewSummary] = useState<any>(null);
+  const [complianceGates, setComplianceGates] = useState<any[]>([]);
+  const [complianceGateSummary, setComplianceGateSummary] = useState<any>(null);
+  const [tickMarks, setTickMarks] = useState<any[]>([]);
+  const [tickMarkLegend, setTickMarkLegend] = useState<any[]>([]);
+  const [versionHistory, setVersionHistory] = useState<any[]>([]);
+  const [leadSchedules, setLeadSchedules] = useState<any[]>([]);
+  const [fsNoteMappings, setFsNoteMappings] = useState<any[]>([]);
+  const [samplingDetails, setSamplingDetails] = useState<any[]>([]);
+  const [reviewWorkflowStatus, setReviewWorkflowStatus] = useState<any>(null);
+  const [isaLoading, setIsaLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("");
   const [editingVar, setEditingVar] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -1302,6 +1319,197 @@ export default function WorkingPapers() {
     } catch {}
   };
 
+  const fetchAuditChain = async () => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/audit-chain`, { headers });
+      if (res.ok) { const data = await res.json(); setAuditChains(data.chains || []); setAuditChainSummary(data.summary || null); }
+    } catch {}
+  };
+
+  const generateAuditChain = async (fsArea?: string, useAI?: boolean) => {
+    if (!activeSession) return;
+    setAuditChainLoading(true);
+    try {
+      const endpoint = useAI ? "audit-chain/ai-generate" : "audit-chain/generate";
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/${endpoint}`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ fsArea }),
+      });
+      if (res.ok) { toast({ title: "Audit chain generated" }); await fetchAuditChain(); }
+      else { const err = await res.json(); toast({ title: "Failed", description: err.error, variant: "destructive" }); }
+    } catch (e: any) { toast({ title: "Failed", description: e.message, variant: "destructive" }); }
+    finally { setAuditChainLoading(false); }
+  };
+
+  const updateAuditChainNode = async (chainId: number, updates: any) => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/audit-chain/${chainId}`, {
+        method: "PUT", headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) { await fetchAuditChain(); }
+    } catch {}
+  };
+
+  const fetchReviewNotes = async () => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/review-notes`, { headers });
+      if (res.ok) { const data = await res.json(); setReviewNotes(data.notes || []); setReviewSummary(data.summary || null); }
+    } catch {}
+  };
+
+  const addReviewNote = async (note: any) => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/review-notes`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(note),
+      });
+      if (res.ok) { toast({ title: "Review note added" }); await fetchReviewNotes(); }
+    } catch {}
+  };
+
+  const respondToReviewNote = async (noteId: number, responseBy: string, responseText: string) => {
+    if (!activeSession) return;
+    try {
+      await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/review-notes/${noteId}/respond`, {
+        method: "PUT", headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ responseBy, responseText }),
+      });
+      await fetchReviewNotes();
+    } catch {}
+  };
+
+  const clearReviewNote = async (noteId: number, clearedBy: string, clearanceNote: string) => {
+    if (!activeSession) return;
+    try {
+      await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/review-notes/${noteId}/clear`, {
+        method: "PUT", headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ clearedBy, clearanceNote }),
+      });
+      toast({ title: "Review note cleared" });
+      await fetchReviewNotes();
+    } catch {}
+  };
+
+  const fetchComplianceGates = async () => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/compliance-gates`, { headers });
+      if (res.ok) { const data = await res.json(); setComplianceGates(data.gates || []); setComplianceGateSummary(data.summary || null); }
+    } catch {}
+  };
+
+  const runComplianceValidation = async () => {
+    if (!activeSession) return;
+    setIsaLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/compliance-gates/run`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      });
+      if (res.ok) { const data = await res.json(); setComplianceGates(data.gates || []); setComplianceGateSummary(data.summary || null); toast({ title: `Compliance: ${data.summary?.compliancePct}%` }); }
+    } catch {}
+    finally { setIsaLoading(false); }
+  };
+
+  const fetchTickMarks = async () => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/tick-marks`, { headers });
+      if (res.ok) { const data = await res.json(); setTickMarks(data.marks || []); setTickMarkLegend(data.legend || []); }
+    } catch {}
+  };
+
+  const initTickMarks = async () => {
+    if (!activeSession) return;
+    try {
+      await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/tick-marks/initialize`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      });
+      await fetchTickMarks();
+    } catch {}
+  };
+
+  const fetchVersionHistory = async () => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/version-history`, { headers });
+      if (res.ok) { const data = await res.json(); setVersionHistory(data.history || []); }
+    } catch {}
+  };
+
+  const fetchLeadSchedules = async () => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/lead-schedules`, { headers });
+      if (res.ok) { const data = await res.json(); setLeadSchedules(data.schedules || []); }
+    } catch {}
+  };
+
+  const generateLeadSchedules = async () => {
+    if (!activeSession) return;
+    setIsaLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/lead-schedules/generate`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      });
+      if (res.ok) { toast({ title: "Lead schedules generated" }); await fetchLeadSchedules(); }
+      else { const err = await res.json(); toast({ title: "Failed", description: err.error, variant: "destructive" }); }
+    } catch {}
+    finally { setIsaLoading(false); }
+  };
+
+  const fetchFsNoteMappings = async () => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/fs-note-mapping`, { headers });
+      if (res.ok) { const data = await res.json(); setFsNoteMappings(data.mappings || []); }
+    } catch {}
+  };
+
+  const generateFsNoteMappings = async () => {
+    if (!activeSession) return;
+    setIsaLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/fs-note-mapping/generate`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      });
+      if (res.ok) { toast({ title: "FS notes mapped" }); await fetchFsNoteMappings(); }
+    } catch {}
+    finally { setIsaLoading(false); }
+  };
+
+  const fetchSamplingDetails = async () => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/sampling-detail`, { headers });
+      if (res.ok) { const data = await res.json(); setSamplingDetails(data.details || []); }
+    } catch {}
+  };
+
+  const uploadTemplate = async (file: File) => {
+    if (!activeSession) return;
+    setIsaLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/upload-template`, {
+        method: "POST", headers: { Authorization: headers.Authorization || "" }, body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast({ title: `Template loaded: ${data.summary?.totalLines} lines, ${data.summary?.wpAreas?.length} areas` });
+        await fetchSession(activeSession.id);
+      } else {
+        const err = await res.json();
+        toast({ title: "Upload failed", description: err.error, variant: "destructive" });
+      }
+    } catch (e: any) { toast({ title: "Upload failed", description: e.message, variant: "destructive" }); }
+    finally { setIsaLoading(false); }
+  };
+
   const fetchExceptions = async () => {
     if (!activeSession) return;
     try {
@@ -1567,7 +1775,7 @@ export default function WorkingPapers() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {sessions.map((s: any) => {
-                  const stageOrder = ["upload","extraction","variables","wp_listing","generation","export"];
+                  const stageOrder = ["upload","extraction","variables","wp_listing","generation","audit_chain","review","export"];
                   const stageIdx = stageOrder.indexOf(s.status);
                   const progressPct = stageIdx < 0 ? 0 : Math.round(((stageIdx + 1) / stageOrder.length) * 100);
                   const isDone = s.status === "completed" || s.status === "exported";
@@ -1678,7 +1886,9 @@ export default function WorkingPapers() {
           <div className="hidden sm:flex items-center gap-0 pt-2 pb-0 text-[9px] font-bold uppercase tracking-widest">
             {([
               { label: "Facts", keys: ["upload","extraction"] as string[], color: "blue" },
-              { label: "Defensible Output", keys: ["wp_listing","generation","export"] as string[], color: "emerald" },
+              { label: "Defensible Output", keys: ["wp_listing","generation"] as string[], color: "emerald" },
+              { label: "ISA Audit", keys: ["audit_chain","review"] as string[], color: "violet" },
+              { label: "Delivery", keys: ["export"] as string[], color: "amber" },
             ]).map((ph, pi) => {
               const phaseStages = STAGES.filter(s => ph.keys.includes(s.key));
               const isCurrentPhase = ph.keys.includes(stage);
@@ -1730,6 +1940,8 @@ export default function WorkingPapers() {
                     }
                     if (s.key === "wp_listing") { fetchWpTriggers(); fetchSession(activeSession.id); }
                     if (s.key === "generation" || s.key === "export") { fetchSession(activeSession.id); fetchExceptions(); }
+                    if (s.key === "audit_chain") { fetchAuditChain(); fetchLeadSchedules(); fetchFsNoteMappings(); }
+                    if (s.key === "review") { fetchReviewNotes(); fetchComplianceGates(); fetchTickMarks(); fetchVersionHistory(); fetchSamplingDetails(); }
                   }}
                 >
                   {isPast ? <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" /> : <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
@@ -1754,9 +1966,11 @@ export default function WorkingPapers() {
             { step: "Variables",       phase: "facts",  active: stage === "variables" },
             { step: "WP Listing",      phase: "output", active: stage === "wp_listing" },
             { step: "WP Generation",   phase: "output", active: stage === "generation" },
+            { step: "Audit Chain",     phase: "audit",  active: stage === "audit_chain" },
+            { step: "Review & QC",     phase: "audit",  active: stage === "review" },
             { step: "Export",          phase: "output", active: stage === "export" },
           ].map((item, idx) => {
-            const stageOrder = ["upload","extraction","variables","wp_listing","generation","export"];
+            const stageOrder = ["upload","extraction","variables","wp_listing","generation","audit_chain","review","export"];
             const pastIdx = stageOrder.indexOf(stage);
             const isPast = pastIdx > idx;
             return (
@@ -1955,7 +2169,47 @@ export default function WorkingPapers() {
         />
       )}
 
-      {/* TAB 7 — Export */}
+      {/* TAB 7 — Audit Chain (Risk→Assertion→Procedure→Evidence→Conclusion) */}
+      {stage === "audit_chain" && (
+        <AuditChainStage
+          chains={auditChains}
+          summary={auditChainSummary}
+          loading={auditChainLoading}
+          leadSchedules={leadSchedules}
+          fsNoteMappings={fsNoteMappings}
+          session={activeSession}
+          onGenerateChain={generateAuditChain}
+          onUpdateNode={updateAuditChainNode}
+          onGenerateLeadSchedules={generateLeadSchedules}
+          onGenerateFsNotes={generateFsNoteMappings}
+          onRefresh={() => { fetchAuditChain(); fetchLeadSchedules(); fetchFsNoteMappings(); }}
+          isaLoading={isaLoading}
+        />
+      )}
+
+      {/* TAB 8 — Review & QC */}
+      {stage === "review" && (
+        <ReviewQCStage
+          reviewNotes={reviewNotes}
+          reviewSummary={reviewSummary}
+          complianceGates={complianceGates}
+          complianceGateSummary={complianceGateSummary}
+          tickMarks={tickMarks}
+          tickMarkLegend={tickMarkLegend}
+          versionHistory={versionHistory}
+          samplingDetails={samplingDetails}
+          session={activeSession}
+          onAddReviewNote={addReviewNote}
+          onRespondToNote={respondToReviewNote}
+          onClearNote={clearReviewNote}
+          onRunComplianceValidation={runComplianceValidation}
+          onInitTickMarks={initTickMarks}
+          onRefresh={() => { fetchReviewNotes(); fetchComplianceGates(); fetchTickMarks(); fetchVersionHistory(); fetchSamplingDetails(); }}
+          isaLoading={isaLoading}
+        />
+      )}
+
+      {/* TAB 9 — Export */}
       {stage === "export" && (
         <ExportStage
           heads={heads}
@@ -10124,6 +10378,578 @@ const HEAD_PHASE: Record<number, { code: string; color: string }> = {
 const FORMAT_LABEL: Record<string, string> = {
   "word": "DOCX", "excel": "XLSX", "word+excel": "DOCX+XLSX", "word+pdf": "DOCX+PDF",
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ISA AUDIT CHAIN STAGE
+// ═══════════════════════════════════════════════════════════════════════════════
+function AuditChainStage({ chains, summary, loading, leadSchedules, fsNoteMappings, session, onGenerateChain, onUpdateNode, onGenerateLeadSchedules, onGenerateFsNotes, onRefresh, isaLoading }: any) {
+  const [activeSubTab, setActiveSubTab] = useState<"chain" | "lead_schedule" | "fs_notes">("chain");
+  const [expandedArea, setExpandedArea] = useState<string | null>(null);
+  const [expandedNode, setExpandedNode] = useState<number | null>(null);
+  const areaGroups: Record<string, any[]> = {};
+  (chains || []).forEach((c: any) => {
+    if (!areaGroups[c.fsArea]) areaGroups[c.fsArea] = [];
+    areaGroups[c.fsArea].push(c);
+  });
+  const areas = Object.keys(areaGroups);
+  const statusColors: Record<string, string> = { planned: "bg-slate-200 text-slate-700", in_progress: "bg-blue-100 text-blue-700", performed: "bg-emerald-100 text-emerald-700", deferred: "bg-amber-100 text-amber-700" };
+  const riskColors: Record<string, string> = { low: "text-emerald-600", medium: "text-amber-600", high: "text-red-600", significant: "text-red-700" };
+
+  return (
+    <div className="space-y-4 p-4 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Shield className="w-5 h-5 text-violet-600" /> ISA Audit Logic Chain</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Risk → Assertion → Procedure → Evidence → Conclusion</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onRefresh} className="px-3 py-1.5 text-xs bg-slate-100 rounded-lg hover:bg-slate-200"><RefreshCw className="w-3 h-3 inline mr-1" />Refresh</button>
+          <button onClick={() => onGenerateChain(undefined, false)} disabled={loading} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50">
+            {loading ? <Loader2 className="w-3 h-3 animate-spin inline mr-1" /> : <Zap className="w-3 h-3 inline mr-1" />}Generate Chains
+          </button>
+          <button onClick={() => onGenerateChain(undefined, true)} disabled={loading} className="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+            {loading ? <Loader2 className="w-3 h-3 animate-spin inline mr-1" /> : <Bot className="w-3 h-3 inline mr-1" />}AI Generate
+          </button>
+        </div>
+      </div>
+
+      {summary && (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {[
+            { label: "Total Procedures", value: summary.total, color: "blue" },
+            { label: "Completed Chains", value: summary.complete, color: "emerald" },
+            { label: "High Risk", value: summary.byRiskLevel?.high || 0, color: "red" },
+            { label: "Full Assertion Coverage", value: summary.assertionCoverage?.full || 0, color: "violet" },
+            { label: "Exceptions Found", value: summary.exceptionsTotal || 0, color: "amber" },
+          ].map(s => (
+            <div key={s.label} className={`bg-${s.color}-50 border border-${s.color}-200 rounded-xl p-3`}>
+              <p className={`text-2xl font-bold text-${s.color}-700`}>{s.value}</p>
+              <p className={`text-[11px] text-${s.color}-600`}>{s.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
+        {[
+          { key: "chain", label: "Audit Logic Chain", icon: Network },
+          { key: "lead_schedule", label: "Lead Schedules", icon: Table2 },
+          { key: "fs_notes", label: "FS Note Mapping", icon: BookOpen },
+        ].map(t => (
+          <button key={t.key} onClick={() => setActiveSubTab(t.key as any)} className={cn("flex-1 px-3 py-2 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-1.5", activeSubTab === t.key ? "bg-white shadow text-slate-900" : "text-slate-500 hover:text-slate-700")}>
+            <t.icon className="w-3.5 h-3.5" />{t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeSubTab === "chain" && (
+        <div className="space-y-3">
+          {areas.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl border">
+              <Shield className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 font-medium">No audit chains generated yet</p>
+              <p className="text-sm text-slate-400 mt-1">Upload the financial data template first, then generate chains</p>
+            </div>
+          ) : areas.map(area => (
+            <div key={area} className="bg-white rounded-xl border overflow-hidden">
+              <button onClick={() => setExpandedArea(expandedArea === area ? null : area)} className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className={cn("w-2 h-2 rounded-full", areaGroups[area].every((c: any) => c.chainComplete) ? "bg-emerald-500" : "bg-amber-400")} />
+                  <span className="font-semibold text-sm text-slate-900">{area}</span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">{areaGroups[area].length} procedures</span>
+                  <span className={cn("text-[11px] font-medium", riskColors[areaGroups[area][0]?.riskLevel || "medium"])}>{(areaGroups[area][0]?.riskLevel || "medium").toUpperCase()} RISK</span>
+                </div>
+                {expandedArea === area ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+              </button>
+              {expandedArea === area && (
+                <div className="border-t divide-y">
+                  {areaGroups[area].map((node: any) => (
+                    <div key={node.id} className="px-4 py-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-mono bg-slate-100 px-1.5 py-0.5 rounded">{node.procedureId}</span>
+                            <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", statusColors[node.procedureStatus || "planned"])}>{(node.procedureStatus || "planned").replace(/_/g, " ")}</span>
+                            <span className="text-[10px] text-violet-600 font-medium">{node.procedureIsaRef}</span>
+                            {node.tickMarkCode && <span className="text-base" title={node.tickMarkMeaning}>{node.tickMarkCode}</span>}
+                          </div>
+                          <p className="text-sm text-slate-800 font-medium">{node.procedureDescription}</p>
+                          <div className="flex flex-wrap gap-3 mt-2 text-[11px] text-slate-500">
+                            <span>Nature: <span className="font-medium text-slate-700">{node.procedureNature}</span></span>
+                            <span>Timing: <span className="font-medium text-slate-700">{node.procedureTiming}</span></span>
+                            {node.evidenceIds?.length > 0 && <span>Evidence: <span className="font-medium text-emerald-600">{node.evidenceIds.length} items</span></span>}
+                            {node.exceptionsFound > 0 && <span>Exceptions: <span className="font-medium text-red-600">{node.exceptionsFound}</span></span>}
+                          </div>
+                          {node.assertions && (
+                            <div className="flex gap-1 mt-2">
+                              {(node.assertions as any[]).map((a: any, ai: number) => (
+                                <span key={ai} className="text-[10px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">{a.code}: {a.name}</span>
+                              ))}
+                            </div>
+                          )}
+                          {node.conclusion && <p className="text-[11px] mt-2 text-slate-600"><span className="font-medium">Conclusion:</span> {node.conclusion} — {node.conclusionNarrative}</p>}
+                        </div>
+                        <div className="flex flex-col gap-1 ml-3 shrink-0">
+                          {node.procedureStatus === "planned" && (
+                            <button onClick={() => onUpdateNode(node.id, { procedureStatus: "in_progress" })} className="text-[10px] px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100">Start</button>
+                          )}
+                          {node.procedureStatus === "in_progress" && (
+                            <button onClick={() => onUpdateNode(node.id, { procedureStatus: "performed", resultSummary: "Procedure performed satisfactorily" })} className="text-[10px] px-2 py-1 bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100">Complete</button>
+                          )}
+                          {node.procedureStatus === "performed" && !node.conclusion && (
+                            <button onClick={() => onUpdateNode(node.id, { conclusion: "satisfactory", conclusionNarrative: "No exceptions noted. Evidence is sufficient and appropriate.", evidenceSufficiency: "sufficient", chainComplete: true })} className="text-[10px] px-2 py-1 bg-violet-50 text-violet-700 rounded hover:bg-violet-100">Conclude</button>
+                          )}
+                          <button onClick={() => setExpandedNode(expandedNode === node.id ? null : node.id)} className="text-[10px] px-2 py-1 bg-slate-50 text-slate-600 rounded hover:bg-slate-100">
+                            {expandedNode === node.id ? "Less" : "Detail"}
+                          </button>
+                        </div>
+                      </div>
+                      {expandedNode === node.id && (
+                        <div className="mt-3 p-3 bg-slate-50 rounded-lg text-[11px] space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div><span className="text-slate-500">Risk ID:</span> <span className="font-mono">{node.riskId}</span></div>
+                            <div><span className="text-slate-500">Risk Type:</span> <span className="font-medium">{node.riskType}</span></div>
+                            <div><span className="text-slate-500">ISA Risk Ref:</span> <span className="text-violet-600">{node.isaRiskRef}</span></div>
+                            <div><span className="text-slate-500">Risk Response:</span> {node.riskResponse}</div>
+                            <div><span className="text-slate-500">Evidence Type:</span> {node.evidenceType || "—"}</div>
+                            <div><span className="text-slate-500">Evidence Reliability:</span> {node.evidenceReliability || "—"}</div>
+                            <div><span className="text-slate-500">Sufficiency:</span> {node.evidenceSufficiency || "—"}</div>
+                            <div><span className="text-slate-500">Assertion Coverage:</span> {node.assertionCoverage}</div>
+                          </div>
+                          {node.riskDescription && <div><span className="text-slate-500">Risk Description:</span> {node.riskDescription}</div>}
+                          {node.procedureIsaClause && <div><span className="text-slate-500">ISA Clause:</span> <span className="italic">{node.procedureIsaClause}</span></div>}
+                          {node.impactOnOpinion && <div><span className="text-slate-500">Impact on Opinion:</span> <span className="font-medium text-red-600">{node.impactOnOpinion}</span></div>}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {activeSubTab === "lead_schedule" && (
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <button onClick={onGenerateLeadSchedules} disabled={isaLoading} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50">
+              {isaLoading ? <Loader2 className="w-3 h-3 animate-spin inline mr-1" /> : <Table2 className="w-3 h-3 inline mr-1" />}Generate Lead Schedules
+            </button>
+          </div>
+          {(leadSchedules || []).length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl border">
+              <Table2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 font-medium">No lead schedules generated</p>
+              <p className="text-sm text-slate-400 mt-1">Generate from uploaded trial balance data</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-50 border-b">
+                    <tr>
+                      {["Ref", "WP Area", "Major Head", "Note", "Opening", "Closing", "Variance", "Var %", "Risk", "Status"].map(h => (
+                        <th key={h} className="px-3 py-2 text-left font-semibold text-slate-600">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {(leadSchedules || []).map((ls: any) => (
+                      <tr key={ls.id} className="hover:bg-slate-50">
+                        <td className="px-3 py-2 font-mono text-violet-600">{ls.scheduleRef}</td>
+                        <td className="px-3 py-2 font-medium">{ls.wpArea}</td>
+                        <td className="px-3 py-2">{ls.majorHead}</td>
+                        <td className="px-3 py-2">{ls.noteNo}</td>
+                        <td className="px-3 py-2 text-right font-mono">{Number(ls.openingBalance || 0).toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right font-mono">{Number(ls.closingBalance || 0).toLocaleString()}</td>
+                        <td className={cn("px-3 py-2 text-right font-mono", Number(ls.variance || 0) < 0 ? "text-red-600" : "text-emerald-600")}>{Number(ls.variance || 0).toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right">{ls.variancePct}%</td>
+                        <td className="px-3 py-2"><span className={cn("text-[10px] px-1.5 py-0.5 rounded-full", ls.riskLevel === "High" ? "bg-red-100 text-red-700" : ls.riskLevel === "Medium" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700")}>{ls.riskLevel}</span></td>
+                        <td className="px-3 py-2"><span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100">{ls.status}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeSubTab === "fs_notes" && (
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <button onClick={onGenerateFsNotes} disabled={isaLoading} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50">
+              {isaLoading ? <Loader2 className="w-3 h-3 animate-spin inline mr-1" /> : <BookOpen className="w-3 h-3 inline mr-1" />}Generate FS Note Mapping
+            </button>
+          </div>
+          {(fsNoteMappings || []).length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl border">
+              <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 font-medium">No FS note mappings generated</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {(fsNoteMappings || []).map((nm: any) => (
+                <div key={nm.id} className="bg-white rounded-xl border p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-sm text-slate-900">Note {nm.noteNo}: {nm.noteTitle}</h4>
+                    <span className={cn("text-[10px] px-2 py-0.5 rounded-full", nm.disclosureStatus === "finalized" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600")}>{nm.disclosureStatus}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="bg-blue-50 rounded p-2"><p className="text-blue-600 text-[10px]">Current Year</p><p className="font-bold text-blue-800">PKR {Number(nm.totalCY || 0).toLocaleString()}</p></div>
+                    <div className="bg-slate-50 rounded p-2"><p className="text-slate-500 text-[10px]">Prior Year</p><p className="font-bold text-slate-700">PKR {Number(nm.totalPY || 0).toLocaleString()}</p></div>
+                    <div className={cn("rounded p-2", Number(nm.variance || 0) >= 0 ? "bg-emerald-50" : "bg-red-50")}><p className="text-[10px]">Variance</p><p className={cn("font-bold", Number(nm.variance || 0) >= 0 ? "text-emerald-700" : "text-red-700")}>PKR {Number(nm.variance || 0).toLocaleString()}</p></div>
+                  </div>
+                  {nm.tbAccountCodes && <p className="text-[10px] text-slate-400 mt-2">Accounts: {(nm.tbAccountCodes as string[]).join(", ")}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REVIEW & QC STAGE
+// ═══════════════════════════════════════════════════════════════════════════════
+function ReviewQCStage({ reviewNotes, reviewSummary, complianceGates, complianceGateSummary, tickMarks, tickMarkLegend, versionHistory, samplingDetails, session, onAddReviewNote, onRespondToNote, onClearNote, onRunComplianceValidation, onInitTickMarks, onRefresh, isaLoading }: any) {
+  const [activeSubTab, setActiveSubTab] = useState<"review" | "compliance" | "tick_marks" | "version" | "sampling">("review");
+  const [showAddNote, setShowAddNote] = useState(false);
+  const [noteForm, setNoteForm] = useState({ reviewLevel: "senior", reviewerName: "", subject: "", detail: "", noteType: "query", priority: "medium", blocksSignOff: false });
+  const [responseText, setResponseText] = useState("");
+  const [respondingTo, setRespondingTo] = useState<number | null>(null);
+  const statusColors: Record<string, string> = { open: "bg-red-100 text-red-700", responded: "bg-blue-100 text-blue-700", cleared: "bg-emerald-100 text-emerald-700", deferred: "bg-slate-100 text-slate-600", escalated: "bg-amber-100 text-amber-700" };
+  const gateStatusColors: Record<string, string> = { pass: "bg-emerald-100 text-emerald-700", fail: "bg-red-100 text-red-700", pending: "bg-slate-100 text-slate-600", warning: "bg-amber-100 text-amber-700", override: "bg-violet-100 text-violet-700", n_a: "bg-slate-50 text-slate-400" };
+
+  return (
+    <div className="space-y-4 p-4 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-violet-600" /> Review & Quality Control</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Multi-level review, compliance validation, tick marks, version control</p>
+        </div>
+        <button onClick={onRefresh} className="px-3 py-1.5 text-xs bg-slate-100 rounded-lg hover:bg-slate-200"><RefreshCw className="w-3 h-3 inline mr-1" />Refresh</button>
+      </div>
+
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-lg overflow-x-auto">
+        {[
+          { key: "review", label: "Review Notes", icon: ClipboardCheck },
+          { key: "compliance", label: "Compliance Gates", icon: Shield },
+          { key: "tick_marks", label: "Tick Marks", icon: Check },
+          { key: "version", label: "Audit Trail", icon: Clock },
+          { key: "sampling", label: "ISA 530 Sampling", icon: Calculator },
+        ].map(t => (
+          <button key={t.key} onClick={() => setActiveSubTab(t.key as any)} className={cn("flex-1 px-3 py-2 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-1.5 whitespace-nowrap", activeSubTab === t.key ? "bg-white shadow text-slate-900" : "text-slate-500 hover:text-slate-700")}>
+            <t.icon className="w-3.5 h-3.5" />{t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── REVIEW NOTES ── */}
+      {activeSubTab === "review" && (
+        <div className="space-y-3">
+          {reviewSummary && (
+            <div className="grid grid-cols-3 sm:grid-cols-7 gap-2">
+              {[
+                { label: "Total", value: reviewSummary.total, color: "slate" },
+                { label: "Open", value: reviewSummary.open, color: "red" },
+                { label: "Responded", value: reviewSummary.responded, color: "blue" },
+                { label: "Cleared", value: reviewSummary.cleared, color: "emerald" },
+                { label: "Blocking", value: reviewSummary.blocking, color: "red" },
+                { label: "Escalated", value: reviewSummary.escalated, color: "amber" },
+                { label: "Deferred", value: reviewSummary.deferred, color: "slate" },
+              ].map(s => (
+                <div key={s.label} className={`bg-${s.color}-50 border border-${s.color}-200 rounded-lg p-2 text-center`}>
+                  <p className={`text-lg font-bold text-${s.color}-700`}>{s.value}</p>
+                  <p className={`text-[10px] text-${s.color}-600`}>{s.label}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between">
+            <div className="flex gap-1">
+              {["Staff", "Senior", "Manager", "Partner", "EQCR"].map(level => (
+                <span key={level} className="text-[10px] px-2 py-1 rounded bg-violet-50 text-violet-700 border border-violet-200">{level}: {reviewSummary?.byLevel?.[level.toLowerCase()] || 0}</span>
+              ))}
+            </div>
+            <button onClick={() => setShowAddNote(!showAddNote)} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700">
+              <Plus className="w-3 h-3 inline mr-1" />Add Review Note
+            </button>
+          </div>
+
+          {showAddNote && (
+            <div className="bg-white rounded-xl border p-4 space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <select value={noteForm.reviewLevel} onChange={e => setNoteForm({ ...noteForm, reviewLevel: e.target.value })} className="text-xs border rounded-lg px-2 py-1.5">
+                  {["staff", "senior", "manager", "partner", "eqcr"].map(l => <option key={l} value={l}>{l.charAt(0).toUpperCase() + l.slice(1)}</option>)}
+                </select>
+                <Input value={noteForm.reviewerName} onChange={e => setNoteForm({ ...noteForm, reviewerName: e.target.value })} placeholder="Reviewer name" className="text-xs h-8" />
+                <select value={noteForm.noteType} onChange={e => setNoteForm({ ...noteForm, noteType: e.target.value })} className="text-xs border rounded-lg px-2 py-1.5">
+                  {["query", "observation", "recommendation", "instruction", "blocker"].map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+                </select>
+                <select value={noteForm.priority} onChange={e => setNoteForm({ ...noteForm, priority: e.target.value })} className="text-xs border rounded-lg px-2 py-1.5">
+                  {["low", "medium", "high", "critical"].map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
+                </select>
+              </div>
+              <Input value={noteForm.subject} onChange={e => setNoteForm({ ...noteForm, subject: e.target.value })} placeholder="Subject" className="text-xs h-8" />
+              <textarea value={noteForm.detail} onChange={e => setNoteForm({ ...noteForm, detail: e.target.value })} placeholder="Detail / query / instruction..." className="w-full text-xs border rounded-lg px-3 py-2 h-20 resize-none" />
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-xs">
+                  <input type="checkbox" checked={noteForm.blocksSignOff} onChange={e => setNoteForm({ ...noteForm, blocksSignOff: e.target.checked })} />
+                  Blocks sign-off (mandatory clearance required)
+                </label>
+                <button onClick={() => { onAddReviewNote(noteForm); setShowAddNote(false); setNoteForm({ reviewLevel: "senior", reviewerName: "", subject: "", detail: "", noteType: "query", priority: "medium", blocksSignOff: false }); }} disabled={!noteForm.subject || !noteForm.detail || !noteForm.reviewerName} className="px-4 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50">Submit Note</button>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {(reviewNotes || []).length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-xl border">
+                <ClipboardCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500 font-medium">No review notes yet</p>
+                <p className="text-sm text-slate-400 mt-1">Add review notes for multi-level quality control</p>
+              </div>
+            ) : (reviewNotes || []).map((note: any) => (
+              <div key={note.id} className={cn("bg-white rounded-xl border p-4", note.blocksSignOff && note.status !== "cleared" ? "border-red-300 bg-red-50/30" : "")}>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", statusColors[note.status || "open"])}>{note.status}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-700">{note.reviewLevel?.toUpperCase()}</span>
+                      <span className="text-[10px] text-slate-500">{note.reviewerName}</span>
+                      <span className={cn("text-[10px] px-1.5 py-0.5 rounded", note.priority === "critical" ? "bg-red-100 text-red-700" : note.priority === "high" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600")}>{note.priority}</span>
+                      {note.blocksSignOff && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700">BLOCKS SIGN-OFF</span>}
+                      {note.wpCode && <span className="text-[10px] font-mono text-slate-500">WP: {note.wpCode}</span>}
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900">{note.subject}</p>
+                    <p className="text-xs text-slate-600 mt-1">{note.detail}</p>
+                    {note.responseText && (
+                      <div className="mt-2 pl-3 border-l-2 border-blue-300">
+                        <p className="text-xs text-blue-700"><span className="font-medium">{note.responseBy}:</span> {note.responseText}</p>
+                      </div>
+                    )}
+                    {note.clearanceNote && (
+                      <div className="mt-2 pl-3 border-l-2 border-emerald-300">
+                        <p className="text-xs text-emerald-700"><span className="font-medium">Cleared by {note.clearedBy}:</span> {note.clearanceNote}</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1 ml-3 shrink-0">
+                    {note.status === "open" && (
+                      <button onClick={() => setRespondingTo(respondingTo === note.id ? null : note.id)} className="text-[10px] px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100">Respond</button>
+                    )}
+                    {(note.status === "responded" || note.status === "open") && (
+                      <button onClick={() => onClearNote(note.id, "Reviewer", "Cleared — satisfactorily addressed")} className="text-[10px] px-2 py-1 bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100">Clear</button>
+                    )}
+                  </div>
+                </div>
+                {respondingTo === note.id && (
+                  <div className="mt-3 flex gap-2">
+                    <Input value={responseText} onChange={e => setResponseText(e.target.value)} placeholder="Type response..." className="text-xs h-8 flex-1" />
+                    <button onClick={() => { onRespondToNote(note.id, "Staff", responseText); setRespondingTo(null); setResponseText(""); }} className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Send</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── COMPLIANCE GATES ── */}
+      {activeSubTab === "compliance" && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            {complianceGateSummary && (
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-16 h-16 relative">
+                    <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
+                      <circle cx="18" cy="18" r="15.915" fill="none" stroke="#e2e8f0" strokeWidth="3" />
+                      <circle cx="18" cy="18" r="15.915" fill="none" stroke={complianceGateSummary.compliancePct >= 80 ? "#10b981" : complianceGateSummary.compliancePct >= 50 ? "#f59e0b" : "#ef4444"} strokeWidth="3" strokeDasharray={`${complianceGateSummary.compliancePct} ${100 - complianceGateSummary.compliancePct}`} strokeLinecap="round" />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center text-sm font-bold">{complianceGateSummary.compliancePct}%</div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">ISA Compliance Score</p>
+                    <p className="text-[11px] text-slate-500">{complianceGateSummary.passed}/{complianceGateSummary.total} gates passed · {complianceGateSummary.blockingFailures} blocking</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <button onClick={onRunComplianceValidation} disabled={isaLoading} className="px-4 py-2 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50">
+              {isaLoading ? <Loader2 className="w-3 h-3 animate-spin inline mr-1" /> : <Shield className="w-3 h-3 inline mr-1" />}Run Compliance Validation
+            </button>
+          </div>
+
+          {(complianceGates || []).length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl border">
+              <Shield className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 font-medium">No compliance checks run yet</p>
+              <p className="text-sm text-slate-400 mt-1">Run the compliance validation engine to check ISA, ISQM, ICAP, and AOB requirements</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {["isa", "isqm", "icap", "aob", "internal"].map(cat => {
+                const catGates = (complianceGates || []).filter((g: any) => g.category === cat);
+                if (!catGates.length) return null;
+                return (
+                  <div key={cat} className="bg-white rounded-xl border overflow-hidden">
+                    <div className="px-4 py-2 bg-slate-50 border-b flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700 uppercase">{cat === "isa" ? "ISA Standards" : cat === "isqm" ? "ISQM Quality" : cat === "icap" ? "ICAP Compliance" : cat === "aob" ? "AOB Inspection" : "Internal Controls"}</span>
+                      <span className="text-[10px] text-slate-500">{catGates.filter((g: any) => g.status === "pass").length}/{catGates.length} passed</span>
+                    </div>
+                    <div className="divide-y">
+                      {catGates.map((gate: any) => (
+                        <div key={gate.id} className="px-4 py-2.5 flex items-center justify-between">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            {gate.status === "pass" ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> : gate.status === "fail" ? <XCircle className="w-4 h-4 text-red-500 shrink-0" /> : <AlertCircle className="w-4 h-4 text-slate-400 shrink-0" />}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-slate-900">{gate.gateName}</span>
+                                <span className="text-[10px] text-violet-600">{gate.clauseRef}</span>
+                                {gate.blocking && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700">BLOCKING</span>}
+                              </div>
+                              <p className="text-[11px] text-slate-500 truncate">{gate.checkDescription}</p>
+                              {gate.status === "fail" && gate.failureDetail && <p className="text-[11px] text-red-600 mt-0.5">{gate.failureDetail}</p>}
+                            </div>
+                          </div>
+                          <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0", gateStatusColors[gate.status || "pending"])}>{gate.status?.toUpperCase()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TICK MARKS ── */}
+      {activeSubTab === "tick_marks" && (
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <button onClick={onInitTickMarks} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700">
+              <Plus className="w-3 h-3 inline mr-1" />Initialize Standard Tick Marks
+            </button>
+          </div>
+          {(tickMarks || []).length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl border">
+              <Check className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 font-medium">No tick marks initialized</p>
+              <p className="text-sm text-slate-400 mt-1">Initialize the standard Big-4 tick mark legend</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border overflow-hidden">
+              <div className="px-4 py-2 bg-slate-50 border-b">
+                <span className="text-xs font-bold text-slate-700">TICK MARK LEGEND</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 divide-y sm:divide-y-0">
+                {(tickMarks || []).map((tm: any) => (
+                  <div key={tm.id} className="px-4 py-3 flex items-center gap-3 border-b sm:border-r hover:bg-slate-50">
+                    <span className="text-2xl w-8 text-center" style={{ color: tm.color || "#333" }}>{tm.symbol}</span>
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{tm.meaning}</p>
+                      <p className="text-[10px] text-slate-400">{tm.category} · Used {tm.usageCount || 0} times</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── VERSION HISTORY / AUDIT TRAIL ── */}
+      {activeSubTab === "version" && (
+        <div className="space-y-3">
+          {(versionHistory || []).length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl border">
+              <Clock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 font-medium">No audit trail entries yet</p>
+              <p className="text-sm text-slate-400 mt-1">Changes are logged automatically as you work</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border overflow-hidden">
+              <div className="px-4 py-2 bg-slate-50 border-b flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700">IMMUTABLE AUDIT TRAIL (ISA 230)</span>
+                <span className="text-[10px] text-slate-500">{(versionHistory || []).length} entries</span>
+              </div>
+              <div className="divide-y max-h-96 overflow-y-auto">
+                {(versionHistory || []).slice().reverse().map((vh: any) => (
+                  <div key={vh.id} className="px-4 py-2.5 flex items-start gap-3">
+                    <div className={cn("w-2 h-2 rounded-full mt-1.5 shrink-0", vh.changeType === "create" ? "bg-emerald-500" : vh.changeType === "delete" ? "bg-red-500" : vh.changeType === "lock" ? "bg-violet-500" : "bg-blue-500")} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-slate-900">{vh.entityType}</span>
+                        <span className="text-[10px] font-mono text-slate-500">{vh.entityId}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{vh.changeType}</span>
+                        <span className="text-[10px] text-slate-400">v{vh.version}</span>
+                      </div>
+                      {vh.fieldName && <p className="text-[11px] text-slate-500">Field: {vh.fieldName}</p>}
+                      {vh.newValue && <p className="text-[11px] text-slate-600 truncate">{vh.newValue.substring(0, 120)}</p>}
+                      <p className="text-[10px] text-slate-400 mt-0.5">{vh.changedBy} ({vh.changedByRole}) · {new Date(vh.createdAt).toLocaleString()}</p>
+                    </div>
+                    {vh.isImmutable && <Lock className="w-3 h-3 text-violet-400 shrink-0 mt-1" title="Immutable — ISA 230" />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── ISA 530 SAMPLING ── */}
+      {activeSubTab === "sampling" && (
+        <div className="space-y-3">
+          {(samplingDetails || []).length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl border">
+              <Calculator className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 font-medium">No sampling plans documented</p>
+              <p className="text-sm text-slate-400 mt-1">ISA 530 sampling details are created as procedures are executed in the Audit Chain tab</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-50 border-b">
+                    <tr>
+                      {["WP Code", "Area", "Method", "Population", "Value (PKR)", "Sample Size", "Tested", "Exceptions", "Conclusion", "Status"].map(h => (
+                        <th key={h} className="px-3 py-2 text-left font-semibold text-slate-600">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {(samplingDetails || []).map((sd: any) => (
+                      <tr key={sd.id} className="hover:bg-slate-50">
+                        <td className="px-3 py-2 font-mono text-violet-600">{sd.wpCode}</td>
+                        <td className="px-3 py-2">{sd.fsArea}</td>
+                        <td className="px-3 py-2 uppercase">{sd.samplingMethod}</td>
+                        <td className="px-3 py-2 text-right">{sd.populationSize?.toLocaleString() || "—"}</td>
+                        <td className="px-3 py-2 text-right font-mono">{Number(sd.populationValuePkr || 0).toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right font-bold">{sd.sampleSize || "—"}</td>
+                        <td className="px-3 py-2 text-right">{sd.itemsTested || "—"}</td>
+                        <td className="px-3 py-2 text-right">{sd.exceptionsFound ?? "—"}</td>
+                        <td className="px-3 py-2"><span className={cn("text-[10px] px-1.5 py-0.5 rounded-full", sd.conclusion === "accept" ? "bg-emerald-100 text-emerald-700" : sd.conclusion === "reject" ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-600")}>{sd.conclusion || "pending"}</span></td>
+                        <td className="px-3 py-2"><span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100">{sd.status}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── Compliance Documents Panel ──────────────────────────────────────────────
 function ComplianceDocsPanel({ docs, complianceLoading, onGenerate, onSign, onUpdateItem, session }: any) {
