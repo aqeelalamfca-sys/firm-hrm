@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, pgEnum, decimal, boolean, jsonb, varchar } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, pgEnum, decimal, boolean, jsonb, varchar, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { clientsTable } from "./clients";
 
 export const wpFileCategory = pgEnum("wp_file_category", [
@@ -59,9 +59,63 @@ export const wpSessionStatus = pgEnum("wp_session_status", [
   "data_sheet",
   "arranged_data",
   "variables",
+  "wp_listing",
   "generation",
+  "audit_chain",
+  "review",
   "export",
   "completed",
+]);
+
+export const wpEntityType = pgEnum("wp_entity_type", [
+  "pvt_ltd",
+  "listed",
+  "smc",
+  "llp",
+  "bank",
+  "insurance",
+  "ngo",
+  "soe",
+  "branch",
+  "association",
+  "trust",
+  "sole_proprietor",
+  "partnership",
+  "other",
+]);
+
+export const wpReportingFramework = pgEnum("wp_reporting_framework", [
+  "IFRS",
+  "IFRS_for_SMEs",
+  "AFRS",
+  "Custom",
+]);
+
+export const wpEngagementType = pgEnum("wp_engagement_type", [
+  "statutory_audit",
+  "internal_audit",
+  "review_engagement",
+  "agreed_upon_procedures",
+  "compilation",
+  "tax_audit",
+  "forensic_audit",
+  "special_purpose",
+  "other",
+]);
+
+export const wpRiskLevel = pgEnum("wp_risk_level", [
+  "low",
+  "medium",
+  "high",
+  "critical",
+]);
+
+export const wpSeverity = pgEnum("wp_severity", [
+  "critical",
+  "high",
+  "medium",
+  "low",
+  "info",
 ]);
 
 export const wpSessionsTable = pgTable("wp_sessions", {
@@ -88,13 +142,19 @@ export const wpSessionsTable = pgTable("wp_sessions", {
   status: wpSessionStatus("status").notNull().default("upload"),
   currentHeadIndex: integer("current_head_index").default(0),
   createdBy: integer("created_by"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_sessions_client_id_idx").on(t.clientId),
+  index("wp_sessions_status_idx").on(t.status),
+  index("wp_sessions_created_by_idx").on(t.createdBy),
+  index("wp_sessions_engagement_year_idx").on(t.engagementYear),
+]);
 
 export const wpUploadedFilesTable = pgTable("wp_uploaded_files", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   fileName: text("file_name").notNull(),
   originalName: text("original_name").notNull(),
   fileSize: integer("file_size"),
@@ -107,13 +167,18 @@ export const wpUploadedFilesTable = pgTable("wp_uploaded_files", {
   isValid: boolean("is_valid").default(true),
   validationErrors: text("validation_errors"),
   fileData: text("file_data"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("wp_uploaded_files_session_id_idx").on(t.sessionId),
+  index("wp_uploaded_files_category_idx").on(t.category),
+]);
 
 export const wpExtractionRunsTable = pgTable("wp_extraction_runs", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
-  fileId: integer("file_id").references(() => wpUploadedFilesTable.id),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
+  fileId: integer("file_id").references(() => wpUploadedFilesTable.id, { onDelete: "cascade" }),
   status: wpExtractionStatus("extraction_status").notNull().default("pending"),
   sourceType: wpSourceType("source_type"),
   totalPages: integer("total_pages"),
@@ -124,12 +189,17 @@ export const wpExtractionRunsTable = pgTable("wp_extraction_runs", {
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("wp_extraction_runs_session_id_idx").on(t.sessionId),
+  index("wp_extraction_runs_file_id_idx").on(t.fileId),
+  index("wp_extraction_runs_status_idx").on(t.status),
+]);
 
 export const wpExtractedFieldsTable = pgTable("wp_extracted_fields", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
-  extractionRunId: integer("extraction_run_id").references(() => wpExtractionRunsTable.id),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
+  extractionRunId: integer("extraction_run_id").references(() => wpExtractionRunsTable.id, { onDelete: "cascade" }),
   category: text("category").notNull(),
   fieldName: text("field_name").notNull(),
   extractedValue: text("extracted_value"),
@@ -142,11 +212,15 @@ export const wpExtractedFieldsTable = pgTable("wp_extracted_fields", {
   isApproved: boolean("is_approved").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_extracted_fields_session_id_idx").on(t.sessionId),
+  index("wp_extracted_fields_run_id_idx").on(t.extractionRunId),
+  index("wp_extracted_fields_category_idx").on(t.category),
+]);
 
 export const wpArrangedDataTable = pgTable("wp_arranged_data", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   tab: text("tab").notNull(),
   rowIndex: integer("row_index").notNull().default(0),
   sourceFile: text("source_file"),
@@ -159,7 +233,10 @@ export const wpArrangedDataTable = pgTable("wp_arranged_data", {
   isApproved: boolean("is_approved").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_arranged_data_session_id_idx").on(t.sessionId),
+  index("wp_arranged_data_tab_idx").on(t.sessionId, t.tab),
+]);
 
 export const wpVariableDefinitionsTable = pgTable("wp_variable_definitions", {
   id: serial("id").primaryKey(),
@@ -184,11 +261,12 @@ export const wpVariableDefinitionsTable = pgTable("wp_variable_definitions", {
   displayOrder: integer("display_order").default(0),
   activeFlag: boolean("active_flag").default(true),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const wpVariablesTable = pgTable("wp_variables", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   variableCode: varchar("variable_code", { length: 100 }).notNull(),
   category: text("category").notNull(),
   variableName: text("variable_name").notNull(),
@@ -199,7 +277,7 @@ export const wpVariablesTable = pgTable("wp_variables", {
   normalizedValue: text("normalized_value"),
   confidence: decimal("confidence", { precision: 5, scale: 2 }),
   sourceType: text("source_type"),
-  sourceFileId: integer("source_file_id"),
+  sourceFileId: integer("source_file_id").references(() => wpUploadedFilesTable.id, { onDelete: "set null" }),
   sourceSheet: text("source_sheet"),
   sourcePage: integer("source_page"),
   reviewStatus: text("review_status").default("pending"),
@@ -212,12 +290,16 @@ export const wpVariablesTable = pgTable("wp_variables", {
   versionNo: integer("version_no").default(1),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  uniqueIndex("wp_variables_session_code_idx").on(t.sessionId, t.variableCode),
+  index("wp_variables_session_id_idx").on(t.sessionId),
+  index("wp_variables_category_idx").on(t.sessionId, t.category),
+]);
 
 export const wpVariableChangeLogTable = pgTable("wp_variable_change_log", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
-  variableId: integer("variable_id").references(() => wpVariablesTable.id),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
+  variableId: integer("variable_id").references(() => wpVariablesTable.id, { onDelete: "cascade" }),
   variableCode: varchar("variable_code", { length: 100 }),
   fieldName: text("field_name").notNull(),
   oldValue: text("old_value"),
@@ -226,7 +308,10 @@ export const wpVariableChangeLogTable = pgTable("wp_variable_change_log", {
   reason: text("reason"),
   sourceOfChange: text("source_of_change").default("manual"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_var_changelog_session_id_idx").on(t.sessionId),
+  index("wp_var_changelog_variable_id_idx").on(t.variableId),
+]);
 
 export const wpVariableDependencyRulesTable = pgTable("wp_variable_dependency_rules", {
   id: serial("id").primaryKey(),
@@ -238,11 +323,12 @@ export const wpVariableDependencyRulesTable = pgTable("wp_variable_dependency_ru
   impactedRiskAreasJson: jsonb("impacted_risk_areas_json"),
   activeFlag: boolean("active_flag").default(true),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const wpExceptionLogTable = pgTable("wp_exception_log", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   headIndex: integer("head_index"),
   exceptionType: text("exception_type").notNull(),
   severity: text("severity").notNull().default("medium"),
@@ -254,11 +340,14 @@ export const wpExceptionLogTable = pgTable("wp_exception_log", {
   resolution: text("resolution"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_exception_log_session_id_idx").on(t.sessionId),
+  index("wp_exception_log_status_idx").on(t.status),
+]);
 
 export const wpTrialBalanceLinesTable = pgTable("wp_trial_balance_lines", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   accountCode: text("account_code").notNull(),
   accountName: text("account_name").notNull(),
   classification: text("classification"),
@@ -266,18 +355,22 @@ export const wpTrialBalanceLinesTable = pgTable("wp_trial_balance_lines", {
   debit: decimal("debit", { precision: 15, scale: 2 }).default("0"),
   credit: decimal("credit", { precision: 15, scale: 2 }).default("0"),
   balance: decimal("balance", { precision: 15, scale: 2 }).default("0"),
-  priorYearBalance: decimal("prior_year_balance", { precision: 15, scale: 2 }),
+  priorYearBalance: decimal("prior_year_balance", { precision: 15, scale: 2 }).default("0"),
   source: text("source").default("deterministic"),
   confidence: decimal("confidence", { precision: 5, scale: 2 }),
   isApproved: boolean("is_approved").default(false),
   hasException: boolean("has_exception").default(false),
   exceptionNote: text("exception_note"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("wp_tb_lines_session_id_idx").on(t.sessionId),
+  index("wp_tb_lines_account_code_idx").on(t.sessionId, t.accountCode),
+]);
 
 export const wpGlAccountsTable = pgTable("wp_gl_accounts", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   accountCode: text("account_code").notNull(),
   accountName: text("account_name").notNull(),
   accountType: text("account_type"),
@@ -292,12 +385,16 @@ export const wpGlAccountsTable = pgTable("wp_gl_accounts", {
   generationRationale: text("generation_rationale"),
   transactionCountNote: text("transaction_count_note"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("wp_gl_accounts_session_id_idx").on(t.sessionId),
+  index("wp_gl_accounts_code_idx").on(t.sessionId, t.accountCode),
+]);
 
 export const wpGlEntriesTable = pgTable("wp_gl_entries", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
-  glAccountId: integer("gl_account_id").references(() => wpGlAccountsTable.id),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
+  glAccountId: integer("gl_account_id").references(() => wpGlAccountsTable.id, { onDelete: "cascade" }),
   entryDate: text("entry_date").notNull(),
   voucherNo: text("voucher_no"),
   narration: text("narration"),
@@ -307,11 +404,16 @@ export const wpGlEntriesTable = pgTable("wp_gl_entries", {
   month: integer("month"),
   isSynthetic: boolean("is_synthetic").default(false),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("wp_gl_entries_session_id_idx").on(t.sessionId),
+  index("wp_gl_entries_account_id_idx").on(t.glAccountId),
+  index("wp_gl_entries_date_idx").on(t.sessionId, t.entryDate),
+]);
 
 export const wpHeadsTable = pgTable("wp_heads", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   headIndex: integer("head_index").notNull(),
   headName: text("head_name").notNull(),
   status: wpHeadStatus("head_status").notNull().default("locked"),
@@ -323,14 +425,18 @@ export const wpHeadsTable = pgTable("wp_heads", {
   approvedBy: integer("approved_by"),
   exportedAt: timestamp("exported_at"),
   exceptionsCount: integer("exceptions_count").default(0),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_heads_session_id_idx").on(t.sessionId),
+  uniqueIndex("wp_heads_session_head_idx").on(t.sessionId, t.headIndex),
+]);
 
 export const wpHeadDocumentsTable = pgTable("wp_head_documents", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
-  headId: integer("head_id").references(() => wpHeadsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
+  headId: integer("head_id").references(() => wpHeadsTable.id, { onDelete: "cascade" }).notNull(),
   paperCode: text("paper_code").notNull(),
   paperName: text("paper_name").notNull(),
   content: text("content"),
@@ -338,63 +444,59 @@ export const wpHeadDocumentsTable = pgTable("wp_head_documents", {
   status: text("document_status").default("pending"),
   generatedAt: timestamp("generated_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("wp_head_docs_session_id_idx").on(t.sessionId),
+  index("wp_head_docs_head_id_idx").on(t.headId),
+]);
 
 export const wpExportJobsTable = pgTable("wp_export_jobs", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
-  headId: integer("head_id").references(() => wpHeadsTable.id),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
+  headId: integer("head_id").references(() => wpHeadsTable.id, { onDelete: "cascade" }),
   exportType: text("export_type").notNull().default("head"),
   format: text("format"),
   fileName: text("file_name"),
   status: text("export_job_status").default("pending"),
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// AUDIT ENGINE MASTER TABLES
-// ═══════════════════════════════════════════════════════════════════════════
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("wp_export_jobs_session_id_idx").on(t.sessionId),
+]);
 
 export const auditEngineMasterTable = pgTable("audit_engine_master", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull().unique(),
-  // Engagement Identity
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull().unique(),
   engagementId: varchar("engagement_id", { length: 50 }),
   clientName: text("client_name"),
-  entityType: text("entity_type"), // Pvt Ltd, Listed, NGO, Bank, etc.
-  industryType: text("industry_type"), // Manufacturing, Services, Retail, etc.
+  entityType: text("entity_type"),
+  industryType: text("industry_type"),
   financialYearStart: text("financial_year_start"),
   financialYearEnd: text("financial_year_end"),
-  reportingFramework: text("reporting_framework").default("IFRS"), // IFRS, IFRS for SMEs, etc.
-  auditType: text("audit_type").default("Statutory"), // Statutory, Internal, etc.
-  engagementStatus: text("engagement_status").default("Planning"), // Planning, Execution, Completed
-  // Materiality
+  reportingFramework: text("reporting_framework").default("IFRS"),
+  auditType: text("audit_type").default("Statutory"),
+  engagementStatus: text("engagement_status").default("Planning"),
   materialityAmount: decimal("materiality_amount", { precision: 18, scale: 2 }),
   performanceMateriality: decimal("performance_materiality", { precision: 18, scale: 2 }),
   trivialityThreshold: decimal("triviality_threshold", { precision: 18, scale: 2 }),
-  // Risk Flags
-  riskLevelOverall: text("risk_level_overall").default("Medium"), // Low, Medium, High
+  riskLevelOverall: text("risk_level_overall").default("Medium"),
   goingConcernFlag: boolean("going_concern_flag").default(false),
   fraudRiskFlag: boolean("fraud_risk_flag").default(false),
   relatedPartyFlag: boolean("related_party_flag").default(false),
   lawsRegulationFlag: boolean("laws_regulation_flag").default(false),
   componentAuditFlag: boolean("component_audit_flag").default(false),
   groupAuditFlag: boolean("group_audit_flag").default(false),
-  // Systems & Methods
-  itSystemType: text("it_system_type").default("ERP"), // ERP, Manual, Hybrid
+  itSystemType: text("it_system_type").default("ERP"),
   internalAuditFlag: boolean("internal_audit_flag").default(false),
   useOfExpertFlag: boolean("use_of_expert_flag").default(false),
-  samplingMethod: text("sampling_method").default("MUS"), // Random, MUS, Judgmental
-  dataSource: text("data_source").default("OCR"), // OCR, Manual
-  // QA
+  samplingMethod: text("sampling_method").default("MUS"),
+  dataSource: text("data_source").default("OCR"),
   confidenceLevel: decimal("confidence_level", { precision: 5, scale: 2 }),
   exceptionFlag: boolean("exception_flag").default(false),
-  // Sign-off
   preparedBy: text("prepared_by"),
   reviewedBy: text("reviewed_by"),
   approvedBy: text("approved_by"),
-  // Meta
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -404,23 +506,24 @@ export const wpTriggerDefsTable = pgTable("wp_trigger_defs", {
   id: serial("id").primaryKey(),
   wpCode: varchar("wp_code", { length: 20 }).notNull().unique(),
   wpName: text("wp_name").notNull(),
-  triggerCondition: text("trigger_condition").notNull(), // always | var:fieldName=value | risk:High | ratio:gp_percent
+  triggerCondition: text("trigger_condition").notNull(),
   triggerDescription: text("trigger_description"),
   isaReference: text("isa_reference"),
-  outputFormat: text("output_format").default("Word"), // Word, Excel
+  outputFormat: text("output_format").default("Word"),
   mandatoryFlag: boolean("mandatory_flag").default(true),
-  category: text("category"), // Planning, Risk, Substantive, Analytical, Completion
+  category: text("category"),
   displayOrder: integer("display_order").default(0),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const wpTriggerSessionTable = pgTable("wp_trigger_session", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   wpCode: varchar("wp_code", { length: 20 }).notNull(),
   triggered: boolean("triggered").default(false),
   triggerReason: text("trigger_reason"),
-  status: text("status").default("pending"), // pending, in_progress, completed, n_a
+  status: text("status").default("pending"),
   preparedBy: text("prepared_by"),
   reviewedBy: text("reviewed_by"),
   completedAt: timestamp("completed_at"),
@@ -428,15 +531,18 @@ export const wpTriggerSessionTable = pgTable("wp_trigger_session", {
   exceptionNote: text("exception_note"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_trigger_session_session_id_idx").on(t.sessionId),
+  uniqueIndex("wp_trigger_session_code_idx").on(t.sessionId, t.wpCode),
+]);
 
 export const assertionLinkageTable = pgTable("assertion_linkage", {
   id: serial("id").primaryKey(),
-  accountType: text("account_type").notNull(), // Asset, Liability, Revenue, Expense, Equity
-  fsLineItem: text("fs_line_item"), // Receivables, Inventory, etc.
-  assertion: text("assertion").notNull(), // Existence, Completeness, Valuation, etc.
+  accountType: text("account_type").notNull(),
+  fsLineItem: text("fs_line_item"),
+  assertion: text("assertion").notNull(),
   wpCode: varchar("wp_code", { length: 20 }),
-  wpLink: text("wp_link"), // Human description
+  wpLink: text("wp_link"),
   testingProcedure: text("testing_procedure"),
   isaReference: text("isa_reference"),
   riskTag: text("risk_tag"),
@@ -446,13 +552,13 @@ export const assertionLinkageTable = pgTable("assertion_linkage", {
 
 export const samplingRulesTable = pgTable("sampling_rules", {
   id: serial("id").primaryKey(),
-  riskLevel: text("risk_level").notNull(), // High, Medium, Low
-  materialityBand: text("materiality_band").notNull(), // GT_PM, LTE_PM, LT_TRIVIAL
+  riskLevel: text("risk_level").notNull(),
+  materialityBand: text("materiality_band").notNull(),
   sampleSizeMin: integer("sample_size_min").notNull(),
   sampleSizeMax: integer("sample_size_max").notNull(),
   coveragePct: decimal("coverage_pct", { precision: 5, scale: 2 }),
-  samplingMethod: text("sampling_method"), // MUS, Random, Judgmental
-  testingApproach: text("testing_approach"), // Full, Moderate, Analytical
+  samplingMethod: text("sampling_method"),
+  testingApproach: text("testing_approach"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -461,21 +567,21 @@ export const analyticsEngineTable = pgTable("analytics_engine", {
   id: serial("id").primaryKey(),
   ratioCode: varchar("ratio_code", { length: 30 }).notNull().unique(),
   ratioName: text("ratio_name").notNull(),
-  formula: text("formula").notNull(), // e.g. "GP / Sales"
-  numeratorField: text("numerator_field"), // variable/account name
+  formula: text("formula").notNull(),
+  numeratorField: text("numerator_field"),
   denominatorField: text("denominator_field"),
   thresholdMin: decimal("threshold_min", { precision: 10, scale: 4 }),
   thresholdMax: decimal("threshold_max", { precision: 10, scale: 4 }),
-  thresholdDescription: text("threshold_description"), // e.g. "±10%"
-  wpTrigger: varchar("wp_trigger", { length: 20 }), // WP code to trigger if breached
-  category: text("category"), // Profitability, Liquidity, Efficiency, Solvency
+  thresholdDescription: text("threshold_description"),
+  wpTrigger: varchar("wp_trigger", { length: 20 }),
+  category: text("category"),
   displayOrder: integer("display_order").default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const analyticsSessionTable = pgTable("analytics_session", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   ratioCode: varchar("ratio_code", { length: 30 }).notNull(),
   computedValue: decimal("computed_value", { precision: 15, scale: 4 }),
   priorYearValue: decimal("prior_year_value", { precision: 15, scale: 4 }),
@@ -486,18 +592,22 @@ export const analyticsSessionTable = pgTable("analytics_session", {
   reviewedBy: text("reviewed_by"),
   conclusion: text("conclusion"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("analytics_session_session_id_idx").on(t.sessionId),
+  uniqueIndex("analytics_session_ratio_idx").on(t.sessionId, t.ratioCode),
+]);
 
 export const controlMatrixTable = pgTable("control_matrix", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
-  processName: text("process_name").notNull(), // Sales, Purchases, Payroll, etc.
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
+  processName: text("process_name").notNull(),
   controlDescription: text("control_description").notNull(),
-  controlFrequency: text("control_frequency"), // Daily, Monthly, Per transaction
+  controlFrequency: text("control_frequency"),
   controlOwner: text("control_owner"),
-  testType: text("test_type").default("ToC"), // ToC (Test of Controls), ToD (Test of Details)
+  testType: text("test_type").default("ToC"),
   sampleSize: integer("sample_size"),
-  testingResult: text("testing_result"), // Effective, Deficient, Not Tested
+  testingResult: text("testing_result"),
   exceptionCount: integer("exception_count").default(0),
   relatedWpCode: varchar("related_wp_code", { length: 20 }),
   isaReference: text("isa_reference"),
@@ -506,17 +616,19 @@ export const controlMatrixTable = pgTable("control_matrix", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("control_matrix_session_id_idx").on(t.sessionId),
+]);
 
 export const evidenceLogTable = pgTable("evidence_log", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   wpCode: varchar("wp_code", { length: 20 }),
-  headId: integer("head_id").references(() => wpHeadsTable.id),
+  headId: integer("head_id").references(() => wpHeadsTable.id, { onDelete: "set null" }),
   evidenceId: varchar("evidence_id", { length: 50 }),
-  documentType: text("document_type"), // Invoice, Contract, Confirmation, etc.
+  documentType: text("document_type"),
   documentRef: text("document_ref"),
-  source: text("source").default("Client"), // Client, External, Self-generated
+  source: text("source").default("Client"),
   description: text("description"),
   obtainedDate: text("obtained_date"),
   verifiedFlag: boolean("verified_flag").default(false),
@@ -525,71 +637,79 @@ export const evidenceLogTable = pgTable("evidence_log", {
   exceptionFlag: boolean("exception_flag").default(false),
   attachmentPath: text("attachment_path"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("evidence_log_session_id_idx").on(t.sessionId),
+  index("evidence_log_wp_code_idx").on(t.sessionId, t.wpCode),
+]);
 
 export const reconEngineTable = pgTable("recon_engine", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
-  checkName: text("check_name").notNull(), // FS vs TB, TB vs GL, etc.
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
+  checkName: text("check_name").notNull(),
   sourceA: text("source_a").notNull(),
   sourceB: text("source_b").notNull(),
-  amountA: decimal("amount_a", { precision: 18, scale: 2 }),
-  amountB: decimal("amount_b", { precision: 18, scale: 2 }),
-  difference: decimal("difference", { precision: 18, scale: 2 }),
+  amountA: decimal("amount_a", { precision: 18, scale: 2 }).default("0"),
+  amountB: decimal("amount_b", { precision: 18, scale: 2 }).default("0"),
+  difference: decimal("difference", { precision: 18, scale: 2 }).default("0"),
   passed: boolean("passed").default(false),
-  rule: text("rule"), // Must match, Within materiality, etc.
+  rule: text("rule"),
   notes: text("notes"),
   runAt: timestamp("run_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("recon_engine_session_id_idx").on(t.sessionId),
+]);
 
-// ── WP Library Master (global ISA/ICAP/Pakistan reference library — 1000+ papers) ──────────
 export const wpLibraryMasterTable = pgTable("wp_library_master", {
   id: serial("id").primaryKey(),
   wpCode: varchar("wp_code", { length: 20 }).notNull().unique(),
-  wpPhase: text("wp_phase"),                         // Pre-engagement | Planning | Execution | Completion | Reporting | QC | Regulatory
+  wpPhase: text("wp_phase"),
   wpTitle: text("wp_title").notNull(),
-  wpCategory: text("wp_category"),                   // Checklist | Memo | Lead schedule | Reconciliation | ToC | ToD | Analytics | Confirmation | Representation | Report
-  isaReference: text("isa_reference"),               // e.g. ISA 315, ISA 530
-  secondaryReference: text("secondary_reference"),   // Related ISA / ISQM / IESBA / local law
-  codeFamily: varchar("code_family", { length: 4 }), // A, B, C, D, E, F, G, H, I, J, K, L, M, N, Z
+  wpCategory: text("wp_category"),
+  isaReference: text("isa_reference"),
+  secondaryReference: text("secondary_reference"),
+  codeFamily: varchar("code_family", { length: 4 }),
   displayOrder: integer("display_order").default(0),
-  triggerEntityType: text("trigger_entity_type"),    // CSV: Pvt Ltd, Listed, SMC, LLP, Bank, Insurance, NGO, SOE, Branch
-  triggerIndustry: text("trigger_industry"),         // CSV: Manufacturing, Trading, Services, Construction…
-  triggerRisk: text("trigger_risk"),                 // CSV: Low, Medium, High, Fraud, Going concern, Related party, Tax, IT reliance
-  triggerFsHead: text("trigger_fs_head"),            // CSV: Revenue, Inventory, PPE, Receivables, Payables, Cash, Equity, Borrowings, Taxation
-  triggerControlMode: text("trigger_control_mode"),  // Manual | IT-dependent | ERP | Mixed
-  triggerMateriality: text("trigger_materiality"),   // Above PM | Above Trivial | Always
+  triggerEntityType: text("trigger_entity_type"),
+  triggerIndustry: text("trigger_industry"),
+  triggerRisk: text("trigger_risk"),
+  triggerFsHead: text("trigger_fs_head"),
+  triggerControlMode: text("trigger_control_mode"),
+  triggerMateriality: text("trigger_materiality"),
   mandatoryFlag: boolean("mandatory_flag").default(false),
-  outputFormat: text("output_format").default("Word"), // Word | Excel | PDF
+  outputFormat: text("output_format").default("Word"),
   parentWpCode: varchar("parent_wp_code", { length: 20 }),
-  linkedWpCodes: text("linked_wp_codes"),            // CSV of related WP codes
-  linkedAssertion: text("linked_assertion"),         // Existence | Completeness | Accuracy | Cut-off | Valuation | Rights | Presentation
-  linkedAuditProcedureType: text("linked_audit_procedure_type"), // Risk | ToC | ToD | Analytics | External confirmation
-  linkedEvidenceType: text("linked_evidence_type"),  // Invoice | GRN | Contract | Bank statement | Tax return | Board minutes
-  linkedReportArea: text("linked_report_area"),      // Main report | CAR | Emphasis | KAM | Other legal report
-  pakistanLawTag: text("pakistan_law_tag"),          // Companies Act 2017 | Listed Regulations | NGO | Tax | Sales tax | SOE
-  reviewerLevel: text("reviewer_level"),             // Associate | Senior | Manager | Partner | EQCR
+  linkedWpCodes: text("linked_wp_codes"),
+  linkedAssertion: text("linked_assertion"),
+  linkedAuditProcedureType: text("linked_audit_procedure_type"),
+  linkedEvidenceType: text("linked_evidence_type"),
+  linkedReportArea: text("linked_report_area"),
+  pakistanLawTag: text("pakistan_law_tag"),
+  reviewerLevel: text("reviewer_level"),
   autoGenerateFlag: boolean("auto_generate_flag").default(false),
-  aiInputSource: text("ai_input_source"),            // FS | TB | GL | Variables | OCR | Tax returns
-  status: text("status").default("Draft"),           // Draft | Active | Deprecated
+  aiInputSource: text("ai_input_source"),
+  status: text("status").default("Draft"),
   versionNo: text("version_no").default("v1.0"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_library_master_phase_idx").on(t.wpPhase),
+  index("wp_library_master_family_idx").on(t.codeFamily),
+]);
 
-// ── WP Library Session (activated WPs per session from library) ───────────────────────────
 export const wpLibrarySessionTable = pgTable("wp_library_session", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   wpCode: varchar("wp_code", { length: 20 }).notNull(),
   wpTitle: text("wp_title"),
   wpPhase: text("wp_phase"),
   wpCategory: text("wp_category"),
   isaReference: text("isa_reference"),
-  triggerReason: text("trigger_reason"),             // Which rule activated this WP
+  triggerReason: text("trigger_reason"),
   mandatoryFlag: boolean("mandatory_flag").default(false),
-  status: text("status").default("Pending"),         // Pending | In Progress | Prepared | Reviewed | Approved | N/A
+  status: text("status").default("Pending"),
   preparedBy: text("prepared_by"),
   reviewedBy: text("reviewed_by"),
   approvedBy: text("approved_by"),
@@ -604,12 +724,14 @@ export const wpLibrarySessionTable = pgTable("wp_library_session", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_library_session_session_id_idx").on(t.sessionId),
+  uniqueIndex("wp_library_session_code_idx").on(t.sessionId, t.wpCode),
+]);
 
-// ── Journal Import (raw double-entry from workbook template Journal_Import sheet) ──────────
 export const wpJournalImportTable = pgTable("wp_journal_import", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   journalId: text("journal_id"),
   entryNo: text("entry_no"),
   entryDate: text("entry_date"),
@@ -637,12 +759,16 @@ export const wpJournalImportTable = pgTable("wp_journal_import", {
   exceptionFlag: boolean("exception_flag").default(false),
   exceptionNote: text("exception_note"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("wp_journal_import_session_id_idx").on(t.sessionId),
+  index("wp_journal_import_account_idx").on(t.sessionId, t.accountCode),
+  index("wp_journal_import_date_idx").on(t.sessionId, t.entryDate),
+]);
 
-// ── FS Extraction Staging (raw FS lines extracted from uploaded PDFs/Excels) ─────────────
 export const wpFsExtractionTable = pgTable("wp_fs_extraction", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   extractionId: text("extraction_id"),
   sourceFileName: text("source_file_name"),
   sourceFileType: text("source_file_type"),
@@ -660,12 +786,14 @@ export const wpFsExtractionTable = pgTable("wp_fs_extraction", {
   exceptionFlag: boolean("exception_flag").default(false),
   exceptionNote: text("exception_note"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("wp_fs_extraction_session_id_idx").on(t.sessionId),
+]);
 
-// ── FS Mapping (maps extracted FS lines to COA accounts) ──────────────────────────────────
 export const wpFsMappingTable = pgTable("wp_fs_mapping", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   mappingId: text("mapping_id"),
   extractionId: text("extraction_id"),
   statementType: text("statement_type"),
@@ -682,11 +810,14 @@ export const wpFsMappingTable = pgTable("wp_fs_mapping", {
   exceptionFlag: boolean("exception_flag").default(false),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("wp_fs_mapping_session_id_idx").on(t.sessionId),
+]);
 
 export const wpMasterCoaTable = pgTable("wp_master_coa", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   accountCode: varchar("account_code", { length: 20 }).notNull(),
   parentCode: varchar("parent_code", { length: 20 }),
   accountName: text("account_name").notNull(),
@@ -704,8 +835,8 @@ export const wpMasterCoaTable = pgTable("wp_master_coa", {
   debitTotal: decimal("debit_total", { precision: 15, scale: 2 }).default("0"),
   creditTotal: decimal("credit_total", { precision: 15, scale: 2 }).default("0"),
   closingBalance: decimal("closing_balance", { precision: 15, scale: 2 }).default("0"),
-  priorYearBalance: decimal("prior_year_balance", { precision: 15, scale: 2 }),
-  variance: decimal("variance", { precision: 15, scale: 2 }),
+  priorYearBalance: decimal("prior_year_balance", { precision: 15, scale: 2 }).default("0"),
+  variance: decimal("variance", { precision: 15, scale: 2 }).default("0"),
   materialityTag: text("materiality_tag"),
   riskTag: text("risk_tag"),
   assertionTag: text("assertion_tag"),
@@ -722,169 +853,135 @@ export const wpMasterCoaTable = pgTable("wp_master_coa", {
   displayOrder: integer("display_order").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_master_coa_session_id_idx").on(t.sessionId),
+  uniqueIndex("wp_master_coa_session_code_idx").on(t.sessionId, t.accountCode),
+]);
 
-// ── WP Trigger Rules (ISA logic layer: conditions → WP activation rules) ─────────────────
 export const wpTriggerRulesTable = pgTable("wp_trigger_rules", {
   id: serial("id").primaryKey(),
   ruleName: text("rule_name").notNull(),
   ruleDescription: text("rule_description"),
-  codeFamily: varchar("code_family", { length: 4 }),       // A, B, E, etc. or null = any
-  entityType: text("entity_type"),                          // CSV: Pvt Ltd, Listed, NGO…
-  industry: text("industry"),                               // CSV: Manufacturing, Trading…
-  risk: text("risk"),                                       // CSV: High, Fraud, Going concern…
-  fsHead: text("fs_head"),                                  // CSV: Revenue, Inventory, PPE…
-  controlMode: text("control_mode"),                        // Manual | IT-dependent | ERP | Mixed
-  materialityLevel: text("materiality_level"),              // Above PM | Above Trivial | Always
-  activateWpCodes: text("activate_wp_codes").notNull(),     // CSV of WP codes to activate
-  procedureType: text("procedure_type"),                    // Risk | ToC | ToD | Analytics
-  assertionLink: text("assertion_link"),                    // Assertions triggered
-  samplingRate: decimal("sampling_rate", { precision: 5, scale: 2 }), // % sampling for high-risk
-  priority: integer("priority").default(50),                // 1=highest, 100=lowest
+  codeFamily: varchar("code_family", { length: 4 }),
+  entityType: text("entity_type"),
+  industry: text("industry"),
+  risk: text("risk"),
+  fsHead: text("fs_head"),
+  controlMode: text("control_mode"),
+  materialityLevel: text("materiality_level"),
+  activateWpCodes: text("activate_wp_codes").notNull(),
+  procedureType: text("procedure_type"),
+  assertionLink: text("assertion_link"),
+  samplingRate: decimal("sampling_rate", { precision: 5, scale: 2 }),
+  priority: integer("priority").default(50),
   mandatoryOverride: boolean("mandatory_override").default(false),
-  isaJustification: text("isa_justification"),              // e.g. ISA 315.28 requires…
+  isaJustification: text("isa_justification"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// ── WP Validation Results (pre-generation validation gate per session) ────────────────────
 export const wpValidationResultTable = pgTable("wp_validation_result", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   runAt: timestamp("run_at").defaultNow(),
   overallPass: boolean("overall_pass").default(false),
-  // TB ↔ FS check
   tbFsPass: boolean("tb_fs_pass").default(false),
   tbFsDifference: decimal("tb_fs_difference", { precision: 15, scale: 2 }),
   tbFsNote: text("tb_fs_note"),
-  // GL ↔ TB check
   glTbPass: boolean("gl_tb_pass").default(false),
   glTbNote: text("gl_tb_note"),
-  // Mandatory variables check
   mandatoryVarsPass: boolean("mandatory_vars_pass").default(false),
-  missingVars: text("missing_vars"),                        // CSV of missing variable names
-  // Confidence check (<85% items)
+  missingVars: text("missing_vars"),
   confidencePass: boolean("confidence_pass").default(false),
   lowConfidenceCount: integer("low_confidence_count").default(0),
-  lowConfidenceItems: text("low_confidence_items"),         // JSON array
-  // Mandatory WPs check
+  lowConfidenceItems: text("low_confidence_items"),
   mandatoryWpsPass: boolean("mandatory_wps_pass").default(false),
   incompleteWpCount: integer("incomplete_wp_count").default(0),
-  // COA ↔ TB mapping check
   coaTbPass: boolean("coa_tb_pass").default(false),
   unmappedAccountCount: integer("unmapped_account_count").default(0),
-  // Blockage
-  blockedReasons: text("blocked_reasons"),                  // JSON array of blocking reasons
-  warnings: text("warnings"),                               // JSON array of non-blocking warnings
+  blockedReasons: text("blocked_reasons"),
+  warnings: text("warnings"),
   generationAllowed: boolean("generation_allowed").default(false),
   validatedBy: text("validated_by"),
   notes: text("notes"),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("wp_validation_result_session_id_idx").on(t.sessionId),
+]);
 
-// ── WP Exceptions (auto-flagged issues per session) ───────────────────────────────────────
 export const wpExceptionsTable = pgTable("wp_exceptions", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
-  exceptionCode: text("exception_code"),                    // e.g. EX001
-  exceptionType: text("exception_type").notNull(),          // Unmapped FS | Missing Evidence | Incomplete WP | Low Confidence | COA Gap | Recon Fail
-  severity: text("severity").default("Medium"),             // Critical | High | Medium | Low | Info
-  sourceArea: text("source_area"),                          // TB | GL | FS | COA | WP | Evidence | Journal
-  referenceCode: text("reference_code"),                    // WP code, account code, etc.
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
+  exceptionCode: text("exception_code"),
+  exceptionType: text("exception_type").notNull(),
+  severity: text("severity").default("Medium"),
+  sourceArea: text("source_area"),
+  referenceCode: text("reference_code"),
   description: text("description").notNull(),
-  detail: text("detail"),                                   // JSON additional detail
-  isaReference: text("isa_reference"),                      // Relevant ISA paragraph
+  detail: text("detail"),
+  isaReference: text("isa_reference"),
   resolvedFlag: boolean("resolved_flag").default(false),
   resolvedBy: text("resolved_by"),
   resolvedAt: timestamp("resolved_at"),
   resolutionNote: text("resolution_note"),
   autoFlagged: boolean("auto_flagged").default(true),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_exceptions_session_id_idx").on(t.sessionId),
+  index("wp_exceptions_type_idx").on(t.sessionId, t.exceptionType),
+  index("wp_exceptions_severity_idx").on(t.severity),
+]);
 
-// ── WP Session Lock (ISA 230 final lock — no overwrites after partner approval) ──────────
 export const wpSessionLockTable = pgTable("wp_session_lock", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull().unique(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull().unique(),
   lockedAt: timestamp("locked_at").defaultNow(),
   lockedBy: text("locked_by").notNull(),
-  lockLevel: text("lock_level").default("Partner"),         // Manager | Partner | EQCR
+  lockLevel: text("lock_level").default("Partner"),
   lockJustification: text("lock_justification"),
   preArchiveValidationPassed: boolean("pre_archive_validation_passed").default(false),
-  archiveRef: text("archive_ref"),                          // ISA 230 archive reference
-  retentionEndDate: text("retention_end_date"),             // 7 years per ICAP
+  archiveRef: text("archive_ref"),
+  retentionEndDate: text("retention_end_date"),
   eqcrCompleted: boolean("eqcr_completed").default(false),
   eqcrBy: text("eqcr_by"),
-  unlockAllowed: boolean("unlock_allowed").default(false),  // Only EQCR/admin can unlock
+  unlockAllowed: boolean("unlock_allowed").default(false),
   unlockedAt: timestamp("unlocked_at"),
   unlockedBy: text("unlocked_by"),
   unlockReason: text("unlock_reason"),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// ── WP Execution (full ISA-compliant audit execution record per WP per session) ──────────
-// One row per selected WP per session. Covers the full lifecycle:
-// procedures → sampling → work performed → evidence → findings → conclusions → sign-off → lock
 export const wpExecutionTable = pgTable("wp_execution", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   wpCode: varchar("wp_code", { length: 20 }).notNull(),
-
-  // Header (auto-filled from session + library)
-  wpTitle: text("wp_title"),
+  wpTitle: text("wp_title").notNull().default("Untitled"),
   wpPhase: text("wp_phase"),
   wpCategory: text("wp_category"),
-  isaReference: text("isa_reference"),         // Primary ISA standard, e.g. "ISA 315"
-  secondaryReference: text("secondary_reference"), // e.g. "ITO 2001 s.177"
-  objective: text("objective"),                // Audit objective for this WP
-
-  // Assertions (ISA 315) — JSON array of {assertion, relevant: bool, rationale: string}
+  isaReference: text("isa_reference"),
+  secondaryReference: text("secondary_reference"),
+  objective: text("objective"),
   assertions: jsonb("assertions"),
-
-  // Risk linkage
-  riskLevel: text("risk_level").default("Medium"),   // Low | Medium | High | Critical
+  riskLevel: text("risk_level").default("Medium"),
   riskDescription: text("risk_description"),
-  linkedRisks: jsonb("linked_risks"),           // [{riskCode, description, assertionLink}]
-
-  // Procedures (standard + AI + editable)
-  // [{stepNo, description, type: standard|ai|custom, status: not_started|in_progress|performed|n_a,
-  //   performedBy, performedDate, notes, evidenceRefs: [evidenceId, ...], finding: string}]
+  linkedRisks: jsonb("linked_risks"),
   procedures: jsonb("procedures"),
-
-  // Sampling (ISA 530)
-  samplingMethod: text("sampling_method"),     // MUS | Random | Judgmental | Systematic | None
+  samplingMethod: text("sampling_method"),
   populationSize: integer("population_size"),
   sampleSize: integer("sample_size"),
-  samplingCriteria: text("sampling_criteria"), // Selection logic narrative
-  // [{itemNo, description, accountCode, accountName, amount, period}]
+  samplingCriteria: text("sampling_criteria"),
   samplingItems: jsonb("sampling_items"),
-
-  // Work Performed (sample-wise execution table)
-  // [{sampleRef, procedureRef, workDone, result: satisfactory|exception|partial, amount, exceptionNote}]
   workPerformed: jsonb("work_performed"),
-
-  // Evidence (cross-referenced to procedures + TB/GL)
-  // [{evidenceRef, documentType, documentRef, source, obtainedDate, crossRefWp, crossRefTb, verifiedBy, attachmentPath}]
   evidenceItems: jsonb("evidence_items"),
-
-  // Results & Findings
-  // [{findingNo, procedureRef, description, findingType: error|omission|estimate|fraud, amount, isaRef}]
   findings: jsonb("findings"),
-
-  // Misstatements (ISA 450)
-  // [{type: factual|judgmental|projected, amount, nature, classification: material|immaterial|waived, decision}]
   misstatements: jsonb("misstatements"),
-  totalMisstatementAmount: decimal("total_misstatement_amount", { precision: 15, scale: 2 }),
-
-  // Analytical / calculation block
-  // {calculations: [{label, formula, value, expected, variance, thresholdPct, exceeded, conclusion}]}
+  totalMisstatementAmount: decimal("total_misstatement_amount", { precision: 15, scale: 2 }).default("0"),
   analyticalData: jsonb("analytical_data"),
-
-  // Professional judgment narrative
   professionalJudgment: text("professional_judgment"),
-
-  // Multi-level conclusions (Staff → Senior → Manager → Partner)
   staffConclusion: text("staff_conclusion"),
   staffConclusionDate: text("staff_conclusion_date"),
   staffName: text("staff_name"),
@@ -897,75 +994,58 @@ export const wpExecutionTable = pgTable("wp_execution", {
   partnerConclusion: text("partner_conclusion"),
   partnerConclusionDate: text("partner_conclusion_date"),
   partnerName: text("partner_name"),
-
-  // Review notes tracking
-  // [{id, level: staff|senior|manager|partner, reviewer, note, date, resolved: bool, resolvedNote}]
   reviewNotes: jsonb("review_notes"),
-
-  // ISA compliance checklist
-  // [{checkCode, description, status: pass|fail|n_a, reference}]
   isaChecklist: jsonb("isa_checklist"),
-
-  // Cross-referencing to TB / GL / FS
-  // [{accountCode, accountName, tbAmount, glAmount, fsAmount, variance, crossRefNote}]
   tbGlCrossRefs: jsonb("tb_gl_cross_refs"),
-
-  // Sign-off (per reviewer level)
-  // {staff: {name, date, locked}, senior: {...}, manager: {...}, partner: {...}}
   signOffs: jsonb("sign_offs"),
-
-  // Validation flags (used by the finalization gate)
   proceduresComplete: boolean("procedures_complete").default(false),
   evidenceComplete: boolean("evidence_complete").default(false),
   conclusionsComplete: boolean("conclusions_complete").default(false),
-  validationErrors: jsonb("validation_errors"),  // [{field, message}]
-
-  // Status & locking (ISA 230)
+  validationErrors: jsonb("validation_errors"),
   status: text("status").default("not_started"),
-  // not_started | in_progress | procedures_done | evidenced | concluded | review | approved | locked
   isLocked: boolean("is_locked").default(false),
   lockedAt: timestamp("locked_at"),
   lockedBy: text("locked_by"),
-
   createdBy: text("created_by"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_execution_session_id_idx").on(t.sessionId),
+  uniqueIndex("wp_execution_session_wp_idx").on(t.sessionId, t.wpCode),
+  index("wp_execution_status_idx").on(t.status),
+]);
 
-// ── WP Output Jobs (output generation tracking — TB/GL/WP document exports) ──────────────
 export const wpOutputJobTable = pgTable("wp_output_job", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
-  jobType: text("job_type").notNull(),                      // tb_excel | gl_excel | wp_index | wp_document | full_file
-  status: text("status").default("queued"),                 // queued | running | complete | failed
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
+  jobType: text("job_type").notNull(),
+  status: text("status").default("queued"),
   triggeredBy: text("triggered_by"),
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
   outputPath: text("output_path"),
-  outputSize: integer("output_size"),                       // bytes
+  outputSize: integer("output_size"),
   recordCount: integer("record_count"),
   errorMessage: text("error_message"),
-  metadata: text("metadata"),                               // JSON: phase counts, family breakdown etc.
+  metadata: text("metadata"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("wp_output_job_session_id_idx").on(t.sessionId),
+  index("wp_output_job_status_idx").on(t.status),
+]);
 
-// ── Compliance Document Engine ─────────────────────────────────────────────────
-// ISA 210 Engagement Letter, ISA 220/ISQM-2 Independence + EQCR,
-// ISA 570 Going Concern, ISA 580 Management Rep Letter,
-// SECP Form 29/A, CCG 2019
 export const wpComplianceDocTable = pgTable("wp_compliance_doc", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
-  // engagement_letter | independence_confirmation | management_rep_letter
-  // eqcr_checklist | going_concern | secp_ccg
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   docType: text("doc_type").notNull(),
-  docCode: text("doc_code").notNull(),        // PP-05 | PP-09 | DL-03 | QR-01 | GC-01 | SECP-F29
+  docCode: text("doc_code").notNull(),
   isaReference: text("isa_reference"),
   generatedContent: jsonb("generated_content"),
   generatedAt: timestamp("generated_at"),
   generatedBy: text("generated_by"),
   version: integer("version").default(1),
-  // pending | generated | sent_to_client | signed | rejected | completed | superseded
   status: text("status").default("pending"),
   signatoryName: text("signatory_name"),
   signatoryDesignation: text("signatory_designation"),
@@ -973,25 +1053,21 @@ export const wpComplianceDocTable = pgTable("wp_compliance_doc", {
   signedBy: text("signed_by"),
   signedAt: timestamp("signed_at"),
   rejectionReason: text("rejection_reason"),
-  // EQCR: [{code,description,isa,status:pass|fail|na,comment,reviewedAt}]
   checklistItems: jsonb("checklist_items"),
   checklistCompletedAt: timestamp("checklist_completed_at"),
   checklistCompletedBy: text("checklist_completed_by"),
-  // Independence: [{memberId,name,role,confirmed,confirmedAt,threats,safeguards}]
   teamMemberConfirmations: jsonb("team_member_confirmations"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ISA AUDIT SYSTEM — Clause-Level Mapping, Audit Logic Chain, Tick Marks,
-// Multi-Level Review, Version Control, FS/Lead Schedule, Compliance Validation
-// ═══════════════════════════════════════════════════════════════════════════════
+}, (t) => [
+  index("wp_compliance_doc_session_id_idx").on(t.sessionId),
+  uniqueIndex("wp_compliance_doc_session_code_idx").on(t.sessionId, t.docCode),
+]);
 
 export const wpAuditChainTable = pgTable("wp_audit_chain", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   wpCode: text("wp_code").notNull(),
   fsArea: text("fs_area").notNull(),
   riskId: text("risk_id").notNull(),
@@ -1020,7 +1096,7 @@ export const wpAuditChainTable = pgTable("wp_audit_chain", {
   resultSummary: text("result_summary"),
   exceptionsFound: integer("exceptions_found").default(0),
   exceptionDetails: jsonb("exception_details"),
-  misstatementAmount: decimal("misstatement_amount", { precision: 18, scale: 2 }),
+  misstatementAmount: decimal("misstatement_amount", { precision: 18, scale: 2 }).default("0"),
   misstatementType: text("misstatement_type"),
   conclusion: text("conclusion"),
   conclusionNarrative: text("conclusion_narrative"),
@@ -1032,7 +1108,12 @@ export const wpAuditChainTable = pgTable("wp_audit_chain", {
   chainValidatedAt: timestamp("chain_validated_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_audit_chain_session_id_idx").on(t.sessionId),
+  uniqueIndex("wp_audit_chain_procedure_idx").on(t.sessionId, t.procedureId),
+  index("wp_audit_chain_wp_code_idx").on(t.sessionId, t.wpCode),
+  index("wp_audit_chain_fs_area_idx").on(t.sessionId, t.fsArea),
+]);
 
 export const wpIsaClauseRefTable = pgTable("wp_isa_clause_ref", {
   id: serial("id").primaryKey(),
@@ -1045,11 +1126,13 @@ export const wpIsaClauseRefTable = pgTable("wp_isa_clause_ref", {
   mandatory: boolean("mandatory").default(false),
   mappedProcedureType: text("mapped_procedure_type"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => [
+  uniqueIndex("wp_isa_clause_ref_std_clause_idx").on(t.isaStandard, t.clauseNumber),
+]);
 
 export const wpTickMarkTable = pgTable("wp_tick_mark", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   symbol: text("symbol").notNull(),
   meaning: text("meaning").notNull(),
   color: text("color"),
@@ -1057,12 +1140,16 @@ export const wpTickMarkTable = pgTable("wp_tick_mark", {
   isStandard: boolean("is_standard").default(true),
   usageCount: integer("usage_count").default(0),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("wp_tick_mark_session_id_idx").on(t.sessionId),
+  uniqueIndex("wp_tick_mark_session_symbol_idx").on(t.sessionId, t.symbol),
+]);
 
 export const wpTickMarkUsageTable = pgTable("wp_tick_mark_usage", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
-  tickMarkId: integer("tick_mark_id").references(() => wpTickMarkTable.id),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
+  tickMarkId: integer("tick_mark_id").references(() => wpTickMarkTable.id, { onDelete: "cascade" }),
   symbol: text("symbol").notNull(),
   wpCode: text("wp_code").notNull(),
   lineRef: text("line_ref"),
@@ -1072,11 +1159,15 @@ export const wpTickMarkUsageTable = pgTable("wp_tick_mark_usage", {
   appliedAt: timestamp("applied_at").defaultNow(),
   evidenceRef: text("evidence_ref"),
   notes: text("notes"),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("wp_tick_mark_usage_session_id_idx").on(t.sessionId),
+  index("wp_tick_mark_usage_wp_code_idx").on(t.sessionId, t.wpCode),
+]);
 
 export const wpReviewNoteTable = pgTable("wp_review_note", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   wpCode: text("wp_code"),
   headIndex: integer("head_index"),
   reviewLevel: text("review_level").notNull(),
@@ -1098,13 +1189,18 @@ export const wpReviewNoteTable = pgTable("wp_review_note", {
   escalationReason: text("escalation_reason"),
   blocksSignOff: boolean("blocks_sign_off").default(false),
   blocksExport: boolean("blocks_export").default(false),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_review_note_session_id_idx").on(t.sessionId),
+  index("wp_review_note_status_idx").on(t.sessionId, t.status),
+  index("wp_review_note_wp_code_idx").on(t.sessionId, t.wpCode),
+]);
 
 export const wpVersionHistoryTable = pgTable("wp_version_history", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   entityType: text("entity_type").notNull(),
   entityId: text("entity_id").notNull(),
   fieldName: text("field_name"),
@@ -1118,11 +1214,14 @@ export const wpVersionHistoryTable = pgTable("wp_version_history", {
   ipAddress: text("ip_address"),
   isImmutable: boolean("is_immutable").default(true),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_version_history_session_id_idx").on(t.sessionId),
+  index("wp_version_history_entity_idx").on(t.sessionId, t.entityType, t.entityId),
+]);
 
 export const wpLeadScheduleTable = pgTable("wp_lead_schedule", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   wpArea: text("wp_area").notNull(),
   wpCode: text("wp_code"),
   scheduleRef: text("schedule_ref").notNull(),
@@ -1130,17 +1229,17 @@ export const wpLeadScheduleTable = pgTable("wp_lead_schedule", {
   majorHead: text("major_head"),
   lineItem: text("line_item"),
   noteNo: text("note_no"),
-  openingBalance: decimal("opening_balance", { precision: 18, scale: 2 }),
-  additions: decimal("additions", { precision: 18, scale: 2 }),
-  disposals: decimal("disposals", { precision: 18, scale: 2 }),
-  transfers: decimal("transfers", { precision: 18, scale: 2 }),
-  revaluation: decimal("revaluation", { precision: 18, scale: 2 }),
-  depreciation: decimal("depreciation", { precision: 18, scale: 2 }),
-  impairment: decimal("impairment", { precision: 18, scale: 2 }),
-  closingBalance: decimal("closing_balance", { precision: 18, scale: 2 }),
-  priorYear: decimal("prior_year", { precision: 18, scale: 2 }),
-  variance: decimal("variance", { precision: 18, scale: 2 }),
-  variancePct: decimal("variance_pct", { precision: 8, scale: 2 }),
+  openingBalance: decimal("opening_balance", { precision: 18, scale: 2 }).default("0"),
+  additions: decimal("additions", { precision: 18, scale: 2 }).default("0"),
+  disposals: decimal("disposals", { precision: 18, scale: 2 }).default("0"),
+  transfers: decimal("transfers", { precision: 18, scale: 2 }).default("0"),
+  revaluation: decimal("revaluation", { precision: 18, scale: 2 }).default("0"),
+  depreciation: decimal("depreciation", { precision: 18, scale: 2 }).default("0"),
+  impairment: decimal("impairment", { precision: 18, scale: 2 }).default("0"),
+  closingBalance: decimal("closing_balance", { precision: 18, scale: 2 }).default("0"),
+  priorYear: decimal("prior_year", { precision: 18, scale: 2 }).default("0"),
+  variance: decimal("variance", { precision: 18, scale: 2 }).default("0"),
+  variancePct: decimal("variance_pct", { precision: 8, scale: 2 }).default("0"),
   tbAccountCodes: jsonb("tb_account_codes"),
   glCrossRef: text("gl_cross_ref"),
   fsCrossRef: text("fs_cross_ref"),
@@ -1154,11 +1253,14 @@ export const wpLeadScheduleTable = pgTable("wp_lead_schedule", {
   reviewedBy: text("reviewed_by"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_lead_schedule_session_id_idx").on(t.sessionId),
+  index("wp_lead_schedule_wp_area_idx").on(t.sessionId, t.wpArea),
+]);
 
 export const wpFsNoteMappingTable = pgTable("wp_fs_note_mapping", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   noteNo: text("note_no").notNull(),
   noteTitle: text("note_title").notNull(),
   fsLineItems: jsonb("fs_line_items"),
@@ -1171,11 +1273,14 @@ export const wpFsNoteMappingTable = pgTable("wp_fs_note_mapping", {
   aiGeneratedNote: jsonb("ai_generated_note"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_fs_note_mapping_session_id_idx").on(t.sessionId),
+  uniqueIndex("wp_fs_note_mapping_note_idx").on(t.sessionId, t.noteNo),
+]);
 
 export const wpComplianceGateTable = pgTable("wp_compliance_gate", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   gateCode: text("gate_code").notNull(),
   gateName: text("gate_name").notNull(),
   category: text("category").notNull(),
@@ -1197,17 +1302,20 @@ export const wpComplianceGateTable = pgTable("wp_compliance_gate", {
   wpCode: text("wp_code"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_compliance_gate_session_id_idx").on(t.sessionId),
+  uniqueIndex("wp_compliance_gate_code_idx").on(t.sessionId, t.gateCode),
+]);
 
 export const wpSamplingDetailTable = pgTable("wp_sampling_detail", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => wpSessionsTable.id).notNull(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
   wpCode: text("wp_code").notNull(),
   fsArea: text("fs_area").notNull(),
   samplingMethod: text("sampling_method").notNull(),
   populationDescription: text("population_description"),
   populationSize: integer("population_size"),
-  populationValuePkr: decimal("population_value_pkr", { precision: 18, scale: 2 }),
+  populationValuePkr: decimal("population_value_pkr", { precision: 18, scale: 2 }).default("0"),
   stratificationApplied: boolean("stratification_applied").default(false),
   strata: jsonb("strata"),
   keyItemThreshold: decimal("key_item_threshold", { precision: 18, scale: 2 }),
@@ -1229,4 +1337,7 @@ export const wpSamplingDetailTable = pgTable("wp_sampling_detail", {
   reviewedBy: text("reviewed_by"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  index("wp_sampling_detail_session_id_idx").on(t.sessionId),
+  uniqueIndex("wp_sampling_detail_wp_fs_idx").on(t.sessionId, t.wpCode, t.fsArea),
+]);

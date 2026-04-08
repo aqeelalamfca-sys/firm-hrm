@@ -2,9 +2,7 @@
 
 ## Overview
 
-This project is an enterprise-grade Human Resources Management (HRM) and Invoice Management System designed for Chartered Accountant firms. Its primary purpose is to streamline and manage various internal operations including employee and trainee administration, attendance tracking, leave management, payroll processing, client relationship management, invoicing, engagement tracking, document management, and comprehensive audit trails. The system incorporates a robust Role-Based Access Control (RBAC) system to ensure data security and appropriate access levels for different user types.
-
-The system aims to modernize the administrative and financial processes within CA firms, enabling greater efficiency, accuracy, and compliance. Key capabilities include automated payroll calculations with tax considerations, full invoice lifecycle management, secure client credential storage, and a dynamic task allocation system.
+This project is an enterprise-grade Human Resources Management (HRM) and Invoice Management System designed for Chartered Accountant firms. It streamlines internal operations, including employee and trainee administration, attendance, leave, payroll, client relationship management, invoicing, engagement tracking, document management, and comprehensive audit trails. The system features a robust Role-Based Access Control (RBAC) system for secure data access. Its goal is to enhance efficiency, accuracy, and compliance within CA firms through automated processes, full invoice lifecycle management, secure client credential storage, and dynamic task allocation.
 
 ## User Preferences
 
@@ -12,184 +10,42 @@ I prefer iterative development. Before making any major changes, please ask for 
 
 ## System Architecture
 
-The project is structured as a monorepo using pnpm workspaces, consisting of a React-based frontend (`hrm-system`) and an Express.js backend (`api-server`). PostgreSQL is used as the primary database, managed by Drizzle ORM.
+The project is structured as a monorepo using pnpm workspaces, consisting of a React-based frontend and an Express.js backend. PostgreSQL is used as the primary database, managed by Drizzle ORM.
 
 **Frontend:**
-- Developed with React, Vite, Tailwind CSS, and shadcn/ui for a modern and responsive user interface.
-- Utilizes Recharts for data visualization, React Hook Form with Zod for form management and validation, and Framer Motion for animations.
-- Wouter v3 is used for client-side routing.
-- UI/UX features include a global header filter for departments, color-coded badges, and role-specific dashboard views. The design emphasizes clarity and efficiency for administrative tasks.
-- **Typography**: Plus Jakarta Sans (display/headings) + Inter Variable (body) loaded from Google Fonts with optical sizing.
-- **Design System**: Professional animations (scroll-reveal via IntersectionObserver `RevealOnScroll` component in `landing.tsx`), glassmorphism effects (`.glass` CSS class), card hover effects (`.card-hover`), gradient text utilities (`.text-gradient`), button glow effects (`.btn-glow`), and floating orb background animations. All animation classes defined in `index.css` with `prefers-reduced-motion` fallbacks.
+- Developed with React, Vite, Tailwind CSS, and shadcn/ui for a modern and responsive UI.
+- Incorporates Recharts for data visualization, React Hook Form with Zod for form management and validation, and Framer Motion for animations.
+- Wouter v3 handles client-side routing.
+- UI/UX emphasizes clarity and efficiency with features like a global header filter, color-coded badges, and role-specific dashboard views. The design includes professional animations, glassmorphism effects, card hover effects, gradient text utilities, and button glow effects. Typography uses Plus Jakarta Sans and Inter Variable from Google Fonts.
 
 **Backend:**
 - Built with Express 5, providing RESTful API endpoints.
-- Drizzle ORM interfaces with PostgreSQL, managing a comprehensive database schema that includes users, employees, attendance, leaves, payroll, clients, invoices, engagements, documents, tasks, and audit logs.
-- Features HMAC-SHA256 signed tokens for authentication and robust RBAC implemented via middleware on all API routes.
-- **Multi-Provider AI Integration**: Supports OpenAI, Anthropic (Claude), Google (Gemini), DeepSeek, and custom OpenAI-compatible APIs. All providers use the OpenAI SDK with custom base URLs. Provider/model/URL configured via `system_settings` table keys: `ai_provider`, `ai_model`, `ai_base_url`, `chatgpt_api_key`. Environment variables `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL` take priority when set. SSRF protection via `isValidBaseUrl()` in `system-settings.ts`.
-- Security enhancements include Helmet security headers, AES-256-CBC encryption for sensitive client credentials, rate limiting, and structured logging with Pino.
-- Performance is optimized through N+1 query elimination strategies (e.g., batched queries, SQL-level filtering), extensive database indexing, and frontend memoization.
-- **Backend Hardening (12 issues fixed)**:
-  - **Transactions**: Session creation, TB generation, GL generation, and session delete all use `db.transaction()` for atomicity — partial failures no longer leave data in inconsistent state.
-  - **Batch Inserts**: Session head creation uses single batch insert (was N+1 loop), TB lines batch insert, exception batch insert — eliminates N+1 query pattern on critical paths.
-  - **Pagination**: GET /sessions, GET /exceptions, GET /version-history, GET /variables endpoints now support `?limit=N&offset=M` query params with `parsePagination()` helper (default 50-200, max 200-1000).
-  - **Input Validation**: Entity type, engagement type, reporting framework, session status, exception status, account type, risk tag, materiality tag all validated against allowed value enums before DB insert/update.
-  - **RBAC on WP Routes**: `requireRoles()` middleware applied to 7 critical routes: session delete (super_admin, partner), head approve (manager+), WP sign-off (manager+), session lock (partner+), WP lock (senior_manager+), compliance doc sign (manager+).
-  - **AI Rate Limiting**: In-memory per-user rate limiter (10 requests/60s window) on 7 AI-heavy routes: extract, ai-fill, head generate, auto-process-all, audit-chain generate, compliance-doc generate.
-  - **Error Logging**: 136 catch blocks now include `logger.error({ err })` — previously 64+ catch blocks silently swallowed errors.
-  - **Consistent Error Format**: All routes standardized to `{ error: "message" }` JSON response format.
-  - **Raw SQL Reduction**: `audit_engine_master` query converted from raw SQL to Drizzle query builder. Remaining raw SQL uses parameterized `sql\`\`` (safe, needed for `::numeric` casts in aggregate queries).
-  - **Per-Category File Size Limits**: Upload enforces category-specific limits (e.g., GL=20MB, FS=15MB, TB=10MB, tax=5MB) in addition to global 30MB cap.
-  - **Type Safety**: All `parseInt(req.params.x)` calls now use `p()` helper for Express v5 string|string[] params (27 occurrences fixed).
-  - **Session Delete with Cleanup**: `DELETE /sessions/:id` cascades through 30+ related tables in a transaction, then removes uploaded files from disk.
-
-**Admin Credentials (seeded):** `admin@calfirm.com` / `Admin@123` (role: `super_admin`). Password hashed as `SHA256(password + "hrm_salt_2024")`. DB column is `password_hash`; role enum values: `super_admin`, `hr_admin`, `finance_officer`, `manager`, `employee`, `partner`, `trainee`.
-
-**AI Working Paper Generator (Audit-Grade Sequential Workflow) — V2 REBUILT:**
-- Frontend: `artifacts/hrm-system/src/pages/working-papers.tsx`
-- Backend: `artifacts/api-server/src/routes/working-papers.ts`
-- Schema: `lib/db/src/schema/working_papers.ts` (36 tables incl. all COA, Audit Engine, WP trigger, sampling, analytics, control, evidence, recon, ISA audit chain, tick marks, review notes, version history, lead schedules, FS note mapping, compliance gates, sampling detail tables)
-- Variable definitions: `artifacts/api-server/src/data/variable-definitions.ts` (417 variables incl. 96 CY/PY generated, 20 groups). 8 new codes added: `engagement_size`, `tb_line_count`, `tb_total_period_debit`, `tb_total_period_credit`, `tb_opening_balance_aggregate`, `tb_closing_balance_aggregate`, `audit_procedure_depth`, `high_priority_gl_count`. Auto-fill covers 100% of variables with tiered confidence. Template parse (sourceType="template", confidence=1.00) maps 152 codes covering ALL 28 template fields (8 top-section + 20 row columns). `audit_procedure_depth` = dominant Procedure_Scale (Expanded/Standard/Basic) by row count. `high_priority_gl_count` = count of rows where GL_Generation_Priority="High". Row-level fields (Line_Item, Sub_Line_Item, Note_No, Normal_Balance, Remarks) stored in TB/GL tables by design — no scalar variable needed. Template field coverage: 100% (0 gaps remaining).
-- **Session creation form**: Entity type dropdown (20 Pakistani entity types: Private Limited, Public Listed, Public Unlisted, GEM Board Company, Single Member, LLP, AOP, Sole Proprietor, Bank/DFI, Islamic Bank/Islamic Window, Modaraba, Leasing Company, Insurance Company, NGO/NPO, Trust, Government Entity, Public Sector Entity, SME, Construction/Real Estate, Branch Office), NTN, STRN, reporting framework (IFRS/IFRS for SMEs/AFRS/Fourth Schedule/Fifth Schedule), engagement type (statutory audit, limited review, agreed-upon procedures, compilation, special purpose, group audit, IPO/due diligence). Session metadata auto-populates variables during auto-fill.
-- **Company-Type WP Filtering**: 130 WP_METADATA entries with `applicableTo` field (47 entity-specific papers). Papers automatically filtered by entity type at session creation and generation time. `filterPapersForEntity()` function maps entity type strings to tags (listed, gem, smc, aop, bank, islamic_bank, modaraba, leasing, insurance, ngo, public_sector, sme, construction, pvt, llp, sole, branch). `entityTypeToTags()` normalizes entity type to filterable tags. API: GET `/wp-metadata` returns full metadata, GET `/heads-definition?entityType=...` returns filtered paper lists.
-- **10-stage flow**: Upload → AI Extraction → Data Sheet (COA Engine) → Arranged Data Review → Variables (Lock) → Audit Engine → Head-wise Generation → Audit Chain → Review & QC → Export
-- **ISA AUDIT SYSTEM (10 new tables, 25+ routes)**:
-  - **Audit Logic Chain**: `wp_audit_chain` — Risk→Assertion→Procedure→Evidence→Conclusion with ISA clause-level references (ISA 315, 330, 500, 505, 520, 530, 540, 550, 570, 580, 700). Auto-generates per FS area from TB data. 14 area-specific ISA risk/procedure mappings (PPE, Inventory, Receivables, Revenue, Payables, Taxation, Employee Benefits, Cash, Intangibles, Other Assets, Cost of Sales, Operating Expenses, Related Parties, Equity). AI-powered chain generation via GPT-4o with Pakistan-specific procedures (FBR, SECP, WHT, SRB).
-  - **Tick Mark System**: `wp_tick_mark` + `wp_tick_mark_usage` — 13 standard Big-4 tick marks (✓✗®©△♦◊★▲●■⊕⊗) with meanings, color coding, and usage tracking. Applied per WP code/line/account.
-  - **Multi-Level Review Workflow**: `wp_review_note` — Staff→Senior→Manager→Partner→EQCR clearance tracking. Note types: query/observation/recommendation/instruction/blocker. Priority: low/medium/high/critical. Status: open→responded→cleared/deferred/escalated. Blocking notes prevent sign-off/export. Review note counts per level. Immutable audit trail per note via `wp_version_history`.
-  - **Version Control & Audit Trail**: `wp_version_history` — ISA 230 compliant immutable change log. Tracks entity type, entity ID, field name, version, change type (create/update/delete/lock/unlock/rollback), old/new values, reason, user, role, IP. Auto-logged on review note creation, template upload, compliance doc generation.
-  - **Lead Schedules**: `wp_lead_schedule` — Auto-generated from TB data grouped by WP area and major head. Tracks opening/closing/variance with TB account code cross-references, GL cross-refs, FS cross-refs, tick marks, risk level, materiality flag. Status: draft→populated→reviewed→approved.
-  - **FS Note Mapping**: `wp_fs_note_mapping` — Maps TB lines to financial statement disclosure notes (Note 5: PPE, Note 9: Inventory, etc.). Auto-calculates CY/PY totals and variance per note. AI-drafted disclosure text support.
-  - **Real-Time Compliance Validation Engine**: `wp_compliance_gate` — 20+ compliance gates across ISA (200, 210, 220, 230, 315, 320, 330, 500, 530, 540, 570, 580, 700), ISQM (1, 2), ICAP CoE, AOB Inspection Standards, and Internal Controls. Each gate has blocking/non-blocking status. Calculates overall compliance percentage. Override capability for partner-level exceptions.
-  - **ISA 530 Enhanced Sampling**: `wp_sampling_detail` — MUS/random/systematic/haphazard/block/stratified methods. Population description, size, value. Stratification with strata definitions. Key item threshold testing. Confidence level, tolerable error, expected error. Auto-calculates sample size by risk level. Exception rate computation and accept/reject/extend conclusions.
-  - **ISA Clause Reference Library**: `wp_isa_clause_ref` — ISA standard, clause number, full reference, clause text, category, applicability, mandatory flag, mapped procedure type.
-  - **Enhanced Template Upload**: 16-column format processor (Line_ID, Statement_Type, FS_Section, Major_Head, Line_Item, Sub_Line_Item, Account_Name, Account_Code, Note_No, Current_Year, Prior_Year, Debit_Transaction_Value, Credit_Transaction_Value, Normal_Balance, WP_Area, Risk_Level). Auto-maps to TB, auto-calculates financial totals (assets, liabilities, equity, revenue, expenses), creates version history entry.
-- **DATA SHEET STAGE (COA Engine)**: `wp_master_coa` table (40+ fields). Inline-editable 15-column table: account code, name, type, Dr/Cr balance, FS head, opening/debit/credit/closing balances, materiality/risk/tax/source/confidence. Populate from AI (with FS extraction fallback), row add/edit/delete, TB validation, approve to advance. COA feeds TB engine as Layer 0 (highest priority).
-- **AUDIT ENGINE STAGE** (ISA/ICAP/IFRS aligned): 9 new tables: `audit_engine_master`, `wp_trigger_defs` (27 WPs seeded), `wp_trigger_session`, `assertion_linkage` (14 mappings seeded), `sampling_rules` (9 rules seeded), `analytics_engine` (9 ratios seeded), `analytics_session`, `control_matrix`, `evidence_log`, `recon_engine`. 7-tab UI: Engagement Control, WP Trigger Matrix, Sampling Engine, Analytical Review, Control Testing, Evidence Vault, Reconciliation. WP triggers auto-evaluate from audit master flags (goingConcernFlag, fraudRiskFlag, relatedPartyFlag, etc.) + risk level + industry. Reconciliation runs FS↔TB↔GL↔COA checks. Seed endpoint: POST `/seed-audit-engine`.
-- **Session-based**: All data persisted in PostgreSQL (wp_sessions, wp_uploaded_files, wp_extraction_runs, wp_extracted_fields, wp_arranged_data, wp_variables, wp_variable_change_log, wp_exception_log, wp_trial_balance_lines, wp_gl_accounts, wp_gl_entries, wp_heads, wp_head_documents, wp_export_jobs, wp_variable_definitions, wp_variable_dependency_rules)
-- **Strict upload rules**: Financial Statements/TB/GL/Bank → Excel only; Sales Tax/Notices/Annexures → PDF only
-- **OCR detection**: Scanned PDFs auto-detected (text < 100 chars with large buffer), source type classified as native_text_pdf/ocr_pdf/image_ocr/excel_native
-- **Arranged data staging**: 10 tabs (Entity Profile, Reporting Metadata, FS Line Items, Prior Year Comparatives, Sales Tax Data, Tax Period Summary, Notes/Schedules, Exceptions, Assumptions Register, Extraction Log) with field-level confidence scoring
-- **Audit Variable Engine (370+ variables across 20 groups)**: Entity & Constitution, Ownership & Governance, Engagement Acceptance, Accounting & Records, TB & COA, Financial Statements (CY+PY), Materiality, Risk Assessment, Internal Controls, Sampling, Analytical Procedures, Tax & Compliance, Related Parties, Laws & Regulations, Audit Evidence, Going Concern, Misstatements, Completion & Reporting, QC & Inspection, Workflow & Sign-offs
-- **Variable management**: Master definitions with dataType, inputMode (text/dropdown/toggle/date), mandatory flag, AI-extractable flag, review-required flag, ISA standard references, Pakistan law references, and working paper impact linkage. Auto-filled from extraction via EXTRACTION_FIELD_TO_VARIABLE_MAP, editable with mandatory reason-for-change, confidence scoring, review status workflow (pending → auto_filled → needs_review → reviewed → confirmed), section-wise and all-at-once locking with mandatory validation gate
-- **100% Auto-Population Engine**: Zero blank variables — every variable receives a value from one of 5 source tiers: (1) AI extraction (confidence=75-95%), (2) Session metadata (90%), (3) Formula/cross-field calculation (85%), (4) Standard defaults (60%), (5) Intelligent assumptions (45%, flagged for review). Cross-field materiality: auto-calculates basis_amount → overall_materiality → performance_materiality → trivial_threshold from extracted financials. Analytics: auto-derives revenue/asset variance narrative from CY/PY data. Sampling: auto-estimates population_value, key_item_value, sample_size from revenue. Source types: ai_extraction, session, formula, default, assumption. Exception engine: `needs_confirmation` for mandatory assumptions, `low_confidence` for <50% confidence. All 26 previously-empty variables now have contextual defaults (officer names reference Form 29, addresses reference SECP Form A, risk summaries cite ISA standards).
-- **Validation rules engine**: Mandatory checks, conditional logic (listed/PIE → EQCR, sales_tax_applicable → ST variables, related_parties → RP register, controls_reliance → ToC, modified opinion → basis), materiality auto-calculation suggestions
-- **Variable dependency rules**: Trigger-based impact detection — when a variable changes after heads are approved, exceptions are auto-generated marking affected heads as needing regeneration
-- **Variable UI**: Collapsible groups with completion %, summary cards (total/filled/missing/low-confidence/needs-review/locked), search bar, filter pills (all/mandatory/missing/low-confidence/needs-review/reviewed/locked), audit trail viewer
-- **Comprehensive Input Renderer (40+ inputModes)**: `RenderEditInput` + `RenderDisplayValue` handle all field types: `text`, `number`, `date`, `time`, `datetime`, `date_range`, `email`, `phone`, `url`, `masked/password`, `dropdown`, `multi_select`, `radio`, `checkbox`, `checkbox_group`, `toggle`, `yes_no_na`, `pass_fail`, `risk_level`, `rating_level`, `exception_flag`, `conclusion`, `status`, `textarea`, `comment`, `tag_input`, `manual_override`, `currency`, `percentage`, plus display-only: `formula`, `readonly`, `locked`, `autofill`, `ai_extracted`, `ai_narrative`, `ai_suggestion`, `ai_confidence`, `ai_reconciliation`, `progress_bar`, `validation_message`, `info_banner`, `error_alert`, `summary_card`, `label`. Utilities: `pillColor()` maps 40+ domain values to color classes, `statusColor()` maps workflow states, `safeParseArray()` guards JSON array parsing, `safeFormatDate()` guards date formatting. Helper components: `PillSelector`, `MultiSelectInput`, `TagInput`.
-- **Confidence scoring**: Field-level 0-100%, color-coded (90-100% green, 70-89% amber/review, <70% red/confirm required)
-- **TB & GL Engine (Production-Grade, Steps 1-11)**: Full refactor into dedicated `artifacts/api-server/src/routes/tb-gl-engine.ts` module. Unified `POST /generate-tb-gl` endpoint added with 5-stage pipeline (Input Extraction → CoA Mapping → Trial Balance → General Ledger → Reconciliation). Individual `/generate-tb` and `/generate-gl` endpoints enhanced to delegate to the engine.
-  - **Step 1-2 (Input & CoA Mapping)**: 30-entry Pakistan COA (4-digit, Companies Act/IFRS), auto-mapped from FS line items via `mapFsToCoa()`. Fuzzy mapping for unlisted keys with keyword-based classification. 3-layer fallback: extracted TB → FS deterministic → AI-generated.
-  - **Step 3 (TB Generation)**: Proper Dr/Cr sign enforcement (Assets/Expenses=Dr; Liabilities/Equity/Revenue=Cr). `intelligentBalance()` replaces blind plug: <0.5% diff → Suspense Rounding (9001), ≥0.5% → Suspense Unreconciled (9002) with audit flag.
-  - **Steps 4-6 (GL Engine)**: Materiality-aware transaction counts (`txCountForAccount()`): high-value accounts fewer/larger; low-value more/granular. Opening balances: P&L=0, B/S=derived ratio. `forceGlBalance()` ensures Opening + Σentries = Closing exactly (adjusts last entry). All entries use Pakistan-context narrations.
-  - **Step 7 (3-Way Reconciliation)**: FS↔TB category totals, TB↔GL per-account closing balances. Auto-corrects GL via adjusting entries; logs variance report as exception.
-  - **Step 11 (Enforcement)**: `checkFinalEnforcement()` blocks finalization unless TB balanced and all GL accounts reconciled.
-  - **UI**: Single "Generate TB & GL" button (primary, above heads list) with animated 5-stage progress tracker. Per-stage icons (ok/warn/fail/pending). Summary card shows TB accounts, balance status, GL accounts, GL entries. Re-generate button after completion.
-- **GL engine (individual)**: AI generates per-account with controls: opening balance, monthly spread, voucher continuity, closing force-corrected to match TB exactly. Batch processing (5 accounts/batch). All synthetic entries flagged
-- **12 audit heads (sequential)**: Trial Balance → General Ledger → Pre-Planning → TB&GL → Client Documents → OB Verification → Planning → Execution → Finalization → Deliverables → EQCR → Inspection. Each: generate → validate → approve → export → unlock next
-- **Dependency gates**: Each head requires all prerequisite heads approved, extraction done, variables locked
-- **Exception center**: Types include extraction_flag, tb_imbalance, gl_issue, generation_issue with severity levels and status workflow (open/cleared/override_approved/deferred/not_applicable)
-- **Export**: TB→Excel, GL→Excel (per-account sheets), Pre-Planning→Word, mixed heads→Word+Excel. Full bundle export with index sheet, TB, exceptions log, and audit trail
-- **AI prompts**: extract (8000 tokens, 0.1 temp, Pakistan-focused forensic extraction), GL (6000 tokens/batch, 0.3 temp), WP generation (4000 tokens/paper, 0.3 temp, ISA-compliant)
-- Docker: `deploy/Dockerfile` uses `--no-frozen-lockfile` (patched for pnpm lockfile drift)
-
-**Key Features & Implementations:**
-- **Authentication & RBAC:** Secure login with HMAC-signed tokens, granular role-based access control for all API routes and UI elements.
-- **Employee & Trainee Management:** Comprehensive CRUD operations for employees with auto-generated codes, detailed profiles, and tracking. Includes a 9-step CA training application process with file uploads, CRN generation, MCQ assessment, and smart interview scheduling.
-- **Attendance & Leave Management:** Daily attendance recording with IP capture, and an approval workflow for leave applications.
-- **Payroll System:** Monthly payroll generation with Pakistan income tax slab calculation and detailed payslips.
-- **Client & Invoice Management:** Client master with financial details, and a full invoice lifecycle (Draft, Approved, Issued, Paid) with WHT/GST tax calculations and aging reports.
-- **Engagement & Task Management:** Tracking client engagements through their lifecycle and a task scheduler with calendar/list/week views, priority levels, and dynamic, seniority-based task allocation.
-- **Document Management:** Version-controlled document storage with categories, soft delete (trash and restore functionality), and permanent deletion.
-- **Role-Based Data Isolation:** Employees and trainees can only view their own records (leaves, employee profile). Only admins/HR/managers/partners can view all records and approve/reject leaves. Employee creation/editing restricted to admin roles.
-- **Trainee-to-Employee Auto-Linking:** When a training application status is changed to "selected", an employee record is automatically created with data from the application (name, email, phone, CNIC, department, ICAP status).
-- **ICAP/Articles Tracking:** Employee records include ICAP registration status (Registered/Not Registered/In Progress/Exempted), articles ending date, and articles extension period fields.
-- **Audit Trail:** Comprehensive logging of all system actions for accountability and compliance.
-- **Credential Vault:** Secure, encrypted storage for client portal credentials (e.g., FBR, SECP, PRA logins).
-- **Notifications:** In-app notification system with real-time updates for important events.
-- **Reports:** Generation of various reports for attendance, payroll, and invoices.
-- **Regulatory Live Updates:** AI-powered regulatory intelligence panel on the landing page with live ticker and category cards (FBR/SECP/PSX/SBP). Admin CRUD page at `/regulatory-updates` for managing updates manually or via AI generation.
-- **System Settings:** Admin settings page at `/settings` with ChatGPT API key management (stored securely, never returned in API responses) and storage provider configuration.
-
-**Regulatory Updates System:**
-- Frontend panel: `artifacts/hrm-system/src/components/regulatory-live-panel.tsx`
-- Admin page: `artifacts/hrm-system/src/pages/regulatory-updates.tsx`
-- Settings page: `artifacts/hrm-system/src/pages/settings.tsx` (AI Integration + Auto-Gen Config + Storage Configuration)
-- Backend routes: `artifacts/api-server/src/routes/regulatory-updates.ts`, `artifacts/api-server/src/routes/system-settings.ts`
-- Scheduler: `artifacts/api-server/src/scheduler/auto-regulatory.ts` (auto-generates updates every N hours)
-- DB schema: `lib/db/src/schema/regulatory_updates.ts` (tables: `regulatory_updates`, `auto_gen_logs`, `system_settings`)
-- AI uses Replit AI Integration proxy (env: `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`) or falls back to `chatgpt_api_key` from system_settings table
-- Auto-gen runs on server startup, configurable via Settings (enable/disable, interval 1-24h)
-- Settings page has "Test" button to verify API key connectivity
-- Regulatory Updates admin page has "Run Now" button and "View Logs" for auto-gen history
-- Config keys in `system_settings`: `auto_gen_enabled`, `auto_gen_interval_hours`, `chatgpt_api_key`
-
-**Pakistan Tax Calculator:**
-- Public page at `/tax-calculator` (no auth required)
-- Source: `artifacts/hrm-system/src/pages/tax-calculator.tsx`
-- Route registered in `App.tsx` as lazy-loaded component
-- Action button on landing page right sidebar (blue "Calculate Now" card)
-- 10 tabs: AI Analyzer, Tax Exposure, Income Tax, WHT Calc, Sales Tax, Property, Vehicle, Investment, Rental, Rate Tables
-- All rates per Finance Act 2025 (FBR Rate Card) with ATL/Non-ATL global toggle
-- Covers 80+ WHT categories including Sec 148, 149, 150, 151, 152, 153, 154, 155, 156, 231B, 233, 234, 236C, 236K, 236CB, 236G, 236H, 236Y, 236Z
-- Property tax supports ATL/Non-ATL/Late Filer with slab-based rates
-- Salary tax uses progressive slabs with surcharge for income >10M
-
-**Law-Integrated AI Tax Engine (First Tab):**
-- Backend: `artifacts/api-server/src/routes/tax-analyze.ts` — POST `/api/tax-analyze`
-- Accepts PDF, Images (JPG/PNG/WebP/GIF), Excel (.xlsx/.xls), CSV uploads via multer (15MB limit)
-- PDF text extraction via `pdf-parse`, Excel via `xlsx`, Images sent as base64 to GPT-4o vision
-- Uses Replit AI Integration proxy (`AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`), falls back to `chatgpt_api_key` from system_settings (VPS)
-- **Law-Integrated System Prompt** with full Pakistan tax law knowledge base:
-  - ITO 2001 (all WHT sections: 148-156A, 231A-236K), Income Tax Rules 2002
-  - Sales Tax Act 1990 (Sec 3, schedules), Sales Tax Rules 2006
-  - Provincial Sales Tax (PRA 16%, SRB 13%, KPRA 15%, BRA 15%)
-  - Federal Excise Act 2005, Finance Act 2025
-- **Multi-Tax Mapping Engine**: Transaction → Nature → Law(s) → Section(s) → Rate(s) → Treatment
-- **Mandatory Legal Fields**: Every tax finding must include `applicable_law`, `section_reference`, `source_text` (law citation), `legal_basis` (Confirmed / Insufficient)
-- **Compliance Check**: `missing_tax_check` array flags non-deducted taxes
-- **Server-side Validation**: Enforces mandatory fields, auto-sets "Insufficient legal basis" for missing section references
-- **Improved Error Handling**: Specific messages for HTTP 400/429/500/502/503 from OpenAI API, content filter detection
-- Returns structured JSON: document_summary, extracted_items, tax_analysis (with applicable_law, section_reference, source_text, legal_basis, ATL/Non-ATL rates, adjustability, risk flags), compliance_notes, missing_tax_check, total_tax_exposure
-- Frontend: full-screen modal popup for results with legal citations section (BookOpen icon), missing tax check section (ShieldAlert icon), Confirmed/Review legal basis badges
-- Route mounted before auth middleware (public endpoint, same as tax calculator page)
-
-**Working Papers Wizard:**
-- Route: `/working-papers` (auth-protected, staff only)
-- Source: `artifacts/hrm-system/src/pages/working-papers.tsx` (~3450 lines)
-- Backend: `artifacts/api-server/src/routes/working-papers.ts` (~2283 lines)
-- **3-section wizard** (STEPS array, ids 0–2):
-  1. **Upload** (step 0) — DropZone file upload · WP category selection (A–K phases via `selectedPhases` state, syncs to `selectedPapers` via useEffect) · Special context/instructions textarea · "Extract & Configure →" button (calls `handleExtractAndNext` → AI OCR extraction → setStep(1))
-  2. **Configure** (step 1) — Entity & firm details · Engagement team · Key deadlines · Financial Statements (BS/PL with manual + Excel upload) · Sales Tax data · Engagement variable template (121 variables in groups A–K) with profile defaults · "Continue to Output →" (setStep(2))
-  3. **Output** (step 2) — Four sub-sections on one page:
-     - **AI Analysis**: Run analysis button → materiality, risk, FS assertions, IC weaknesses; stale-data warning if config changed
-     - **GL & TB Generation**: `handleGenerateGlTb` → AI-generated GL entries + TB accounts; expandable GL/TB data tables
-     - **Working Papers**: idle/generating/generated view; phase-by-phase progress (A–K); evidence index; paper cards with expand/collapse and download per paper
-     - **Export & Finalize**: Excel (.xlsx), Word (.docx), PDF, and Confirmations Bundle download cards
-- **Draft key**: `DRAFT_KEY = "ana_wp_draft_v2"` — autosaved to localStorage (1.5s debounce)
-- **AI model**: `gpt-4o` via Replit proxy (`getAIClient()`)
-- pdfkit is in `external` array of `artifacts/api-server/build.mjs` (prevents Helvetica.afm crash)
-
-## Deployment & CI/CD
-
-**Pipeline**: Replit → GitHub → Hostinger VPS (Docker, SSH-based deploy)
-
-- **One-command deploy**: `bash scripts/deploy.sh` (pushes to GitHub + deploys to VPS)
-- **GitHub Repo**: https://github.com/aqeelalamfca-sys/firm-hrm
-- **VPS**: Hostinger Ubuntu 22.04 (187.77.130.117), app at `~/firm-hrm`
-- **Domain**: https://ana-ca.com (HTTPS live, Let's Encrypt SSL managed by Certbot)
-- **Containers**: `ana-backend` (127.0.0.1:5002:5000), `ana-db` (127.0.0.1:5433:5432)
-- **Docker files**: `deploy/Dockerfile`, `deploy/docker-compose.yml`
-- **Dockerfile fix**: Uses `--shamefully-hoist` for pnpm deps; installs `exceljs pdfkit xlsx multer` explicitly in production stage (these are esbuild externals)
-- **Nginx**: Host-level nginx (`/etc/nginx/sites-available/ana-ca.com`) — HTTPS+redirect fully configured; proxies to `127.0.0.1:5002`
-- **SSL**: Let's Encrypt at `/etc/letsencrypt/live/ana-ca.com/` — auto-renewal cron at 3am
-- **DB**: `ana-hrm` database with all 37+ tables migrated; migration SQL at `lib/db/drizzle/`
-- **Admin Login**: `admin@calfirm.com` / `Admin@123`
-- **JWT**: `JWT_SECRET` env var (set via deploy .env); tokens 7 days valid
-- **Secrets flow**: GITHUB_TOKEN + VPS_SSH_KEY as Replit Secrets; DB_PASSWORD + JWT_SECRET + ENCRYPTION_KEY written to VPS `deploy/.env` via SCP (never in git)
-- **Helper scripts**: `push.sh`, `vps-status.sh`, `vps-logs.sh`, `vps-rollback.sh`, `vps-rebuild.sh`, `vps-shell.sh`
-- **Token storage key**: Frontend uses `hrm_token` in localStorage
-- **Full guide**: `deploy/DEPLOY.md`
+- Drizzle ORM manages a comprehensive PostgreSQL database schema covering users, employees, attendance, leaves, payroll, clients, invoices, engagements, documents, tasks, and audit logs.
+- Features HMAC-SHA256 signed tokens for authentication and robust RBAC implemented via middleware.
+- **Multi-Provider AI Integration**: Supports OpenAI, Anthropic (Claude), Google (Gemini), DeepSeek, and custom OpenAI-compatible APIs, configured via `system_settings` or environment variables with SSRF protection.
+- Security enhancements include Helmet, AES-256-CBC encryption for sensitive data, rate limiting, and structured logging with Pino.
+- Performance is optimized through N+1 query elimination, extensive database indexing, and frontend memoization.
+- **Backend Hardening**: Includes transactions for atomicity, batch inserts for efficiency, pagination, input validation against enums, RBAC on critical routes, AI rate limiting, consistent error logging and formatting, Drizzle ORM for raw SQL reduction, category-specific file size limits, and type safety for request parameters.
+- **AI Working Paper Generator (Audit-Grade Sequential Workflow) — V2 REBUILT**:
+    - Features 36 tables for comprehensive audit data, including COA, Audit Engine, WP triggers, sampling, analytics, control, evidence, reconciliation, ISA audit chain, tick marks, review notes, version history, lead schedules, FS note mapping, and compliance gates.
+    - **Schema Hardening**: Includes over 70 database indexes, cascade deletes, unique constraints, default values, `updated_at` timestamps, soft delete for ISA 230 compliance, and new pgEnums for improved data integrity.
+    - Variable definitions cover 417 variables across 20 groups, with 100% auto-fill coverage and tiered confidence scoring.
+    - Supports dynamic WP filtering based on 20 Pakistani entity types and 9 engagement types.
+    - Implements a 10-stage flow: Upload → AI Extraction → Data Sheet (COA Engine) → Arranged Data Review → Variables (Lock) → Audit Engine → Head-wise Generation → Audit Chain → Review & QC → Export.
+    - **ISA AUDIT SYSTEM**: Includes audit logic chain (`wp_audit_chain`) with ISA clause references, a tick mark system, multi-level review workflow (`wp_review_note`), ISA 230 compliant version control (`wp_version_history`), auto-generated lead schedules, FS note mapping, real-time compliance validation engine (`wp_compliance_gate`), enhanced ISA 530 sampling, and an ISA clause reference library.
+    - Features a DATA SHEET STAGE for COA management and an AUDIT ENGINE STAGE with 9 new tables for engagement control, WP trigger matrix, sampling, analytical review, control testing, evidence vault, and reconciliation.
+    - Strict upload rules for different file types and OCR detection for scanned PDFs.
+    - A comprehensive Audit Variable Engine (370+ variables across 20 groups) with 100% auto-population, validation rules engine, and variable dependency rules.
+    - **Comprehensive Input Renderer**: Supports over 40 inputModes for diverse data types and display options, with confidence scoring.
+    - **TB & GL Engine**: Production-grade 5-stage pipeline (Input Extraction → CoA Mapping → Trial Balance → General Ledger → Reconciliation) with fuzzy CoA mapping, intelligent balance handling, materiality-aware GL generation, 3-way reconciliation, and enforcement checks.
+    - 12 sequential audit heads with dependency gates and an exception center.
+    - Export functionality for various formats (Excel, Word, PDF) and a full bundle export.
+    - AI prompts are tailored for Pakistan-focused forensic extraction, GL generation, and ISA-compliant WP generation.
+- **Key Features & Implementations:** Authentication & RBAC, Employee & Trainee Management (with auto-linking and ICAP tracking), Attendance & Leave Management, Payroll System (with Pakistan tax slabs), Client & Invoice Management, Engagement & Task Management (seniority-based allocation), Version-controlled Document Management, Role-Based Data Isolation, Audit Trail, Credential Vault (encrypted), In-app Notifications, Reports, Regulatory Live Updates (AI-powered with auto-generation and admin CRUD), and System Settings for AI integration and storage.
+- **Regulatory Updates System**: AI-powered live panel with admin management, auto-generation scheduler, and configurable settings for AI API keys and intervals.
+- **Pakistan Tax Calculator**: Publicly accessible page with 10 tabs covering AI analysis, income tax, WHT, sales tax, property, vehicle, investment, rental, and rate tables (Finance Act 2025).
+- **Law-Integrated AI Tax Engine**: Accepts various document uploads (PDF, image, Excel, CSV) for AI analysis using GPT-4o vision. It incorporates a comprehensive Pakistan tax law knowledge base (ITO 2001, Sales Tax Act 1990, Provincial Sales Tax, Federal Excise Act 2005, Finance Act 2025) to provide structured JSON output including legal citations, compliance checks, and tax exposure.
+- **Working Papers Wizard**: A 3-section wizard for Upload, Configure (entity/firm details, engagement team, deadlines, financial statements, sales tax, variables), and Output (AI analysis, GL & TB generation, working papers, export). Autosaves drafts to local storage.
 
 ## External Dependencies
 
@@ -200,7 +56,7 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - **API Framework:** Express
 - **ORM:** Drizzle ORM
 - **Validation:** Zod
-- **API Codegen:** Orval (from OpenAPI spec)
+- **API Codegen:** Orval
 - **Charts:** Recharts
 - **Form Management:** React Hook Form
 - **Animations:** Framer Motion
@@ -208,3 +64,8 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - **Build Tool:** Vite, esbuild
 - **Logging:** Pino
 - **Encryption:** AES-256-CBC
+- **AI Integrations:** OpenAI, Anthropic (Claude), Google (Gemini), DeepSeek, custom OpenAI-compatible APIs
+- **PDF Parsing:** pdf-parse
+- **Excel Parsing:** xlsx
+- **File Uploads:** multer
+- **PDF Generation:** pdfkit
