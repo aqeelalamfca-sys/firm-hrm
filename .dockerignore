@@ -7,6 +7,7 @@ artifacts/mockup-sandbox
 deploy
 *.md
 !deploy/Dockerfile
+!deploy/entrypoint.sh
 .replit
 replit.nix
 replit_agent
