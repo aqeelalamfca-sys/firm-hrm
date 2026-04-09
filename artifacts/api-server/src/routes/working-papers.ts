@@ -4091,6 +4091,11 @@ const DOCX_GREEN = "15803D";
 const DOCX_AMBER = "B45309";
 const DOCX_RED   = "B91C1C";
 
+function fmtAssertions(a: string): string {
+  if (!a || a === "—") return a || "—";
+  return a.split(/[,\s]+/).filter(Boolean).map(s => `✓${s}`).join("   ");
+}
+
 function dxCell(text: string, opts: { bold?: boolean; color?: string; bg?: string; size?: number; width?: number; widthType?: (typeof WidthType)[keyof typeof WidthType] } = {}): TableCell {
   return new TableCell({
     width: opts.width ? { size: opts.width, type: opts.widthType || WidthType.PERCENTAGE } : undefined,
@@ -4142,8 +4147,13 @@ function dxFirmHeader(firmName: string, clientName: string, docTitle: string, pe
     new Paragraph({
       children: [new TextRun({ text: docTitle.toUpperCase(), bold: true, size: 32, color: DOCX_BLUE, font: "Calibri" })],
       alignment: AlignmentType.CENTER,
-      spacing: { after: 160 },
+      spacing: { after: 40 },
     }),
+    ...(extra?.fsArea ? [new Paragraph({
+      children: [new TextRun({ text: extra.fsArea, bold: true, size: 28, color: DOCX_NAVY, font: "Calibri" })],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 140 },
+    })] : [new Paragraph({ text: "", spacing: { after: 120 } })]),
     dxTable(
       ["Field", "Details"],
       [
@@ -4158,7 +4168,7 @@ function dxFirmHeader(firmName: string, clientName: string, docTitle: string, pe
         ["ISA References", isaRef || "—"],
         ["Risk Level", extra?.riskLevel || "—"],
         ["FS Area / Scope", extra?.fsArea || "—"],
-        ["Assertions Covered", extra?.assertions || "—"],
+        ["Assertions Covered", fmtAssertions(extra?.assertions || "—")],
         ["CONFIDENTIAL", "For Audit Use Only — ISA / ISQM-1 Compliant — Do not distribute"],
       ],
       [30, 70]
@@ -4876,7 +4886,7 @@ router.post("/sessions/:id/heads/:headIndex/export", requireRoles(...WP_ROLES_WR
             ["Client", clientName], ["Engagement Code", engCode], ["Period", period], ["NTN / STRN", ntn],
             ["WP Version", wpData.version || "v1.0"], ["Phase", meta?.phase || headDef.name],
             ["ISA References", meta?.isa || headIsaR[headIndex] || "ISA 500"], ["Risk Level", meta?.riskLevel || "Medium"],
-            ["FS Area / Scope", meta?.fsArea || headDef.name], ["Assertions Covered", meta?.assertions || "C, E, A, V"],
+            ["FS Area / Scope", meta?.fsArea || headDef.name], ["Assertions Covered", fmtAssertions(meta?.assertions || "C, E, A, V")],
             ["Lead Schedule Ref", wpData.lead_schedule_ref || "—"],
           ];
           doc.moveDown(0.3);
