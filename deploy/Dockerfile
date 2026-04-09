@@ -28,14 +28,20 @@ COPY --from=builder /app/artifacts/api-server/dist ./dist
 COPY --from=builder /app/artifacts/api-server/src/templates ./templates
 COPY --from=builder /app/artifacts/hrm-system/dist/public ./dist/public
 COPY --from=builder /app/package.json ./
+# Copy DB schema for runtime migrations
+COPY --from=builder /app/lib/db ./db
+COPY --from=builder /app/pnpm-workspace.yaml ./
 # Explicitly install externalized native/large packages that esbuild doesn't bundle
 RUN npm install --no-save exceljs pdfkit xlsx multer 2>/dev/null || true
+# Copy and configure entrypoint
+COPY deploy/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 ENV NODE_ENV=production
 ENV PORT=5000
 EXPOSE 5000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD node -e "fetch('http://localhost:5000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
-CMD ["node", "--enable-source-maps", "./dist/index.mjs"]
+CMD ["/entrypoint.sh"]
