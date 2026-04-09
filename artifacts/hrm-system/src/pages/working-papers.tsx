@@ -179,9 +179,11 @@ export default function WorkingPapers() {
   const [newAuditFirmLogo, setNewAuditFirmLogo] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>("");
   const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const [newPreparerIds, setNewPreparerIds] = useState<string[]>([]);
   const [newPreparerId, setNewPreparerId] = useState<string>("");
   const [newReviewerId, setNewReviewerId] = useState<string>("");
   const [newApproverId, setNewApproverId] = useState<string>("");
+  const [newEqcrId, setNewEqcrId] = useState<string>("");
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
   const [uploadFiles, setUploadFiles] = useState<{ file: File; category: string }[]>([]);
@@ -469,12 +471,16 @@ export default function WorkingPapers() {
           specialConditions: newSpecialConditions.length > 0 ? newSpecialConditions.join(",") : undefined,
           auditFirmName: newAuditFirmName || undefined,
           auditFirmLogo: logoUrl || undefined,
-          preparerId: newPreparerId ? parseInt(newPreparerId) : undefined,
-          preparerName: newPreparerId ? teamMembers.find((m: any) => m.id === parseInt(newPreparerId))?.name : undefined,
+          preparerId: newPreparerIds.length > 0 ? parseInt(newPreparerIds[0]) : (newPreparerId ? parseInt(newPreparerId) : undefined),
+          preparerName: newPreparerIds.length > 0 ? teamMembers.find((m: any) => m.id === parseInt(newPreparerIds[0]))?.name : (newPreparerId ? teamMembers.find((m: any) => m.id === parseInt(newPreparerId))?.name : undefined),
+          preparerIds: newPreparerIds.length > 0 ? newPreparerIds.map(id => parseInt(id)) : undefined,
+          preparerNames: newPreparerIds.length > 0 ? newPreparerIds.map(id => teamMembers.find((m: any) => m.id === parseInt(id))?.name).filter(Boolean) : undefined,
           reviewerId: newReviewerId ? parseInt(newReviewerId) : undefined,
           reviewerName: newReviewerId ? teamMembers.find((m: any) => m.id === parseInt(newReviewerId))?.name : undefined,
           approverId: newApproverId ? parseInt(newApproverId) : undefined,
           approverName: newApproverId ? teamMembers.find((m: any) => m.id === parseInt(newApproverId))?.name : undefined,
+          eqcrId: newEqcrId ? parseInt(newEqcrId) : undefined,
+          eqcrName: newEqcrId ? teamMembers.find((m: any) => m.id === parseInt(newEqcrId))?.name : undefined,
         }),
       });
       if (res.ok) {
@@ -1967,7 +1973,7 @@ export default function WorkingPapers() {
                   <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
                   Audit Team & Firm
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-slate-600">Audit Firm Name</label>
                     <Input placeholder="e.g. Alam & Aulakh CA" value={newAuditFirmName} onChange={e => setNewAuditFirmName(e.target.value)} className="h-9" />
@@ -1985,20 +1991,48 @@ export default function WorkingPapers() {
                       {logoPreview && <img src={logoPreview} alt="Logo preview" className="h-8 w-auto rounded border" />}
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">Preparer</label>
-                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newPreparerId} onChange={e => setNewPreparerId(e.target.value)}>
-                      <option value="">-- Select Preparer --</option>
-                      {teamMembers.map((m: any) => (
-                        <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
-                      ))}
-                    </select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3 mt-3">
+                  <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
+                    <label className="text-xs font-medium text-slate-600">Preparer(s) <span className="text-slate-400 font-normal">— select one or more</span></label>
+                    <div className="relative">
+                      <div className={cn("min-h-[36px] w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm flex flex-wrap gap-1.5 items-center cursor-pointer", newPreparerIds.length === 0 && "text-slate-400")}>
+                        {newPreparerIds.length === 0 && <span className="text-sm text-slate-400">Click to select preparers...</span>}
+                        {newPreparerIds.map(id => {
+                          const m = teamMembers.find((tm: any) => String(tm.id) === id);
+                          return m ? (
+                            <span key={id} className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-md px-2 py-0.5 text-xs font-medium">
+                              {m.name}
+                              <button type="button" onClick={(e) => { e.stopPropagation(); setNewPreparerIds(prev => prev.filter(p => p !== id)); }} className="hover:text-red-500 transition-colors ml-0.5">
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ) : null;
+                        })}
+                      </div>
+                      <select
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        value=""
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (val && !newPreparerIds.includes(val)) {
+                            setNewPreparerIds(prev => [...prev, val]);
+                          }
+                        }}
+                      >
+                        <option value="">-- Add Preparer --</option>
+                        {teamMembers.filter((m: any) => !newPreparerIds.includes(String(m.id))).map((m: any) => (
+                          <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-slate-600">Reviewer</label>
                     <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newReviewerId} onChange={e => setNewReviewerId(e.target.value)}>
                       <option value="">-- Select Reviewer --</option>
-                      {teamMembers.filter((m: any) => ["super_admin", "manager", "partner", "hr_admin"].includes(m.role)).map((m: any) => (
+                      {teamMembers.map((m: any) => (
                         <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
                       ))}
                     </select>
@@ -2007,7 +2041,16 @@ export default function WorkingPapers() {
                     <label className="text-xs font-medium text-slate-600">Approver</label>
                     <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newApproverId} onChange={e => setNewApproverId(e.target.value)}>
                       <option value="">-- Select Approver --</option>
-                      {teamMembers.filter((m: any) => ["super_admin", "partner"].includes(m.role)).map((m: any) => (
+                      {teamMembers.map((m: any) => (
+                        <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">EQCR <span className="text-slate-400 font-normal">(Engagement Quality Control Reviewer)</span></label>
+                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newEqcrId} onChange={e => setNewEqcrId(e.target.value)}>
+                      <option value="">-- Select EQCR --</option>
+                      {teamMembers.map((m: any) => (
                         <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
                       ))}
                     </select>
@@ -3936,9 +3979,10 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
               <span className="inline-block w-3 h-px bg-slate-300" /> Engagement Team
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
-              <F label="Partner (Preparer)"  value={session?.preparerName  || varVal("engagement_partner")}  source="form" />
-              <F label="Manager (Reviewer)"  value={session?.reviewerName  || varVal("engagement_manager")}  source="form" />
+              <F label="Preparer(s)"  value={(() => { try { const names = session?.preparerNames ? JSON.parse(session.preparerNames) : null; return names?.length ? names.join(", ") : session?.preparerName || varVal("engagement_partner"); } catch { return session?.preparerName || varVal("engagement_partner"); } })()}  source="form" />
+              <F label="Reviewer"  value={session?.reviewerName  || varVal("engagement_manager")}  source="form" />
               <F label="Approver"            value={session?.approverName  || varVal("approver")}             source="form" />
+              <F label="EQCR"               value={session?.eqcrName  || "—"}             source="form" />
               <F label="Signing City"        value={varVal("signing_city")} source="form" />
             </div>
           </div>

@@ -203,10 +203,14 @@ const createSessionSchema = z.object({
   auditFirmLogo: z.string().max(500).optional().nullable(),
   preparerId: z.number().optional().nullable(),
   preparerName: z.string().max(100).optional().nullable(),
+  preparerIds: z.array(z.number()).optional().nullable(),
+  preparerNames: z.array(z.string()).optional().nullable(),
   reviewerId: z.number().optional().nullable(),
   reviewerName: z.string().max(100).optional().nullable(),
   approverId: z.number().optional().nullable(),
   approverName: z.string().max(100).optional().nullable(),
+  eqcrId: z.number().optional().nullable(),
+  eqcrName: z.string().max(100).optional().nullable(),
 });
 
 const updateVariableSchema = z.object({
@@ -609,7 +613,7 @@ router.post("/sessions", requireRoles(...WP_ROLES_WRITE), async (req: Authentica
   try {
     const parsed = validateBody(createSessionSchema, req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error });
-    const { clientName, engagementYear, entityType, ntn, strn, periodStart, periodEnd, reportingFramework, engagementType, engagementContinuity, industryType, groupAuditFlag, itEnvironmentType, taxStatusFlags, specialConditions, auditFirmName, auditFirmLogo, preparerId, preparerName, reviewerId, reviewerName, approverId, approverName } = parsed.data;
+    const { clientName, engagementYear, entityType, ntn, strn, periodStart, periodEnd, reportingFramework, engagementType, engagementContinuity, industryType, groupAuditFlag, itEnvironmentType, taxStatusFlags, specialConditions, auditFirmName, auditFirmLogo, preparerId, preparerName, preparerIds, preparerNames, reviewerId, reviewerName, approverId, approverName, eqcrId, eqcrName } = parsed.data;
 
     const session = await db.transaction(async (tx) => {
       const [created] = await tx.insert(wpSessionsTable).values({
@@ -631,10 +635,14 @@ router.post("/sessions", requireRoles(...WP_ROLES_WRITE), async (req: Authentica
         auditFirmLogo: auditFirmLogo || null,
         preparerId: preparerId || null,
         preparerName: preparerName || null,
+        preparerIds: preparerIds ? JSON.stringify(preparerIds) : null,
+        preparerNames: preparerNames ? JSON.stringify(preparerNames) : null,
         reviewerId: reviewerId || null,
         reviewerName: reviewerName || null,
         approverId: approverId || null,
         approverName: approverName || null,
+        eqcrId: eqcrId || null,
+        eqcrName: eqcrName || null,
         status: "upload",
       }).returning();
 
