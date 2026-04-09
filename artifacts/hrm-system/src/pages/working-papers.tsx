@@ -6028,7 +6028,7 @@ function RenderEditInput({ def, value, onChange }: { def: any; value: string; on
   const options: string[] = def?.dropdownOptionsJson || [];
   switch (mode) {
     case "toggle":
-      return <PillSelector options={["true", "false"]} value={value} onChange={onChange} />;
+      return <PillSelector options={["Yes", "No"]} value={value === "true" ? "Yes" : value === "false" ? "No" : value} onChange={(v) => onChange(v === "Yes" ? "true" : v === "No" ? "false" : v)} />;
     case "yes_no_na":
       return <PillSelector options={["Yes", "No", "N/A"]} value={value} onChange={onChange} />;
     case "pass_fail":
@@ -6533,7 +6533,7 @@ function VariableRow({ v, onSaveDirect, confidenceBadge }: any) {
             );
           })()}
         </div>
-        <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{v.variableCode}</p>
+        {/* variable code hidden per user request */}
       </div>
 
       {/* Editable value */}
@@ -6751,7 +6751,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
           {/* Search + filter chips */}
           <div className="flex flex-col sm:flex-row gap-2 mt-3">
             <div className="relative flex-1 sm:max-w-sm">
-              <Input className="h-8 text-xs pl-8 bg-white" placeholder="Search by variable name or code…"
+              <Input className="h-8 text-xs pl-8 bg-white" placeholder="Search by variable name…"
                 value={search} onChange={e => setSearch(e.target.value)} />
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
             </div>
@@ -6830,8 +6830,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
             <div className="space-y-1.5 max-h-48 overflow-y-auto">
               {changeLog.map((c: any) => (
                 <div key={c.id} className="text-xs flex flex-wrap gap-2 sm:gap-3 p-2.5 rounded-lg bg-white border border-slate-100 items-center">
-                  <span className="font-mono text-slate-400 text-[10px]">{c.variableCode || c.fieldName}</span>
-                  <span className="font-medium text-slate-700">{(c.fieldName || "").replace(/_/g, " ")}</span>
+                  <span className="font-medium text-slate-700">{(c.fieldName || c.variableCode || "").replace(/_/g, " ")}</span>
                   <span className="text-red-500 line-through bg-red-50 px-1.5 py-0.5 rounded">{c.oldValue || "—"}</span>
                   <ArrowRight className="w-3 h-3 text-slate-300" />
                   <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{c.newValue}</span>
