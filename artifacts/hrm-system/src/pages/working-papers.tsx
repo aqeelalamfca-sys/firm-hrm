@@ -190,6 +190,7 @@ export default function WorkingPapers() {
   const [extractionData, setExtractionData] = useState<any>(null);
   const [coaData, setCoaData] = useState<any[]>([]);
   const [coaLoading, setCoaLoading] = useState(false);
+  const [fsLines, setFsLines] = useState<any[]>([]);
   const [arrangedData, setArrangedData] = useState<any>(null);
   // Audit Engine state
   const [auditMaster, setAuditMaster] = useState<any>(null);
@@ -703,6 +704,46 @@ export default function WorkingPapers() {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/coa`, { headers });
       if (res.ok) setCoaData(await res.json());
     } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); } finally { setCoaLoading(false); }
+  };
+
+  const fetchFsLines = async () => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/fs-lines`, { headers });
+      if (res.ok) { const data = await res.json(); setFsLines(data.lines || []); }
+    } catch { }
+  };
+
+  const addFsLine = async (row: any = {}) => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/fs-lines`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(row),
+      });
+      if (res.ok) { await fetchFsLines(); }
+    } catch (err: any) { toast?.({ title: "Failed to add row", description: err?.message, variant: "destructive" }); }
+  };
+
+  const updateFsLine = async (lineDbId: number, updates: any) => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/fs-lines/${lineDbId}`, {
+        method: "PATCH", headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) { await fetchFsLines(); }
+    } catch (err: any) { toast?.({ title: "Failed to update", description: err?.message, variant: "destructive" }); }
+  };
+
+  const deleteFsLine = async (lineDbId: number) => {
+    if (!activeSession) return;
+    try {
+      await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/fs-lines/${lineDbId}`, {
+        method: "DELETE", headers,
+      });
+      await fetchFsLines();
+    } catch (err: any) { toast?.({ title: "Failed to delete", description: err?.message, variant: "destructive" }); }
   };
 
   const populateCoa = async () => {
@@ -2421,12 +2462,18 @@ export default function WorkingPapers() {
           data={extractionData}
           session={activeSession}
           variables={variables}
-          onRefreshVariables={() => { fetchVariables(); fetchCoaData(); }}
+          onRefreshVariables={() => { fetchVariables(); fetchCoaData(); fetchFsLines(); }}
           onRerun={handleExtractData}
           onAiFill={handleAiFill}
           onOpenAiSettings={() => setShowAiSettings(true)}
           loading={loading || parseLoading}
           confidenceBadge={confidenceBadge}
+          onSaveVariable={saveVariableDirect}
+          fsLines={fsLines}
+          onAddFsLine={addFsLine}
+          onUpdateFsLine={updateFsLine}
+          onDeleteFsLine={deleteFsLine}
+          onFetchFsLines={fetchFsLines}
           onNext={async () => {
             try {
               await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/status`, {
@@ -3765,341 +3812,417 @@ function TemplateParsedPanel({ result, onClear }: { result: any; onClear: () => 
   );
 }
 
-function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun, onAiFill, onOpenAiSettings, loading, confidenceBadge, onNext }: any) {
-  const extractionData = data?.data || session?.extractionData;
-  const stats = data?.stats;
+function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun, onAiFill, onOpenAiSettings, loading, confidenceBadge, onSaveVariable, fsLines, onAddFsLine, onUpdateFsLine, onDeleteFsLine, onFetchFsLines, onNext }: any) {
+  const { toast } = useToast();
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editVal, setEditVal] = useState("");
+  const [editingFsCell, setEditingFsCell] = useState<string | null>(null);
+  const [editFsCellVal, setEditFsCellVal] = useState("");
 
-  const hasFlags = extractionData?.flags && extractionData.flags.length > 0;
+  useEffect(() => { if (onFetchFsLines) onFetchFsLines(); }, []);
 
-  // Helper: look up a variable's finalValue by code from the variables array
+  const varFind = (code: string) => (variables || []).find((v: any) => v.variableCode === code);
   const varVal = (code: string): string => {
-    const found = (variables || []).find((v: any) => v.variableCode === code);
+    const found = varFind(code);
     const raw = found?.finalValue;
     if (!raw || raw === "N/A" || raw.trim() === "") return "";
     return raw;
   };
+  const varId = (code: string): number | null => varFind(code)?.id || null;
 
-  // Format currency values — full amounts with comma separators (no M/K/B abbreviation)
-  const fmt = (v: string) => {
-    const n = Number(v);
-    if (isNaN(n) || v === "") return "—";
-    return n.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const saveField = async (code: string, value: string) => {
+    const id = varId(code);
+    if (id && onSaveVariable) {
+      await onSaveVariable(id, value, "Updated from extraction form");
+    }
+    setEditingField(null);
   };
 
-  // Small read-only field display
-  const F = ({ label, value, source }: { label: string; value: string | undefined; source?: "form" | "template" }) => {
-    const v = value || "";
-    const empty = !v;
+  const ENTITY_TYPES = ["Private Limited","Public Limited (Unlisted)","Public Limited (Listed)","Single Member","LLP","AOP","Sole Proprietor","Bank / DFI","Insurance Company","NGO/NPO","Trust","Government Entity","SME","Branch Office","Other"];
+  const ENGAGEMENT_YEARS = Array.from({ length: 10 }, (_, i) => String(new Date().getFullYear() - i));
+  const FRAMEWORKS = ["IFRS","IFRS for SMEs","AFRS","Fourth Schedule","Fifth Schedule"];
+  const ENGAGEMENT_TYPES = ["statutory_audit","limited_review","group_audit","internal_audit","review_engagement","agreed_upon_procedures","tax_audit"];
+  const CONTINUITY = ["First Time","Recurring"];
+  const INDUSTRY_SECTORS = ["Manufacturing","Services","Trading","Construction","IT/Software","Financial Services","Healthcare","Education","Energy","Textiles","FMCG","Real Estate","Agriculture","Telecommunications","Other"];
+  const ACCOUNTING_SYSTEMS = ["QuickBooks","Sage","Xero","SAP","Oracle","Tally","Custom ERP","Manual Books","Other"];
+
+  const STATEMENT_TYPES = ["Balance Sheet","Profit & Loss","Cash Flow","Statement of Changes in Equity","Notes"];
+  const FS_SECTIONS = ["Assets","Liabilities","Equity","Revenue","Cost of Sales","Operating Expenses","Other Income","Finance Cost","Taxation","Cash Flow"];
+  const MAJOR_HEADS = ["Property Plant & Equipment","Intangibles","Inventory","Trade Debtors","Cash & Bank","Share Capital","Reserves","Trade Creditors","Accrued Liabilities","Sales","Administrative Expenses","Distribution Cost","Other"];
+  const LINE_ITEM_MAP: Record<string, string[]> = {
+    "Property Plant & Equipment": ["Land","Buildings","Plant & Machinery","Vehicles","Furniture & Fixtures","Office Equipment","Computer Equipment","Capital WIP"],
+    "Intangibles": ["Goodwill","Software","Patents & Trademarks","Licenses","Other Intangibles"],
+    "Inventory": ["Raw Materials","Work in Progress","Finished Goods","Stores & Spares","Goods in Transit"],
+    "Trade Debtors": ["Local Debtors","Export Debtors","Related Party Receivables","Provision for Doubtful Debts"],
+    "Cash & Bank": ["Cash in Hand","Current Accounts","Savings Accounts","Term Deposits","Petty Cash"],
+    "Share Capital": ["Ordinary Shares","Preference Shares","Share Premium","Bonus Shares"],
+    "Reserves": ["General Reserve","Revenue Reserve","Revaluation Surplus","Hedging Reserve","Translation Reserve"],
+    "Trade Creditors": ["Local Creditors","Import Creditors","Related Party Payables","Accrued Expenses"],
+    "Accrued Liabilities": ["Accrued Salaries","Accrued Utilities","Accrued Interest","Provision for Taxation","Other Accruals"],
+    "Sales": ["Local Sales","Export Sales","Services Revenue","Rental Income","Other Revenue"],
+    "Administrative Expenses": ["Salaries & Wages","Rent","Utilities","Depreciation","Amortization","Professional Fees","Insurance","Repairs & Maintenance","Other Admin"],
+    "Distribution Cost": ["Distribution Salaries","Freight & Carriage","Marketing & Advertising","Commission","Travel & Conveyance","Other Distribution"],
+    "Other": ["Other Assets","Other Liabilities","Other Income Items","Other Expenses"],
+  };
+  const SUB_LINE_ITEM_MAP: Record<string, string[]> = {
+    "Land": ["Freehold Land","Leasehold Land"],
+    "Buildings": ["Factory Building","Office Building","Warehouse"],
+    "Plant & Machinery": ["Production Machinery","Generator","Compressor"],
+    "Vehicles": ["Company Vehicles","Delivery Vehicles"],
+    "Raw Materials": ["Direct Materials","Packaging Materials"],
+    "Finished Goods": ["Finished Products","By-Products"],
+    "Current Accounts": ["Operating Account","Collection Account"],
+  };
+  const NOTE_NOS = Array.from({ length: 40 }, (_, i) => `Note ${i + 1}`);
+  const NORMAL_BALANCES = ["Debit","Credit"];
+  const WP_AREAS = ["Cash & Bank","Receivables","Inventory","Fixed Assets","Payables","Revenue","Expenses","Equity","Taxation","Compliance","Other"];
+  const RISK_LEVELS = ["Low","Medium","High","Significant"];
+
+  const TextField = ({ code, label, placeholder }: { code: string; label: string; placeholder?: string }) => {
+    const val = varVal(code);
+    const isEditing = editingField === code;
     return (
-      <div className="flex flex-col gap-0.5">
-        <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-1">
-          {label}
-          {source === "form"     && <span className="text-[8px] text-blue-400 font-normal normal-case tracking-normal">📝</span>}
-          {source === "template" && <span className="text-[8px] text-teal-400 font-normal normal-case tracking-normal">📋</span>}
-        </span>
-        <span className={cn("text-[12px] font-medium leading-tight", empty ? "text-slate-300 italic" : "text-slate-800")}>
-          {v || "—"}
-        </span>
+      <div className="flex flex-col gap-1">
+        <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{label}</label>
+        {isEditing ? (
+          <div className="flex gap-1">
+            <Input className="h-8 text-xs" value={editVal} onChange={e => setEditVal(e.target.value)} autoFocus onKeyDown={e => { if (e.key === "Enter") saveField(code, editVal); if (e.key === "Escape") setEditingField(null); }} />
+            <Button size="sm" className="h-8 w-8 p-0 bg-emerald-600 hover:bg-emerald-700" onClick={() => saveField(code, editVal)}><Check className="w-3 h-3" /></Button>
+            <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setEditingField(null)}><X className="w-3 h-3" /></Button>
+          </div>
+        ) : (
+          <div className="h-8 px-2.5 flex items-center rounded-md border border-slate-200 bg-white cursor-pointer hover:border-indigo-300 transition-colors text-xs text-slate-800" onClick={() => { setEditingField(code); setEditVal(val); }}>
+            {val || <span className="text-slate-300 italic">{placeholder || "Click to enter"}</span>}
+          </div>
+        )}
       </div>
     );
   };
 
-  // Financial row inside the balance sheet / P&L grid
-  const FinRow = ({ label, cy, py, indent = false }: { label: string; cy: string; py: string; indent?: boolean }) => {
-    const cyV = fmt(cy);
-    const pyV = fmt(py);
-    const empty = cyV === "—" && pyV === "—";
+  const DropdownField = ({ code, label, options }: { code: string; label: string; options: string[] }) => {
+    const val = varVal(code);
     return (
-      <div className={cn("grid py-1 border-b border-slate-50", empty && "opacity-40", indent ? "pl-4" : "")} style={{ gridTemplateColumns: "1fr auto auto" }}>
-        <span className="text-[11px] text-slate-600 font-medium pr-2 truncate">{label}</span>
-        <span className={cn("text-right font-mono text-[10px] tabular-nums min-w-[80px] sm:min-w-[120px] pl-2", cyV !== "—" ? "text-slate-800 font-semibold" : "text-slate-300")}>{cyV}</span>
-        <span className={cn("text-right font-mono text-[10px] tabular-nums min-w-[80px] sm:min-w-[110px] pl-2 text-slate-500", pyV !== "—" ? "" : "text-slate-300")}>{pyV}</span>
+      <div className="flex flex-col gap-1">
+        <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{label}</label>
+        <select className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-800 cursor-pointer hover:border-indigo-300 transition-colors" value={val} onChange={e => { const id = varId(code); if (id && onSaveVariable) onSaveVariable(id, e.target.value, "Dropdown selection"); }}>
+          <option value="">— Select —</option>
+          {options.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
       </div>
     );
   };
 
-  const templateVarsFilled = (variables || []).filter((v: any) => TEMPLATE_VARS.has(v.variableCode) && v.finalValue && v.finalValue.trim() !== "" && v.finalValue !== "N/A").length;
-  const formVarsFilled     = (variables || []).filter((v: any) => FORM_VARS.has(v.variableCode) && v.finalValue && v.finalValue.trim() !== "" && v.finalValue !== "N/A").length;
+  const DateField = ({ code, label }: { code: string; label: string }) => {
+    const val = varVal(code);
+    return (
+      <div className="flex flex-col gap-1">
+        <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{label}</label>
+        <input type="date" className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-800 cursor-pointer hover:border-indigo-300 transition-colors" value={val} onChange={e => { const id = varId(code); if (id && onSaveVariable) onSaveVariable(id, e.target.value, "Date selection"); }} />
+      </div>
+    );
+  };
+
+  const CheckboxField = ({ code, label }: { code: string; label: string }) => {
+    const val = varVal(code);
+    const checked = val === "true" || val === "1" || val === "yes";
+    return (
+      <label className="flex items-center gap-2 cursor-pointer group">
+        <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" checked={checked} onChange={e => { const id = varId(code); if (id && onSaveVariable) onSaveVariable(id, e.target.checked ? "true" : "false", "Checkbox toggle"); }} />
+        <span className="text-xs text-slate-700 group-hover:text-indigo-700 transition-colors">{label}</span>
+      </label>
+    );
+  };
+
+  const ToggleField = ({ code, label }: { code: string; label: string }) => {
+    const val = varVal(code);
+    const on = val === "true" || val === "1" || val === "yes";
+    return (
+      <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-slate-100 bg-white hover:border-indigo-200 transition-colors">
+        <span className="text-xs text-slate-700">{label}</span>
+        <button className={cn("relative w-10 h-5 rounded-full transition-colors", on ? "bg-indigo-600" : "bg-slate-200")} onClick={() => { const id = varId(code); if (id && onSaveVariable) onSaveVariable(id, on ? "false" : "true", "Toggle"); }}>
+          <span className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform", on ? "translate-x-5" : "translate-x-0.5")} />
+        </button>
+      </div>
+    );
+  };
+
+  const SectionHeader = ({ title, icon, color = "indigo" }: { title: string; icon: React.ReactNode; color?: string }) => (
+    <div className={`px-4 py-2.5 bg-${color}-50/60 border-b border-${color}-100 flex items-center gap-2`}>
+      {icon}
+      <span className={`text-sm font-semibold text-${color}-900`}>{title}</span>
+    </div>
+  );
+
+  const riskColor = (r: string) => r === "High" || r === "Significant" ? "text-red-600 bg-red-50" : r === "Medium" ? "text-amber-600 bg-amber-50" : "text-green-600 bg-green-50";
+
+  const FsSelect = ({ value, options, rowId, field }: { value: string; options: string[]; rowId: number; field: string }) => {
+    const cellKey = `${rowId}-${field}`;
+    return (
+      <select className="w-full h-7 text-[10px] border-0 bg-transparent focus:ring-1 focus:ring-indigo-300 rounded cursor-pointer" value={value || ""} onChange={e => onUpdateFsLine(rowId, { [field]: e.target.value })}>
+        <option value="">—</option>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    );
+  };
+
+  const FsNumericCell = ({ value, rowId, field }: { value: any; rowId: number; field: string }) => {
+    const cellKey = `${rowId}-${field}`;
+    const isEditing = editingFsCell === cellKey;
+    const display = value != null && value !== "" ? Number(value).toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : "";
+    return isEditing ? (
+      <input type="number" className="w-full h-7 text-[10px] text-right font-mono border border-indigo-300 rounded px-1 bg-white" value={editFsCellVal} autoFocus onChange={e => setEditFsCellVal(e.target.value)} onBlur={() => { onUpdateFsLine(rowId, { [field]: editFsCellVal || null }); setEditingFsCell(null); }} onKeyDown={e => { if (e.key === "Enter") { onUpdateFsLine(rowId, { [field]: editFsCellVal || null }); setEditingFsCell(null); } if (e.key === "Escape") setEditingFsCell(null); }} />
+    ) : (
+      <div className="text-right font-mono text-[10px] tabular-nums px-1 h-7 flex items-center justify-end cursor-pointer hover:bg-indigo-50 rounded" onClick={() => { setEditingFsCell(cellKey); setEditFsCellVal(value != null ? String(value) : ""); }}>
+        {display || <span className="text-slate-300">—</span>}
+      </div>
+    );
+  };
+
+  const FsTextCell = ({ value, rowId, field }: { value: string; rowId: number; field: string }) => {
+    const cellKey = `${rowId}-${field}`;
+    const isEditing = editingFsCell === cellKey;
+    return isEditing ? (
+      <input className="w-full h-7 text-[10px] border border-indigo-300 rounded px-1 bg-white" value={editFsCellVal} autoFocus onChange={e => setEditFsCellVal(e.target.value)} onBlur={() => { onUpdateFsLine(rowId, { [field]: editFsCellVal || null }); setEditingFsCell(null); }} onKeyDown={e => { if (e.key === "Enter") { onUpdateFsLine(rowId, { [field]: editFsCellVal || null }); setEditingFsCell(null); } if (e.key === "Escape") setEditingFsCell(null); }} />
+    ) : (
+      <div className="text-[10px] px-1 h-7 flex items-center cursor-pointer hover:bg-indigo-50 rounded truncate" onClick={() => { setEditingFsCell(cellKey); setEditFsCellVal(value || ""); }}>
+        {value || <span className="text-slate-300">—</span>}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-4">
 
-      {/* ── Top action banner ── */}
       <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
             <Bot className="w-4.5 h-4.5 text-purple-600" />
           </div>
           <div>
-            <p className="font-semibold text-sm text-slate-900">Data Extraction Results</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              {stats
-                ? `${stats.files} file${stats.files !== 1 ? "s" : ""} · ${stats.sheets} sheet${stats.sheets !== 1 ? "s" : ""} · ${stats.pages} page${stats.pages !== 1 ? "s" : ""} scanned`
-                : "Review extracted data below — proceed to Variables when ready"}
-            </p>
+            <p className="font-semibold text-sm text-slate-900">Data Extraction & Input Fields</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Complete all fields below. Dropdowns and checkboxes control WP applicability and generation logic.</p>
           </div>
         </div>
         <div className="flex gap-2 shrink-0 flex-wrap">
           <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onRerun} disabled={loading}>
-            <RefreshCw className={cn("w-3 h-3 mr-1", loading && "animate-spin")} /> Re-extract from Template
+            <RefreshCw className={cn("w-3 h-3 mr-1", loading && "animate-spin")} /> Re-extract
           </Button>
-          <Button
-            size="sm"
-            className="h-7 text-xs bg-violet-600 hover:bg-violet-700 shadow-sm"
-            onClick={onAiFill}
-            disabled={loading}
-            title="Detect all missing variables and fill them using AI — reads every uploaded document and derives values intelligently"
-          >
-            {loading
-              ? <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Filling…</>
-              : <><Sparkles className="w-3 h-3 mr-1" /> AI Filled</>
-            }
+          <Button size="sm" className="h-7 text-xs bg-violet-600 hover:bg-violet-700 shadow-sm" onClick={onAiFill} disabled={loading}>
+            {loading ? <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Filling...</> : <><Sparkles className="w-3 h-3 mr-1" /> AI Fill</>}
           </Button>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-400 hover:text-violet-600" onClick={onOpenAiSettings} title="Configure AI provider">
-            <Settings className="w-3.5 h-3.5" />
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onRefreshVariables} disabled={loading}>
+            <RefreshCw className="w-3 h-3 mr-1" /> Refresh
           </Button>
         </div>
       </div>
 
-      {/* ── Source summary pills ── */}
-      <div className="flex flex-wrap gap-2">
-        <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
-          <span className="text-blue-600 text-sm">📝</span>
-          <div>
-            <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wide">Form Data</p>
-            <p className="text-[11px] text-blue-600">{formVarsFilled} engagement fields populated</p>
-          </div>
+      <div className="bg-white border border-indigo-100 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 bg-indigo-50/60 border-b border-indigo-100 flex items-center gap-2">
+          <FileText className="w-4 h-4 text-indigo-600" />
+          <span className="text-sm font-semibold text-indigo-900">Section 1 — Client Information</span>
+          <span className="text-[9px] font-bold bg-indigo-100 text-indigo-600 rounded-full px-2 py-0.5 uppercase tracking-wide ml-auto">Sr. 1-4</span>
         </div>
-        <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-lg px-3 py-1.5">
-          <span className="text-teal-600 text-sm">📋</span>
-          <div>
-            <p className="text-[10px] font-bold text-teal-700 uppercase tracking-wide">Template Data</p>
-            <p className="text-[11px] text-teal-600">{templateVarsFilled} financial variables populated</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-1.5">
-          <span className="text-purple-600 text-sm">⚙️</span>
-          <div>
-            <p className="text-[10px] font-bold text-purple-700 uppercase tracking-wide">System / AI</p>
-            <p className="text-[11px] text-purple-600">Remaining variables pending AI fill</p>
-          </div>
+        <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-4">
+          <TextField code="entity_name" label="1. Client / Entity Name" placeholder="Enter entity name" />
+          <DropdownField code="entity_legal_form" label="2. Entity Type" options={ENTITY_TYPES} />
+          <TextField code="ntn" label="3. NTN" placeholder="National Tax Number" />
+          <TextField code="strn" label="4. STRN (Sales Tax)" placeholder="Sales Tax Reg. No." />
         </div>
       </div>
 
-      {/* ── Flags warning ── */}
-      {hasFlags && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-          <h3 className="text-xs font-semibold text-amber-800 mb-2 flex items-center gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5" /> Extraction Flags ({extractionData.flags.length})
-          </h3>
-          <ul className="space-y-1">
-            {extractionData.flags.map((f: string, i: number) => (
-              <li key={i} className="text-xs text-amber-800 flex items-start gap-2 bg-white/60 rounded-lg p-2 border border-amber-100">
-                <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500" /> {f}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* ════════════════════════════════════════════════════════
-          SECTION A — FORM DATA (from engagement creation form)
-      ════════════════════════════════════════════════════════ */}
       <div className="bg-white border border-blue-100 rounded-xl overflow-hidden">
-        {/* Header */}
-        <div className="px-5 py-3 bg-blue-50/60 border-b border-blue-100 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-base">📝</span>
-            <div>
-              <p className="text-sm font-semibold text-blue-900">Form Data</p>
-              <p className="text-[10px] text-blue-500">Captured at engagement creation — maps directly to variables</p>
-            </div>
-          </div>
-          <span className="text-[9px] font-bold bg-blue-100 text-blue-600 rounded-full px-2 py-0.5 uppercase tracking-wide">{formVarsFilled} fields</span>
+        <div className="px-5 py-3 bg-blue-50/60 border-b border-blue-100 flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-blue-600" />
+          <span className="text-sm font-semibold text-blue-900">Section 2 — Engagement Details</span>
+          <span className="text-[9px] font-bold bg-blue-100 text-blue-600 rounded-full px-2 py-0.5 uppercase tracking-wide ml-auto">Sr. 5-10</span>
         </div>
-
-        <div className="p-5 space-y-5">
-
-          {/* Entity Details */}
-          <div>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-              <span className="inline-block w-3 h-px bg-slate-300" /> Entity Details
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
-              <F label="Entity Name"     value={session?.clientName}          source="form" />
-              <F label="Legal Form"      value={session?.entityType || varVal("entity_legal_form")} source="form" />
-              <F label="NTN"             value={session?.ntn || varVal("ntn")} source="form" />
-              <F label="STRN"            value={session?.strn || varVal("strn")} source="form" />
-              <F label="Industry Sector" value={varVal("industry_sector")}     source="form" />
-              <F label="Provinces"       value={varVal("provinces_of_operation")} source="form" />
-              <F label="Company Law"     value={varVal("applicable_company_law")} source="form" />
-            </div>
-          </div>
-
-          <div className="border-t border-slate-100" />
-
-          {/* Reporting Period */}
-          <div>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-              <span className="inline-block w-3 h-px bg-slate-300" /> Reporting Period & Framework
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-4">
-              <F label="Engagement Year"     value={String(session?.engagementYear || "")} source="form" />
-              <F label="Period Start"        value={session?.periodStart || varVal("reporting_period_start")} source="form" />
-              <F label="Period End"          value={session?.periodEnd   || varVal("reporting_period_end")}   source="form" />
-              <F label="Framework"           value={session?.reportingFramework || varVal("reporting_framework")} source="form" />
-              <F label="Currency"            value={varVal("functional_currency") || "PKR"} source="form" />
-            </div>
-          </div>
-
-          <div className="border-t border-slate-100" />
-
-          {/* Engagement Setup */}
-          <div>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-              <span className="inline-block w-3 h-px bg-slate-300" /> Engagement Setup
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
-              <F label="Engagement Type"    value={session?.engagementType || varVal("engagement_type")} source="form" />
-              <F label="Continuity"         value={session?.engagementContinuity || varVal("recurring_engagement")} source="form" />
-              <F label="Audit Firm"         value={session?.auditFirmName || varVal("firm_name")} source="form" />
-              <F label="ICAP Reg."          value={varVal("firm_icap_registration")} source="form" />
-              <F label="Materiality Basis"  value={varVal("materiality_basis")} source="form" />
-              <F label="Tax Rate (%)"       value={varVal("applicable_tax_rate")} source="form" />
-              <F label="Super Tax (%)"      value={varVal("super_tax_rate")} source="form" />
-              <F label="Procedure Depth"    value={varVal("audit_procedure_depth")} source="form" />
-            </div>
-          </div>
-
-          <div className="border-t border-slate-100" />
-
-          {/* Engagement Team */}
-          <div>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-              <span className="inline-block w-3 h-px bg-slate-300" /> Engagement Team
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
-              <F label="Preparer(s)"  value={(() => { try { const names = session?.preparerNames ? JSON.parse(session.preparerNames) : null; return names?.length ? names.join(", ") : session?.preparerName || varVal("engagement_partner"); } catch { return session?.preparerName || varVal("engagement_partner"); } })()}  source="form" />
-              <F label="Reviewer"  value={session?.reviewerName  || varVal("engagement_manager")}  source="form" />
-              <F label="Approver"            value={session?.approverName  || varVal("approver")}             source="form" />
-              <F label="EQCR"               value={session?.eqcrName  || "—"}             source="form" />
-              <F label="Signing City"        value={varVal("signing_city")} source="form" />
-            </div>
-          </div>
-
+        <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-4">
+          <DropdownField code="audit_year" label="5. Engagement Year" options={ENGAGEMENT_YEARS} />
+          <DateField code="reporting_period_start" label="6. Period Start" />
+          <DateField code="reporting_period_end" label="7. Period End" />
+          <DropdownField code="reporting_framework" label="8. Reporting Framework" options={FRAMEWORKS} />
+          <DropdownField code="engagement_type" label="9. Engagement Type" options={ENGAGEMENT_TYPES} />
+          <DropdownField code="recurring_engagement" label="10. Continuity" options={CONTINUITY} />
         </div>
       </div>
 
-      {/* ════════════════════════════════════════════════════════
-          SECTION B — TEMPLATE DATA (from uploaded Excel file)
-      ════════════════════════════════════════════════════════ */}
-      <div className="bg-white border border-teal-100 rounded-xl overflow-hidden">
-        {/* Header */}
-        <div className="px-5 py-3 bg-teal-50/60 border-b border-teal-100 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-base">📋</span>
-            <div>
-              <p className="text-sm font-semibold text-teal-900">Template Data</p>
-              <p className="text-[10px] text-teal-500">Extracted from uploaded Excel template — CY/PY financials + TB structure</p>
-            </div>
-          </div>
-          <span className="text-[9px] font-bold bg-teal-100 text-teal-600 rounded-full px-2 py-0.5 uppercase tracking-wide">{templateVarsFilled} variables</span>
+      <div className="bg-white border border-purple-100 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 bg-purple-50/60 border-b border-purple-100 flex items-center gap-2">
+          <SlidersHorizontal className="w-4 h-4 text-purple-600" />
+          <span className="text-sm font-semibold text-purple-900">Section 3 — WP Controlling Variables</span>
+          <span className="text-[9px] font-bold bg-purple-100 text-purple-600 rounded-full px-2 py-0.5 uppercase tracking-wide ml-auto">Sr. 11-13</span>
         </div>
-
-        <div className="p-5 space-y-5">
-
-          {/* TB Stats row */}
-          <div>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-              <span className="inline-block w-3 h-px bg-slate-300" /> Trial Balance Statistics
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-4">
-              <F label="TB Lines"           value={varVal("tb_line_count")}                source="template" />
-              <F label="Total Debit"        value={fmt(varVal("tb_total_period_debit"))}   source="template" />
-              <F label="Total Credit"       value={fmt(varVal("tb_total_period_credit"))}  source="template" />
-              <F label="Opening Balance"    value={fmt(varVal("tb_opening_balance_aggregate"))} source="template" />
-              <F label="Closing Balance"    value={fmt(varVal("tb_closing_balance_aggregate"))} source="template" />
-            </div>
-          </div>
-
-          <div className="border-t border-slate-100" />
-
-          {/* Financial Statement — CY vs PY grid */}
-          <div>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-              <span className="inline-block w-3 h-px bg-slate-300" /> Financial Statements Summary
-              <span className="ml-auto text-[8px] font-normal normal-case tracking-normal text-slate-300">Values in {varVal("functional_currency") || "PKR"}</span>
-            </p>
-            {!varVal("cy_total_assets") && !varVal("cy_revenue") && !varVal("cy_total_equity") && (
-              <div className="text-center py-8 bg-slate-50/60 rounded-xl border border-dashed border-slate-200">
-                <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                <p className="text-sm text-slate-500 font-medium">No financial data extracted yet</p>
-                <p className="text-xs text-slate-400 mt-1">Upload a completed template and click "Extract Data" to populate these figures.</p>
-              </div>
-            )}
-
-            {/* Column headers */}
-            <div className="grid pb-1 border-b border-slate-200 mb-1 text-[9px] font-bold text-slate-400 uppercase tracking-wide" style={{ gridTemplateColumns: "1fr auto auto" }}>
-              <span>Line</span>
-              <span className="text-right min-w-[80px] sm:min-w-[120px] pl-2">CY {session?.engagementYear || ""}</span>
-              <span className="text-right min-w-[80px] sm:min-w-[110px] pl-2">PY {session?.engagementYear ? Number(session.engagementYear) - 1 : ""}</span>
-            </div>
-
-            {/* ── Balance Sheet ── */}
-            <p className="text-[9px] font-semibold text-indigo-500 mt-3 mb-1 uppercase tracking-widest">Balance Sheet</p>
-            <FinRow label="Total Assets"              cy={varVal("cy_total_assets")}                py={varVal("py_total_assets")} />
-            <FinRow label="  Non-Current Assets"      cy={varVal("cy_non_current_assets")}          py={varVal("py_non_current_assets")} indent />
-            <FinRow label="  Current Assets"          cy={varVal("cy_current_assets")}              py={varVal("py_current_assets")} indent />
-            <FinRow label="  Fixed Assets (PPE)"      cy={varVal("cy_fixed_assets")}                py={varVal("py_fixed_assets")} indent />
-            <FinRow label="  Inventory"               cy={varVal("cy_inventory")}                   py={varVal("py_inventory")} indent />
-            <FinRow label="  Trade Receivables"       cy={varVal("cy_trade_receivables")}           py={varVal("py_trade_receivables")} indent />
-            <FinRow label="  Cash & Bank"             cy={varVal("cy_cash_and_bank")}               py={varVal("py_cash_and_bank")} indent />
-            <FinRow label="Total Equity"              cy={varVal("cy_total_equity")}                py={varVal("py_total_equity")} />
-            <FinRow label="  Share Capital"           cy={varVal("cy_share_capital_fs")}            py={varVal("py_share_capital_fs")} indent />
-            <FinRow label="  Retained Earnings"       cy={varVal("cy_retained_earnings")}           py={varVal("py_retained_earnings")} indent />
-            <FinRow label="Total Liabilities"         cy={varVal("cy_total_liabilities")}           py={varVal("py_total_liabilities")} />
-            <FinRow label="  Non-Current Liabilities" cy={varVal("cy_non_current_liabilities")}     py={varVal("py_non_current_liabilities")} indent />
-            <FinRow label="  Current Liabilities"     cy={varVal("cy_current_liabilities")}         py={varVal("py_current_liabilities")} indent />
-            <FinRow label="  Trade Payables"          cy={varVal("cy_trade_payables")}              py={varVal("py_trade_payables")} indent />
-            <FinRow label="  Taxation Payable"        cy={varVal("cy_taxation_payable")}            py={varVal("py_taxation_payable")} indent />
-
-            {/* ── P&L ── */}
-            <p className="text-[9px] font-semibold text-emerald-600 mt-4 mb-1 uppercase tracking-widest">Profit & Loss</p>
-            <FinRow label="Revenue"                   cy={varVal("cy_revenue")}                     py={varVal("py_revenue")} />
-            <FinRow label="Cost of Sales"             cy={varVal("cy_cost_of_sales")}               py={varVal("py_cost_of_sales")} />
-            <FinRow label="Gross Profit"              cy={varVal("cy_gross_profit")}                py={varVal("py_gross_profit")} />
-            <FinRow label="  Admin Expenses"          cy={varVal("cy_admin_expenses")}              py={varVal("py_admin_expenses")} indent />
-            <FinRow label="  Selling & Dist. Exp."    cy={varVal("cy_selling_distribution_expenses")} py={varVal("py_selling_distribution_expenses")} indent />
-            <FinRow label="  Finance Cost"            cy={varVal("cy_finance_cost")}                py={varVal("py_finance_cost")} indent />
-            <FinRow label="  Other Income"            cy={varVal("cy_other_income")}                py={varVal("py_other_income")} indent />
-            <FinRow label="Profit Before Tax"         cy={varVal("cy_profit_before_tax")}           py={varVal("py_profit_before_tax")} />
-            <FinRow label="Tax Expense"               cy={varVal("cy_tax_expense")}                 py={varVal("py_tax_expense")} />
-            <FinRow label="Profit After Tax"          cy={varVal("cy_profit_after_tax")}            py={varVal("py_profit_after_tax")} />
-            <FinRow label="Total Comprehensive Income" cy={varVal("cy_total_comprehensive_income")} py={varVal("py_total_comprehensive_income")} />
-
-            {/* ── Cash Flow ── */}
-            <p className="text-[9px] font-semibold text-blue-500 mt-4 mb-1 uppercase tracking-widest">Cash Flows</p>
-            <FinRow label="Operating Activities"      cy={varVal("cy_operating_cash_flow")}         py={varVal("py_operating_cash_flow")} />
-            <FinRow label="Investing Activities"      cy={varVal("cy_investing_cash_flow")}         py={varVal("py_investing_cash_flow")} />
-            <FinRow label="Financing Activities"      cy={varVal("cy_financing_cash_flow")}         py={varVal("py_financing_cash_flow")} />
-          </div>
-
-          {/* Accounting policies row */}
-          <div className="border-t border-slate-100 pt-4">
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-              <span className="inline-block w-3 h-px bg-slate-300" /> Accounting Policies
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
-              <F label="Inventory Valuation"     value={varVal("inventory_valuation_method")} source="template" />
-              <F label="Depreciation Method"     value={varVal("depreciation_method")}        source="template" />
-              <F label="Revenue Recognition"     value={varVal("revenue_recognition_policy")} source="template" />
-            </div>
-          </div>
-
+        <div className="p-5 grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-4">
+          <DropdownField code="industry_sector" label="11. Industry / Sector" options={INDUSTRY_SECTORS} />
+          <DropdownField code="accounting_software" label="12. IT / Accounting System" options={ACCOUNTING_SYSTEMS} />
+          <ToggleField code="group_entity_flag" label="13. Group / Consolidated Audit" />
         </div>
       </div>
 
-      {/* ── Continue to Variables ── */}
+      <div className="bg-white border border-amber-100 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 bg-amber-50/60 border-b border-amber-100 flex items-center gap-2">
+          <Shield className="w-4 h-4 text-amber-600" />
+          <span className="text-sm font-semibold text-amber-900">Section 4 — Tax Status Flags</span>
+          <span className="text-[9px] font-bold bg-amber-100 text-amber-600 rounded-full px-2 py-0.5 uppercase tracking-wide ml-auto">Sr. 14-21</span>
+        </div>
+        <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-4">
+          <CheckboxField code="income_tax_return_filed" label="14. NTN Registered" />
+          <CheckboxField code="sales_tax_applicable" label="15. GST / Sales Tax Registered (STRN)" />
+          <CheckboxField code="sales_tax_return_filed" label="16. Provincial Sales Tax Registered" />
+          <CheckboxField code="normal_tax_regime_flag" label="17. Active Taxpayer List (ATL)" />
+          <CheckboxField code="withholding_statements_filed" label="18. Withholding Tax Agent" />
+          <CheckboxField code="super_tax_applicable" label="19. Super Tax Applicable (>150M income)" />
+          <CheckboxField code="foreign_operations_flag" label="20. Transfer Pricing / Cross-border" />
+          <CheckboxField code="tax_litigation_exists" label="21. Prior FBR Tax Audit / Assessment Orders" />
+        </div>
+      </div>
+
+      <div className="bg-white border border-red-100 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 bg-red-50/60 border-b border-red-100 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-red-600" />
+          <span className="text-sm font-semibold text-red-900">Section 5 — WP Trigger Variables (Special Conditions)</span>
+          <span className="text-[9px] font-bold bg-red-100 text-red-600 rounded-full px-2 py-0.5 uppercase tracking-wide ml-auto">Sr. 22-29</span>
+        </div>
+        <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-4">
+          <CheckboxField code="going_concern_risk_flag" label="22. Going Concern Risk" />
+          <CheckboxField code="fraud_risk_flag" label="23. Fraud Risk / ISA 240 Triggers" />
+          <CheckboxField code="related_parties_exist" label="24. Significant Related Party Transactions" />
+          <CheckboxField code="compliance_risk_flag" label="25. AML / KYC / CFT Risk" />
+          <CheckboxField code="restricted_scope_flag" label="26. Donor / Grant Funded Entity" />
+          <CheckboxField code="public_interest_entity_flag" label="27. Public Interest Entity (PIE)" />
+          <CheckboxField code="control_deficiencies_identified" label="28. ESG / Sustainability Reporting" />
+          <CheckboxField code="it_general_controls" label="29. Significant Cyber / IT Security Risk" />
+        </div>
+      </div>
+
+      <div className="bg-white border border-emerald-100 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 bg-emerald-50/60 border-b border-emerald-100 flex items-center gap-2">
+          <Layers className="w-4 h-4 text-emerald-600" />
+          <span className="text-sm font-semibold text-emerald-900">Section 6 — Audit Team & Firm</span>
+          <span className="text-[9px] font-bold bg-emerald-100 text-emerald-600 rounded-full px-2 py-0.5 uppercase tracking-wide ml-auto">Sr. 30-35</span>
+        </div>
+        <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-4">
+          <TextField code="firm_name" label="30. Audit Firm Name" placeholder="Enter firm name" />
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">31. Audit Firm Logo</label>
+            <label className="h-8 px-2.5 flex items-center rounded-md border border-dashed border-slate-300 bg-slate-50 cursor-pointer hover:border-indigo-300 transition-colors text-xs text-slate-400">
+              <Upload className="w-3 h-3 mr-1.5 text-slate-400" /> Upload Logo
+              <input type="file" className="hidden" accept="image/*" onChange={() => toast({ title: "Logo upload", description: "Firm logo upload noted." })} />
+            </label>
+          </div>
+          <TextField code="engagement_partner" label="32. Preparer(s)" placeholder="Preparer names" />
+          <TextField code="engagement_manager" label="33. Reviewer" placeholder="Reviewer name" />
+          <TextField code="approver" label="34. Approver" placeholder="Approver name" />
+          <ToggleField code="eqcr_required" label="35. EQCR Required" />
+        </div>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-teal-50 to-emerald-50/40 px-5 py-3 border-b border-slate-200/60 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Table2 className="w-5 h-5 text-teal-600" />
+            <div>
+              <h2 className="font-semibold text-slate-900 text-sm">Section 7 — Financial Statement Lines</h2>
+              <p className="text-[10px] text-slate-500 mt-0.5">Editable tabulated form with 16 columns. Auto-extending Line IDs.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-bold bg-teal-100 text-teal-700 rounded-full px-2.5 py-0.5">{(fsLines || []).length} rows</span>
+            <Button size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700" onClick={() => onAddFsLine({})}>
+              <Plus className="w-3 h-3 mr-1" /> Add Row
+            </Button>
+          </div>
+        </div>
+
+        {(!fsLines || fsLines.length === 0) ? (
+          <div className="py-14 text-center">
+            <Table2 className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-sm text-slate-500 font-medium">No financial statement lines yet</p>
+            <p className="text-xs text-slate-400 mt-1 mb-4">Add rows to create the financial statement structure.</p>
+            <Button onClick={() => onAddFsLine({})} className="bg-emerald-600 hover:bg-emerald-700 gap-2 text-xs"><Plus className="w-3.5 h-3.5" /> Add First Row</Button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[10px] border-collapse min-w-[1800px]">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[50px] sticky left-0 bg-slate-50 z-10">Line ID</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[110px]">Statement Type</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[100px]">FS Section</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[120px]">Major Head</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[110px]">Line Item</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[100px]">Sub Line Item</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[120px]">Account Name</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[80px]">Account Code</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[70px]">Note No</th>
+                  <th className="text-right px-2 py-2 font-semibold text-slate-600 min-w-[100px]">Current Year</th>
+                  <th className="text-right px-2 py-2 font-semibold text-slate-600 min-w-[100px]">Prior Year</th>
+                  <th className="text-right px-2 py-2 font-semibold text-slate-600 min-w-[90px]">Debit Value</th>
+                  <th className="text-right px-2 py-2 font-semibold text-slate-600 min-w-[90px]">Credit Value</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[70px]">Dr/Cr</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[90px]">WP Area</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[80px]">Risk Level</th>
+                  <th className="text-center px-2 py-2 font-semibold text-slate-600 min-w-[40px]"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {(fsLines || []).map((row: any) => {
+                  const lineItems = LINE_ITEM_MAP[row.majorHead] || [];
+                  const subItems = SUB_LINE_ITEM_MAP[row.lineItem] || [];
+                  return (
+                    <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                      <td className="px-2 py-1 font-mono font-semibold text-indigo-600 sticky left-0 bg-white z-10">{row.lineId}</td>
+                      <td className="px-1 py-1"><FsSelect value={row.statementType} options={STATEMENT_TYPES} rowId={row.id} field="statementType" /></td>
+                      <td className="px-1 py-1"><FsSelect value={row.fsSection} options={FS_SECTIONS} rowId={row.id} field="fsSection" /></td>
+                      <td className="px-1 py-1"><FsSelect value={row.majorHead} options={MAJOR_HEADS} rowId={row.id} field="majorHead" /></td>
+                      <td className="px-1 py-1"><FsSelect value={row.lineItem} options={lineItems.length > 0 ? lineItems : MAJOR_HEADS} rowId={row.id} field="lineItem" /></td>
+                      <td className="px-1 py-1"><FsSelect value={row.subLineItem} options={subItems.length > 0 ? subItems : (lineItems.length > 0 ? lineItems : ["N/A"])} rowId={row.id} field="subLineItem" /></td>
+                      <td className="px-1 py-1"><FsTextCell value={row.accountName} rowId={row.id} field="accountName" /></td>
+                      <td className="px-1 py-1"><FsTextCell value={row.accountCode} rowId={row.id} field="accountCode" /></td>
+                      <td className="px-1 py-1"><FsSelect value={row.noteNo} options={NOTE_NOS} rowId={row.id} field="noteNo" /></td>
+                      <td className="px-1 py-1"><FsNumericCell value={row.currentYear} rowId={row.id} field="currentYear" /></td>
+                      <td className="px-1 py-1"><FsNumericCell value={row.priorYear} rowId={row.id} field="priorYear" /></td>
+                      <td className="px-1 py-1"><FsNumericCell value={row.debitTransactionValue} rowId={row.id} field="debitTransactionValue" /></td>
+                      <td className="px-1 py-1"><FsNumericCell value={row.creditTransactionValue} rowId={row.id} field="creditTransactionValue" /></td>
+                      <td className="px-1 py-1"><FsSelect value={row.normalBalance} options={NORMAL_BALANCES} rowId={row.id} field="normalBalance" /></td>
+                      <td className="px-1 py-1"><FsSelect value={row.wpArea} options={WP_AREAS} rowId={row.id} field="wpArea" /></td>
+                      <td className="px-1 py-1">
+                        <span className={cn("inline-block px-1.5 py-0.5 rounded text-[9px] font-semibold", row.riskLevel ? riskColor(row.riskLevel) : "text-slate-300")}>
+                          {row.riskLevel ? (
+                            <select className="bg-transparent border-0 text-[9px] font-semibold cursor-pointer" value={row.riskLevel} onChange={e => onUpdateFsLine(row.id, { riskLevel: e.target.value })}>
+                              {RISK_LEVELS.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                          ) : (
+                            <select className="bg-transparent border-0 text-[9px] text-slate-400 cursor-pointer" value="" onChange={e => onUpdateFsLine(row.id, { riskLevel: e.target.value })}>
+                              <option value="">—</option>
+                              {RISK_LEVELS.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                          )}
+                        </span>
+                      </td>
+                      <td className="px-1 py-1 text-center">
+                        <button className="w-6 h-6 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors inline-flex items-center justify-center" onClick={() => onDeleteFsLine(row.id)} title="Delete row">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {(fsLines || []).length > 0 && (
+          <div className="px-5 py-2 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-[10px] text-slate-400">{(fsLines || []).length} row(s)</span>
+            <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => onAddFsLine({})}>
+              <Plus className="w-2.5 h-2.5 mr-1" /> Add Row
+            </Button>
+          </div>
+        )}
+      </div>
+
       <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">

@@ -1,0 +1,47 @@
+Working Paper Generator — Input Fields Matrix
+Sr.	Field Name	Category	Input Type
+1	Client / Entity Name	Client Information	Text
+2	Entity Type	Client Information	Dropdown
+3	NTN	Client Information	Text
+4	STRN (Sales Tax)	Client Information	Text
+Engagement Details
+Sr.	Field Name	Category	Input Type
+5	Engagement Year	Engagement Details	Dropdown
+6	Period Start	Engagement Details	Date Picker
+7	Period End	Engagement Details	Date Picker
+8	Reporting Framework	Engagement Details	Dropdown
+9	Engagement Type	Engagement Details	Dropdown
+10	Continuity (First Time / Recurring)	Engagement Details	Dropdown
+WP Controlling Variables
+Sr.	Field Name	Category	Input Type
+11	Industry / Sector	WP Control	Dropdown
+12	IT / Accounting System	WP Control	Dropdown
+13	Group / Consolidated Audit	WP Control	Toggle (Yes/No)
+Tax Status Flags
+Sr.	Field Name	Category	Input Type
+14	NTN Registered	Tax Status	Checkbox
+15	GST / Sales Tax Registered (STRN)	Tax Status	Checkbox
+16	Provincial Sales Tax Registered	Tax Status	Checkbox
+17	Active Taxpayer List (ATL)	Tax Status	Checkbox
+18	Withholding Tax Agent	Tax Status	Checkbox
+19	Super Tax Applicable (>150M income)	Tax Status	Checkbox
+20	Transfer Pricing / Cross-border Transactions	Tax Status	Checkbox
+21	Prior FBR Tax Audit / Assessment Orders	Tax Status	Checkbox
+Special Conditions (WP Trigger Variables)
+Sr.	Field Name	Category	Input Type
+22	Going Concern Risk	WP Trigger	Checkbox
+23	Fraud Risk / ISA 240 Triggers	WP Trigger	Checkbox
+24	Significant Related Party Transactions	WP Trigger	Checkbox
+25	AML / KYC / CFT Risk	WP Trigger	Checkbox
+26	Donor / Grant Funded Entity	WP Trigger	Checkbox
+27	Public Interest Entity (PIE)	WP Trigger	Checkbox
+28	ESG / Sustainability Reporting	WP Trigger	Checkbox
+29	Significant Cyber / IT Security Risk	WP Trigger	Checkbox
+Audit Team & Firm
+Sr.	Field Name	Category	Input Type
+30	Audit Firm Name	Audit Team	Text
+31	Audit Firm Logo	Audit Team	File Upload
+32	Preparer(s)	Audit Team	Multi-Select Dropdown
+33	Reviewer	Audit Team	Dropdown
+34	Approver	Audit Team	Dropdown
+35	EQCR	Audit Team	Dropdown

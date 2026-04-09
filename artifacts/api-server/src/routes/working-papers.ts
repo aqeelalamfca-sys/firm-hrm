@@ -31,6 +31,7 @@ import {
   wpFsNoteMappingTable,
   wpComplianceGateTable,
   wpSamplingDetailTable,
+  wpFsLinesTable,
 } from "@workspace/db";
 import { WP_LIBRARY, type WpLibraryEntry } from "../data/wp-library-seed";
 import { WP_LIBRARY as WP_FULL_LIBRARY, type WpMeta as WpMetaFull, industryToTags, itEnvToTags, isWpApplicable, WP_LIBRARY_COUNT, WP_CATEGORIES, wpCodeToCategory, getWpsByCategory } from "../data/wp-library-full";
@@ -1509,6 +1510,94 @@ router.post("/sessions/:id/coa/approve", requireRoles(...WP_ROLES_APPROVE), asyn
   } catch (err: any) {
     logger.error({ err }, "Failed to approve COA");
     res.status(500).json({ error: "Failed to approve COA" });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FINANCIAL STATEMENT LINES
+// ═══════════════════════════════════════════════════════════════════════════
+
+router.get("/sessions/:id/fs-lines", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+    const rows = await db.select().from(wpFsLinesTable)
+      .where(eq(wpFsLinesTable.sessionId, sessionId))
+      .orderBy(asc(wpFsLinesTable.lineId));
+    res.json({ lines: rows });
+  } catch (err: any) {
+    logger.error({ err }, "Failed to fetch FS lines");
+    res.status(500).json({ error: "Failed to fetch FS lines" });
+  }
+});
+
+router.post("/sessions/:id/fs-lines", requireRoles(...WP_ROLES_WRITE), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+    const existing = await db.select({ maxId: sql<number>`COALESCE(MAX(${wpFsLinesTable.lineId}), 0)` })
+      .from(wpFsLinesTable).where(eq(wpFsLinesTable.sessionId, sessionId));
+    const nextLineId = (existing[0]?.maxId || 0) + 1;
+    const row = req.body;
+    const [inserted] = await db.insert(wpFsLinesTable).values({
+      sessionId,
+      lineId: nextLineId,
+      statementType: row.statementType || null,
+      fsSection: row.fsSection || null,
+      majorHead: row.majorHead || null,
+      lineItem: row.lineItem || null,
+      subLineItem: row.subLineItem || null,
+      accountName: row.accountName || null,
+      accountCode: row.accountCode || null,
+      noteNo: row.noteNo || null,
+      currentYear: row.currentYear || null,
+      priorYear: row.priorYear || null,
+      debitTransactionValue: row.debitTransactionValue || null,
+      creditTransactionValue: row.creditTransactionValue || null,
+      normalBalance: row.normalBalance || null,
+      wpArea: row.wpArea || null,
+      riskLevel: row.riskLevel || null,
+    }).returning();
+    res.json({ line: inserted });
+  } catch (err: any) {
+    logger.error({ err }, "Failed to create FS line");
+    res.status(500).json({ error: "Failed to create FS line" });
+  }
+});
+
+router.patch("/sessions/:id/fs-lines/:lineDbId", requireRoles(...WP_ROLES_WRITE), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    const lineDbId = parseInt(p(req.params.lineDbId));
+    if (isNaN(sessionId) || isNaN(lineDbId)) return res.status(400).json({ error: "Invalid ID" });
+    const updates: any = { updatedAt: new Date() };
+    const allowed = ["statementType","fsSection","majorHead","lineItem","subLineItem","accountName","accountCode","noteNo","currentYear","priorYear","debitTransactionValue","creditTransactionValue","normalBalance","wpArea","riskLevel"];
+    for (const k of allowed) {
+      if (req.body[k] !== undefined) updates[k] = req.body[k];
+    }
+    const [updated] = await db.update(wpFsLinesTable)
+      .set(updates)
+      .where(and(eq(wpFsLinesTable.id, lineDbId), eq(wpFsLinesTable.sessionId, sessionId)))
+      .returning();
+    if (!updated) return res.status(404).json({ error: "FS line not found" });
+    res.json({ line: updated });
+  } catch (err: any) {
+    logger.error({ err }, "Failed to update FS line");
+    res.status(500).json({ error: "Failed to update FS line" });
+  }
+});
+
+router.delete("/sessions/:id/fs-lines/:lineDbId", requireRoles(...WP_ROLES_WRITE), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    const lineDbId = parseInt(p(req.params.lineDbId));
+    if (isNaN(sessionId) || isNaN(lineDbId)) return res.status(400).json({ error: "Invalid ID" });
+    await db.delete(wpFsLinesTable)
+      .where(and(eq(wpFsLinesTable.id, lineDbId), eq(wpFsLinesTable.sessionId, sessionId)));
+    res.json({ ok: true });
+  } catch (err: any) {
+    logger.error({ err }, "Failed to delete FS line");
+    res.status(500).json({ error: "Failed to delete FS line" });
   }
 });
 

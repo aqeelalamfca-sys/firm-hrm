@@ -1351,3 +1351,28 @@ export const wpSamplingDetailTable = pgTable("wp_sampling_detail", {
   index("wp_sampling_detail_session_id_idx").on(t.sessionId),
   uniqueIndex("wp_sampling_detail_wp_fs_idx").on(t.sessionId, t.wpCode, t.fsArea),
 ]);
+
+export const wpFsLinesTable = pgTable("wp_fs_lines", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").references(() => wpSessionsTable.id, { onDelete: "cascade" }).notNull(),
+  lineId: integer("line_id").notNull(),
+  statementType: text("statement_type"),
+  fsSection: text("fs_section"),
+  majorHead: text("major_head"),
+  lineItem: text("line_item"),
+  subLineItem: text("sub_line_item"),
+  accountName: text("account_name"),
+  accountCode: text("account_code"),
+  noteNo: text("note_no"),
+  currentYear: decimal("current_year", { precision: 18, scale: 2 }),
+  priorYear: decimal("prior_year", { precision: 18, scale: 2 }),
+  debitTransactionValue: decimal("debit_transaction_value", { precision: 18, scale: 2 }),
+  creditTransactionValue: decimal("credit_transaction_value", { precision: 18, scale: 2 }),
+  normalBalance: text("normal_balance"),
+  wpArea: text("wp_area"),
+  riskLevel: text("risk_level"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("wp_fs_lines_session_id_idx").on(t.sessionId),
+]);
