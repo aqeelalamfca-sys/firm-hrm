@@ -170,6 +170,11 @@ export default function WorkingPapers() {
   const [newFramework, setNewFramework] = useState("IFRS");
   const [newEngagementType, setNewEngagementType] = useState("statutory_audit");
   const [newEngagementContinuity, setNewEngagementContinuity] = useState("first_time");
+  const [newIndustryType, setNewIndustryType] = useState("Manufacturing");
+  const [newGroupAuditFlag, setNewGroupAuditFlag] = useState(false);
+  const [newItEnvironmentType, setNewItEnvironmentType] = useState("Spreadsheets Only (Excel / Google Sheets)");
+  const [newTaxStatusFlags, setNewTaxStatusFlags] = useState<string[]>([]);
+  const [newSpecialConditions, setNewSpecialConditions] = useState<string[]>([]);
   const [newAuditFirmName, setNewAuditFirmName] = useState("");
   const [newAuditFirmLogo, setNewAuditFirmLogo] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>("");
@@ -457,6 +462,11 @@ export default function WorkingPapers() {
           reportingFramework: newFramework,
           engagementType: newEngagementType,
           engagementContinuity: newEngagementContinuity,
+          industryType: newIndustryType || undefined,
+          groupAuditFlag: newGroupAuditFlag,
+          itEnvironmentType: newItEnvironmentType || undefined,
+          taxStatusFlags: newTaxStatusFlags.length > 0 ? newTaxStatusFlags.join(",") : undefined,
+          specialConditions: newSpecialConditions.length > 0 ? newSpecialConditions.join(",") : undefined,
           auditFirmName: newAuditFirmName || undefined,
           auditFirmLogo: logoUrl || undefined,
           preparerId: newPreparerId ? parseInt(newPreparerId) : undefined,
@@ -1845,6 +1855,109 @@ export default function WorkingPapers() {
                       <option value="first_time">First Time Engagement</option>
                       <option value="recurring">Recurring (Same Auditor)</option>
                     </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-dashed border-slate-200 pt-4">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                  WP Controlling Variables
+                  <span className="text-[10px] font-normal text-slate-400 normal-case ml-1">— drives dynamic visibility &amp; recommendation of all 274 working papers</span>
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Industry / Sector <span className="text-red-500">*</span></label>
+                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newIndustryType} onChange={e => setNewIndustryType(e.target.value)}>
+                      <option value="Manufacturing">Manufacturing</option>
+                      <option value="Trading / Wholesale / Retail">Trading / Wholesale / Retail</option>
+                      <option value="Services / Consulting">Services / Consulting</option>
+                      <option value="Agriculture / Farming / Livestock">Agriculture / Farming / Livestock</option>
+                      <option value="Information Technology / Software">Information Technology / Software</option>
+                      <option value="Real Estate / Construction / Property">Real Estate / Construction / Property</option>
+                      <option value="Energy / Power / Oil & Gas">Energy / Power / Oil &amp; Gas</option>
+                      <option value="Telecommunications">Telecommunications</option>
+                      <option value="Pharmaceutical / Healthcare">Pharmaceutical / Healthcare</option>
+                      <option value="FMCG / Consumer Goods">FMCG / Consumer Goods</option>
+                      <option value="Textile / Garments / Spinning">Textile / Garments / Spinning</option>
+                      <option value="Cement / Building Materials">Cement / Building Materials</option>
+                      <option value="Chemical / Fertilizers">Chemical / Fertilizers</option>
+                      <option value="Sugar / Food Processing">Sugar / Food Processing</option>
+                      <option value="Steel / Iron / Metals">Steel / Iron / Metals</option>
+                      <option value="Financial Services (Non-banking)">Financial Services (Non-banking)</option>
+                      <option value="Education / NGO / NPO">Education / NGO / NPO</option>
+                      <option value="Hospitality / Tourism">Hospitality / Tourism</option>
+                      <option value="Transport / Logistics">Transport / Logistics</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">IT / Accounting System</label>
+                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newItEnvironmentType} onChange={e => setNewItEnvironmentType(e.target.value)}>
+                      <option value="ERP System (SAP / Oracle / Microsoft Dynamics)">ERP System (SAP / Oracle / Microsoft Dynamics)</option>
+                      <option value="Cloud-based Accounting (Xero / QuickBooks Online / Zoho)">Cloud-based Accounting (Xero / QuickBooks / Zoho)</option>
+                      <option value="Standalone Desktop Software (Tally / QuickBooks Desktop)">Standalone Desktop Software (Tally / QuickBooks)</option>
+                      <option value="Spreadsheets Only (Excel / Google Sheets)">Spreadsheets Only (Excel / Google Sheets)</option>
+                      <option value="Mixed / Hybrid Environment">Mixed / Hybrid Environment</option>
+                      <option value="Manual / Paper-based Records">Manual / Paper-based Records</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Group / Consolidated Audit?</label>
+                    <div className="flex items-center gap-3 h-9">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="groupAuditFlag" checked={newGroupAuditFlag === true} onChange={() => { setNewGroupAuditFlag(true); if (newEngagementType !== "group_audit") setNewEngagementType("group_audit"); }} className="w-3.5 h-3.5 text-indigo-600" />
+                        <span className="text-sm text-slate-700">Yes — Group Audit (ISA 600)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="groupAuditFlag" checked={newGroupAuditFlag === false} onChange={() => setNewGroupAuditFlag(false)} className="w-3.5 h-3.5 text-indigo-600" />
+                        <span className="text-sm text-slate-700">No</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-medium text-slate-600">Tax Status Flags <span className="text-slate-400">(select all that apply)</span></label>
+                    <div className="flex flex-wrap gap-x-5 gap-y-2">
+                      {[
+                        { value: "ntn_holder", label: "NTN Registered" },
+                        { value: "gst_registered", label: "GST / Sales Tax Registered (STRN)" },
+                        { value: "strn_holder", label: "Provincial Sales Tax Registered" },
+                        { value: "active_taxpayer", label: "Active Taxpayer List (ATL)" },
+                        { value: "withholding_agent", label: "Withholding Tax Agent" },
+                        { value: "super_tax_applicable", label: "Super Tax Applicable (>150M income)" },
+                        { value: "transfer_pricing_risk", label: "Transfer Pricing / Cross-border Transactions" },
+                        { value: "tax_audit_history", label: "Prior FBR Tax Audit / Assessment Orders" },
+                      ].map(opt => (
+                        <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer text-sm text-slate-700">
+                          <input type="checkbox" checked={newTaxStatusFlags.includes(opt.value)}
+                            onChange={e => setNewTaxStatusFlags(prev => e.target.checked ? [...prev, opt.value] : prev.filter(v => v !== opt.value))}
+                            className="w-3.5 h-3.5 text-indigo-600 rounded" />
+                          {opt.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
+                    <label className="text-xs font-medium text-slate-600">Special Conditions <span className="text-slate-400">(select all that apply — adds targeted working papers)</span></label>
+                    <div className="flex flex-wrap gap-x-5 gap-y-2">
+                      {[
+                        { value: "going_concern", label: "Going Concern Risk" },
+                        { value: "fraud_risk", label: "Fraud Risk / ISA 240 Triggers" },
+                        { value: "related_party_heavy", label: "Significant Related Party Transactions" },
+                        { value: "aml_risk", label: "AML / KYC / CFT Risk" },
+                        { value: "donor_funded", label: "Donor / Grant Funded Entity" },
+                        { value: "public_interest", label: "Public Interest Entity (PIE)" },
+                        { value: "esg_reporting", label: "ESG / Sustainability Reporting" },
+                        { value: "cyber_risk", label: "Significant Cyber / IT Security Risk" },
+                      ].map(opt => (
+                        <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer text-sm text-slate-700">
+                          <input type="checkbox" checked={newSpecialConditions.includes(opt.value)}
+                            onChange={e => setNewSpecialConditions(prev => e.target.checked ? [...prev, opt.value] : prev.filter(v => v !== opt.value))}
+                            className="w-3.5 h-3.5 text-indigo-600 rounded" />
+                          {opt.label}
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -9776,6 +9889,27 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
   const [preview, setPreview]         = useState<WpItem | null>(null);
   const [executionWp, setExecutionWp] = useState<WpItem | null>(null);
   const [collapsed, setCollapsed]     = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode]       = useState<"library" | "recommendations">("library");
+  const [wpRecs, setWpRecs]           = useState<any>(null);
+  const [wpRecsLoading, setWpRecsLoading] = useState(false);
+  const [wpRecsSearch, setWpRecsSearch] = useState("");
+  const [wpRecsPhaseFilter, setWpRecsPhaseFilter] = useState("all");
+  const [wpRecsStatusFilter, setWpRecsStatusFilter] = useState("all");
+
+  const fetchWpRecommendations = async () => {
+    if (!session?.id) return;
+    setWpRecsLoading(true);
+    try {
+      const headers: Record<string, string> = getToken() ? { Authorization: `Bearer ${getToken()}` } : {};
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/wp-recommendations`, { headers });
+      if (res.ok) setWpRecs(await res.json());
+    } catch { /* silent */ }
+    finally { setWpRecsLoading(false); }
+  };
+
+  useEffect(() => {
+    if (viewMode === "recommendations" && !wpRecs) fetchWpRecommendations();
+  }, [viewMode, session?.id]);
 
   const triggeredCodes = new Set(allTriggers.filter((t: any) => t.triggered).map((t: any) => t.wpCode));
   const triggerConf: Record<string, number> = {};
@@ -9991,8 +10125,187 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
   return (
     <div className="space-y-4">
 
-      {/* ── Hero Header ── */}
-      <div className="bg-gradient-to-r from-indigo-700 to-violet-800 rounded-2xl p-5 text-white shadow-lg">
+      {/* ── View Mode Toggle ── */}
+      <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1 border border-slate-200 w-fit">
+        <button onClick={() => setViewMode("library")}
+          className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+            viewMode === "library" ? "bg-white shadow-sm text-indigo-700" : "text-slate-500 hover:text-slate-700")}>
+          <ClipboardList className="w-3.5 h-3.5" /> Library Selection
+          <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full ml-0.5",
+            viewMode === "library" ? "bg-indigo-100 text-indigo-700" : "bg-slate-200 text-slate-500")}>
+            {DEFAULT_WP_ITEMS.length}
+          </span>
+        </button>
+        <button onClick={() => setViewMode("recommendations")}
+          className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+            viewMode === "recommendations" ? "bg-white shadow-sm text-emerald-700" : "text-slate-500 hover:text-slate-700")}>
+          <Sparkles className="w-3.5 h-3.5" /> WP Recommendations (274)
+          {wpRecs && <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full ml-0.5",
+            viewMode === "recommendations" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500")}>
+            {wpRecs.totalRecommended} rec
+          </span>}
+        </button>
+      </div>
+
+      {/* ── 274-WP Recommendations View ── */}
+      {viewMode === "recommendations" && (
+        <div className="space-y-3">
+          <div className="bg-gradient-to-r from-emerald-700 to-teal-800 rounded-2xl p-5 text-white shadow-lg">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                <Sparkles className="w-6 h-6 text-emerald-200" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-bold">Dynamic WP Recommendations Engine — 274 Working Papers</h2>
+                <p className="text-sm text-emerald-100 mt-0.5 leading-relaxed">
+                  Full 274-WP library evaluated against your session controlling variables:
+                  industry ({session?.industryType || "—"}), IT environment ({session?.itEnvironmentType || "—"}),
+                  group audit ({session?.groupAuditFlag ? "Yes" : "No"}), engagement ({session?.engagementContinuity === "first_time" ? "First Year" : "Recurring"}),
+                  tax flags &amp; special conditions.
+                </p>
+                {wpRecs && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {[
+                      { label: "Total Library", value: wpRecs.totalLibrary, color: "bg-white/10" },
+                      { label: "Applicable", value: wpRecs.totalApplicable, color: "bg-emerald-500/30" },
+                      { label: "Recommended", value: wpRecs.totalRecommended, color: "bg-teal-400/30" },
+                      { label: "Filtered Out", value: wpRecs.totalLibrary - wpRecs.totalApplicable, color: "bg-white/10" },
+                    ].map(s => (
+                      <div key={s.label} className={cn("px-2.5 py-1 rounded-lg text-center min-w-[70px]", s.color)}>
+                        <div className="text-lg font-bold">{s.value}</div>
+                        <div className="text-[10px] text-emerald-100">{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <Button size="sm" onClick={fetchWpRecommendations} disabled={wpRecsLoading}
+                className="shrink-0 bg-white text-emerald-800 hover:bg-emerald-50 font-semibold shadow-sm h-9">
+                {wpRecsLoading ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />Loading…</> : <><RefreshCw className="w-3.5 h-3.5 mr-1.5" />Refresh</>}
+              </Button>
+            </div>
+          </div>
+
+          {wpRecsLoading && (
+            <div className="flex items-center justify-center py-12 gap-3 text-slate-500">
+              <Loader2 className="w-5 h-5 animate-spin" /><span className="text-sm">Evaluating 274 working papers against your session context…</span>
+            </div>
+          )}
+
+          {wpRecs && !wpRecsLoading && (
+            <>
+              <div className="flex flex-col sm:flex-row gap-2 bg-white border border-slate-200 rounded-xl px-4 py-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <input className="w-full pl-8 pr-3 py-1.5 text-[12px] border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                    placeholder="Search code, name, ISA, phase…"
+                    value={wpRecsSearch} onChange={e => setWpRecsSearch(e.target.value)} />
+                </div>
+                <select className="h-8 text-[11px] border border-slate-200 rounded-md px-2 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                  value={wpRecsPhaseFilter} onChange={e => setWpRecsPhaseFilter(e.target.value)}>
+                  <option value="all">All Phases</option>
+                  {Array.from(new Set((wpRecs.papers || []).map((p: any) => p.phase))).filter(Boolean).map((ph: any) => (
+                    <option key={ph} value={ph}>{ph}</option>
+                  ))}
+                </select>
+                <select className="h-8 text-[11px] border border-slate-200 rounded-md px-2 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                  value={wpRecsStatusFilter} onChange={e => setWpRecsStatusFilter(e.target.value)}>
+                  <option value="all">All</option>
+                  <option value="recommended">Recommended</option>
+                  <option value="applicable">Applicable (not recommended)</option>
+                  <option value="not_applicable">Not Applicable</option>
+                  <option value="core">Core / Mandatory</option>
+                </select>
+              </div>
+
+              {/* Phase summary cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                {Object.entries(wpRecs.byPhase || {}).map(([phase, data]: any) => (
+                  <button key={phase} onClick={() => { setWpRecsPhaseFilter(phase); setWpRecsStatusFilter("all"); }}
+                    className={cn("bg-white border rounded-xl p-3 text-left transition-all hover:shadow-sm",
+                      wpRecsPhaseFilter === phase ? "border-emerald-400 ring-2 ring-emerald-200" : "border-slate-200")}>
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide truncate">{phase}</p>
+                    <div className="flex items-end gap-2 mt-1">
+                      <span className="text-xl font-bold text-emerald-700">{data.recommended}</span>
+                      <span className="text-[10px] text-slate-400 mb-0.5">rec / {data.applicable} applicable / {data.total} total</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* WP table */}
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200">
+                      <tr>
+                        <th className="text-left px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-20">Code</th>
+                        <th className="text-left px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Working Paper Title</th>
+                        <th className="text-left px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-32">Phase</th>
+                        <th className="text-left px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-24">Risk</th>
+                        <th className="text-left px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-24">Status</th>
+                        <th className="text-left px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(wpRecs.papers || []).filter((p: any) => {
+                        const s = wpRecsSearch.toLowerCase();
+                        if (s && !p.code.toLowerCase().includes(s) && !p.name.toLowerCase().includes(s) && !(p.isa||"").toLowerCase().includes(s) && !(p.phase||"").toLowerCase().includes(s)) return false;
+                        if (wpRecsPhaseFilter !== "all" && p.phase !== wpRecsPhaseFilter) return false;
+                        if (wpRecsStatusFilter === "recommended" && !p.recommended) return false;
+                        if (wpRecsStatusFilter === "applicable" && (!p.applicable || p.recommended)) return false;
+                        if (wpRecsStatusFilter === "not_applicable" && p.applicable) return false;
+                        if (wpRecsStatusFilter === "core" && !p.isCore) return false;
+                        return true;
+                      }).map((p: any) => (
+                        <tr key={p.code} className={cn("hover:bg-slate-50 transition-colors",
+                          !p.applicable ? "opacity-50" : "")}>
+                          <td className="px-3 py-2 font-mono text-[11px] font-semibold text-indigo-700">{p.code}</td>
+                          <td className="px-3 py-2">
+                            <div className="font-medium text-slate-800 leading-tight">{p.name}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">{p.isa}</div>
+                          </td>
+                          <td className="px-3 py-2 text-[10px] text-slate-600">{p.phase}</td>
+                          <td className="px-3 py-2">
+                            <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold",
+                              p.riskLevel === "High" ? "bg-red-100 text-red-700" :
+                              p.riskLevel === "Medium" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600")}>
+                              {p.riskLevel || "—"}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            {p.isCore ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[9px] font-semibold">
+                                <CheckCircle2 className="w-2.5 h-2.5" /> Core
+                              </span>
+                            ) : p.recommended ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[9px] font-semibold">
+                                <Sparkles className="w-2.5 h-2.5" /> Recommended
+                              </span>
+                            ) : p.applicable ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[9px] font-semibold">
+                                <CheckCircle2 className="w-2.5 h-2.5" /> Applicable
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px]">
+                                <XCircle className="w-2.5 h-2.5" /> N/A
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-[10px] text-slate-500 max-w-[200px] truncate" title={p.reason}>{p.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Hero Header (Library View only) ── */}
+      {viewMode === "library" && <div className="bg-gradient-to-r from-indigo-700 to-violet-800 rounded-2xl p-5 text-white shadow-lg">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
             <ClipboardList className="w-6 h-6 text-indigo-200" />
@@ -10017,8 +10330,10 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
               : <><Sparkles className="w-4 h-4 mr-2" />AI Recommend</>}
           </Button>
         </div>
-      </div>
+      </div>}
 
+      {/* ── Library View: Stats, Filters, Templates ── */}
+      {viewMode === "library" && (<>
       {/* ── Stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
         {[
@@ -10436,7 +10751,7 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
       {/* ── Proceed Bar ── */}
       <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 flex-wrap">
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
             <span>{selectedCount} templates selected</span>
             <span className="text-slate-300">|</span>
@@ -10470,6 +10785,7 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
           </Button>
         </div>
       </div>
+      </>)}
     </div>
   );
 }

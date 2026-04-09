@@ -33,6 +33,7 @@ import {
   wpSamplingDetailTable,
 } from "@workspace/db";
 import { WP_LIBRARY, type WpLibraryEntry } from "../data/wp-library-seed";
+import { WP_LIBRARY as WP_FULL_LIBRARY, type WpMeta as WpMetaFull, industryToTags, itEnvToTags, isWpApplicable, WP_LIBRARY_COUNT } from "../data/wp-library-full";
 import { VARIABLE_DEFINITIONS, EXTRACTION_FIELD_TO_VARIABLE_MAP, VARIABLE_GROUPS, DEPENDENCY_RULES, PRIMARY_VARIABLE_CODES, SECONDARY_VARIABLE_CODES } from "../data/variable-definitions";
 import {
   runTBEngine, runGLEngine, runReconciliation, checkFinalEnforcement,
@@ -161,6 +162,27 @@ const WP_ROLES_WRITE = ["super_admin", "partner", "senior_manager", "manager", "
 const WP_ROLES_APPROVE = ["super_admin", "partner", "senior_manager", "manager"] as const;
 const WP_ROLES_ADMIN = ["super_admin", "partner"] as const;
 
+const VALID_INDUSTRY_TYPES = [
+  "Manufacturing", "Trading / Wholesale / Retail", "Services / Consulting",
+  "Agriculture / Farming / Livestock", "Information Technology / Software",
+  "Real Estate / Construction / Property", "Energy / Power / Oil & Gas",
+  "Telecommunications", "Pharmaceutical / Healthcare",
+  "FMCG / Consumer Goods", "Textile / Garments / Spinning",
+  "Cement / Building Materials", "Chemical / Fertilizers",
+  "Sugar / Food Processing", "Steel / Iron / Metals",
+  "Financial Services (Non-banking)", "Education / NGO / NPO",
+  "Hospitality / Tourism", "Transport / Logistics", "Other",
+] as const;
+
+const VALID_IT_ENVIRONMENTS = [
+  "ERP System (SAP / Oracle / Microsoft Dynamics)",
+  "Cloud-based Accounting (Xero / QuickBooks Online / Zoho)",
+  "Standalone Desktop Software (Tally / QuickBooks Desktop)",
+  "Spreadsheets Only (Excel / Google Sheets)",
+  "Mixed / Hybrid Environment",
+  "Manual / Paper-based Records",
+] as const;
+
 const createSessionSchema = z.object({
   clientName: z.string().min(1, "Client name is required").max(200),
   engagementYear: z.string().min(4).max(10),
@@ -172,6 +194,11 @@ const createSessionSchema = z.object({
   reportingFramework: z.enum(VALID_REPORTING_FRAMEWORKS),
   engagementType: z.preprocess((v) => typeof v === "string" ? (ENGAGEMENT_TYPE_MAP[v] || v) : v, z.enum(VALID_ENGAGEMENT_TYPES)),
   engagementContinuity: z.preprocess((v) => typeof v === "string" ? (CONTINUITY_MAP[v] || v) : v, z.enum(["first_time", "recurring"])).optional().default("first_time"),
+  industryType: z.string().max(100).optional().nullable(),
+  groupAuditFlag: z.boolean().optional().default(false),
+  itEnvironmentType: z.string().max(200).optional().nullable(),
+  taxStatusFlags: z.string().max(500).optional().nullable(),
+  specialConditions: z.string().max(500).optional().nullable(),
   auditFirmName: z.string().max(200).optional().nullable(),
   auditFirmLogo: z.string().max(500).optional().nullable(),
   preparerId: z.number().optional().nullable(),
@@ -220,7 +247,7 @@ function validateBody<T>(schema: z.ZodSchema<T>, body: unknown): { success: true
   return { success: true, data: result.data };
 }
 
-type WpMeta = { name: string; isa: string; phase: string; riskLevel: string; assertions: string; fsArea: string; applicableTo?: string[] };
+type WpMeta = WpMetaFull;
 const WP_METADATA: Record<string, WpMeta> = {
   "PP-01": { name: "Engagement Setup", isa: "ISA 210, ISA 220, ISA 300, ISA 315", phase: "Pre-Planning", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
   "PP-02": { name: "Entity Understanding", isa: "ISA 315", phase: "Pre-Planning", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
@@ -357,6 +384,10 @@ const WP_METADATA: Record<string, WpMeta> = {
   "IN-03": { name: "Inspection – Phase Completion Summary", isa: "ISQM 1", phase: "Inspection", riskLevel: "Medium", assertions: "N/A", fsArea: "Engagement Level" },
   "IN-04": { name: "Inspection – Risk & Audit Matters", isa: "ISA 315, ISA 330, ISQM 1", phase: "Inspection", riskLevel: "High", assertions: "N/A", fsArea: "Engagement Level" },
 };
+
+// Merge full 274-WP library — adds 140 new WPs and enhances metadata on the existing 134
+// The full library wins (has richer metadata: isCore, industry, controlledBy)
+Object.assign(WP_METADATA, WP_FULL_LIBRARY);
 
 function entityTypeToTags(entityType: string | null | undefined): string[] {
   const et = (entityType || "").toLowerCase();
@@ -578,7 +609,7 @@ router.post("/sessions", requireRoles(...WP_ROLES_WRITE), async (req: Authentica
   try {
     const parsed = validateBody(createSessionSchema, req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error });
-    const { clientName, engagementYear, entityType, ntn, strn, periodStart, periodEnd, reportingFramework, engagementType, engagementContinuity, auditFirmName, auditFirmLogo, preparerId, preparerName, reviewerId, reviewerName, approverId, approverName } = parsed.data;
+    const { clientName, engagementYear, entityType, ntn, strn, periodStart, periodEnd, reportingFramework, engagementType, engagementContinuity, industryType, groupAuditFlag, itEnvironmentType, taxStatusFlags, specialConditions, auditFirmName, auditFirmLogo, preparerId, preparerName, reviewerId, reviewerName, approverId, approverName } = parsed.data;
 
     const session = await db.transaction(async (tx) => {
       const [created] = await tx.insert(wpSessionsTable).values({
@@ -591,6 +622,11 @@ router.post("/sessions", requireRoles(...WP_ROLES_WRITE), async (req: Authentica
         reportingFramework,
         engagementType,
         engagementContinuity: engagementContinuity || "first_time",
+        industryType: industryType || null,
+        groupAuditFlag: groupAuditFlag || false,
+        itEnvironmentType: itEnvironmentType || null,
+        taxStatusFlags: taxStatusFlags || null,
+        specialConditions: specialConditions || null,
         auditFirmName: auditFirmName || null,
         auditFirmLogo: auditFirmLogo || null,
         preparerId: preparerId || null,
@@ -7205,6 +7241,83 @@ router.get("/wp-library", async (req: Request, res: Response) => {
     return res.json({ total: filtered.length, byFamily, papers: filtered });
   } catch (err: any) {
     logger.error({ err }, "Route error");
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /sessions/:id/wp-recommendations
+// Returns all 274 WPs with dynamic applicability/recommendation flags
+// driven by session controlling variables (industry, IT env, group audit, etc.)
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/sessions/:id/wp-recommendations", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id), 10);
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+
+    const [session] = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    const entityTypeTags = entityTypeToTags(session.entityType || "Private Limited");
+    const industryTagsArr = industryToTags(session.industryType || null);
+    const itEnvTagsArr = itEnvToTags(session.itEnvironmentType || null);
+    const taxStatusTagsArr = (session.taxStatusFlags || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+    const specialCondTagsArr = (session.specialConditions || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+
+    const ctx = {
+      entityTypeTags,
+      industryTags: industryTagsArr,
+      isFirstYear: (session.engagementContinuity || "first_time") === "first_time",
+      isGroupAudit: session.groupAuditFlag === true,
+      itEnvironmentTags: itEnvTagsArr,
+      taxStatusTags: taxStatusTagsArr,
+      specialConditionTags: specialCondTagsArr,
+      engagementType: session.engagementType || "statutory_audit",
+      reportingFramework: session.reportingFramework || "IFRS",
+    };
+
+    const results: any[] = [];
+    let totalApplicable = 0;
+    let totalRecommended = 0;
+
+    for (const [code, meta] of Object.entries(WP_FULL_LIBRARY)) {
+      const { applicable, reason, recommended } = isWpApplicable(code, meta as any, ctx);
+      if (applicable) totalApplicable++;
+      if (recommended) totalRecommended++;
+      results.push({
+        code,
+        name: meta.name,
+        phase: meta.phase,
+        isa: meta.isa,
+        riskLevel: meta.riskLevel,
+        assertions: meta.assertions,
+        fsArea: meta.fsArea,
+        isCore: meta.isCore,
+        applicable,
+        recommended,
+        reason,
+      });
+    }
+
+    const byPhase = results.reduce((acc: any, r) => {
+      const ph = r.phase || "Other";
+      if (!acc[ph]) acc[ph] = { total: 0, applicable: 0, recommended: 0 };
+      acc[ph].total++;
+      if (r.applicable) acc[ph].applicable++;
+      if (r.recommended) acc[ph].recommended++;
+      return acc;
+    }, {});
+
+    return res.json({
+      totalLibrary: results.length,
+      totalApplicable,
+      totalRecommended,
+      byPhase,
+      sessionContext: ctx,
+      papers: results,
+    });
+  } catch (err: any) {
+    logger.error({ err }, "wp-recommendations error");
     res.status(500).json({ error: err.message });
   }
 });
