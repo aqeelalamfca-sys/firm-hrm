@@ -55,7 +55,7 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - **VPS**: 187.77.130.117, containers: `ana-db` (PostgreSQL) + `ana-backend` (app)
 - **Auto Schema Sync**: `deploy/entrypoint.sh` runs `drizzle-kit push` before every app startup to keep DB in sync with schema
 - **Admin credentials**: `admin@calfirm.com` / `Admin@123`
-- **April 2026 Fix**: Added `deleted_at` column to all 38 WP tables (`wp_sessions`, `wp_heads`, etc.) and added missing `wp_session_status` enum values (`wp_listing`, `audit_chain`, `review`) directly on VPS DB. Root cause: production DB was created from an older schema snapshot without these columns. Future deployments use entrypoint.sh to auto-sync via drizzle-kit push.
+- **April 2026 Fix**: Added `deleted_at` to all 38 WP tables and missing `wp_session_status` enum values (`wp_listing`, `audit_chain`, `review`) on VPS. Also added `updated_at` to 19 WP/audit tables (`wp_uploaded_files`, `wp_trigger_defs`, `analytics_session`, `evidence_log`, `recon_engine`, `wp_gl_accounts`, etc.) that were missing this column. Root cause: production DB was created from an older schema snapshot. All 36 GET endpoints now return HTTP 200. Future deployments auto-sync via entrypoint.sh → drizzle-kit push.
 
 ## External Dependencies
 
