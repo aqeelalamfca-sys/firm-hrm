@@ -4510,6 +4510,12 @@ router.post("/sessions/:id/heads/:headIndex/export", requireRoles(...WP_ROLES_WR
       : session?.engagementYear ? `FY ${session.engagementYear}` : "—";
     const firmName = "Alam & Aulakh Chartered Accountants";
 
+    // Fetch session variables for sign-off auto-fill
+    const sessionVarsForExport = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+    const varLkp: Record<string, string> = Object.fromEntries(sessionVarsForExport.map(v => [v.variableCode, v.value || ""]));
+    const eqcrRequired = varLkp["eqcr_required"] === "true";
+    const exportDate = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+
     // ── HEAD 0: TRIAL BALANCE — ExcelJS ───────────────────────────────────────
     if (headIndex === 0) {
       const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
@@ -4990,29 +4996,51 @@ router.post("/sessions/:id/heads/:headIndex/export", requireRoles(...WP_ROLES_WR
 
           // SIGN-OFF BLOCK
           doc.moveDown(1);
-          if (doc.y > doc.page.height - 130) doc.addPage();
-          drawHRule(BLUE);
-          doc.moveDown(0.4).font("Helvetica-Bold").fontSize(10).fillColor(BLUE).text("SIGN-OFF & REVIEW  (ISQM-1 / ISA 220 COMPLIANT)").moveDown(0.5);
-          const signLevels = ["Staff Preparer", "Senior Auditor", "Audit Manager", "Engagement Partner", "EQCR Reviewer"];
-          const colW2 = pgW / 5;
+          if (doc.y > doc.page.height - 170) doc.addPage();
+          sectionTitle("SIGN-OFF & REVIEW  (ISQM-1 / ISA 220 COMPLIANT)");
+          const soRoles = ["Preparer", "Reviewer", "Approver", "EQCR"];
+          const soNames = [
+            session?.preparerName || "—",
+            session?.reviewerName || "—",
+            session?.approverName || "—",
+            eqcrRequired ? (varLkp["eqcr_reviewer_name"] || "—") : "N/A",
+          ];
+          const soComments = [
+            "Prepared and reviewed for completeness.",
+            "Reviewed. No exceptions noted.",
+            "Approved. Report is unmodified.",
+            eqcrRequired ? "EQCR review completed." : "N/A",
+          ];
+          const colW2 = pgW / 4;
           const signY = doc.y;
           // header row
-          doc.rect(45, signY, pgW, 16).fill(BLUE);
-          signLevels.forEach((lv, i) => {
-            doc.font("Helvetica-Bold").fontSize(8).fillColor("white").text(lv, 45 + i * colW2 + 3, signY + 4, { width: colW2 - 6, lineBreak: false });
+          doc.rect(45, signY, pgW, 16).fill(NAVY);
+          soRoles.forEach((lv, i) => {
+            doc.font("Helvetica-Bold").fontSize(9).fillColor("white").text(lv, 45 + i * colW2 + 4, signY + 4, { width: colW2 - 8, lineBreak: false });
           });
-          // sign row
+          // data row
+          const signRowH = 76;
           const signRowY = signY + 16;
-          doc.rect(45, signRowY, pgW, 60).fill("#F8FAFC").strokeColor("#E2E8F0").lineWidth(0.3).stroke();
-          signLevels.forEach((_, i) => {
-            const cx2 = 45 + i * colW2 + 3;
-            doc.font("Helvetica").fontSize(8).fillColor("#1E293B")
-              .text("Name: _______________", cx2, signRowY + 5, { width: colW2 - 6, lineBreak: false }).moveDown(0.4)
-              .text("Signature: ___________", cx2, signRowY + 18, { width: colW2 - 6, lineBreak: false })
-              .text("Date: _______________", cx2, signRowY + 31, { width: colW2 - 6, lineBreak: false })
-              .text("☐ Sat  ☐ Sat w/Exc  ☐ Unsat", cx2, signRowY + 44, { width: colW2 - 6, lineBreak: false });
+          doc.rect(45, signRowY, pgW, signRowH).fill("#F8FAFC").strokeColor("#E2E8F0").lineWidth(0.3).stroke();
+          soNames.forEach((nm, i) => {
+            const cx2 = 45 + i * colW2 + 4;
+            const cw = colW2 - 8;
+            if (nm === "N/A") {
+              doc.font("Helvetica-Oblique").fontSize(8).fillColor(SLATE)
+                 .text("N/A — Not Applicable", cx2, signRowY + 30, { width: cw, lineBreak: false });
+            } else {
+              doc.font("Helvetica-Bold").fontSize(8).fillColor("#1E293B")
+                 .text(`Name: ${nm}`, cx2, signRowY + 4, { width: cw, lineBreak: false });
+              doc.font("Helvetica").fontSize(8).fillColor(SLATE)
+                 .text("Signature: _______________", cx2, signRowY + 18, { width: cw, lineBreak: false })
+                 .text(`Date: ${exportDate}`, cx2, signRowY + 32, { width: cw, lineBreak: false });
+              doc.font("Helvetica-Bold").fontSize(8).fillColor(GREEN)
+                 .text("☑  Satisfactory", cx2, signRowY + 46, { width: cw, lineBreak: false });
+              doc.font("Helvetica").fontSize(7.5).fillColor(SLATE)
+                 .text(soComments[i], cx2, signRowY + 60, { width: cw, lineBreak: false });
+            }
           });
-          doc.y = signRowY + 66;
+          doc.y = signRowY + signRowH + 4;
 
           // Page footer
           drawHRule("#E2E8F0");
@@ -5089,34 +5117,47 @@ router.post("/sessions/:id/heads/:headIndex/export", requireRoles(...WP_ROLES_WR
       // Structured content (10 sections)
       docSections.push(...parseDocxContent(doc.content || "", clientName));
 
-      // ── 5-Level Sign-Off Table (ISQM-1 / ISA 220 compliant) ──────────────
+      // ── 4-Level Sign-Off Table (ISQM-1 / ISA 220 compliant) ──────────────
       docSections.push(new Paragraph({ text: "", spacing: { before: 480 } }));
       docSections.push(dxSection("SIGN-OFF & REVIEW  (ISQM-1 / ISA 220)"));
-      const levels = ["Staff Preparer", "Senior Auditor", "Audit Manager", "Engagement Partner", "EQCR Reviewer"];
+      const soSignData = [
+        { role: "Preparer",  name: session?.preparerName || "—", comments: "Prepared and reviewed for completeness." },
+        { role: "Reviewer",  name: session?.reviewerName || "—", comments: "Reviewed. No exceptions noted." },
+        { role: "Approver",  name: session?.approverName || "—", comments: "Approved. Report is unmodified." },
+        { role: "EQCR",      name: eqcrRequired ? (varLkp["eqcr_reviewer_name"] || "—") : "N/A", comments: eqcrRequired ? "EQCR review completed." : "N/A" },
+      ];
+      const cellBorder = { top: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, bottom: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, left: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, right: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 } };
       docSections.push(new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         rows: [
+          // Header row
           new TableRow({
             tableHeader: true,
-            children: levels.map(l => new TableCell({
-              shading: { fill: DOCX_BLUE, type: ShadingType.SOLID },
-              children: [new Paragraph({ children: [new TextRun({ text: l, bold: true, color: "FFFFFF", size: 17, font: "Calibri" })] })],
-              borders: { top: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, bottom: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, left: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, right: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 } },
-              margins: { top: 60, bottom: 60, left: 80, right: 80 },
+            children: soSignData.map(d => new TableCell({
+              shading: { fill: DOCX_NAVY, type: ShadingType.SOLID },
+              children: [new Paragraph({ children: [new TextRun({ text: d.role, bold: true, color: "FFFFFF", size: 20, font: "Calibri" })] })],
+              borders: cellBorder,
+              margins: { top: 80, bottom: 80, left: 120, right: 120 },
             })),
           }),
+          // Data row
           new TableRow({
-            children: levels.map(() => new TableCell({
-              children: [
-                new Paragraph({ children: [new TextRun({ text: "Name: ___________________________", size: 17, font: "Calibri" })], spacing: { after: 80 } }),
-                new Paragraph({ children: [new TextRun({ text: "Signature: ______________________", size: 17, font: "Calibri" })], spacing: { after: 80 } }),
-                new Paragraph({ children: [new TextRun({ text: "Date: ___________________________", size: 17, font: "Calibri" })], spacing: { after: 80 } }),
-                new Paragraph({ children: [new TextRun({ text: "Conclusion: ☐ Sat  ☐ Sat w/Exc  ☐ Unsat", size: 16, font: "Calibri", color: DOCX_SLATE })], spacing: { after: 80 } }),
-                new Paragraph({ children: [new TextRun({ text: "Comments: _______________________", size: 17, font: "Calibri" })] }),
-              ],
-              borders: { top: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, bottom: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, left: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 }, right: { style: BorderStyle.SINGLE, color: "E2E8F0", size: 1 } },
-              margins: { top: 80, bottom: 80, left: 80, right: 80 },
-            })),
+            children: soSignData.map(d => {
+              const isNA = d.name === "N/A";
+              return new TableCell({
+                children: isNA ? [
+                  new Paragraph({ children: [new TextRun({ text: "N/A — Not Applicable", size: 17, font: "Calibri", color: DOCX_SLATE, italics: true })], spacing: { after: 40 } }),
+                ] : [
+                  new Paragraph({ children: [new TextRun({ text: `Name: ${d.name}`, size: 17, font: "Calibri", bold: true })], spacing: { after: 80 } }),
+                  new Paragraph({ children: [new TextRun({ text: "Signature: ______________________", size: 17, font: "Calibri", color: DOCX_SLATE })], spacing: { after: 80 } }),
+                  new Paragraph({ children: [new TextRun({ text: `Date: ${exportDate}`, size: 17, font: "Calibri" })], spacing: { after: 80 } }),
+                  new Paragraph({ children: [new TextRun({ text: "☑  Satisfactory", size: 17, font: "Calibri", color: DOCX_GREEN, bold: true })], spacing: { after: 80 } }),
+                  new Paragraph({ children: [new TextRun({ text: `Comments: ${d.comments}`, size: 16, font: "Calibri", color: DOCX_SLATE })], spacing: { after: 0 } }),
+                ],
+                borders: cellBorder,
+                margins: { top: 100, bottom: 100, left: 120, right: 120 },
+              });
+            }),
           }),
         ],
       }));
