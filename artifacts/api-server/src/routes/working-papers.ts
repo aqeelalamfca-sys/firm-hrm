@@ -7480,15 +7480,21 @@ router.post("/sessions/:id/categories/:catKey/generate-next", requireRoles(...WP
       targetHead = newHead;
     }
 
+    const preparerNames = session.preparerIds ? "Assigned Preparers" : "Senior Auditor";
+    const reviewerName = session.reviewerId ? "Engagement Manager" : "Manager";
+    const firmNameFull = session.firmName || "Alam & Aulakh Chartered Accountants";
+    const clientNameFull = session.clientName || "Unknown";
+    const periodStr = `${session.periodStart || "01/07/2025"} to ${session.periodEnd || "30/06/2026"}`;
+
     const paperPrompt = `You are a Big-4 trained senior audit partner generating a COMPLETE, 100% ISA-compliant, ISQM-1 compliant, audit-defensible, inspection-ready working paper for a Pakistani CA firm (ICAP). Generate working paper "${paperCode}" — "${wpMeta.name}" for category "${catDef.key} — ${catDef.name}".
 
 ═══ ENGAGEMENT DETAILS ═══
-Firm: ${session.firmName || "Alam & Aulakh Chartered Accountants"}
-Client: ${session.clientName || "Unknown"}
+Firm: ${firmNameFull}
+Client: ${clientNameFull}
 Engagement Code: ${engCode}
 Entity Type: ${session.entityType || "Private Limited"}
 Financial Year End: ${session.periodEnd || "30 June " + (session.engagementYear || "2026")}
-Period: ${session.periodStart || "01/07/2025"} to ${session.periodEnd || "30/06/2026"}
+Period: ${periodStr}
 Tax Year: ${session.engagementYear || "2026"}
 Reporting Framework: ${session.reportingFramework || "IFRS"}
 Engagement Type: ${(session.engagementType || "statutory_audit").replace(/_/g, " ")}
@@ -7508,6 +7514,21 @@ ${smartChunk(tbSummary, 3000)}
 ═══ MANDATORY REQUIREMENTS ═══
 Generate a COMPLETE, SPECIFIC, NON-GENERIC working paper. Every field must reference actual client data, actual account balances from the TB above, or specific ISA paragraph numbers. No generic placeholders. All PKR amounts must be realistic and consistent with TB data.
 
+EVERY working paper MUST contain ALL 12 mandatory sections as the MINIMUM. AI should ENHANCE and EXPAND each section based on the specific WP's requirements, applicable standards, and practical audit needs. These 12 sections are the FLOOR, not the ceiling:
+
+1. IDENTIFYING INFORMATION — Client name, audit period (${periodStr}), date of working paper, engagement code, firm name
+2. AUDIT OBJECTIVES AND SCOPE — Specific ISA objective referencing exact ISA paragraph numbers, scope of procedures for this particular FS area/assertion
+3. AUDIT PROCEDURES PERFORMED — Detailed steps actually executed: inspection, observation, confirmation, recalculation, reperformance, analytical procedures, inquiry. Minimum 5 detailed procedures with step numbers.
+4. AUDIT EVIDENCE OBTAINED — Nature, source, date, and sufficiency assessment of each piece of evidence (invoices, confirmations, screenshots, minutes, emails, reconciliations). Minimum 3 evidence items.
+5. FINDINGS AND RESULTS OF TESTING — Actual observations, exceptions, deviations, misstatements, or confirmations from each procedure performed. Be specific with amounts and percentages.
+6. CONCLUSIONS REACHED — Clear pass/fail, qualified/unqualified, or control effectiveness conclusion. Must state whether the objective was met.
+7. SIGNIFICANT MATTERS AND THEIR RESOLUTION — Any disagreements, audit adjustments, management responses, or unresolved issues. If none, state "No significant matters identified during testing."
+8. CROSS-REFERENCES TO OTHER PAPERS OR RECORDS — Specific links to lead schedules, permanent file, prior year WPs, or related WPs by code (e.g., "See PP-03", "Ref: LS-F-SA-01")
+9. REVIEW AND APPROVAL — Preparer name/date/signature block, Reviewer name/date/signature block, Partner approval section
+10. INDEXING AND FILING ORGANIZATION — Unique WP reference (${paperCode}), version control (v1.0), file path (${catDef.key}/${paperCode})
+11. LEGAL COMPLIANCE REFERENCE — Specific ISA clause numbers + IESBA Code of Ethics sections + Companies Act 2017 section + Income Tax Ordinance 2001 section (all applicable to this WP)
+12. RESTRICTION ON USE STATEMENT — "For audit purposes only. Not for third-party reliance without written consent."
+
 Return ONLY valid JSON with this structure:
 {
   "paper_code": "${paperCode}",
@@ -7521,11 +7542,92 @@ Return ONLY valid JSON with this structure:
   "lead_schedule_ref": "LS-${catDef.key}-${paperCode}",
   "fs_head": "${wpMeta.fsArea}",
   "isa_references": "${wpMeta.isa}",
-  "objective": "Specific ISA-aligned objective for this WP referencing client name and FS area. Minimum 4 sentences.",
+
+  "sec1_identifying_info": {
+    "client_name": "${clientNameFull}",
+    "firm_name": "${firmNameFull}",
+    "audit_period": "${periodStr}",
+    "date_of_wp": "${new Date().toISOString().slice(0, 10)}",
+    "engagement_code": "${engCode}",
+    "entity_type": "${session.entityType || "Private Limited"}",
+    "ntn": "${session.ntn || "N/A"}",
+    "reporting_framework": "${session.reportingFramework || "IFRS"}"
+  },
+
+  "sec2_objectives_and_scope": {
+    "objective": "Specific ISA-aligned objective for this WP referencing client name and FS area. Minimum 4 sentences with ISA paragraph references.",
+    "scope": "Detailed scope of procedures covering the specific FS area, period, and assertions tested."
+  },
+
+  "sec3_procedures_performed": [
+    { "step_no": "1", "procedure_type": "Inspection/Observation/Confirmation/Recalculation/Reperformance/Analytical/Inquiry", "description": "Detailed procedure description", "assertion": "C,E", "reference": "${paperCode}-P1", "done_by": "${preparerNames}", "date": "During fieldwork", "result": "Satisfactory" }
+  ],
+
+  "sec4_evidence_obtained": [
+    { "ref": "E001", "description": "Description of evidence", "evidence_type": "External/Internal", "nature": "Documentary/Electronic/Verbal", "source": "Client/Bank/Third Party", "date_obtained": "During fieldwork", "sufficiency": "Sufficient and appropriate", "reliability": "High" }
+  ],
+
+  "sec5_findings_and_results": {
+    "summary": "Overall summary of testing results with specific amounts and percentages.",
+    "observations": ["Specific observation 1 with amounts", "Specific observation 2"],
+    "exceptions": [],
+    "misstatements_identified": [],
+    "deviations": []
+  },
+
+  "sec6_conclusions": {
+    "conclusion_status": "Satisfactory / Unsatisfactory / Qualified",
+    "conclusion_narrative": "Clear conclusion statement. Minimum 3 sentences stating whether the audit objective was met, the basis for the conclusion, and the impact on the overall audit opinion.",
+    "objective_met": true
+  },
+
+  "sec7_significant_matters": {
+    "matters_identified": false,
+    "details": "No significant matters identified during testing.",
+    "disagreements": [],
+    "audit_adjustments": [],
+    "management_responses": [],
+    "unresolved_issues": []
+  },
+
+  "sec8_cross_references": {
+    "related_wps": ["List specific related WP codes"],
+    "lead_schedules": ["LS-${catDef.key}-${paperCode}"],
+    "permanent_file_refs": [],
+    "prior_year_refs": []
+  },
+
+  "sec9_review_and_approval": {
+    "prepared_by": "${preparerNames}",
+    "prepared_date": "${new Date().toISOString().slice(0, 10)}",
+    "reviewed_by": "${reviewerName}",
+    "reviewed_date": "",
+    "partner_approval": "",
+    "partner_approval_date": ""
+  },
+
+  "sec10_indexing_and_filing": {
+    "wp_reference": "${paperCode}",
+    "version": "v1.0",
+    "file_path": "${catDef.key}/${paperCode}",
+    "supersedes": "N/A"
+  },
+
+  "sec11_legal_compliance": {
+    "isa_clauses": "List specific ISA paragraph numbers applicable to this WP",
+    "iesba_sections": "Relevant IESBA Code of Ethics sections",
+    "companies_act_sections": "Relevant Companies Act 2017 sections",
+    "income_tax_sections": "Relevant Income Tax Ordinance 2001 sections (if applicable)",
+    "other_regulations": ""
+  },
+
+  "sec12_restriction_on_use": "This working paper is prepared for audit purposes only. It is intended solely for use by the engagement team and the firm's quality control reviewers. Not for third-party reliance without written consent of ${firmNameFull}.",
+
+  "objective": "Same as sec2_objectives_and_scope.objective (for backward compatibility)",
+  "work_performed": "Detailed narrative minimum 6 sentences of what auditor did.",
   "materiality_linkage": { "overall_materiality": 0, "performance_materiality": 0, "basis": "Revenue or Total Assets", "percentage": "1.5%" },
   "risk_assertion_table": [{ "risk_description": "Specific risk", "assertion": "C,E,V", "risk_level": "High", "audit_approach": "Substantive" }],
   "procedures_table": [{ "step_no": "1", "description": "Detailed procedure", "assertion": "C,E", "reference": "${paperCode}-P1", "done_by": "Senior Auditor", "date": "During fieldwork", "result": "Satisfactory" }],
-  "work_performed": "Detailed narrative minimum 6 sentences of what auditor did.",
   "variance_analysis": { "current_year": 0, "prior_year": 0, "variance": 0, "variance_percentage": "0%" },
   "evidence_table": [{ "ref": "E001", "description": "Evidence obtained", "evidence_type": "External", "source": "Bank/Client", "reliability": "High" }],
   "auditor_judgement": "Professional narrative minimum 5 sentences.",
@@ -7542,7 +7644,7 @@ Return ONLY valid JSON with this structure:
         { role: "system", content: "You are a Big-4 trained senior audit partner generating 100% ISA-compliant working papers for Pakistan (ICAP) audits. Return ONLY valid JSON. No markdown." },
         { role: "user", content: paperPrompt },
       ],
-      max_tokens: 5000, temperature: 0.2,
+      max_tokens: 8000, temperature: 0.2,
       response_format: { type: "json_object" },
     }, { signal: AbortSignal.timeout(180000) });
 
@@ -7584,6 +7686,233 @@ Return ONLY valid JSON with this structure:
   }
 });
 
+function buildWpDocxChildren(wp: any, doc: any, catDef: any, session: any, DOCX_NAVY: string): any[] {
+  const children: any[] = [];
+  const sec = (num: string, title: string) => {
+    children.push(new Paragraph({
+      children: [new TextRun({ text: `${num}. ${title}`, bold: true, size: 22, color: DOCX_NAVY, font: "Calibri" })],
+      spacing: { before: 200, after: 60 },
+      border: { bottom: { style: BorderStyle.SINGLE, size: 2, color: DOCX_NAVY } },
+    }));
+  };
+  const txt = (text: string, opts?: { bold?: boolean; size?: number; color?: string; italic?: boolean }) => {
+    if (!text) return;
+    children.push(new Paragraph({
+      children: [new TextRun({ text, size: opts?.size || 20, font: "Calibri", color: opts?.color || "1E293B", bold: opts?.bold, italics: opts?.italic })],
+      spacing: { after: 60 },
+    }));
+  };
+  const kvRow = (label: string, value: string) => {
+    children.push(new Paragraph({
+      children: [
+        new TextRun({ text: `${label}: `, bold: true, size: 18, font: "Calibri", color: "475569" }),
+        new TextRun({ text: value || "—", size: 18, font: "Calibri", color: "1E293B" }),
+      ],
+      spacing: { after: 30 },
+    }));
+  };
+
+  children.push(new Paragraph({
+    children: [new TextRun({ text: `${catDef.key} — ${catDef.name}`, bold: true, size: 20, color: "FFFFFF", font: "Calibri" })],
+    shading: { fill: DOCX_NAVY, type: ShadingType.SOLID },
+    spacing: { after: 80 },
+  }));
+  children.push(new Paragraph({
+    children: [new TextRun({ text: `${doc.paperCode} — ${doc.paperName || wp.paper_name || ""}`, bold: true, size: 28, color: DOCX_NAVY, font: "Calibri" })],
+    spacing: { after: 60 },
+  }));
+
+  const s1 = wp.sec1_identifying_info;
+  sec("1", "Identifying Information");
+  if (s1) {
+    kvRow("Client Name", s1.client_name || session.clientName);
+    kvRow("Firm", s1.firm_name || session.firmName || "Alam & Aulakh Chartered Accountants");
+    kvRow("Audit Period", s1.audit_period || `${session.periodStart || ""} to ${session.periodEnd || ""}`);
+    kvRow("Date of Working Paper", s1.date_of_wp || new Date().toISOString().slice(0, 10));
+    kvRow("Engagement Code", s1.engagement_code || wp.engagement_code || "—");
+    kvRow("Entity Type", s1.entity_type || session.entityType || "—");
+    kvRow("NTN", s1.ntn || session.ntn || "N/A");
+    kvRow("Reporting Framework", s1.reporting_framework || session.reportingFramework || "IFRS");
+  } else {
+    kvRow("Client", session.clientName || "—");
+    kvRow("Period", session.engagementYear || "—");
+    kvRow("ISA References", wp.isa_references || "—");
+    kvRow("FS Area", wp.fs_head || "—");
+  }
+
+  const s2 = wp.sec2_objectives_and_scope;
+  sec("2", "Audit Objectives and Scope");
+  txt(s2?.objective || wp.objective || "");
+  if (s2?.scope) txt(s2.scope, { italic: true, color: "475569" });
+
+  sec("3", "Audit Procedures Performed");
+  const procs = wp.sec3_procedures_performed || wp.procedures_table || [];
+  if (Array.isArray(procs) && procs.length > 0) {
+    const procHeaderRow = new TableRow({
+      tableHeader: true,
+      children: ["#", "Type", "Procedure", "Assertion", "Done By", "Result"].map(h =>
+        new TableCell({
+          children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, size: 16, font: "Calibri", color: "FFFFFF" })], alignment: AlignmentType.CENTER })],
+          shading: { fill: DOCX_NAVY, type: ShadingType.SOLID },
+        })
+      ),
+    });
+    const procRows = procs.map((p: any) => new TableRow({
+      children: [
+        p.step_no || "",
+        p.procedure_type || "",
+        p.description || "",
+        p.assertion || "",
+        p.done_by || "",
+        p.result || "",
+      ].map(v => new TableCell({
+        children: [new Paragraph({ children: [new TextRun({ text: String(v), size: 16, font: "Calibri" })] })],
+      })),
+    }));
+    children.push(new Table({ rows: [procHeaderRow, ...procRows], width: { size: 100, type: WidthType.PERCENTAGE } }));
+  } else {
+    txt(wp.work_performed || "Procedures not detailed.");
+  }
+
+  sec("4", "Audit Evidence Obtained");
+  const evidence = wp.sec4_evidence_obtained || wp.evidence_table || [];
+  if (Array.isArray(evidence) && evidence.length > 0) {
+    const evHeaderRow = new TableRow({
+      tableHeader: true,
+      children: ["Ref", "Description", "Type", "Source", "Sufficiency", "Reliability"].map(h =>
+        new TableCell({
+          children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, size: 16, font: "Calibri", color: "FFFFFF" })], alignment: AlignmentType.CENTER })],
+          shading: { fill: DOCX_NAVY, type: ShadingType.SOLID },
+        })
+      ),
+    });
+    const evRows = evidence.map((e: any) => new TableRow({
+      children: [
+        e.ref || "",
+        e.description || "",
+        e.evidence_type || e.nature || "",
+        e.source || "",
+        e.sufficiency || "",
+        e.reliability || "",
+      ].map(v => new TableCell({
+        children: [new Paragraph({ children: [new TextRun({ text: String(v), size: 16, font: "Calibri" })] })],
+      })),
+    }));
+    children.push(new Table({ rows: [evHeaderRow, ...evRows], width: { size: 100, type: WidthType.PERCENTAGE } }));
+  }
+
+  const s5 = wp.sec5_findings_and_results;
+  sec("5", "Findings and Results of Testing");
+  txt(s5?.summary || "");
+  if (Array.isArray(s5?.observations)) s5.observations.forEach((o: string) => txt(`• ${o}`));
+  if (Array.isArray(s5?.exceptions) && s5.exceptions.length > 0) {
+    txt("Exceptions:", { bold: true, color: "DC2626" });
+    s5.exceptions.forEach((e: any) => txt(`• ${typeof e === "string" ? e : JSON.stringify(e)}`));
+  }
+  if (Array.isArray(s5?.misstatements_identified) && s5.misstatements_identified.length > 0) {
+    txt("Misstatements:", { bold: true, color: "DC2626" });
+    s5.misstatements_identified.forEach((m: any) => txt(`• ${typeof m === "string" ? m : JSON.stringify(m)}`));
+  }
+
+  const s6 = wp.sec6_conclusions;
+  sec("6", "Conclusions Reached");
+  if (s6) {
+    txt(`Status: ${s6.conclusion_status || "—"}`, { bold: true });
+    txt(s6.conclusion_narrative || "");
+    txt(`Objective Met: ${s6.objective_met ? "Yes" : "No"}`, { italic: true, color: s6.objective_met ? "059669" : "DC2626" });
+  } else {
+    const conclusionText = typeof wp.conclusion === "string" ? wp.conclusion : wp.conclusion?.status || wp.conclusion?.conclusion_narrative || "";
+    txt(conclusionText || "—");
+  }
+
+  const s7 = wp.sec7_significant_matters;
+  sec("7", "Significant Matters and Their Resolution");
+  if (s7) {
+    txt(s7.details || (s7.matters_identified ? "Matters identified — see below." : "No significant matters identified during testing."));
+    if (Array.isArray(s7.audit_adjustments) && s7.audit_adjustments.length > 0) {
+      txt("Audit Adjustments:", { bold: true });
+      s7.audit_adjustments.forEach((a: any) => txt(`• ${typeof a === "string" ? a : JSON.stringify(a)}`));
+    }
+    if (Array.isArray(s7.unresolved_issues) && s7.unresolved_issues.length > 0) {
+      txt("Unresolved Issues:", { bold: true, color: "DC2626" });
+      s7.unresolved_issues.forEach((u: any) => txt(`• ${typeof u === "string" ? u : JSON.stringify(u)}`));
+    }
+  } else {
+    txt("No significant matters identified during testing.");
+  }
+
+  const s8 = wp.sec8_cross_references;
+  sec("8", "Cross-References to Other Papers or Records");
+  if (s8) {
+    if (Array.isArray(s8.related_wps) && s8.related_wps.length > 0) kvRow("Related WPs", s8.related_wps.join(", "));
+    if (Array.isArray(s8.lead_schedules) && s8.lead_schedules.length > 0) kvRow("Lead Schedules", s8.lead_schedules.join(", "));
+    if (Array.isArray(s8.permanent_file_refs) && s8.permanent_file_refs.length > 0) kvRow("Permanent File", s8.permanent_file_refs.join(", "));
+    if (Array.isArray(s8.prior_year_refs) && s8.prior_year_refs.length > 0) kvRow("Prior Year", s8.prior_year_refs.join(", "));
+  } else if (Array.isArray(wp.cross_references)) {
+    txt(wp.cross_references.join(", "));
+  }
+
+  const s9 = wp.sec9_review_and_approval;
+  sec("9", "Review and Approval");
+  if (s9) {
+    const raRows = [
+      ["Prepared By", s9.prepared_by || "—", "Date", s9.prepared_date || "—"],
+      ["Reviewed By", s9.reviewed_by || "—", "Date", s9.reviewed_date || "—"],
+      ["Partner Approval", s9.partner_approval || "—", "Date", s9.partner_approval_date || "—"],
+    ];
+    children.push(new Table({
+      rows: raRows.map(row => new TableRow({
+        children: row.map((cell, ci) => new TableCell({
+          width: { size: 25, type: WidthType.PERCENTAGE },
+          shading: ci % 2 === 0 ? { fill: "F1F5F9", type: ShadingType.SOLID } : undefined,
+          children: [new Paragraph({ children: [new TextRun({ text: cell, size: 18, bold: ci % 2 === 0, font: "Calibri", color: ci % 2 === 0 ? "475569" : "1E293B" })], spacing: { before: 40, after: 40 } })],
+        })),
+      })),
+      width: { size: 100, type: WidthType.PERCENTAGE },
+    }));
+  }
+
+  const s10 = wp.sec10_indexing_and_filing;
+  sec("10", "Indexing and Filing Organization");
+  if (s10) {
+    kvRow("WP Reference", s10.wp_reference || doc.paperCode);
+    kvRow("Version", s10.version || "v1.0");
+    kvRow("File Path", s10.file_path || "—");
+    kvRow("Supersedes", s10.supersedes || "N/A");
+  } else {
+    kvRow("WP Reference", doc.paperCode);
+    kvRow("Version", wp.version || "v1.0");
+  }
+
+  const s11 = wp.sec11_legal_compliance;
+  sec("11", "Legal Compliance Reference");
+  if (s11) {
+    kvRow("ISA Clauses", s11.isa_clauses || wp.isa_references || "—");
+    kvRow("IESBA Code of Ethics", s11.iesba_sections || "—");
+    kvRow("Companies Act 2017", s11.companies_act_sections || "—");
+    kvRow("Income Tax Ordinance 2001", s11.income_tax_sections || "—");
+    if (s11.other_regulations) kvRow("Other Regulations", s11.other_regulations);
+  } else {
+    kvRow("ISA References", wp.isa_references || "—");
+  }
+
+  sec("12", "Restriction on Use Statement");
+  txt(wp.sec12_restriction_on_use || "This working paper is prepared for audit purposes only. It is intended solely for use by the engagement team and the firm's quality control reviewers. Not for third-party reliance without written consent.", { italic: true, color: "64748B" });
+
+  if (wp.auditor_judgement) {
+    sec("—", "Auditor Judgement (Additional)");
+    txt(wp.auditor_judgement);
+  }
+
+  children.push(new Paragraph({ text: "", spacing: { after: 40 } }));
+  children.push(new Paragraph({
+    children: [new TextRun({ text: `${doc.paperCode} | ${session.clientName} | ${session.engagementYear} | Generated by AuditWise`, size: 14, color: "94A3B8", font: "Calibri" })],
+    alignment: AlignmentType.CENTER,
+  }));
+
+  return children;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /sessions/:id/categories/:catKey/export-docx
 // Merged Word file for one category
@@ -7614,62 +7943,7 @@ router.post("/sessions/:id/categories/:catKey/export-docx", requireRoles(...WP_R
 
     for (const doc of catDocs) {
       const wp = typeof doc.content === "string" ? JSON.parse(doc.content) : (doc.content || {});
-      const children: any[] = [];
-
-      children.push(new Paragraph({
-        children: [new TextRun({ text: `${catDef.key} — ${catDef.name}`, bold: true, size: 20, color: "FFFFFF", font: "Calibri" })],
-        shading: { fill: DOCX_NAVY, type: ShadingType.SOLID },
-        spacing: { after: 80 },
-      }));
-
-      children.push(new Paragraph({
-        children: [new TextRun({ text: `${doc.paperCode} — ${doc.paperName || wp.paper_name || ""}`, bold: true, size: 28, color: DOCX_NAVY, font: "Calibri" })],
-        spacing: { after: 40 },
-      }));
-
-      const metaRows = [
-        ["Client", session.clientName || "—", "Period", session.engagementYear || "—"],
-        ["ISA References", wp.isa_references || "—", "Risk Level", wp.risk_level || "—"],
-        ["FS Area", wp.fs_head || "—", "Status", wp.status || "Draft"],
-      ];
-      children.push(new Table({
-        rows: metaRows.map(row => new TableRow({
-          children: row.map((cell, ci) => new TableCell({
-            width: { size: ci % 2 === 0 ? 25 : 25, type: WidthType.PERCENTAGE },
-            shading: ci % 2 === 0 ? { fill: "F1F5F9", type: ShadingType.SOLID } : undefined,
-            children: [new Paragraph({ children: [new TextRun({ text: cell, size: 18, bold: ci % 2 === 0, font: "Calibri", color: ci % 2 === 0 ? "475569" : "1E293B" })], spacing: { before: 40, after: 40 } })],
-          })),
-        })),
-        width: { size: 100, type: WidthType.PERCENTAGE },
-      }));
-
-      const addSection = (title: string, text: string) => {
-        if (!text) return;
-        children.push(new Paragraph({
-          children: [new TextRun({ text: title, bold: true, size: 20, color: DOCX_NAVY, font: "Calibri" })],
-          spacing: { before: 200, after: 60 },
-          border: { bottom: { style: BorderStyle.SINGLE, size: 2, color: DOCX_NAVY } },
-        }));
-        children.push(new Paragraph({
-          children: [new TextRun({ text, size: 20, font: "Calibri", color: "1E293B" })],
-          spacing: { after: 80 },
-        }));
-      };
-
-      addSection("Audit Objective", wp.objective);
-      addSection("Work Performed", wp.work_performed);
-      addSection("Auditor Judgement", wp.auditor_judgement);
-
-      const conclusionText = typeof wp.conclusion === "string" ? wp.conclusion : wp.conclusion?.status || "";
-      addSection("Conclusion", conclusionText);
-      addSection("Review Notes", typeof wp.review_notes === "string" ? wp.review_notes : "");
-
-      children.push(new Paragraph({ text: "", spacing: { after: 40 } }));
-      children.push(new Paragraph({
-        children: [new TextRun({ text: `${doc.paperCode} | ${session.clientName} | ${session.engagementYear} | Generated by AuditWise`, size: 14, color: "94A3B8", font: "Calibri" })],
-        alignment: AlignmentType.CENTER,
-      }));
-
+      const children: any[] = buildWpDocxChildren(wp, doc, catDef, session, DOCX_NAVY);
       sections.push({ children });
     }
 
@@ -7796,43 +8070,7 @@ router.post("/sessions/:id/categories/export-all-docx", requireRoles(...WP_ROLES
       for (const doc of catDocs) {
         if (!doc) continue;
         const wp = typeof doc.content === "string" ? JSON.parse(doc.content) : (doc.content || {});
-        const children: any[] = [];
-
-        children.push(new Paragraph({
-          children: [new TextRun({ text: `${cat.key} — ${cat.name}`, bold: true, size: 20, color: "FFFFFF", font: "Calibri" })],
-          shading: { fill: DOCX_NAVY, type: ShadingType.SOLID },
-          spacing: { after: 80 },
-        }));
-        children.push(new Paragraph({
-          children: [new TextRun({ text: `${doc.paperCode} — ${doc.paperName || wp.paper_name || ""}`, bold: true, size: 28, color: DOCX_NAVY, font: "Calibri" })],
-          spacing: { after: 40 },
-        }));
-
-        const addSec = (title: string, text: string) => {
-          if (!text) return;
-          children.push(new Paragraph({
-            children: [new TextRun({ text: title, bold: true, size: 20, color: DOCX_NAVY, font: "Calibri" })],
-            spacing: { before: 160, after: 40 },
-            border: { bottom: { style: BorderStyle.SINGLE, size: 2, color: DOCX_NAVY } },
-          }));
-          children.push(new Paragraph({
-            children: [new TextRun({ text, size: 20, font: "Calibri", color: "1E293B" })],
-            spacing: { after: 60 },
-          }));
-        };
-
-        addSec("Audit Objective", wp.objective);
-        addSec("Work Performed", wp.work_performed);
-        addSec("Auditor Judgement", wp.auditor_judgement);
-        const conclusionText = typeof wp.conclusion === "string" ? wp.conclusion : wp.conclusion?.status || "";
-        addSec("Conclusion", conclusionText);
-
-        children.push(new Paragraph({
-          children: [new TextRun({ text: `${doc.paperCode} | ${session.clientName} | ${session.engagementYear}`, size: 14, color: "94A3B8", font: "Calibri" })],
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 120 },
-        }));
-
+        const children: any[] = buildWpDocxChildren(wp, doc, cat, session, DOCX_NAVY);
         sections.push({ children });
       }
     }
