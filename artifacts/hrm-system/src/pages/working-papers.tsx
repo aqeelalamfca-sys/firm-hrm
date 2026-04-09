@@ -2271,7 +2271,16 @@ export default function WorkingPapers() {
           onOpenAiSettings={() => setShowAiSettings(true)}
           loading={loading || parseLoading}
           confidenceBadge={confidenceBadge}
-          onNext={() => { fetchVariables(); setStage("variables"); }}
+          onNext={async () => {
+            try {
+              await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/status`, {
+                method: "PATCH", headers: { ...headers, "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "variables" }),
+              });
+            } catch { /* best-effort */ }
+            fetchVariables();
+            setStage("variables");
+          }}
         />
       )}
 
@@ -2289,7 +2298,16 @@ export default function WorkingPapers() {
           onLockAll={lockAllVariables}
           loading={loading}
           confidenceBadge={confidenceBadge}
-          onNext={() => { fetchWpTriggers(); setStage("wp_listing"); }}
+          onNext={async () => {
+            try {
+              await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/status`, {
+                method: "PATCH", headers: { ...headers, "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "wp_listing" }),
+              });
+            } catch { /* best-effort */ }
+            fetchWpTriggers();
+            setStage("wp_listing");
+          }}
         />
       )}
 

@@ -648,16 +648,17 @@ router.patch("/sessions/:id/status", requireRoles(...WP_ROLES_WRITE), async (req
     if (!validStatuses.includes(status)) return res.status(400).json({ error: "Invalid status" });
 
     const validTransitions: Record<string, string[]> = {
-      upload: ["extraction"],
-      extraction: ["data_sheet", "arranged_data", "upload", "variables"],
-      data_sheet: ["arranged_data", "variables", "extraction"],
-      arranged_data: ["variables", "data_sheet"],
-      variables: ["wp_listing", "generation"],
-      wp_listing: ["generation"],
-      generation: ["audit_chain", "export"],
-      audit_chain: ["review", "generation"],
-      review: ["export", "audit_chain"],
-      export: ["completed", "generation"],
+      upload:        ["extraction", "variables", "wp_listing", "generation"],
+      extraction:    ["data_sheet", "arranged_data", "upload", "variables", "wp_listing", "generation"],
+      data_sheet:    ["arranged_data", "variables", "extraction", "wp_listing", "generation"],
+      arranged_data: ["variables", "data_sheet", "wp_listing", "generation"],
+      variables:     ["wp_listing", "generation", "extraction"],
+      wp_listing:    ["generation", "variables"],
+      generation:    ["audit_chain", "export", "wp_listing"],
+      audit_chain:   ["review", "generation"],
+      review:        ["export", "audit_chain"],
+      export:        ["completed", "generation"],
+      completed:     ["generation", "export"],
     };
     const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, id)))[0];
     if (!session) return res.status(404).json({ error: "Session not found" });
