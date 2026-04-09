@@ -48,7 +48,7 @@ import ExcelJS from "exceljs";
 import pdfParse from "pdf-parse";
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell,
-  WidthType, AlignmentType, BorderStyle, ShadingType, PageBreak, Footer,
+  WidthType, AlignmentType, BorderStyle, ShadingType, PageBreak, Footer, VerticalAlign,
   type IShadingAttributesProperties,
 } from "docx";
 
@@ -4202,7 +4202,7 @@ function dxFirmHeader(firmName: string, clientName: string, docTitle: string, pe
                 spacing: { after: 0 },
               }),
             ],
-            verticalAlign: "center" as any,
+            verticalAlign: VerticalAlign.CENTER,
           }),
           // Right cell — Reference Number (40%)
           new TableCell({
@@ -4231,7 +4231,7 @@ function dxFirmHeader(firmName: string, clientName: string, docTitle: string, pe
                 spacing: { after: 60 },
               }),
             ],
-            verticalAlign: "center" as any,
+            verticalAlign: VerticalAlign.CENTER,
           }),
         ],
       })],
@@ -7276,12 +7276,12 @@ router.get("/sessions/:id/wp-recommendations", async (req: Request, res: Respons
       reportingFramework: session.reportingFramework || "IFRS",
     };
 
-    const results: any[] = [];
+    const results: Array<{ code: string; name: string; phase: string; isa: string; riskLevel: string; assertions: string; fsArea: string; isCore: boolean | undefined; applicable: boolean; recommended: boolean; reason: string }> = [];
     let totalApplicable = 0;
     let totalRecommended = 0;
 
     for (const [code, meta] of Object.entries(WP_FULL_LIBRARY)) {
-      const { applicable, reason, recommended } = isWpApplicable(code, meta as any, ctx);
+      const { applicable, reason, recommended } = isWpApplicable(code, meta, ctx);
       if (applicable) totalApplicable++;
       if (recommended) totalRecommended++;
       results.push({
