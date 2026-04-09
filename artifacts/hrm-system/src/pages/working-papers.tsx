@@ -3851,10 +3851,38 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
   const INDUSTRY_SECTORS = ["Manufacturing","Services","Trading","Construction","IT/Software","Financial Services","Healthcare","Education","Energy","Textiles","FMCG","Real Estate","Agriculture","Telecommunications","Other"];
   const ACCOUNTING_SYSTEMS = ["QuickBooks","Sage","Xero","SAP","Oracle","Tally","Custom ERP","Manual Books","Other"];
 
-  const STATEMENT_TYPES = ["Balance Sheet","Profit & Loss","Cash Flow","Statement of Changes in Equity","Notes"];
-  const FS_SECTIONS = ["Assets","Liabilities","Equity","Revenue","Cost of Sales","Operating Expenses","Other Income","Finance Cost","Taxation","Cash Flow"];
-  const MAJOR_HEADS = ["Property Plant & Equipment","Intangibles","Inventory","Trade Debtors","Cash & Bank","Share Capital","Reserves","Trade Creditors","Accrued Liabilities","Sales","Administrative Expenses","Distribution Cost","Other"];
+  const STATEMENT_TYPES = ["BS","P&L","CF","OCI","EQ","Notes","Balance Sheet","Profit & Loss","Cash Flow","Statement of Changes in Equity"];
+  const FS_SECTIONS = ["Assets","Liabilities","Equity","Income","Revenue","Expenses","Cost of Sales","Operating Expenses","Other Income","Finance Cost","Taxation","Cash Flow"];
+  const MAJOR_HEADS = [
+    "Non-Current Assets","Current Assets","Non-Current Liabilities","Current Liabilities","Equity",
+    "Revenue","Cost of Sales","Selling and Distribution","Administrative Expenses","Other income",
+    "Finance Cost","Taxation",
+    "Property Plant & Equipment","Intangibles","Inventory","Trade Debtors","Cash & Bank",
+    "Share Capital","Reserves","Trade Creditors","Accrued Liabilities","Distribution Cost","Other",
+  ];
+  const ALL_LINE_ITEMS = [
+    "Property, plant and equipment","Intangible assets","Long-term investments","Long-term loans","Long-term loans and advances",
+    "Capital work in progress","Inventories","Trade debts","Advances and deposits","Other receivables",
+    "Short-term investments","Cash and bank balances","Sales","Scrap sales","Direct material",
+    "Direct labour","Manufacturing overhead","Salaries and benefits","Advertisement and marketing",
+    "Communication expenses","Depreciation","Amortisation","Freight outward","Printing and stationery",
+    "Repair and maintenance","Travelling and conveyance","Utilities","Interest income","Gain on disposal",
+    "Markup on borrowings","Current tax","Deferred tax","Share capital","Reserves","Retained earnings",
+    "Short-term borrowings","Trade and other payables","Accrued liabilities","Staff retirement benefits","Taxation",
+  ];
   const LINE_ITEM_MAP: Record<string, string[]> = {
+    "Non-Current Assets": ["Property, plant and equipment","Intangible assets","Long-term investments","Long-term loans","Long-term loans and advances","Capital work in progress"],
+    "Current Assets": ["Inventories","Trade debts","Advances and deposits","Other receivables","Short-term investments","Cash and bank balances"],
+    "Revenue": ["Sales","Scrap sales","Interest income","Gain on disposal"],
+    "Cost of Sales": ["Direct material","Direct labour","Manufacturing overhead"],
+    "Selling and Distribution": ["Advertisement and marketing","Communication expenses","Freight outward","Travelling and conveyance","Salaries and benefits"],
+    "Administrative Expenses": ["Salaries and benefits","Depreciation","Amortisation","Printing and stationery","Repair and maintenance","Utilities","Travelling and conveyance","Communication expenses"],
+    "Other income": ["Interest income","Gain on disposal"],
+    "Finance Cost": ["Markup on borrowings"],
+    "Taxation": ["Current tax","Deferred tax","Taxation"],
+    "Equity": ["Share capital","Reserves","Retained earnings"],
+    "Non-Current Liabilities": ["Long-term loans","Staff retirement benefits"],
+    "Current Liabilities": ["Short-term borrowings","Trade and other payables","Accrued liabilities","Taxation"],
     "Property Plant & Equipment": ["Land","Buildings","Plant & Machinery","Vehicles","Furniture & Fixtures","Office Equipment","Computer Equipment","Capital WIP"],
     "Intangibles": ["Goodwill","Software","Patents & Trademarks","Licenses","Other Intangibles"],
     "Inventory": ["Raw Materials","Work in Progress","Finished Goods","Stores & Spares","Goods in Transit"],
@@ -3865,22 +3893,57 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
     "Trade Creditors": ["Local Creditors","Import Creditors","Related Party Payables","Accrued Expenses"],
     "Accrued Liabilities": ["Accrued Salaries","Accrued Utilities","Accrued Interest","Provision for Taxation","Other Accruals"],
     "Sales": ["Local Sales","Export Sales","Services Revenue","Rental Income","Other Revenue"],
-    "Administrative Expenses": ["Salaries & Wages","Rent","Utilities","Depreciation","Amortization","Professional Fees","Insurance","Repairs & Maintenance","Other Admin"],
     "Distribution Cost": ["Distribution Salaries","Freight & Carriage","Marketing & Advertising","Commission","Travel & Conveyance","Other Distribution"],
     "Other": ["Other Assets","Other Liabilities","Other Income Items","Other Expenses"],
   };
   const SUB_LINE_ITEM_MAP: Record<string, string[]> = {
-    "Land": ["Freehold Land","Leasehold Land"],
-    "Buildings": ["Factory Building","Office Building","Warehouse"],
-    "Plant & Machinery": ["Production Machinery","Generator","Compressor"],
-    "Vehicles": ["Company Vehicles","Delivery Vehicles"],
-    "Raw Materials": ["Direct Materials","Packaging Materials"],
-    "Finished Goods": ["Finished Products","By-Products"],
-    "Current Accounts": ["Operating Account","Collection Account"],
+    "Property, plant and equipment": ["Land","Building","Plant and machinery","Furniture and fixtures","Office equipment","Vehicles","Capital work in progress"],
+    "Land": ["Freehold land","Leasehold land"],
+    "Building": ["Factory building","Office building","Warehouse"],
+    "Plant and machinery": ["Factory machinery","Generator","Compressor"],
+    "Vehicles": ["Company vehicles","Delivery vehicles"],
+    "Intangible assets": ["ERP software","Patents and trademarks"],
+    "Long-term investments": ["Investments in subsidiaries","Treasury bills"],
+    "Long-term loans": ["Diminishing musharaka","Term finance"],
+    "Inventories": ["Raw materials","Packing materials","Work in progress","Finished goods","Stores and spares"],
+    "Raw materials": ["Purchases","Raw material consumed"],
+    "Finished goods": ["Finished products","Scrap sales"],
+    "Trade debts": ["Local customers","Export customers","Government receivables"],
+    "Advances and deposits": ["Advances to employees","Advances to suppliers","Security deposits","Prepayments"],
+    "Other receivables": ["Income tax refundable","Sales tax refundable","Income tax payable"],
+    "Cash and bank balances": ["Cash in hand","Current account","Savings account","Foreign currency account","Cash credit"],
+    "Sales": ["Local sales","Export sales","Service revenue","Scrap sales"],
+    "Direct material": ["Purchases","Raw material consumed","Packing materials"],
+    "Direct labour": ["Factory salaries","Factory wages","Factory insurance","Factory utilities","Factory rent"],
+    "Manufacturing overhead": ["Depreciation expense","Repair and maintenance"],
+    "Salaries and benefits": ["Admin salaries","Admin wages","Provident fund","Gratuity"],
+    "Advertisement and marketing": ["Advertisement and marketing"],
+    "Communication expenses": ["Communication expenses"],
+    "Depreciation": ["Depreciation expense"],
+    "Amortisation": ["Amortisation expense"],
+    "Freight outward": ["Delivery expense","Forwarding expense"],
+    "Printing and stationery": ["Printing and stationery"],
+    "Repair and maintenance": ["Repair and maintenance","Repair and maintenance (admin)"],
+    "Travelling and conveyance": ["Travelling and conveyance"],
+    "Utilities": ["Office utilities","Factory utilities"],
+    "Interest income": ["Interest income"],
+    "Gain on disposal": ["Gain on disposal of assets"],
+    "Markup on borrowings": ["Markup on running finance","Markup on term finance","Bank charges"],
+    "Current tax": ["Current tax expense","Income tax payable","Withholding tax payable","Sales tax payable"],
+    "Deferred tax": ["Deferred tax expense","Deferred tax liability"],
+    "Share capital": ["Ordinary shares","Preference shares"],
+    "Reserves": ["General reserve","Capital reserve","Surplus on revaluation of fixed assets"],
+    "Retained earnings": ["Accumulated profit"],
+    "Long-term loans and advances": ["Term finance","Diminishing musharaka","Running finance"],
+    "Short-term borrowings": ["Running finance","Cash credit","Current maturity of long-term loan","Loan from directors"],
+    "Trade and other payables": ["Suppliers","Advance from customers"],
+    "Accrued liabilities": ["Accrued expenses","Accrued wages","Sales tax payable","Withholding tax payable"],
+    "Staff retirement benefits": ["Gratuity","Provident fund"],
+    "Taxation": ["Income tax payable","Sales tax payable","Current tax expense"],
   };
-  const NOTE_NOS = Array.from({ length: 40 }, (_, i) => `Note ${i + 1}`);
+  const NOTE_NOS = Array.from({ length: 40 }, (_, i) => String(i + 1));
   const NORMAL_BALANCES = ["Debit","Credit"];
-  const WP_AREAS = ["Cash & Bank","Receivables","Inventory","Fixed Assets","Payables","Revenue","Expenses","Equity","Taxation","Compliance","Other"];
+  const WP_AREAS = ["PPE","Intangibles","Inventory","Receivables","Cash and Bank","Other Assets","Payables","Provisions","Borrowings","Equity","Revenue","Cost of Sales","Operating Expenses","Other Income","Taxation","Fixed Assets","Cash & Bank","Compliance","Other"];
   const RISK_LEVELS = ["Low","Medium","High","Significant"];
 
   const TextField = ({ code, label, placeholder }: { code: string; label: string; placeholder?: string }) => {
@@ -3961,11 +4024,11 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
   const riskColor = (r: string) => r === "High" || r === "Significant" ? "text-red-600 bg-red-50" : r === "Medium" ? "text-amber-600 bg-amber-50" : "text-green-600 bg-green-50";
 
   const FsSelect = ({ value, options, rowId, field }: { value: string; options: string[]; rowId: number; field: string }) => {
-    const cellKey = `${rowId}-${field}`;
+    const effectiveOptions = value && !options.includes(value) ? [value, ...options] : options;
     return (
       <select className="w-full h-7 text-[10px] border-0 bg-transparent focus:ring-1 focus:ring-indigo-300 rounded cursor-pointer" value={value || ""} onChange={e => onUpdateFsLine(rowId, { [field]: e.target.value })}>
         <option value="">—</option>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
+        {effectiveOptions.map(o => <option key={o} value={o}>{o}</option>)}
       </select>
     );
   };
@@ -4180,8 +4243,8 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
                       <td className="px-1 py-1"><FsSelect value={row.statementType} options={STATEMENT_TYPES} rowId={row.id} field="statementType" /></td>
                       <td className="px-1 py-1"><FsSelect value={row.fsSection} options={FS_SECTIONS} rowId={row.id} field="fsSection" /></td>
                       <td className="px-1 py-1"><FsSelect value={row.majorHead} options={MAJOR_HEADS} rowId={row.id} field="majorHead" /></td>
-                      <td className="px-1 py-1"><FsSelect value={row.lineItem} options={lineItems.length > 0 ? lineItems : MAJOR_HEADS} rowId={row.id} field="lineItem" /></td>
-                      <td className="px-1 py-1"><FsSelect value={row.subLineItem} options={subItems.length > 0 ? subItems : (lineItems.length > 0 ? lineItems : ["N/A"])} rowId={row.id} field="subLineItem" /></td>
+                      <td className="px-1 py-1"><FsSelect value={row.lineItem} options={lineItems.length > 0 ? lineItems : ALL_LINE_ITEMS} rowId={row.id} field="lineItem" /></td>
+                      <td className="px-1 py-1"><FsSelect value={row.subLineItem} options={subItems.length > 0 ? subItems : (lineItems.length > 0 ? lineItems : ALL_LINE_ITEMS)} rowId={row.id} field="subLineItem" /></td>
                       <td className="px-1 py-1"><FsTextCell value={row.accountName} rowId={row.id} field="accountName" /></td>
                       <td className="px-1 py-1"><FsTextCell value={row.accountCode} rowId={row.id} field="accountCode" /></td>
                       <td className="px-1 py-1"><FsSelect value={row.noteNo} options={NOTE_NOS} rowId={row.id} field="noteNo" /></td>
