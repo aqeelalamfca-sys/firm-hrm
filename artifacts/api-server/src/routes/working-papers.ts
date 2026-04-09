@@ -2438,7 +2438,6 @@ router.post("/sessions/:id/variables/auto-fill", requireRoles(...WP_ROLES_WRITE)
       // Create new row — only for Primary and Secondary variables
       const value = extracted?.value || def.defaultValue || "";
       if (!value && cat === "primary") {
-        // Primary var with no value — still create the row so UI shows it as missing
         const [v] = await db.insert(wpVariablesTable).values({
           sessionId,
           variableCode: def.variableCode,
@@ -2450,6 +2449,9 @@ router.post("/sessions/:id/variables/auto-fill", requireRoles(...WP_ROLES_WRITE)
           confidence: "0",
           sourceType: "primary_session",
           reviewStatus: "missing",
+        }).onConflictDoUpdate({
+          target: [wpVariablesTable.sessionId, wpVariablesTable.variableCode],
+          set: { category: def.variableGroup, variableName: def.variableName, updatedAt: new Date() },
         }).returning();
         results.push(v);
         created++;
@@ -2477,6 +2479,17 @@ router.post("/sessions/:id/variables/auto-fill", requireRoles(...WP_ROLES_WRITE)
         sourceSheet: extracted?.sourceSheet || null,
         sourcePage: extracted?.sourcePage || null,
         reviewStatus,
+      }).onConflictDoUpdate({
+        target: [wpVariablesTable.sessionId, wpVariablesTable.variableCode],
+        set: {
+          autoFilledValue: value,
+          rawExtractedValue: extracted?.value || null,
+          finalValue: value,
+          confidence: conf,
+          sourceType: srcType,
+          reviewStatus,
+          updatedAt: new Date(),
+        },
       }).returning();
       results.push(v);
       created++;
@@ -8198,27 +8211,35 @@ router.post("/sessions/:id/parse-one-sheet-template", requireRoles(...WP_ROLES_W
     const [session] = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
     if (!session) return res.status(404).json({ error: "Session not found" });
 
-    // Find uploaded Excel file
+    // Find uploaded Excel file — prefer the most recent one with stored fileData
     let files = await db.select().from(wpUploadedFilesTable).where(eq(wpUploadedFilesTable.sessionId, sessionId));
     if (fileId) files = files.filter(f => f.id === parseInt(fileId));
-    const xlFile = files.find(f => {
-      const ext = (f.originalName || "").split(".").pop()?.toLowerCase();
-      return ext === "xlsx" || ext === "xls" || ext === "xlsm";
-    });
+    const excelFiles = files
+      .filter(f => {
+        const ext = (f.originalName || "").split(".").pop()?.toLowerCase();
+        return ext === "xlsx" || ext === "xls" || ext === "xlsm";
+      })
+      .sort((a, b) => b.id - a.id);
+    const xlFile = excelFiles.find(f => f.fileData) || excelFiles[0];
     if (!xlFile) return res.status(400).json({ error: "No Excel file uploaded for this session. Please upload the Financial_Data_Upload template first." });
 
     let wb: XLSX.WorkBook;
     try {
-      if ((xlFile as any).fileData) {
-        // Stored as base64 in DB
-        const buf = Buffer.from((xlFile as any).fileData, "base64");
+      if (xlFile.fileData) {
+        const buf = Buffer.from(xlFile.fileData, "base64");
         wb = XLSX.read(buf, { type: "buffer" });
       } else {
+        const fs = require("fs");
         const filePath = `uploads/${(xlFile as any).storedName || xlFile.originalName}`;
-        wb = XLSX.readFile(filePath);
+        if (fs.existsSync(filePath)) {
+          wb = XLSX.readFile(filePath);
+        } else {
+          return res.status(400).json({ error: `File data not available. Please re-upload the template: ${xlFile.originalName}` });
+        }
       }
-    } catch {
-      return res.status(400).json({ error: `Cannot read file: ${xlFile.originalName}` });
+    } catch (readErr: any) {
+      logger.error({ err: readErr, file: xlFile.originalName }, "Failed to read Excel file");
+      return res.status(400).json({ error: `Cannot read file: ${xlFile.originalName}. Please re-upload the template.` });
     }
 
     const parsed = parseOneSheetAuditTemplate(wb);
@@ -11886,7 +11907,8 @@ router.post("/sessions/:sessionId/upload-template", requireRoles(...WP_ROLES_WRI
       fileName: `template_${Date.now()}.xlsx`,
       originalName: req.file.originalname, mimeType: req.file.mimetype,
       fileSize: req.file.size, isValid: true,
-    }).returning();
+      fileData: req.file.buffer.toString("base64"),
+    } as any).returning();
 
     const bsTotal = tbInserts.filter(t => t.classification?.includes("Asset") || t.classification?.includes("Liabilit") || t.classification?.includes("Equity")).length;
     const plTotal = tbInserts.filter(t => t.classification?.includes("Revenue") || t.classification?.includes("Expense") || t.classification?.includes("Income")).length;

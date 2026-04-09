@@ -452,7 +452,7 @@ export const VARIABLE_DEFINITIONS: VariableDefinition[] = [
   v("super_tax_rate", "Tax & Compliance", "Super Tax", "Super Tax Rate (%)", { dataType: "number", inputMode: "percentage", pakistanReference: "ITO 2001 s.4C", displayOrder: 26 }),
   v("active_taxpayer_status", "Tax & Compliance", "Compliance Status", "Active Taxpayer (ATL) Status", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Active — Income Tax","Active — Sales Tax","Active — Both","Inactive / Suspended","Not Registered"]), aiExtractableFlag: AI, pakistanReference: "FBR ATL", displayOrder: 27 }),
   v("e_filing_status", "Tax & Compliance", "Compliance Status", "E-Filing Status (FBR)", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Fully E-Filed","Partially E-Filed","Manual Returns Only","Not Filed"]), pakistanReference: "FBR Iris Portal", displayOrder: 28 }),
-  v("audit_procedure_depth", "Tax & Compliance", "Procedure Depth", "Tax Audit Procedure Depth", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Full Substantive Testing","Risk-Based Substantive","Analytical Only","Limited Procedures"]), displayOrder: 29 }),
+  v("tax_audit_procedure_depth", "Tax & Compliance", "Procedure Depth", "Tax Audit Procedure Depth", { dataType: "text", inputMode: "dropdown", dropdownOptionsJson: dd(["Full Substantive Testing","Risk-Based Substantive","Analytical Only","Limited Procedures"]), displayOrder: 29 }),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GROUP 13 — Related Parties
