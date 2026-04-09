@@ -4862,13 +4862,13 @@ router.post("/sessions/:id/heads/:headIndex/export", requireRoles(...WP_ROLES_WR
     // ── HEADS 2-11: PDF output ─────────────────────────────────────────────────
     if (exportFormat === "pdf" && headIndex >= 2) {
       const pdfBuf = await new Promise<Buffer>((resolve, reject) => {
-        const doc = new PDFDocument({ size: "A4", margin: 45, info: { Title: `${headDef.name} — ${clientName}`, Author: firmName, Creator: "AuditWise" } });
+        const doc = new PDFDocument({ size: "A4", margin: 45, bufferPages: true, info: { Title: `${headDef.name} — ${clientName}`, Author: firmName, Creator: "AuditWise" } });
         const chunks: Buffer[] = [];
         doc.on("data", (c: Buffer) => chunks.push(c));
         doc.on("end", () => resolve(Buffer.concat(chunks)));
         doc.on("error", reject);
 
-        const NAVY = "#0F3460", BLUE = "#1E3A8A", SLATE = "#475569", LIGHT = "#EFF6FF", RED = "#B91C1C", GREEN = "#15803D";
+        const NAVY = "#0F3460", BLUE = "#1E3A8A", SLATE = "#475569", LIGHT = "#EFF6FF", RED = "#B91C1C", GREEN = "#15803D", ACCENT = "#1E40AF", AMBER = "#B45309";
         const pgW = doc.page.width - 90;
 
         const drawHRule = (color = "#CBD5E1", y?: number) => {
@@ -4877,15 +4877,17 @@ router.post("/sessions/:id/heads/:headIndex/export", requireRoles(...WP_ROLES_WR
         };
 
         const sectionTitle = (text: string) => {
-          doc.moveDown(0.5);
+          doc.moveDown(0.6);
+          if (doc.y > doc.page.height - 80) { doc.addPage(); drawRunningHeader(); }
           const sy = doc.y;
-          const barH = 16;
+          const barH = 21;
           doc.rect(45, sy, pgW, barH).fill(NAVY);
+          doc.rect(45, sy + barH, pgW, 2).fill(ACCENT);
           doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#FFFFFF")
-             .text("  " + text, 51, sy + 3.5, { width: pgW - 12, lineBreak: false });
+             .text("  " + text, 51, sy + 5.5, { width: pgW - 12, lineBreak: false });
           doc.fillColor("#1E293B").font("Helvetica").fontSize(9)
-             .text("", 45, sy + barH + 3, { lineBreak: false });
-          doc.moveDown(0.2);
+             .text("", 45, sy + barH + 6, { lineBreak: false });
+          doc.moveDown(0.15);
         };
 
         const kv = (label: string, value: string, indent = 0) => {
@@ -4893,7 +4895,17 @@ router.post("/sessions/:id/heads/:headIndex/export", requireRoles(...WP_ROLES_WR
         };
 
         const bodyText = (text: string) => {
-          doc.font("Helvetica").fontSize(9).fillColor("#1E293B").text(text || "—", { align: "justify", lineGap: 2 }).moveDown(0.3);
+          doc.font("Helvetica").fontSize(9).fillColor("#1E293B").text(text || "—", { align: "justify", lineGap: 3 }).moveDown(0.4);
+        };
+
+        // Running header context (updated per WP document)
+        let runWpCode = "", runWpName = "", runClient = "";
+        const drawRunningHeader = () => {
+          if (!runWpCode) return;
+          doc.rect(45, 40, pgW, 13).fill("#EFF6FF").rect(45, 40, pgW, 13).strokeColor("#BFDBFE").lineWidth(0.5).stroke();
+          doc.font("Helvetica").fontSize(6.5).fillColor(SLATE)
+             .text(`${firmName}  ·  ${runWpCode}  ·  ${runWpName}  ·  Client: ${runClient}  ·  CONFIDENTIAL`, 50, 44, { width: pgW - 10, lineBreak: false });
+          doc.y = 60;
         };
 
         const simpleTable = (headers: string[], rows: string[][], widths: number[]) => {
@@ -4901,40 +4913,60 @@ router.post("/sessions/:id/heads/:headIndex/export", requireRoles(...WP_ROLES_WR
           const colW = widths.map(w => (w / total) * pgW);
           const x = 45;
           let y = doc.y;
-          // Draw header (reusable for page-break continuation)
+          const HDR_H = 18;
+          const MIN_ROW_H = 18;
+          // Draw column headers (reusable for page-break continuation)
           const drawHeader = (atY: number): number => {
-            doc.rect(45, atY, pgW, 14).fill(NAVY);
+            doc.rect(45, atY, pgW, HDR_H).fill(NAVY);
+            // Accent underline
+            doc.rect(45, atY + HDR_H, pgW, 2).fill(ACCENT);
             let cx = x;
             headers.forEach((h, i) => {
-              doc.font("Helvetica-Bold").fontSize(7.5).fillColor("white").text(h, cx + 2, atY + 3, { width: colW[i] - 4, lineBreak: false });
+              doc.font("Helvetica-Bold").fontSize(8).fillColor("white")
+                 .text(h, cx + 4, atY + 5, { width: colW[i] - 8, lineBreak: false });
+              // Vertical separator
+              if (i < headers.length - 1) {
+                doc.moveTo(cx + colW[i], atY + 3).lineTo(cx + colW[i], atY + HDR_H - 3)
+                   .strokeColor("rgba(255,255,255,0.25)").lineWidth(0.4).stroke();
+              }
               cx += colW[i];
             });
-            return atY + 14;
+            return atY + HDR_H + 2;
           };
           y = drawHeader(y);
           // Data rows — re-draw header on every page break
           rows.forEach((row, ri) => {
-            const rowColor = ri % 2 === 0 ? "#F8FAFC" : "white";
-            let maxH = 14;
+            const rowColor = ri % 2 === 0 ? "#EEF2FF" : "#FFFFFF";
+            let maxH = MIN_ROW_H;
             row.forEach((cell, i) => {
-              const h2 = doc.heightOfString(cell || "—", { width: colW[i] - 6, fontSize: 8 });
-              if (h2 + 6 > maxH) maxH = h2 + 6;
+              const h2 = doc.heightOfString(String(cell || "—"), { width: colW[i] - 8, fontSize: 8.5 });
+              if (h2 + 8 > maxH) maxH = h2 + 8;
             });
             if (y + maxH > doc.page.height - 60) {
               doc.addPage();
-              y = 45;
-              y = drawHeader(y);   // ← re-render header on new page (cont.)
+              drawRunningHeader();
+              y = doc.y;
+              y = drawHeader(y);
             }
             doc.rect(45, y, pgW, maxH).fill(rowColor);
             let cx = x;
             row.forEach((cell, i) => {
-              doc.font("Helvetica").fontSize(8).fillColor("#1E293B").text(cell || "—", cx + 2, y + 3, { width: colW[i] - 6, lineBreak: true });
+              doc.font("Helvetica").fontSize(8.5).fillColor("#1E293B")
+                 .text(String(cell || "—"), cx + 4, y + 4, { width: colW[i] - 8, lineBreak: true });
+              // Vertical cell separator
+              if (i < row.length - 1) {
+                doc.moveTo(cx + colW[i], y + 2).lineTo(cx + colW[i], y + maxH - 2)
+                   .strokeColor("#CBD5E1").lineWidth(0.3).stroke();
+              }
               cx += colW[i];
             });
-            doc.rect(45, y, pgW, maxH).strokeColor("#E2E8F0").lineWidth(0.3).stroke();
+            // Row bottom border
+            doc.rect(45, y, pgW, maxH).strokeColor("#DDE3F0").lineWidth(0.3).stroke();
             y += maxH;
           });
-          doc.y = y + 4;
+          // Close bottom border of last row
+          doc.moveTo(45, y).lineTo(45 + pgW, y).strokeColor(NAVY).lineWidth(0.6).stroke();
+          doc.y = y + 6;
         };
 
         let firstDoc = true;
@@ -4950,30 +4982,81 @@ router.post("/sessions/:id/heads/:headIndex/export", requireRoles(...WP_ROLES_WR
             5: "ISA 510, ISA 520", 6: "ISA 315, ISA 330, ISA 540", 7: "ISA 240, ISA 530",
             8: "ISA 450, ISA 560, ISA 570", 9: "ISA 700, ISA 705, ISA 706", 10: "ISA 220, ISQM 2", 11: "ISQM 1, ISA 220",
           };
+          // Update running header context
+          runWpCode = wpDoc.paperCode;
+          runWpName = (wpDoc.paperName || meta?.name || headDef.name).substring(0, 50);
+          runClient = clientName.substring(0, 30);
 
-          // COVER HEADER
-          doc.rect(45, 45, pgW, 36).fill(NAVY);
-          doc.font("Helvetica-Bold").fontSize(16).fillColor("white").text(firmName, 55, 52, { width: pgW - 20, lineBreak: false });
-          doc.font("Helvetica").fontSize(8.5).fillColor("#CBD5E1").text("Chartered Accountants  |  Registered with ICAP  |  CONFIDENTIAL — FOR AUDIT USE ONLY", 55, 71, { width: pgW - 20, lineBreak: false });
-          doc.rect(45, 81, pgW, 18).fill(LIGHT);
-          doc.font("Helvetica-Bold").fontSize(10).fillColor(BLUE).text("AUDIT WORKING PAPER", 55, 85, { continued: true }).font("Helvetica").text(`  —  ${headDef.name.toUpperCase()}`, { fillColor: SLATE });
-          doc.y = 110;
+          // ── COVER PAGE ─────────────────────────────────────────────────────────
+          // Header band
+          doc.rect(45, 45, pgW, 52).fill(NAVY);
+          doc.rect(45, 97, pgW, 3).fill(ACCENT);
+          doc.font("Helvetica-Bold").fontSize(17).fillColor("white")
+             .text(firmName, 55, 53, { width: pgW - 20, lineBreak: false });
+          doc.font("Helvetica").fontSize(8).fillColor("#93C5FD")
+             .text("Chartered Accountants  |  Registered with ICAP  |  CONFIDENTIAL — FOR AUDIT USE ONLY", 55, 76, { width: pgW - 20, lineBreak: false });
+          // WP type banner
+          doc.rect(45, 100, pgW, 22).fill(LIGHT);
+          doc.font("Helvetica-Bold").fontSize(10).fillColor(BLUE)
+             .text("AUDIT WORKING PAPER", 55, 107, { continued: true, lineBreak: false })
+             .font("Helvetica").fillColor(SLATE)
+             .text(`  —  ${headDef.name.toUpperCase()}`, { lineBreak: false });
+          // Status badge (top-right of banner)
+          const wpStatus2 = (wpDoc as any).status || "Draft";
+          const badgeColor = wpStatus2 === "Final" ? GREEN : wpStatus2 === "exported" ? ACCENT : AMBER;
+          const badgeLabel = wpStatus2 === "exported" ? "Exported" : wpStatus2;
+          const badgeX = 45 + pgW - 64;
+          doc.rect(badgeX, 104, 60, 14).fill(badgeColor);
+          doc.font("Helvetica-Bold").fontSize(7.5).fillColor("white")
+             .text(badgeLabel.toUpperCase(), badgeX + 4, 107.5, { width: 52, align: "center", lineBreak: false });
+          doc.y = 130;
 
           // WP Title
-          doc.font("Helvetica-Bold").fontSize(13).fillColor(NAVY).text(`${wpDoc.paperCode}  —  ${wpDoc.paperName || meta?.name || headDef.name}`).moveDown(0.4);
-          drawHRule(BLUE);
+          doc.font("Helvetica-Bold").fontSize(14).fillColor(NAVY)
+             .text(`${wpDoc.paperCode}  —  ${wpDoc.paperName || meta?.name || headDef.name}`)
+             .moveDown(0.3);
+          drawHRule(ACCENT);
+          doc.moveDown(0.2);
 
-          // Metadata 2-column kv
+          // Metadata as styled 2-col table
           const metaRows: [string, string][] = [
-            ["Client", clientName], ["Engagement Code", engCode], ["Period", period], ["NTN / STRN", ntn],
-            ["WP Version", wpData.version || "v1.0"], ["Phase", meta?.phase || headDef.name],
-            ["ISA References", meta?.isa || headIsaR[headIndex] || "ISA 500"], ["Risk Level", meta?.riskLevel || "Medium"],
-            ["FS Area / Scope", meta?.fsArea || headDef.name], ["Assertions Covered", fmtAssertions(meta?.assertions || "C, E, A, V")],
+            ["Client", clientName],
+            ["Engagement Code", engCode],
+            ["Financial Period", period],
+            ["NTN / STRN", ntn],
+            ["WP Code / Version", `${wpDoc.paperCode}  |  ${wpData.version || "v1.0"}`],
+            ["Phase / Stage", meta?.phase || headDef.name],
+            ["ISA References", meta?.isa || headIsaR[headIndex] || "ISA 500"],
+            ["Risk Level", meta?.riskLevel || "Medium"],
+            ["FS Area / Scope", meta?.fsArea || headDef.name],
+            ["Assertions Covered", fmtAssertions(meta?.assertions || "C, E, A, V")],
             ["Lead Schedule Ref", wpData.lead_schedule_ref || "—"],
           ];
-          doc.moveDown(0.3);
-          metaRows.forEach(([k, v]) => kv(k, v, 0));
-          doc.moveDown(0.3);
+          const lblW = pgW * 0.34, valW = pgW * 0.66;
+          const metaRowH = 16;
+          let mty = doc.y;
+          // Table outer top border
+          doc.moveTo(45, mty).lineTo(45 + pgW, mty).strokeColor(NAVY).lineWidth(0.7).stroke();
+          metaRows.forEach(([k, v], i) => {
+            const bg = i % 2 === 0 ? "#F0F4FF" : "#FFFFFF";
+            doc.rect(45, mty, pgW, metaRowH).fill(bg);
+            // Divider line between label and value
+            doc.moveTo(45 + lblW, mty).lineTo(45 + lblW, mty + metaRowH).strokeColor("#C7D2FE").lineWidth(0.4).stroke();
+            // Row bottom border
+            doc.moveTo(45, mty + metaRowH).lineTo(45 + pgW, mty + metaRowH).strokeColor("#DDE3F0").lineWidth(0.3).stroke();
+            // Left edge accent
+            doc.rect(45, mty, 3, metaRowH).fill(i === 0 ? ACCENT : (i % 2 === 0 ? BLUE : "#94A3B8"));
+            // Label
+            doc.font("Helvetica-Bold").fontSize(8).fillColor(SLATE)
+               .text(k, 53, mty + 4.5, { width: lblW - 14, lineBreak: false });
+            // Value
+            doc.font("Helvetica").fontSize(8).fillColor("#1E293B")
+               .text(v || "—", 45 + lblW + 6, mty + 4.5, { width: valW - 16, lineBreak: false });
+            mty += metaRowH;
+          });
+          // Table outer bottom border
+          doc.moveTo(45, mty).lineTo(45 + pgW, mty).strokeColor(NAVY).lineWidth(0.7).stroke();
+          doc.y = mty + 10;
 
           // Sections from WP JSON
           if (wpData.objective) { sectionTitle("1. OBJECTIVE"); bodyText(wpData.objective); }
@@ -5080,7 +5163,7 @@ router.post("/sessions/:id/heads/:headIndex/export", requireRoles(...WP_ROLES_WR
 
           // SIGN-OFF BLOCK
           doc.moveDown(1);
-          if (doc.y > doc.page.height - 170) doc.addPage();
+          if (doc.y > doc.page.height - 185) { doc.addPage(); drawRunningHeader(); }
           sectionTitle("SIGN-OFF & REVIEW  (ISQM-1 / ISA 220 COMPLIANT)");
           const soRoles = ["Preparer", "Reviewer", "Approver", "EQCR"];
           const soNames = [
@@ -5097,44 +5180,66 @@ router.post("/sessions/:id/heads/:headIndex/export", requireRoles(...WP_ROLES_WR
           ];
           const colW2 = pgW / 4;
           const signY = doc.y;
-          // header row
-          doc.rect(45, signY, pgW, 16).fill(NAVY);
+          // Header row
+          doc.rect(45, signY, pgW, 20).fill(NAVY);
+          doc.rect(45, signY + 20, pgW, 2).fill(ACCENT);
           soRoles.forEach((lv, i) => {
-            doc.font("Helvetica-Bold").fontSize(9).fillColor("white").text(lv, 45 + i * colW2 + 4, signY + 4, { width: colW2 - 8, lineBreak: false });
-          });
-          // data row
-          const signRowH = 76;
-          const signRowY = signY + 16;
-          doc.rect(45, signRowY, pgW, signRowH).fill("#F8FAFC").strokeColor("#E2E8F0").lineWidth(0.3).stroke();
-          soNames.forEach((nm, i) => {
-            const cx2 = 45 + i * colW2 + 4;
-            const cw = colW2 - 8;
-            if (nm === "N/A") {
-              doc.font("Helvetica-Oblique").fontSize(8).fillColor(SLATE)
-                 .text("N/A — Not Applicable", cx2, signRowY + 30, { width: cw, lineBreak: false });
-            } else {
-              doc.font("Helvetica-Bold").fontSize(8).fillColor("#1E293B")
-                 .text(`Name: ${nm}`, cx2, signRowY + 4, { width: cw, lineBreak: false });
-              doc.font("Helvetica").fontSize(8).fillColor(SLATE)
-                 .text("Signature: _______________", cx2, signRowY + 18, { width: cw, lineBreak: false })
-                 .text(`Date: ${exportDate}`, cx2, signRowY + 32, { width: cw, lineBreak: false });
-              doc.font("Helvetica-Bold").fontSize(8).fillColor(GREEN)
-                 .text("☑  Satisfactory", cx2, signRowY + 46, { width: cw, lineBreak: false });
-              doc.font("Helvetica").fontSize(7.5).fillColor(SLATE)
-                 .text(soComments[i], cx2, signRowY + 60, { width: cw, lineBreak: false });
+            doc.font("Helvetica-Bold").fontSize(9).fillColor("white")
+               .text(lv, 45 + i * colW2 + 6, signY + 6, { width: colW2 - 12, lineBreak: false });
+            if (i < soRoles.length - 1) {
+              doc.moveTo(45 + (i + 1) * colW2, signY + 3).lineTo(45 + (i + 1) * colW2, signY + 17)
+                 .strokeColor("rgba(255,255,255,0.3)").lineWidth(0.5).stroke();
             }
           });
-          doc.y = signRowY + signRowH + 4;
+          // Data row
+          const signRowH = 84;
+          const signRowY = signY + 22;
+          soNames.forEach((nm, i) => {
+            const cellX = 45 + i * colW2;
+            const cellBg = i % 2 === 0 ? "#F0F4FF" : "#FFFFFF";
+            doc.rect(cellX, signRowY, colW2, signRowH).fill(cellBg);
+            if (i < soNames.length - 1) {
+              doc.moveTo(cellX + colW2, signRowY).lineTo(cellX + colW2, signRowY + signRowH)
+                 .strokeColor("#CBD5E1").lineWidth(0.4).stroke();
+            }
+            const cx2 = cellX + 6;
+            const cw = colW2 - 12;
+            if (nm === "N/A") {
+              doc.font("Helvetica-Oblique").fontSize(8.5).fillColor(SLATE)
+                 .text("N/A — Not Required", cx2, signRowY + 34, { width: cw, align: "center", lineBreak: false });
+            } else {
+              doc.font("Helvetica-Bold").fontSize(8).fillColor("#1E293B")
+                 .text(nm, cx2, signRowY + 5, { width: cw, lineBreak: false });
+              doc.font("Helvetica").fontSize(8).fillColor(SLATE)
+                 .text("Signature: _________________", cx2, signRowY + 20, { width: cw, lineBreak: false })
+                 .text(`Date: ${exportDate}`, cx2, signRowY + 35, { width: cw, lineBreak: false });
+              doc.font("Helvetica-Bold").fontSize(8).fillColor(GREEN)
+                 .text("[+] Satisfactory", cx2, signRowY + 50, { width: cw, lineBreak: false });
+              doc.font("Helvetica").fontSize(7).fillColor(SLATE)
+                 .text(soComments[i], cx2, signRowY + 65, { width: cw, lineBreak: true });
+            }
+          });
+          // Outer border
+          doc.rect(45, signRowY, pgW, signRowH).strokeColor(NAVY).lineWidth(0.6).stroke();
+          doc.y = signRowY + signRowH + 6;
 
           // Page footer
-          drawHRule("#E2E8F0");
-          doc.moveDown(0.2).font("Helvetica").fontSize(7.5).fillColor("#94A3B8")
+          doc.moveTo(45, doc.y).lineTo(45 + pgW, doc.y).strokeColor(ACCENT).lineWidth(0.8).stroke();
+          doc.moveDown(0.3).font("Helvetica").fontSize(7.5).fillColor("#94A3B8")
             .text(`${firmName}  |  CONFIDENTIAL — For Audit Use Only  |  ${clientName}  |  ${period}  |  Generated: ${new Date().toLocaleDateString("en-GB")}`, { align: "center" });
-          doc.moveDown(0.1).font("Helvetica-Bold").fontSize(8).fillColor(SLATE).text("⚠  LOCKED after Engagement Partner sign-off. Amendment requires EQCR re-review per ISQM 1.", { align: "center" });
+          doc.moveDown(0.15).font("Helvetica").fontSize(7.5).fillColor(SLATE)
+             .text("LOCKED after Engagement Partner sign-off. Amendment requires EQCR re-review per ISQM 1.", { align: "center" });
         }
 
-        // Page numbers
-        const pagesR = (doc as any)._pageBuffer?.length || 0;
+        // Stamp page numbers on every page using buffered pages
+        const pageRange = doc.bufferedPageRange();
+        for (let i = 0; i < pageRange.count; i++) {
+          doc.switchToPage(pageRange.start + i);
+          // Bottom-right page number
+          doc.font("Helvetica").fontSize(7.5).fillColor("#94A3B8")
+             .text(`Page ${i + 1} of ${pageRange.count}`, 45, doc.page.height - 28, { width: pgW, align: "right", lineBreak: false });
+        }
+        doc.flushPages();
         doc.end();
       });
 
