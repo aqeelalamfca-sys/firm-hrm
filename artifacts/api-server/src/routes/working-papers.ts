@@ -4138,22 +4138,69 @@ function dxFirmHeader(firmName: string, clientName: string, docTitle: string, pe
         borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
       })] })],
     }),
+    new Paragraph({ text: "", spacing: { after: 100 } }),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      borders: {
+        top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE },
+        left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE },
+        insideH: { style: BorderStyle.NONE }, insideV: { style: BorderStyle.NONE },
+      },
+      rows: [new TableRow({
+        children: [
+          // Left cell — WP titles (60%)
+          new TableCell({
+            width: { size: 60, type: WidthType.PERCENTAGE },
+            borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: "AUDIT WORKING PAPERS", bold: true, size: 20, color: DOCX_SLATE, font: "Calibri" })],
+                spacing: { after: 40 },
+              }),
+              new Paragraph({
+                children: [new TextRun({ text: docTitle.toUpperCase(), bold: true, size: 32, color: DOCX_BLUE, font: "Calibri" })],
+                spacing: { after: 30 },
+              }),
+              new Paragraph({
+                children: [new TextRun({ text: extra?.fsArea || extra?.phase || "", bold: true, size: 24, color: DOCX_NAVY, font: "Calibri" })],
+                spacing: { after: 0 },
+              }),
+            ],
+            verticalAlign: "center" as any,
+          }),
+          // Right cell — Reference Number (40%)
+          new TableCell({
+            width: { size: 40, type: WidthType.PERCENTAGE },
+            shading: { fill: "EEF2FF", type: ShadingType.SOLID },
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 4, color: DOCX_NAVY },
+              bottom: { style: BorderStyle.SINGLE, size: 4, color: DOCX_NAVY },
+              left: { style: BorderStyle.SINGLE, size: 4, color: DOCX_NAVY },
+              right: { style: BorderStyle.SINGLE, size: 4, color: DOCX_NAVY },
+            },
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: "REFERENCE NO.", bold: false, size: 16, color: DOCX_SLATE, font: "Calibri" })],
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 60, after: 20 },
+              }),
+              new Paragraph({
+                children: [new TextRun({ text: extra?.wpCode || "—", bold: true, size: 52, color: DOCX_NAVY, font: "Calibri" })],
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 20 },
+              }),
+              new Paragraph({
+                children: [new TextRun({ text: extra?.engCode || "", bold: false, size: 16, color: DOCX_SLATE, font: "Calibri" })],
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 60 },
+              }),
+            ],
+            verticalAlign: "center" as any,
+          }),
+        ],
+      })],
+    }),
     new Paragraph({ text: "", spacing: { after: 120 } }),
-    new Paragraph({
-      children: [new TextRun({ text: "AUDIT WORKING PAPERS", bold: true, size: 24, color: DOCX_SLATE, font: "Calibri" })],
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 60 },
-    }),
-    new Paragraph({
-      children: [new TextRun({ text: docTitle.toUpperCase(), bold: true, size: 32, color: DOCX_BLUE, font: "Calibri" })],
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 40 },
-    }),
-    ...(extra?.fsArea ? [new Paragraph({
-      children: [new TextRun({ text: extra.fsArea, bold: true, size: 28, color: DOCX_NAVY, font: "Calibri" })],
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 140 },
-    })] : [new Paragraph({ text: "", spacing: { after: 120 } })]),
     dxTable(
       ["Field", "Details"],
       [
