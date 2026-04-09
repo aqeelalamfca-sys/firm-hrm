@@ -4899,32 +4899,38 @@ router.post("/sessions/:id/heads/:headIndex/export", requireRoles(...WP_ROLES_WR
         const simpleTable = (headers: string[], rows: string[][], widths: number[]) => {
           const total = widths.reduce((s, w) => s + w, 0);
           const colW = widths.map(w => (w / total) * pgW);
-          let x = 45, y = doc.y;
-          // Header row
-          doc.rect(45, y, pgW, 14).fill(BLUE);
-          let cx = x;
-          headers.forEach((h, i) => {
-            doc.font("Helvetica-Bold").fontSize(7.5).fillColor("white").text(h, cx + 2, y + 3, { width: colW[i] - 4, lineBreak: false });
-            cx += colW[i];
-          });
-          y += 14;
-          // Data rows
+          const x = 45;
+          let y = doc.y;
+          // Draw header (reusable for page-break continuation)
+          const drawHeader = (atY: number): number => {
+            doc.rect(45, atY, pgW, 14).fill(NAVY);
+            let cx = x;
+            headers.forEach((h, i) => {
+              doc.font("Helvetica-Bold").fontSize(7.5).fillColor("white").text(h, cx + 2, atY + 3, { width: colW[i] - 4, lineBreak: false });
+              cx += colW[i];
+            });
+            return atY + 14;
+          };
+          y = drawHeader(y);
+          // Data rows — re-draw header on every page break
           rows.forEach((row, ri) => {
             const rowColor = ri % 2 === 0 ? "#F8FAFC" : "white";
-            // estimate row height
             let maxH = 14;
             row.forEach((cell, i) => {
               const h2 = doc.heightOfString(cell || "—", { width: colW[i] - 6, fontSize: 8 });
               if (h2 + 6 > maxH) maxH = h2 + 6;
             });
-            if (y + maxH > doc.page.height - 60) { doc.addPage(); y = 45; }
+            if (y + maxH > doc.page.height - 60) {
+              doc.addPage();
+              y = 45;
+              y = drawHeader(y);   // ← re-render header on new page (cont.)
+            }
             doc.rect(45, y, pgW, maxH).fill(rowColor);
-            cx = x;
+            let cx = x;
             row.forEach((cell, i) => {
               doc.font("Helvetica").fontSize(8).fillColor("#1E293B").text(cell || "—", cx + 2, y + 3, { width: colW[i] - 6, lineBreak: true });
               cx += colW[i];
             });
-            // Border bottom
             doc.rect(45, y, pgW, maxH).strokeColor("#E2E8F0").lineWidth(0.3).stroke();
             y += maxH;
           });
@@ -5054,6 +5060,18 @@ router.post("/sessions/:id/heads/:headIndex/export", requireRoles(...WP_ROLES_WR
             simpleTable(["Note ID", "Reviewer", "Date", "Note", "Status", "Resolved By"],
               wpData.review_notes.map((n: any) => [n.note_id, n.reviewer, n.date, n.note, n.status, n.resolved_by || "—"]),
               [8, 12, 12, 40, 10, 18]);
+          }
+          if (wpData.action_points?.length) {
+            sectionTitle("13. ACTION POINTS & FOLLOW-UPS");
+            simpleTable(
+              ["Issue ID", "Description", "Risk Impact", "Assigned To", "Deadline", "Status"],
+              wpData.action_points.map((a: any) => [a.issue_id, a.description || "—", a.risk_impact || "—", a.assigned_to || "—", a.deadline || "—", a.status || "—"]),
+              [8, 36, 10, 14, 16, 10]
+            );
+          }
+          if (wpData.exceptions?.length) {
+            sectionTitle("13b. EXCEPTIONS & FINDINGS");
+            wpData.exceptions.forEach((exc: string) => doc.font("Helvetica").fontSize(9).fillColor("#1E293B").text("• " + exc).moveDown(0.1));
           }
           if (wpData.cross_references?.length) {
             sectionTitle("14. CROSS-REFERENCES");
