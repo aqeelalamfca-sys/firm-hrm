@@ -33,7 +33,7 @@ import {
   wpSamplingDetailTable,
 } from "@workspace/db";
 import { WP_LIBRARY, type WpLibraryEntry } from "../data/wp-library-seed";
-import { WP_LIBRARY as WP_FULL_LIBRARY, type WpMeta as WpMetaFull, industryToTags, itEnvToTags, isWpApplicable, WP_LIBRARY_COUNT } from "../data/wp-library-full";
+import { WP_LIBRARY as WP_FULL_LIBRARY, type WpMeta as WpMetaFull, industryToTags, itEnvToTags, isWpApplicable, WP_LIBRARY_COUNT, WP_CATEGORIES, wpCodeToCategory, getWpsByCategory } from "../data/wp-library-full";
 import { VARIABLE_DEFINITIONS, EXTRACTION_FIELD_TO_VARIABLE_MAP, VARIABLE_GROUPS, DEPENDENCY_RULES, PRIMARY_VARIABLE_CODES, SECONDARY_VARIABLE_CODES } from "../data/variable-definitions";
 import {
   runTBEngine, runGLEngine, runReconciliation, checkFinalEnforcement,
@@ -7318,6 +7318,431 @@ router.get("/sessions/:id/wp-recommendations", async (req: Request, res: Respons
     });
   } catch (err: any) {
     logger.error({ err }, "wp-recommendations error");
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /sessions/:id/categories/status
+// Returns all 17 A-Q categories with totalWp / wpUsed counts
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/sessions/:id/categories/status", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    const wpsByCategory = getWpsByCategory();
+
+    const existingDocs = await db.select({
+      paperCode: wpHeadDocumentsTable.paperCode,
+      status: wpHeadDocumentsTable.status,
+    }).from(wpHeadDocumentsTable).where(eq(wpHeadDocumentsTable.sessionId, sessionId));
+
+    const generatedSet = new Set(existingDocs.map(d => d.paperCode));
+
+    const categories = WP_CATEGORIES.map(cat => {
+      const codes = wpsByCategory[cat.key] || [];
+      const wpUsed = codes.filter(c => generatedSet.has(c)).length;
+      return {
+        key: cat.key,
+        name: cat.name,
+        totalWp: codes.length,
+        wpUsed,
+        complete: codes.length > 0 && wpUsed >= codes.length,
+        codes,
+      };
+    });
+
+    const allComplete = categories.every(c => c.totalWp === 0 || c.complete);
+
+    res.json({ categories, allComplete });
+  } catch (err: any) {
+    logger.error({ err }, "categories/status error");
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/categories/:catKey/generate-next
+// Generates the NEXT pending WP in a category, one at a time
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/sessions/:id/categories/:catKey/generate-next", requireRoles(...WP_ROLES_WRITE), aiRateLimit, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    const catKey = p(req.params.catKey).toUpperCase();
+
+    const catDef = WP_CATEGORIES.find(c => c.key === catKey);
+    if (!catDef) return res.status(400).json({ error: `Invalid category: ${catKey}` });
+
+    const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    const ai = await getAIClient();
+    if (!ai) return res.status(503).json({ error: "AI service not configured" });
+
+    const wpsByCategory = getWpsByCategory();
+    const catCodes = wpsByCategory[catKey] || [];
+    if (catCodes.length === 0) return res.json({ done: true, message: "No WPs in this category", categoryComplete: true });
+
+    const existingDocs = await db.select({ paperCode: wpHeadDocumentsTable.paperCode })
+      .from(wpHeadDocumentsTable)
+      .where(and(eq(wpHeadDocumentsTable.sessionId, sessionId)));
+    const generatedSet = new Set(existingDocs.map(d => d.paperCode));
+
+    const pendingCodes = catCodes.filter(c => !generatedSet.has(c));
+    if (pendingCodes.length === 0) return res.json({ done: true, message: "All WPs in this category are complete", categoryComplete: true });
+
+    const paperCode = pendingCodes[0];
+    const wpMeta = WP_FULL_LIBRARY[paperCode];
+    if (!wpMeta) return res.status(404).json({ error: `WP metadata not found for ${paperCode}` });
+
+    const variables = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
+    const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+    const varSummary = variables.map(v => `${v.variableName}: ${v.finalValue}`).join("\n");
+    const tbSummary = tbLines.map(l => `${l.accountCode} ${l.accountName}: Dr=${l.debit} Cr=${l.credit}`).join("\n");
+    const engCode = `ENG-${session.engagementYear || "2026"}-${String(sessionId).padStart(3, "0")}`;
+
+    const headRows = await db.select().from(wpHeadsTable).where(eq(wpHeadsTable.sessionId, sessionId));
+    let targetHead = headRows.find(h => h.headName === catDef.name);
+    if (!targetHead) {
+      const maxIdx = headRows.reduce((mx, h) => Math.max(mx, h.headIndex ?? 0), 11);
+      const [newHead] = await db.insert(wpHeadsTable).values({
+        sessionId, headIndex: maxIdx + 1, headName: catDef.name,
+        status: "in_progress", papersIncluded: catCodes,
+        outputType: "word",
+      }).returning();
+      targetHead = newHead;
+    }
+
+    const paperPrompt = `You are a Big-4 trained senior audit partner generating a COMPLETE, 100% ISA-compliant, ISQM-1 compliant, audit-defensible, inspection-ready working paper for a Pakistani CA firm (ICAP). Generate working paper "${paperCode}" — "${wpMeta.name}" for category "${catDef.key} — ${catDef.name}".
+
+═══ ENGAGEMENT DETAILS ═══
+Firm: ${session.firmName || "Alam & Aulakh Chartered Accountants"}
+Client: ${session.clientName || "Unknown"}
+Engagement Code: ${engCode}
+Entity Type: ${session.entityType || "Private Limited"}
+Financial Year End: ${session.periodEnd || "30 June " + (session.engagementYear || "2026")}
+Period: ${session.periodStart || "01/07/2025"} to ${session.periodEnd || "30/06/2026"}
+Tax Year: ${session.engagementYear || "2026"}
+Reporting Framework: ${session.reportingFramework || "IFRS"}
+Engagement Type: ${(session.engagementType || "statutory_audit").replace(/_/g, " ")}
+NTN: ${session.ntn || "N/A"}
+WP Phase: ${wpMeta.phase}
+ISA References: ${wpMeta.isa}
+Risk Level: ${wpMeta.riskLevel}
+FS Area / Scope: ${wpMeta.fsArea}
+Assertions Covered: ${wpMeta.assertions}
+
+═══ ENGAGEMENT VARIABLES ═══
+${smartChunk(varSummary, 2000)}
+
+═══ TRIAL BALANCE SUMMARY ═══
+${smartChunk(tbSummary, 3000)}
+
+═══ MANDATORY REQUIREMENTS ═══
+Generate a COMPLETE, SPECIFIC, NON-GENERIC working paper. Every field must reference actual client data, actual account balances from the TB above, or specific ISA paragraph numbers. No generic placeholders. All PKR amounts must be realistic and consistent with TB data.
+
+Return ONLY valid JSON with this structure:
+{
+  "paper_code": "${paperCode}",
+  "paper_name": "${wpMeta.name}",
+  "category": "${catDef.key} — ${catDef.name}",
+  "version": "v1.0",
+  "status": "Draft",
+  "lock_status": "draft",
+  "ai_generated": true,
+  "engagement_code": "${engCode}",
+  "lead_schedule_ref": "LS-${catDef.key}-${paperCode}",
+  "fs_head": "${wpMeta.fsArea}",
+  "isa_references": "${wpMeta.isa}",
+  "objective": "Specific ISA-aligned objective for this WP referencing client name and FS area. Minimum 4 sentences.",
+  "materiality_linkage": { "overall_materiality": 0, "performance_materiality": 0, "basis": "Revenue or Total Assets", "percentage": "1.5%" },
+  "risk_assertion_table": [{ "risk_description": "Specific risk", "assertion": "C,E,V", "risk_level": "High", "audit_approach": "Substantive" }],
+  "procedures_table": [{ "step_no": "1", "description": "Detailed procedure", "assertion": "C,E", "reference": "${paperCode}-P1", "done_by": "Senior Auditor", "date": "During fieldwork", "result": "Satisfactory" }],
+  "work_performed": "Detailed narrative minimum 6 sentences of what auditor did.",
+  "variance_analysis": { "current_year": 0, "prior_year": 0, "variance": 0, "variance_percentage": "0%" },
+  "evidence_table": [{ "ref": "E001", "description": "Evidence obtained", "evidence_type": "External", "source": "Bank/Client", "reliability": "High" }],
+  "auditor_judgement": "Professional narrative minimum 5 sentences.",
+  "proposed_adjustments": [],
+  "conclusion": "Satisfactory — No material exceptions noted.",
+  "review_notes": "",
+  "cross_references": ["Related WP codes"],
+  "exceptions": []
+}`;
+
+    const resp = await ai.client.chat.completions.create({
+      model: ai.model,
+      messages: [
+        { role: "system", content: "You are a Big-4 trained senior audit partner generating 100% ISA-compliant working papers for Pakistan (ICAP) audits. Return ONLY valid JSON. No markdown." },
+        { role: "user", content: paperPrompt },
+      ],
+      max_tokens: 5000, temperature: 0.2,
+      response_format: { type: "json_object" },
+    }, { signal: AbortSignal.timeout(180000) });
+
+    const raw = JSON.parse(resp.choices[0]?.message?.content || "{}");
+
+    const [doc] = await db.insert(wpHeadDocumentsTable).values({
+      sessionId, headId: targetHead.id,
+      paperCode: raw.paper_code || paperCode,
+      paperName: raw.paper_name || wpMeta.name,
+      content: JSON.stringify(raw),
+      outputFormat: "word",
+      status: "generated",
+      generatedAt: new Date(),
+    }).returning();
+
+    await db.update(wpHeadsTable).set({ status: "in_progress", updatedAt: new Date() }).where(eq(wpHeadsTable.id, targetHead.id));
+
+    const remainingCount = pendingCodes.length - 1;
+    const categoryComplete = remainingCount === 0;
+
+    if (categoryComplete) {
+      await db.update(wpHeadsTable).set({ status: "validating", updatedAt: new Date() }).where(eq(wpHeadsTable.id, targetHead.id));
+    }
+
+    res.json({
+      document: doc,
+      paperCode,
+      paperName: wpMeta.name,
+      category: catDef.key,
+      categoryName: catDef.name,
+      categoryComplete,
+      remainingInCategory: remainingCount,
+      totalInCategory: catCodes.length,
+      generatedInCategory: catCodes.length - remainingCount,
+    });
+  } catch (err: any) {
+    logger.error({ err }, "category generate-next error");
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/categories/:catKey/export-docx
+// Merged Word file for one category
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/sessions/:id/categories/:catKey/export-docx", requireRoles(...WP_ROLES_WRITE), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    const catKey = p(req.params.catKey).toUpperCase();
+    const catDef = WP_CATEGORIES.find(c => c.key === catKey);
+    if (!catDef) return res.status(400).json({ error: "Invalid category" });
+
+    const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    const wpsByCategory = getWpsByCategory();
+    const catCodes = wpsByCategory[catKey] || [];
+
+    const docs = await db.select().from(wpHeadDocumentsTable)
+      .where(and(eq(wpHeadDocumentsTable.sessionId, sessionId)));
+    const catDocs = docs.filter(d => catCodes.includes(d.paperCode));
+
+    if (catDocs.length === 0) return res.status(400).json({ error: "No generated WPs in this category" });
+
+    catDocs.sort((a, b) => catCodes.indexOf(a.paperCode) - catCodes.indexOf(b.paperCode));
+
+    const sections: any[] = [];
+    const DOCX_NAVY = "0F3460";
+
+    for (const doc of catDocs) {
+      const wp = typeof doc.content === "string" ? JSON.parse(doc.content) : (doc.content || {});
+      const children: any[] = [];
+
+      children.push(new Paragraph({
+        children: [new TextRun({ text: `${catDef.key} — ${catDef.name}`, bold: true, size: 20, color: "FFFFFF", font: "Calibri" })],
+        shading: { fill: DOCX_NAVY, type: ShadingType.SOLID },
+        spacing: { after: 80 },
+      }));
+
+      children.push(new Paragraph({
+        children: [new TextRun({ text: `${doc.paperCode} — ${doc.paperName || wp.paper_name || ""}`, bold: true, size: 28, color: DOCX_NAVY, font: "Calibri" })],
+        spacing: { after: 40 },
+      }));
+
+      const metaRows = [
+        ["Client", session.clientName || "—", "Period", session.engagementYear || "—"],
+        ["ISA References", wp.isa_references || "—", "Risk Level", wp.risk_level || "—"],
+        ["FS Area", wp.fs_head || "—", "Status", wp.status || "Draft"],
+      ];
+      children.push(new Table({
+        rows: metaRows.map(row => new TableRow({
+          children: row.map((cell, ci) => new TableCell({
+            width: { size: ci % 2 === 0 ? 25 : 25, type: WidthType.PERCENTAGE },
+            shading: ci % 2 === 0 ? { fill: "F1F5F9", type: ShadingType.SOLID } : undefined,
+            children: [new Paragraph({ children: [new TextRun({ text: cell, size: 18, bold: ci % 2 === 0, font: "Calibri", color: ci % 2 === 0 ? "475569" : "1E293B" })], spacing: { before: 40, after: 40 } })],
+          })),
+        })),
+        width: { size: 100, type: WidthType.PERCENTAGE },
+      }));
+
+      const addSection = (title: string, text: string) => {
+        if (!text) return;
+        children.push(new Paragraph({
+          children: [new TextRun({ text: title, bold: true, size: 20, color: DOCX_NAVY, font: "Calibri" })],
+          spacing: { before: 200, after: 60 },
+          border: { bottom: { style: BorderStyle.SINGLE, size: 2, color: DOCX_NAVY } },
+        }));
+        children.push(new Paragraph({
+          children: [new TextRun({ text, size: 20, font: "Calibri", color: "1E293B" })],
+          spacing: { after: 80 },
+        }));
+      };
+
+      addSection("Audit Objective", wp.objective);
+      addSection("Work Performed", wp.work_performed);
+      addSection("Auditor Judgement", wp.auditor_judgement);
+
+      const conclusionText = typeof wp.conclusion === "string" ? wp.conclusion : wp.conclusion?.status || "";
+      addSection("Conclusion", conclusionText);
+      addSection("Review Notes", typeof wp.review_notes === "string" ? wp.review_notes : "");
+
+      children.push(new Paragraph({ text: "", spacing: { after: 40 } }));
+      children.push(new Paragraph({
+        children: [new TextRun({ text: `${doc.paperCode} | ${session.clientName} | ${session.engagementYear} | Generated by AuditWise`, size: 14, color: "94A3B8", font: "Calibri" })],
+        alignment: AlignmentType.CENTER,
+      }));
+
+      sections.push({ children });
+    }
+
+    const document = new Document({
+      sections: sections.map((s, i) => ({
+        properties: i > 0 ? { page: { size: { width: 12240, height: 15840 } } } : undefined,
+        children: s.children,
+      })),
+    });
+
+    const buffer = await Packer.toBuffer(document);
+    const filename = `${catDef.key}_${catDef.name.replace(/[^a-zA-Z0-9]/g, "_")}_${session.clientName?.replace(/[^a-zA-Z0-9]/g, "_") || "Client"}.docx`;
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (err: any) {
+    logger.error({ err }, "category export-docx error");
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/categories/export-all-docx
+// Final merged Word file for ALL categories
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/sessions/:id/categories/export-all-docx", requireRoles(...WP_ROLES_WRITE), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    const wpsByCategory = getWpsByCategory();
+    const allDocs = await db.select().from(wpHeadDocumentsTable).where(eq(wpHeadDocumentsTable.sessionId, sessionId));
+    const docMap = new Map(allDocs.map(d => [d.paperCode, d]));
+
+    const DOCX_NAVY = "0F3460";
+    const sections: any[] = [];
+
+    sections.push({
+      children: [
+        new Paragraph({ spacing: { after: 400 } }),
+        new Paragraph({
+          children: [new TextRun({ text: session.firmName || "Alam & Aulakh Chartered Accountants", bold: true, size: 36, color: DOCX_NAVY, font: "Calibri" })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 120 },
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: "Complete Audit Working Papers", bold: true, size: 28, color: "475569", font: "Calibri" })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 },
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: `Client: ${session.clientName || "—"}`, size: 22, color: "1E293B", font: "Calibri" })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 60 },
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: `Engagement Year: ${session.engagementYear || "—"}`, size: 22, color: "1E293B", font: "Calibri" })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 60 },
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: `Entity Type: ${session.entityType || "—"}`, size: 22, color: "1E293B", font: "Calibri" })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 },
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: `Generated: ${new Date().toLocaleDateString()}`, size: 18, color: "94A3B8", font: "Calibri" })],
+          alignment: AlignmentType.CENTER,
+        }),
+      ],
+    });
+
+    for (const cat of WP_CATEGORIES) {
+      const catCodes = wpsByCategory[cat.key] || [];
+      const catDocs = catCodes.map(c => docMap.get(c)).filter(Boolean);
+      if (catDocs.length === 0) continue;
+
+      for (const doc of catDocs) {
+        if (!doc) continue;
+        const wp = typeof doc.content === "string" ? JSON.parse(doc.content) : (doc.content || {});
+        const children: any[] = [];
+
+        children.push(new Paragraph({
+          children: [new TextRun({ text: `${cat.key} — ${cat.name}`, bold: true, size: 20, color: "FFFFFF", font: "Calibri" })],
+          shading: { fill: DOCX_NAVY, type: ShadingType.SOLID },
+          spacing: { after: 80 },
+        }));
+        children.push(new Paragraph({
+          children: [new TextRun({ text: `${doc.paperCode} — ${doc.paperName || wp.paper_name || ""}`, bold: true, size: 28, color: DOCX_NAVY, font: "Calibri" })],
+          spacing: { after: 40 },
+        }));
+
+        const addSec = (title: string, text: string) => {
+          if (!text) return;
+          children.push(new Paragraph({
+            children: [new TextRun({ text: title, bold: true, size: 20, color: DOCX_NAVY, font: "Calibri" })],
+            spacing: { before: 160, after: 40 },
+            border: { bottom: { style: BorderStyle.SINGLE, size: 2, color: DOCX_NAVY } },
+          }));
+          children.push(new Paragraph({
+            children: [new TextRun({ text, size: 20, font: "Calibri", color: "1E293B" })],
+            spacing: { after: 60 },
+          }));
+        };
+
+        addSec("Audit Objective", wp.objective);
+        addSec("Work Performed", wp.work_performed);
+        addSec("Auditor Judgement", wp.auditor_judgement);
+        const conclusionText = typeof wp.conclusion === "string" ? wp.conclusion : wp.conclusion?.status || "";
+        addSec("Conclusion", conclusionText);
+
+        children.push(new Paragraph({
+          children: [new TextRun({ text: `${doc.paperCode} | ${session.clientName} | ${session.engagementYear}`, size: 14, color: "94A3B8", font: "Calibri" })],
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 120 },
+        }));
+
+        sections.push({ children });
+      }
+    }
+
+    const document = new Document({
+      sections: sections.map((s, i) => ({
+        properties: i > 0 ? { page: { size: { width: 12240, height: 15840 } } } : undefined,
+        children: s.children,
+      })),
+    });
+
+    const buffer = await Packer.toBuffer(document);
+    const filename = `All_Working_Papers_${session.clientName?.replace(/[^a-zA-Z0-9]/g, "_") || "Client"}_${session.engagementYear || "2026"}.docx`;
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (err: any) {
+    logger.error({ err }, "export-all-docx error");
     res.status(500).json({ error: err.message });
   }
 });

@@ -6873,395 +6873,224 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
   );
 }
 
-function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, onExport, onAutoProcessAll, onResolveException, loading, onRefresh, autoChainRunning, autoChainCurrentHead, onStopChain, onNext, onBulkApprove }: any) {
+function GenerationStage({ session, onNext, ...legacyProps }: any) {
   const { toast } = useToast();
-  const allExceptions: any[] = exceptions || [];
-  const allHeads: any[] = (heads || []).filter((h: any) => h.headIndex >= 2);
-  const [approvalInProgress, setApprovalInProgress] = useState(false);
-  const [expandedHead, setExpandedHead] = useState<number | null>(null);
-  const [previewHead, setPreviewHead] = useState<any | null>(null);
-  const [previewDocs, setPreviewDocs] = useState<any[]>([]);
-  const [previewLoading, setPreviewLoading] = useState(false);
+  const API_BASE = (import.meta.env.VITE_API_URL || "/api");
+  const token = localStorage.getItem("hrm_token");
+  const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
-  const openPreview = async (head: any) => {
-    setPreviewHead(head);
-    setPreviewDocs([]);
-    setPreviewLoading(true);
+  const [catStatus, setCatStatus] = useState<any[]>([]);
+  const [allComplete, setAllComplete] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [activeCat, setActiveCat] = useState<string | null>(null);
+  const [activeWp, setActiveWp] = useState<string | null>(null);
+  const [activeWpName, setActiveWpName] = useState<string>("");
+  const [stopRequested, setStopRequested] = useState(false);
+  const stopRef = useRef(false);
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  const fetchCategoryStatus = useCallback(async () => {
+    if (!session?.id) return [];
     try {
-      const base = import.meta.env.VITE_API_URL || "/api";
-      const token = localStorage.getItem("hrm_token");
-      const res = await fetch(`${base}/working-papers/sessions/${session?.id}/heads/${head.headIndex}/documents`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/categories/status`, { headers: authHeaders });
       if (res.ok) {
         const data = await res.json();
-        setPreviewDocs(data.documents || []);
+        const cats = data.categories || [];
+        setCatStatus(cats);
+        setAllComplete(data.allComplete || false);
+        return cats;
+      } else {
+        toast({ title: "Failed to load categories", description: "Server returned an error", variant: "destructive" });
       }
-    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
-    finally { setPreviewLoading(false); }
+    } catch (err: any) {
+      toast({ title: "Failed to load categories", description: err?.message || "Network error", variant: "destructive" });
+    }
+    return [];
+  }, [session?.id]);
+
+  useEffect(() => { fetchCategoryStatus(); }, [fetchCategoryStatus]);
+
+  const generateNextInCategory = async (catKey: string): Promise<{ categoryComplete: boolean; stopped: boolean }> => {
+    if (stopRef.current) return { categoryComplete: false, stopped: true };
+    setActiveCat(catKey);
+    setActiveWp("...");
+    setActiveWpName("Initializing...");
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/categories/${catKey}/generate-next`, {
+        method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "Generation failed", description: err.error || "Unknown error", variant: "destructive" });
+        return { categoryComplete: false, stopped: false };
+      }
+      const data = await res.json();
+      if (data.done || data.categoryComplete) {
+        await fetchCategoryStatus();
+        return { categoryComplete: true, stopped: false };
+      }
+      setActiveWp(data.paperCode);
+      setActiveWpName(`${data.paperCode} — ${data.paperName}`);
+      toast({ title: `Generated: ${data.paperCode}`, description: `${data.paperName} (${data.generatedInCategory}/${data.totalInCategory})` });
+      await fetchCategoryStatus();
+      return { categoryComplete: data.categoryComplete || false, stopped: false };
+    } catch (err: any) {
+      toast({ title: "Generation error", description: err.message, variant: "destructive" });
+      return { categoryComplete: false, stopped: false };
+    }
   };
 
-  const printPreview = () => {
-    const w = window.open("", "_blank");
-    if (!w) return;
-    const html = document.getElementById("wp-print-preview-content")?.innerHTML || "";
-    w.document.write(`<!DOCTYPE html><html><head><title>Audit Working Paper Preview</title><style>
-      body{font-family:Calibri,sans-serif;font-size:11pt;color:#1e293b;margin:0;padding:0}
-      @media print{body{margin:15mm 20mm 15mm 25mm}.no-print{display:none}.page-break{page-break-after:always}}
-      .firm-hdr{background:#0F3460;color:white;padding:16px 24px;margin-bottom:4px}
-      .firm-hdr h1{font-size:18pt;margin:0;color:white}
-      .firm-hdr p{font-size:9pt;margin:4px 0 0 0;color:#CBD5E1}
-      .wp-title{background:#EFF6FF;padding:10px 24px;border-bottom:2px solid #1E3A8A;margin-bottom:12px}
-      .wp-title h2{font-size:14pt;color:#1E3A8A;margin:0}
-      .meta-table{width:100%;border-collapse:collapse;margin:8px 0 16px 0;font-size:9pt}
-      .meta-table td{padding:4px 8px;border:1px solid #E2E8F0}
-      .meta-table td:first-child{font-weight:bold;background:#F8FAFC;width:30%;color:#475569}
-      .section-hdr{font-size:10pt;font-weight:bold;color:#1E3A8A;border-bottom:2px solid #1E3A8A;padding:6px 0 3px 0;margin:16px 0 8px 0}
-      .body-text{font-size:9.5pt;line-height:1.6;color:#1e293b;margin-bottom:8px;text-align:justify}
-      .wp-table{width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:12px}
-      .wp-table th{background:#1E3A8A;color:white;padding:5px 6px;text-align:left}
-      .wp-table td{padding:4px 6px;border:1px solid #E2E8F0;vertical-align:top}
-      .wp-table tr:nth-child(even) td{background:#F8FAFC}
-      .sign-hdr{background:#1E3A8A;color:white;padding:6px 8px;font-weight:bold;font-size:9pt;margin-top:20px}
-      .sign-grid{display:grid;grid-template-columns:repeat(5,1fr);border:1px solid #E2E8F0}
-      .sign-cell{border-right:1px solid #E2E8F0;padding:8px;font-size:8pt}
-      .sign-cell:last-child{border-right:none}
-      .sign-line{border-bottom:1px solid #666;margin:4px 0;height:16px}
-      .conclusion-box{padding:8px 12px;border-left:4px solid #15803D;background:#F0FDF4;margin:8px 0;font-weight:bold;font-size:10pt}
-      .conclusion-box.unsat{border-color:#B91C1C;background:#FEF2F2}
-      .footer{border-top:1px solid #E2E8F0;padding:6px 0;font-size:8pt;color:#94A3B8;text-align:center;margin-top:12px}
-      .confidential{background:#FEF2F2;border:1px solid #FECACA;color:#B91C1C;font-weight:bold;font-size:8pt;padding:4px 8px;text-align:center;margin-bottom:8px}
-    </style></head><body>${html}</body></html>`);
-    w.document.close();
-    setTimeout(() => w.print(), 300);
-  };
+  const runFullGeneration = async () => {
+    setGenerating(true);
+    stopRef.current = false;
+    setStopRequested(false);
 
-  const completed = allHeads.filter((h: any) => ["approved", "exported", "completed"].includes(h.status)).length;
-  const validating = allHeads.filter((h: any) => h.status === "validating" || h.status === "review").length;
-  const total = allHeads.length;
-  const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const freshCats = await fetchCategoryStatus();
+    const cats = freshCats.length > 0 ? freshCats : catStatus;
+    if (cats.length === 0) {
+      toast({ title: "No categories loaded", description: "Please try refreshing first", variant: "destructive" });
+      setGenerating(false);
+      return;
+    }
 
-  const approvableHeads = allHeads.filter((h: any) => h.status === "validating" || h.status === "review");
-  const exportableHeads = allHeads.filter((h: any) => ["approved", "exported", "completed"].includes(h.status));
+    for (const cat of cats) {
+      if (stopRef.current) break;
+      if (cat.complete || cat.totalWp === 0) continue;
 
-  const approveAll = async () => {
-    setApprovalInProgress(true);
-    let succeeded = 0;
-    let failed = 0;
-    for (const h of approvableHeads) {
-      try {
-        await onApprove(h.headIndex);
-        succeeded++;
-      } catch {
-        failed++;
+      setActiveCat(cat.key);
+      while (!stopRef.current) {
+        const result = await generateNextInCategory(cat.key);
+        if (result.stopped || result.categoryComplete) break;
+      }
+
+      if (!stopRef.current && cat.key !== "Q") {
+        toast({ title: `Category ${cat.key} complete`, description: `${cat.name} — all working papers generated` });
       }
     }
-    setApprovalInProgress(false);
-    if (failed > 0) {
-      toast({ title: `Approval completed with errors`, description: `${succeeded} approved, ${failed} failed`, variant: "destructive" });
+
+    setGenerating(false);
+    setActiveCat(null);
+    setActiveWp(null);
+    setActiveWpName("");
+    await fetchCategoryStatus();
+    if (!stopRef.current) {
+      toast({ title: "All categories complete", description: "All working papers have been generated successfully" });
     }
   };
 
-  const exportAll = async () => {
-    for (const h of exportableHeads) {
-      await onExport(h.headIndex);
-    }
+  const stopGeneration = () => {
+    stopRef.current = true;
+    setStopRequested(true);
   };
 
-  const statusIcon = (status: string) => {
-    switch (status) {
-      case "approved": case "exported": case "completed": return <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500" />;
-      case "validating": case "review": return <Eye className="w-4.5 h-4.5 text-purple-500" />;
-      case "ready": return <Play className="w-4.5 h-4.5 text-blue-500" />;
-      case "in_progress": return <Loader2 className="w-4.5 h-4.5 text-amber-500 animate-spin" />;
-      default: return <Lock className="w-4.5 h-4.5 text-gray-300" />;
+  const downloadCategoryDocx = async (catKey: string) => {
+    setDownloading(catKey);
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/categories/${catKey}/export-docx`, {
+        method: "POST", headers: authHeaders,
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Export failed");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const disposition = res.headers.get("Content-Disposition");
+      a.download = disposition?.match(/filename="(.+)"/)?.[1] || `Category_${catKey}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast({ title: "Download failed", description: err.message, variant: "destructive" });
     }
+    setDownloading(null);
   };
 
-  const statusLabel = (status: string) => {
-    switch (status) {
-      case "approved": return "Approved";
-      case "exported": return "Exported";
-      case "completed": return "Completed";
-      case "validating": return "Pending Review";
-      case "review": return "Under Review";
-      case "ready": return "Ready to Generate";
-      case "in_progress": return "Generating...";
-      default: return "Locked";
+  const downloadAllDocx = async () => {
+    setDownloading("ALL");
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/categories/export-all-docx`, {
+        method: "POST", headers: authHeaders,
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Export failed");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const disposition = res.headers.get("Content-Disposition");
+      a.download = disposition?.match(/filename="(.+)"/)?.[1] || "All_Working_Papers.docx";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast({ title: "Download failed", description: err.message, variant: "destructive" });
     }
+    setDownloading(null);
   };
 
-  const statusBadgeClass = (status: string) => {
-    switch (status) {
-      case "approved": case "exported": case "completed": return "bg-emerald-100 text-emerald-700";
-      case "validating": case "review": return "bg-purple-100 text-purple-700";
-      case "ready": return "bg-blue-100 text-blue-700";
-      case "in_progress": return "bg-amber-100 text-amber-700";
-      default: return "bg-gray-100 text-gray-400";
-    }
-  };
+  const totalWps = catStatus.reduce((s: number, c: any) => s + (c.totalWp || 0), 0);
+  const totalUsed = catStatus.reduce((s: number, c: any) => s + (c.wpUsed || 0), 0);
+  const progress = totalWps > 0 ? Math.round((totalUsed / totalWps) * 100) : 0;
+  const completedCats = catStatus.filter((c: any) => c.complete).length;
 
   return (
     <div className="space-y-5">
 
-      {/* ── Print Preview Modal ──────────────────────────────────────────── */}
-      {previewHead && createPortal(
-        <div className="fixed inset-0 z-50 flex items-stretch bg-black/60 backdrop-blur-sm">
-          <div className="flex flex-col w-full max-w-5xl mx-auto my-4 bg-white rounded-2xl shadow-2xl overflow-hidden">
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-5 py-3 bg-[#0F3460] text-white shrink-0">
-              <div className="flex items-center gap-3">
-                <FileText className="w-5 h-5 text-blue-300" />
-                <div>
-                  <p className="text-xs text-blue-200 uppercase tracking-wider">Audit Working Paper Preview</p>
-                  <p className="font-semibold text-sm">{previewHead.headName}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={printPreview} className="h-8 px-3 border-white/20 text-white hover:bg-white/10 text-xs">
-                  <Printer className="w-3.5 h-3.5 mr-1.5" />Print / Save PDF
-                </Button>
-                {previewDocs.length > 0 && (
-                  <>
-                    <Button size="sm" variant="outline" onClick={() => onExport(previewHead.headIndex, "word")} className="h-8 px-3 border-white/20 text-white hover:bg-white/10 text-xs">
-                      <Download className="w-3.5 h-3.5 mr-1.5" />Word
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => onExport(previewHead.headIndex, "pdf")} className="h-8 px-3 border-rose-400/40 text-rose-200 hover:bg-rose-500/20 text-xs">
-                      <FileText className="w-3.5 h-3.5 mr-1.5" />PDF
-                    </Button>
-                  </>
-                )}
-                <button onClick={() => setPreviewHead(null)} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
-                  <X className="w-4 h-4 text-white" />
-                </button>
-              </div>
-            </div>
-
-            {/* Modal content */}
-            <div className="flex-1 overflow-y-auto bg-slate-100 p-4">
-              {previewLoading ? (
-                <div className="flex items-center justify-center h-64">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                  <span className="ml-3 text-slate-500">Loading working papers…</span>
-                </div>
-              ) : previewDocs.length === 0 ? (
-                <div className="flex items-center justify-center h-64 text-slate-400">
-                  <AlertTriangle className="w-8 h-8 mr-3" />
-                  No documents found for this head.
-                </div>
-              ) : (
-                <div id="wp-print-preview-content" className="space-y-6">
-                  {previewDocs.map((doc: any, di: number) => {
-                    const wp = doc.content || {};
-                    const procedures: any[] = wp.procedures_table || [];
-                    const evidence: any[] = wp.evidence_table || [];
-                    const varAnalysis = wp.variance_analysis || {};
-                    const risks: any[] = wp.risk_assertion_table || [];
-                    const proposed: any[] = wp.proposed_adjustments || [];
-                    const crossRefs: any[] = wp.cross_references || [];
-                    const exceptions: any[] = wp.exceptions || [];
-                    return (
-                      <div key={di} className={cn("bg-white shadow-md rounded-xl overflow-hidden", di > 0 && "page-break")}>
-                        {/* Firm Header */}
-                        <div className="firm-hdr bg-[#0F3460] text-white px-6 py-4">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h1 className="text-lg font-bold text-white">{session?.firmName || "Audit Firm"}</h1>
-                              <p className="text-xs text-blue-200 mt-1">{session?.firmAddress || "Pakistan"} | ICAP Member Firm</p>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-xs bg-white/10 px-2 py-1 rounded font-mono">{doc.paperCode}</span>
-                              {wp.lock_status === "final" && <div className="text-[10px] text-amber-300 mt-1">FINAL — LOCKED</div>}
-                              {wp.ai_generated && <div className="text-[10px] text-blue-300 mt-1">AI Generated</div>}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* WP Title */}
-                        <div className="bg-blue-50 border-b-2 border-[#1E3A8A] px-6 py-3">
-                          <h2 className="text-base font-bold text-[#1E3A8A]">{doc.paperName || wp.paper_name}</h2>
-                          <p className="text-xs text-slate-500 mt-0.5">{wp.fs_head || previewHead.headName}</p>
-                        </div>
-
-                        <div className="px-6 py-4 space-y-5">
-                          {/* Metadata Grid */}
-                          <div className="confidential bg-red-50 border border-red-200 rounded px-4 py-2 text-xs text-red-700 font-semibold text-center uppercase tracking-wider">
-                            Confidential — Audit Working Paper — Not for External Distribution
-                          </div>
-                          <table className="meta-table w-full text-xs border-collapse">
-                            <tbody>
-                              <tr><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200 w-[28%]">Client</td><td className="px-3 py-2 border border-slate-200">{session?.clientName}</td><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200 w-[28%]">Period</td><td className="px-3 py-2 border border-slate-200">{session?.engagementYear}</td></tr>
-                              <tr><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">Engagement Code</td><td className="px-3 py-2 border border-slate-200 font-mono">{wp.engagement_code || "—"}</td><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">Lead Schedule Ref</td><td className="px-3 py-2 border border-slate-200 font-mono">{wp.lead_schedule_ref || "—"}</td></tr>
-                              <tr><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">ISA References</td><td className="px-3 py-2 border border-slate-200" colSpan={3}>{Array.isArray(wp.isa_references) ? wp.isa_references.join(", ") : wp.isa_references || "—"}</td></tr>
-                              {wp.materiality_linkage && <tr><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">Materiality</td><td className="px-3 py-2 border border-slate-200">PKR {wp.materiality_linkage.overall_materiality?.toLocaleString()} ({wp.materiality_linkage.basis} — {wp.materiality_linkage.percentage})</td><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">PM</td><td className="px-3 py-2 border border-slate-200">PKR {wp.materiality_linkage.performance_materiality?.toLocaleString()}</td></tr>}
-                              {wp.population && <tr><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">Population</td><td className="px-3 py-2 border border-slate-200">{wp.population.count} items / PKR {wp.population.amount?.toLocaleString()}</td><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">Sample</td><td className="px-3 py-2 border border-slate-200">{wp.sample?.count} items / PKR {wp.sample?.amount?.toLocaleString()} ({wp.sample?.coverage_percentage})</td></tr>}
-                              <tr><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">Status</td><td className="px-3 py-2 border border-slate-200 capitalize">{doc.status || wp.status}</td><td className="bg-slate-50 font-semibold text-slate-500 px-3 py-2 border border-slate-200">Version</td><td className="px-3 py-2 border border-slate-200">{doc.version || wp.version}</td></tr>
-                            </tbody>
-                          </table>
-
-                          {/* Objective */}
-                          {wp.objective && <div><div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Audit Objective</div><p className="body-text text-sm text-slate-700 leading-relaxed">{wp.objective}</p></div>}
-
-                          {/* Risk & Assertion Table */}
-                          {risks.length > 0 && (
-                            <div>
-                              <div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Risks & Assertions</div>
-                              <table className="wp-table w-full text-xs border-collapse">
-                                <thead><tr className="bg-[#1E3A8A] text-white"><th className="px-3 py-2 text-left">Risk</th><th className="px-3 py-2 text-left">Assertion</th><th className="px-3 py-2 text-left">Level</th><th className="px-3 py-2 text-left">Approach</th></tr></thead>
-                                <tbody>{risks.map((r: any, i: number) => <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}><td className="px-3 py-2 border border-slate-200">{r.risk_description}</td><td className="px-3 py-2 border border-slate-200">{r.assertion}</td><td className="px-3 py-2 border border-slate-200">{r.risk_level}</td><td className="px-3 py-2 border border-slate-200">{r.audit_approach}</td></tr>)}</tbody>
-                              </table>
-                            </div>
-                          )}
-
-                          {/* Procedures */}
-                          {procedures.length > 0 && (
-                            <div>
-                              <div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Audit Procedures</div>
-                              <table className="wp-table w-full text-xs border-collapse">
-                                <thead><tr className="bg-[#1E3A8A] text-white"><th className="px-3 py-2 text-left">#</th><th className="px-3 py-2 text-left">Procedure</th><th className="px-3 py-2 text-left">Assertion</th><th className="px-3 py-2 text-left">Ref</th><th className="px-3 py-2 text-left">Done By</th><th className="px-3 py-2 text-left">Date</th><th className="px-3 py-2 text-left">Result</th></tr></thead>
-                                <tbody>{procedures.map((p: any, i: number) => <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}><td className="px-3 py-2 border border-slate-200 font-mono">{p.step_no}</td><td className="px-3 py-2 border border-slate-200">{p.description}</td><td className="px-3 py-2 border border-slate-200">{p.assertion}</td><td className="px-3 py-2 border border-slate-200 font-mono">{p.reference}</td><td className="px-3 py-2 border border-slate-200">{p.done_by}</td><td className="px-3 py-2 border border-slate-200">{p.date}</td><td className="px-3 py-2 border border-slate-200">{p.result}</td></tr>)}</tbody>
-                              </table>
-                            </div>
-                          )}
-
-                          {/* Work Performed */}
-                          {wp.work_performed && <div><div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Work Performed</div><p className="body-text text-sm text-slate-700 leading-relaxed whitespace-pre-line">{wp.work_performed}</p></div>}
-
-                          {/* Variance Analysis */}
-                          {(varAnalysis.current_year || varAnalysis.prior_year) && (
-                            <div>
-                              <div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Variance Analysis</div>
-                              <table className="wp-table w-full text-xs border-collapse">
-                                <tbody>
-                                  <tr><td className="bg-slate-50 font-semibold px-3 py-2 border border-slate-200 w-[25%]">Current Year (PKR)</td><td className="px-3 py-2 border border-slate-200">{varAnalysis.current_year?.toLocaleString()}</td></tr>
-                                  <tr><td className="bg-slate-50 font-semibold px-3 py-2 border border-slate-200">Prior Year (PKR)</td><td className="px-3 py-2 border border-slate-200">{varAnalysis.prior_year?.toLocaleString()}</td></tr>
-                                  <tr><td className="bg-slate-50 font-semibold px-3 py-2 border border-slate-200">Variance</td><td className="px-3 py-2 border border-slate-200">{varAnalysis.variance?.toLocaleString()} ({varAnalysis.variance_percentage})</td></tr>
-                                  {varAnalysis.management_response && <tr><td className="bg-slate-50 font-semibold px-3 py-2 border border-slate-200">Mgmt Response</td><td className="px-3 py-2 border border-slate-200">{varAnalysis.management_response}</td></tr>}
-                                  {varAnalysis.auditor_evaluation && <tr><td className="bg-slate-50 font-semibold px-3 py-2 border border-slate-200">Auditor Evaluation</td><td className="px-3 py-2 border border-slate-200">{varAnalysis.auditor_evaluation}</td></tr>}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-
-                          {/* Evidence */}
-                          {evidence.length > 0 && (
-                            <div>
-                              <div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Evidence Obtained</div>
-                              <table className="wp-table w-full text-xs border-collapse">
-                                <thead><tr className="bg-[#1E3A8A] text-white"><th className="px-3 py-2 text-left">Ref</th><th className="px-3 py-2 text-left">Description</th><th className="px-3 py-2 text-left">Type</th><th className="px-3 py-2 text-left">Source</th><th className="px-3 py-2 text-left">Reliability</th></tr></thead>
-                                <tbody>{evidence.map((e: any, i: number) => <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}><td className="px-3 py-2 border border-slate-200 font-mono">{e.ref}</td><td className="px-3 py-2 border border-slate-200">{e.description}</td><td className="px-3 py-2 border border-slate-200">{e.evidence_type}</td><td className="px-3 py-2 border border-slate-200">{e.source}</td><td className="px-3 py-2 border border-slate-200">{e.reliability}</td></tr>)}</tbody>
-                              </table>
-                            </div>
-                          )}
-
-                          {/* Proposed Adjustments */}
-                          {proposed.length > 0 && (
-                            <div>
-                              <div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Proposed Adjustments</div>
-                              <table className="wp-table w-full text-xs border-collapse">
-                                <thead><tr className="bg-[#1E3A8A] text-white"><th className="px-3 py-2 text-left">Description</th><th className="px-3 py-2 text-left">Account</th><th className="px-3 py-2 text-left">Dr (PKR)</th><th className="px-3 py-2 text-left">Cr (PKR)</th><th className="px-3 py-2 text-left">Type</th></tr></thead>
-                                <tbody>{proposed.map((p: any, i: number) => <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}><td className="px-3 py-2 border border-slate-200">{p.description}</td><td className="px-3 py-2 border border-slate-200">{p.account_affected}</td><td className="px-3 py-2 border border-slate-200">{p.debit?.toLocaleString()}</td><td className="px-3 py-2 border border-slate-200">{p.credit?.toLocaleString()}</td><td className="px-3 py-2 border border-slate-200">{p.type}</td></tr>)}</tbody>
-                              </table>
-                            </div>
-                          )}
-
-                          {/* Auditor Judgement */}
-                          {wp.auditor_judgement && <div><div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Auditor Judgement</div><p className="body-text text-sm text-slate-700 leading-relaxed">{wp.auditor_judgement}</p></div>}
-
-                          {/* Conclusion */}
-                          {wp.conclusion && (
-                            <div className={cn("px-4 py-3 rounded border-l-4 text-sm font-semibold", wp.conclusion?.toLowerCase()?.includes("satisf") ? "bg-emerald-50 border-emerald-500 text-emerald-800" : "bg-red-50 border-red-500 text-red-800")}>
-                              {wp.conclusion}
-                            </div>
-                          )}
-
-                          {/* Review Notes */}
-                          {wp.review_notes && <div><div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Review Notes</div><p className="body-text text-sm text-slate-700 leading-relaxed whitespace-pre-line">{wp.review_notes}</p></div>}
-
-                          {/* Exceptions */}
-                          {exceptions.length > 0 && <div className="bg-amber-50 border border-amber-200 rounded-lg p-3"><div className="section-hdr text-xs font-bold text-amber-700 uppercase tracking-wider mb-2">Exceptions / Action Points</div>{exceptions.map((ex: any, i: number) => <div key={i} className="text-xs text-amber-800 mb-1">{i + 1}. {ex.description || ex}</div>)}</div>}
-
-                          {/* Cross References */}
-                          {crossRefs.length > 0 && <div><div className="section-hdr text-xs font-bold text-[#1E3A8A] border-b-2 border-[#1E3A8A] pb-1 mb-2 uppercase tracking-wider">Cross References</div><div className="flex flex-wrap gap-2">{crossRefs.map((cr: any, i: number) => <span key={i} className="bg-blue-50 border border-blue-200 text-blue-700 text-xs px-2 py-1 rounded font-mono">{typeof cr === "string" ? cr : `${cr.wp_ref} — ${cr.description}`}</span>)}</div></div>}
-
-                          {/* Sign-off Block */}
-                          <div>
-                            <div className="bg-[#1E3A8A] text-white text-xs font-bold px-4 py-2 uppercase tracking-wider mt-4">Sign-off & Review Authorization</div>
-                            <div className="grid grid-cols-5 border border-slate-200">
-                              {["Staff", "Senior", "Manager", "Partner", "EQCR"].map((role, i) => (
-                                <div key={i} className={cn("p-3 text-xs", i < 4 && "border-r border-slate-200")}>
-                                  <p className="font-semibold text-slate-600 mb-3">{role}</p>
-                                  <div className="border-b border-slate-400 h-5 mb-2" />
-                                  <p className="text-slate-400 text-[10px]">Name: _____________</p>
-                                  <div className="border-b border-slate-300 h-4 mt-3 mb-2" />
-                                  <p className="text-slate-400 text-[10px]">Date: _____________</p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Footer */}
-                          <div className="border-t border-slate-200 pt-3 flex justify-between text-[10px] text-slate-400">
-                            <span>{doc.paperCode} | {session?.clientName} | {session?.engagementYear}</span>
-                            <span>Generated by AuditWise — ISA Compliant</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* ── Auto-chain progress banner ──────────────────────────────────── */}
-      {autoChainRunning && (
+      {generating && (
         <div className="flex items-center gap-3 bg-blue-600 text-white rounded-xl px-4 py-3 shadow-md">
           <Loader2 className="w-5 h-5 animate-spin shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold leading-tight">Auto-chain running</p>
+            <p className="text-sm font-semibold leading-tight">AI Generation in Progress</p>
             <p className="text-xs text-blue-200 truncate">
-              {autoChainCurrentHead !== null ? `Generating & approving Head ${autoChainCurrentHead + 1} of 12` : "Starting…"}
+              {activeCat ? `Category ${activeCat}` : "Starting..."}{activeWpName ? ` — ${activeWpName}` : ""}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <div className="w-24 bg-blue-500/50 rounded-full h-1.5">
-              <div className="h-1.5 bg-white rounded-full transition-all duration-500" style={{ width: `${autoChainCurrentHead !== null ? ((autoChainCurrentHead + 1) / 12) * 100 : 0}%` }} />
+            <div className="w-32 bg-blue-500/50 rounded-full h-1.5">
+              <div className="h-1.5 bg-white rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
             </div>
-            <button onClick={onStopChain} className="text-xs px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg font-medium transition-colors border border-white/20">
+            <span className="text-xs font-mono">{totalUsed}/{totalWps}</span>
+            <button onClick={stopGeneration} className="text-xs px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg font-medium transition-colors border border-white/20">
               Stop
             </button>
           </div>
         </div>
       )}
 
-      <div className="space-y-5">
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+            <Layers className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-slate-900">17</p>
+            <p className="text-xs text-slate-500">Categories</p>
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
+            <FileText className="w-5 h-5 text-indigo-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-slate-900">{totalWps}</p>
+            <p className="text-xs text-slate-500">Total WPs</p>
+          </div>
+        </div>
         <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
             <CheckCircle2 className="w-5 h-5 text-emerald-600" />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{completed}/{total}</p>
-            <p className="text-xs text-slate-500">Approved</p>
+            <p className="text-2xl font-bold text-slate-900">{totalUsed}</p>
+            <p className="text-xs text-slate-500">WPs Generated</p>
           </div>
         </div>
         <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
-            <Eye className="w-5 h-5 text-purple-600" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-slate-900">{validating}</p>
-            <p className="text-xs text-slate-500">Pending Review</p>
-          </div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-            <Gauge className="w-5 h-5 text-blue-600" />
+          <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+            <Gauge className="w-5 h-5 text-amber-600" />
           </div>
           <div>
             <p className="text-2xl font-bold text-slate-900">{progress}%</p>
@@ -7271,29 +7100,28 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-orange-50 to-amber-50/50 px-4 sm:px-5 py-4 border-b border-slate-200/60">
+        <div className="bg-gradient-to-r from-[#0F3460]/5 to-blue-50/50 px-4 sm:px-5 py-4 border-b border-slate-200/60">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-                <Layers className="w-5 h-5 text-orange-600" /> Audit Head Generation
+                <Layers className="w-5 h-5 text-[#0F3460]" /> WP Generation — Category-wise
               </h2>
-              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                <p className="text-xs text-slate-500">Generate → Review → Approve → Export</p>
-                {session?.entityType && (
-                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
-                    {session.entityType}
-                  </span>
-                )}
-              </div>
+              <p className="text-xs text-slate-500 mt-0.5">AI generates one WP at a time, sequentially through each category (A → Q)</p>
             </div>
             <div className="flex items-center gap-2 self-start flex-wrap">
-              <Button variant="outline" size="sm" onClick={onRefresh} className="h-8">
+              <Button variant="outline" size="sm" onClick={fetchCategoryStatus} className="h-8">
                 <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
               </Button>
-              <Button size="sm" onClick={onAutoProcessAll} disabled={loading || completed === total} className="h-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-sm text-white">
-                {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Play className="w-3.5 h-3.5 mr-1.5" />}
-                Auto Process All
-              </Button>
+              {!generating ? (
+                <Button size="sm" onClick={runFullGeneration} disabled={allComplete} className="h-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-sm text-white">
+                  <Play className="w-3.5 h-3.5 mr-1.5" />
+                  {allComplete ? "All Complete" : "Generate All WPs"}
+                </Button>
+              ) : (
+                <Button size="sm" onClick={stopGeneration} className="h-8 bg-red-600 hover:bg-red-700 text-white">
+                  <X className="w-3.5 h-3.5 mr-1.5" /> Stop
+                </Button>
+              )}
             </div>
           </div>
 
@@ -7303,230 +7131,130 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
                 <div className={cn("h-2 rounded-full transition-all duration-500", progress === 100 ? "bg-emerald-500" : progress > 50 ? "bg-blue-500" : "bg-amber-500")} style={{ width: `${progress}%` }} />
               </div>
             </div>
-            <span className="text-xs font-medium text-slate-600 whitespace-nowrap">{completed}/{total}</span>
-          </div>
-
-          <div className="flex items-center gap-4 sm:gap-6 mt-2.5">
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className="text-slate-500 text-[11px]">{completed} Approved</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-purple-500" />
-              <span className="text-slate-500 text-[11px]">{validating} Pending</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-slate-300" />
-              <span className="text-slate-500 text-[11px]">{total - completed - validating} Remaining</span>
-            </div>
+            <span className="text-xs font-medium text-slate-600 whitespace-nowrap">{completedCats}/17 categories done</span>
           </div>
         </div>
 
-        {(approvableHeads.length > 1 || exportableHeads.length > 1) && (
-          <div className="px-4 sm:px-5 py-2.5 bg-slate-50/50 border-b border-slate-100 flex items-center gap-3 flex-wrap">
-            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Bulk:</span>
-            {approvableHeads.length > 1 && (
-              <Button size="sm" variant="outline" onClick={approveAll} disabled={loading || approvalInProgress} className="h-7 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50">
-                {approvalInProgress ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
-                Approve All ({approvableHeads.length})
-              </Button>
-            )}
-            {exportableHeads.length > 1 && (
-              <Button size="sm" variant="outline" onClick={exportAll} disabled={loading} className="h-7 text-xs border-blue-200 text-blue-700 hover:bg-blue-50">
-                <Download className="w-3 h-3 mr-1" /> Export All ({exportableHeads.length})
-              </Button>
-            )}
-            {onBulkApprove && approvableHeads.length > 0 && (
-              <Button size="sm" variant="outline" onClick={onBulkApprove} disabled={loading || approvalInProgress} className="h-7 text-xs border-violet-200 text-violet-700 hover:bg-violet-50">
-                <CheckCheck className="w-3 h-3 mr-1" /> Server Bulk Approve
-              </Button>
-            )}
-          </div>
-        )}
-
-        <div className="divide-y divide-slate-100">
-          {allHeads.map((head: any, i: number) => {
-            const canGenerate = head.status === "ready" || head.status === "in_progress";
-            const canRegenerate = head.status === "validating" || head.status === "review";
-            const canApprove = head.status === "validating" || head.status === "review";
-            const canExport = head.status === "approved" || head.status === "exported" || head.status === "completed";
-            const isLocked = head.status === "locked";
-            const isDone = ["approved", "exported", "completed"].includes(head.status);
-            const headExceptions = allExceptions.filter((e: any) => (e.headIndex === head.headIndex || e.headIndex === i) && e.status === "open");
-            const isExpanded = expandedHead === i;
-
-            return (
-              <div key={head.id} className={cn("transition-colors", isLocked ? "opacity-50" : "")}>
-                <div
-                  className={cn(
-                    "flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 cursor-pointer hover:bg-slate-50/80 transition-colors",
-                    isDone && "bg-emerald-50/30",
-                    canApprove && "bg-purple-50/20",
-                    canGenerate && "bg-blue-50/20",
-                  )}
-                  onClick={() => !isLocked && setExpandedHead(isExpanded ? null : i)}
-                >
-                  <div className={cn(
-                    "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
-                    isDone ? "bg-emerald-100 text-emerald-700" :
-                    canApprove ? "bg-purple-100 text-purple-700" :
-                    canGenerate ? "bg-blue-100 text-blue-700" :
-                    "bg-slate-100 text-slate-400"
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-[#0F3460] text-white">
+                <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider w-[55%]">Category</th>
+                <th className="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wider w-[12%]">Total WP</th>
+                <th className="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wider w-[12%]">WP Used</th>
+                <th className="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wider w-[21%]">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {catStatus.map((cat: any, idx: number) => {
+                const isActive = generating && activeCat === cat.key;
+                const isDone = cat.complete;
+                const hasWps = cat.wpUsed > 0;
+                return (
+                  <tr key={cat.key} className={cn(
+                    "transition-colors",
+                    isActive && "bg-blue-50/60",
+                    isDone && !isActive && "bg-emerald-50/30",
+                    idx % 2 === 0 && !isActive && !isDone && "bg-white",
+                    idx % 2 !== 0 && !isActive && !isDone && "bg-slate-50/40",
                   )}>
-                    {i + 1}
-                  </div>
-
-                  <div className="w-5 shrink-0 flex justify-center">
-                    {statusIcon(head.status)}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className={cn("font-medium text-sm text-slate-900", isLocked && "text-slate-400")}>{head.headName}</p>
-                      <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-medium", statusBadgeClass(head.status))}>
-                        {statusLabel(head.status)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 sm:gap-3 mt-0.5 flex-wrap">
-                      {head.papersIncluded && (
-                        <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                          <FileText className="w-3 h-3" /> {(head.papersIncluded as string[]).length} WPs
-                        </span>
-                      )}
-                      {head.outputType && (
-                        <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                          {head.outputType.toUpperCase()}
-                        </span>
-                      )}
-                      {head.generatedAt && (
-                        <span className="text-[11px] text-slate-400 flex items-center gap-1 hidden sm:flex">
-                          <Clock className="w-3 h-3" /> {new Date(head.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      )}
-                      {head.exceptionsCount > 0 && (
-                        <span className="relative group cursor-pointer">
-                          <span className="text-[11px] text-amber-600 flex items-center gap-0.5 font-medium">
-                            <AlertTriangle className="w-3 h-3" /> {head.exceptionsCount}
-                          </span>
-                          <div className="absolute left-0 top-full mt-1.5 z-50 hidden group-hover:block w-72 sm:w-80 max-h-52 overflow-y-auto">
-                            <div className="bg-white border border-amber-200 rounded-xl shadow-xl p-3 space-y-2">
-                              <p className="text-xs font-semibold text-amber-900 flex items-center gap-1.5 border-b border-amber-100 pb-1.5">
-                                <AlertTriangle className="w-3.5 h-3.5" /> {head.exceptionsCount} Exception{head.exceptionsCount > 1 ? "s" : ""}
-                              </p>
-                              {headExceptions.length > 0 ? headExceptions.slice(0, 8).map((exc: any, idx: number) => (
-                                <div key={exc.id || idx} className="flex items-start gap-2">
-                                  <span className={cn("mt-0.5 w-2 h-2 rounded-full shrink-0",
-                                    exc.severity === "critical" ? "bg-red-500" :
-                                    exc.severity === "high" ? "bg-orange-500" :
-                                    exc.severity === "medium" ? "bg-amber-500" : "bg-blue-400"
-                                  )} />
-                                  <div className="min-w-0">
-                                    <p className="text-xs font-medium text-slate-800 leading-tight">{exc.title}</p>
-                                    {exc.description && <p className="text-[10px] text-slate-500 leading-tight mt-0.5 line-clamp-2">{exc.description}</p>}
-                                  </div>
-                                </div>
-                              )) : (
-                                <p className="text-[10px] text-slate-500 italic">Check the Exceptions panel for details.</p>
-                              )}
-                              {headExceptions.length > 8 && (
-                                <p className="text-[10px] text-slate-400 pt-1 border-t border-slate-100">+ {headExceptions.length - 8} more</p>
-                              )}
-                            </div>
-                          </div>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-wrap justify-end" onClick={(e) => e.stopPropagation()}>
-                    {canGenerate && (
-                      <Button size="sm" onClick={() => onGenerate(head.headIndex)} disabled={loading} className="h-8 px-2.5 sm:px-3 bg-blue-600 hover:bg-blue-700 text-white shadow-sm text-xs">
-                        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Play className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Generate</span></>}
-                      </Button>
-                    )}
-                    {canRegenerate && (
-                      <Button size="sm" variant="outline" onClick={() => onGenerate(head.headIndex)} disabled={loading} className="h-8 px-2.5 sm:px-3 border-amber-200 text-amber-700 hover:bg-amber-50 text-xs">
-                        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><RefreshCw className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Redo</span></>}
-                      </Button>
-                    )}
-                    {canApprove && (
-                      <Button size="sm" onClick={() => onApprove(head.headIndex)} disabled={loading} className="h-8 px-2.5 sm:px-3 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm text-xs">
-                        <CheckCircle2 className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Approve</span>
-                      </Button>
-                    )}
-                    {(canExport || head.status === "approved") && (
-                      <Button size="sm" variant="outline" onClick={() => openPreview(head)} className="h-8 px-2.5 sm:px-3 border-blue-200 hover:bg-blue-50 text-blue-700 text-xs">
-                        <Eye className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Preview</span>
-                      </Button>
-                    )}
-                    {canExport && (
-                      <Button size="sm" variant="outline" onClick={() => onExport(head.headIndex, "word")} className="h-8 px-2.5 sm:px-3 border-slate-200 hover:bg-slate-50 text-xs">
-                        <Download className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Word</span>
-                      </Button>
-                    )}
-                    {canExport && head.headIndex >= 2 && (
-                      <Button size="sm" variant="outline" onClick={() => onExport(head.headIndex, "pdf")} className="h-8 px-2.5 sm:px-3 border-rose-200 hover:bg-rose-50 text-rose-700 text-xs">
-                        <FileText className="w-3.5 h-3.5 sm:mr-1.5" /><span className="hidden sm:inline">PDF</span>
-                      </Button>
-                    )}
-                    {!isLocked && (
-                      <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform hidden sm:block", isExpanded && "rotate-180")} />
-                    )}
-                  </div>
-                </div>
-
-                {isExpanded && !isLocked && (
-                  <div className="px-4 sm:px-5 pb-4 pt-2 bg-slate-50/30 border-t border-slate-100">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-                      <div className="bg-white rounded-xl p-3 border border-slate-100">
-                        <p className="text-slate-400 mb-1 text-[10px] uppercase tracking-wider">Status</p>
-                        <p className="font-medium text-slate-700 flex items-center gap-1">{statusIcon(head.status)} {statusLabel(head.status)}</p>
-                      </div>
-                      <div className="bg-white rounded-xl p-3 border border-slate-100">
-                        <p className="text-slate-400 mb-1 text-[10px] uppercase tracking-wider">Format</p>
-                        <p className="font-medium text-slate-700 flex items-center gap-1"><FileText className="w-3.5 h-3.5 text-blue-500" /> {(head.outputType || "N/A").toUpperCase()}</p>
-                      </div>
-                      <div className="bg-white rounded-xl p-3 border border-slate-100">
-                        <p className="text-slate-400 mb-1 text-[10px] uppercase tracking-wider">Exceptions</p>
-                        <p className={cn("font-medium flex items-center gap-1", head.exceptionsCount > 0 ? "text-amber-600" : "text-emerald-600")}>
-                          {head.exceptionsCount > 0 ? <><AlertTriangle className="w-3.5 h-3.5" /> {head.exceptionsCount}</> : <><CheckCircle2 className="w-3.5 h-3.5" /> None</>}
-                        </p>
-                      </div>
-                      <div className="bg-white rounded-xl p-3 border border-slate-100">
-                        <p className="text-slate-400 mb-1 text-[10px] uppercase tracking-wider">Generated</p>
-                        <p className="font-medium text-slate-700 flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5 text-slate-400" /> {head.generatedAt ? new Date(head.generatedAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "Not yet"}
-                        </p>
-                      </div>
-                    </div>
-                    {headExceptions.length > 0 && (
-                      <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
-                        <p className="text-xs font-semibold text-amber-800 mb-2 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Open Exceptions</p>
-                        <div className="space-y-1.5">
-                          {headExceptions.map((exc: any, idx: number) => (
-                            <div key={exc.id || idx} className="flex items-start gap-2 text-xs bg-white/60 rounded-lg p-2 border border-amber-100">
-                              <span className={cn("mt-0.5 w-2 h-2 rounded-full shrink-0",
-                                exc.severity === "critical" ? "bg-red-500" : exc.severity === "high" ? "bg-orange-500" : exc.severity === "medium" ? "bg-amber-500" : "bg-blue-400"
-                              )} />
-                              <div className="flex-1 min-w-0">
-                                <span className="font-medium text-slate-700">{exc.title}</span>
-                                {exc.description && <span className="text-slate-500 ml-1">— {exc.description}</span>}
-                              </div>
-                              {onResolveException && (
-                                <button onClick={() => onResolveException(exc.id, "cleared")} className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 hover:bg-green-200 font-medium">Clear</button>
-                              )}
-                            </div>
-                          ))}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className={cn(
+                          "w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
+                          isDone ? "bg-emerald-100 text-emerald-700" :
+                          isActive ? "bg-blue-100 text-blue-700" :
+                          "bg-slate-100 text-slate-500"
+                        )}>
+                          {isDone ? <CheckCircle2 className="w-4 h-4" /> :
+                           isActive ? <Loader2 className="w-4 h-4 animate-spin" /> :
+                           cat.key}
+                        </div>
+                        <div className="min-w-0">
+                          <p className={cn("font-medium text-sm", isDone ? "text-emerald-800" : "text-slate-800")}>
+                            {cat.key} — {cat.name}
+                          </p>
+                          {isActive && activeWpName && (
+                            <p className="text-[11px] text-blue-600 mt-0.5 truncate flex items-center gap-1">
+                              <Loader2 className="w-3 h-3 animate-spin" /> {activeWpName}
+                            </p>
+                          )}
                         </div>
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="text-sm font-semibold text-slate-700">{cat.totalWp}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={cn(
+                        "text-sm font-semibold",
+                        isDone ? "text-emerald-600" :
+                        cat.wpUsed > 0 ? "text-blue-600" :
+                        "text-slate-400"
+                      )}>{cat.wpUsed}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-1.5">
+                        {isDone && (
+                          <Button size="sm" variant="outline" onClick={() => downloadCategoryDocx(cat.key)}
+                            disabled={downloading === cat.key}
+                            className="h-7 px-2.5 text-xs border-blue-200 text-blue-700 hover:bg-blue-50">
+                            {downloading === cat.key ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Download className="w-3 h-3 mr-1" />}
+                            Word
+                          </Button>
+                        )}
+                        {!generating && !isDone && cat.totalWp > 0 && (
+                          <Button size="sm" variant="outline"
+                            onClick={async () => {
+                              setGenerating(true);
+                              stopRef.current = false;
+                              setStopRequested(false);
+                              setActiveCat(cat.key);
+                              while (!stopRef.current) {
+                                const r = await generateNextInCategory(cat.key);
+                                if (r.stopped || r.categoryComplete) break;
+                              }
+                              setGenerating(false);
+                              setActiveCat(null);
+                              setActiveWp(null);
+                              setActiveWpName("");
+                            }}
+                            className="h-7 px-2.5 text-xs border-blue-200 text-blue-700 hover:bg-blue-50">
+                            <Play className="w-3 h-3 mr-1" /> Generate
+                          </Button>
+                        )}
+                        {isActive && (
+                          <span className="inline-flex items-center gap-1 text-xs text-blue-600 font-medium px-2 py-1 bg-blue-50 rounded-full">
+                            <Loader2 className="w-3 h-3 animate-spin" /> Running
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="bg-slate-100 border-t-2 border-slate-300">
+                <td className="px-4 py-3 font-bold text-sm text-slate-800">Total</td>
+                <td className="px-4 py-3 text-center font-bold text-sm text-slate-800">{totalWps}</td>
+                <td className="px-4 py-3 text-center font-bold text-sm text-emerald-700">{totalUsed}</td>
+                <td className="px-4 py-3 text-center">
+                  {allComplete && (
+                    <Button size="sm" onClick={downloadAllDocx}
+                      disabled={downloading === "ALL"}
+                      className="h-8 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs shadow-sm">
+                      {downloading === "ALL" ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Download className="w-3.5 h-3.5 mr-1.5" />}
+                      Download All (Word)
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
+
       {onNext && (
         <div className="flex justify-end pt-2">
           <Button onClick={onNext} size="lg" className="px-8 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-md text-white font-semibold">
@@ -7534,7 +7262,6 @@ function GenerationStage({ heads, session, exceptions, onGenerate, onApprove, on
           </Button>
         </div>
       )}
-      </div>
     </div>
   );
 }

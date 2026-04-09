@@ -437,6 +437,97 @@ export const WP_LIBRARY: Record<string, WpMeta> = {
 /** Returns total count of papers in the library */
 export const WP_LIBRARY_COUNT = Object.keys(WP_LIBRARY).length;
 
+export const WP_CATEGORIES: { key: string; name: string }[] = [
+  { key: "A", name: "Pre-Planning & Engagement Acceptance" },
+  { key: "B", name: "Planning, Strategy & Materiality" },
+  { key: "C", name: "Risk Assessment" },
+  { key: "D", name: "Analytical Procedures" },
+  { key: "E", name: "Internal Controls" },
+  { key: "F", name: "Substantive: Assets" },
+  { key: "G", name: "Substantive: Liabilities & Equity" },
+  { key: "H", name: "Substantive: Profit & Loss" },
+  { key: "I", name: "Taxation" },
+  { key: "J", name: "Estimates, Judgments & Fair Value" },
+  { key: "K", name: "Related Parties & Compliance" },
+  { key: "L", name: "Audit Evidence & Misstatements" },
+  { key: "M", name: "Completion Procedures" },
+  { key: "N", name: "Reporting & Opinion" },
+  { key: "O", name: "Quality Control & EQCR" },
+  { key: "P", name: "Archiving & File Closure" },
+  { key: "Q", name: "Specialized / Conditional Templates" },
+];
+
+const ASSET_BS_CODES = new Set([
+  "EX-BS-01", "EX-BS-02", "EX-BS-04", "EX-BS-05", "EX-BS-07", "EX-BS-08",
+  "EX-BS-09", "EX-BS-10", "EX-BS-14", "EX-BS-15", "EX-BS-16", "EX-BS-17",
+  "EX-BS-18", "EX-BS-19", "EX-BS-20", "EX-BS-26", "EX-BS-27",
+]);
+const LIABILITY_BS_CODES = new Set([
+  "EX-BS-03", "EX-BS-06", "EX-BS-11", "EX-BS-12", "EX-BS-13",
+  "EX-BS-21", "EX-BS-22", "EX-BS-23", "EX-BS-24", "EX-BS-25",
+]);
+
+export function wpCodeToCategory(code: string): string {
+  if (code.startsWith("PP-")) return "A";
+  if (code.startsWith("DI-")) return "B";
+  if (code.startsWith("OB-")) return "B";
+  if (code.startsWith("IR-")) return "L";
+
+  if (code.startsWith("PL-")) {
+    if (["PL-03", "PL-26"].includes(code)) return "C";
+    if (["PL-04"].includes(code)) return "D";
+    if (["PL-25"].includes(code)) return "E";
+    if (["PL-27"].includes(code)) return "I";
+    if (["PL-28", "PL-29", "PL-30"].includes(code)) return "K";
+    return "B";
+  }
+
+  if (code.startsWith("EX-IC-")) return "E";
+  if (code.startsWith("EX-EST-")) return "J";
+  if (code.startsWith("EX-TAX-")) return "I";
+  if (code.startsWith("EX-RP-")) return "K";
+  if (code.startsWith("EX-PAY-")) return "H";
+  if (code.startsWith("EX-PL-")) return "H";
+
+  if (code.startsWith("EX-BS-")) {
+    if (ASSET_BS_CODES.has(code)) return "F";
+    if (LIABILITY_BS_CODES.has(code)) return "G";
+    return "F";
+  }
+
+  if (code.startsWith("EX-")) {
+    if (["EX-04"].includes(code)) return "L";
+    if (["EX-07"].includes(code)) return "L";
+    if (["EX-08", "EX-09"].includes(code)) return "G";
+    if (["EX-05", "EX-06", "EX-10"].includes(code)) return "L";
+    return "L";
+  }
+
+  if (code.startsWith("EV-")) return "L";
+  if (code === "GC-01") return "J";
+  if (code.startsWith("FH-")) return "N";
+  if (code.startsWith("FN-")) return "M";
+  if (code.startsWith("DL-")) return "N";
+  if (code.startsWith("QR-")) return "O";
+  if (code.startsWith("IN-")) return "P";
+  if (code.startsWith("SECP-") || code.startsWith("CCG-") || code.startsWith("REG-")) return "K";
+  if (code.startsWith("M")) return "Q";
+
+  return "Q";
+}
+
+export function getWpsByCategory(): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+  for (const cat of WP_CATEGORIES) {
+    result[cat.key] = [];
+  }
+  for (const code of Object.keys(WP_LIBRARY)) {
+    const cat = wpCodeToCategory(code);
+    if (result[cat]) result[cat].push(code);
+  }
+  return result;
+}
+
 /**
  * WP VISIBILITY ENGINE
  * Determines whether a WP should be recommended / visible based on session context
