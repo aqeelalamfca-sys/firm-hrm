@@ -13173,7 +13173,9 @@ router.post("/sessions/:sessionId/upload-template", requireRoles(...WP_ROLES_WRI
 
     const dataRows = rows.slice(headerIdx + 1).filter((r: any[]) => r[colMap["Line_ID"] ?? 0]);
     const tbInserts: any[] = [];
+    const fsLineInserts: any[] = [];
     const leadScheduleInserts: any[] = [];
+    let fsLineCounter = 1;
     for (const row of dataRows) {
       const get = (col: string) => row[colMap[col] ?? -1] ?? "";
       const cy = parseFloat(get("Current_Year") || "0");
@@ -13183,9 +13185,37 @@ router.post("/sessions/:sessionId/upload-template", requireRoles(...WP_ROLES_WRI
       const stType = String(get("Statement_Type"));
       const fsSection = String(get("FS_Section"));
       const majorHead = String(get("Major_Head"));
+      const lineItem = String(get("Line_Item"));
+      const subLineItem = String(get("Sub_Line_Item"));
+      const accountName = String(get("Account_Name"));
+      const accountCode = String(get("Account_Code"));
       const noteNo = String(get("Note_No"));
+      const normalBalance = String(get("Normal_Balance"));
       const wpArea = String(get("WP_Area"));
       const riskLevel = String(get("Risk_Level"));
+      const rawLineId = get("Line_ID");
+      const lineId = typeof rawLineId === "number" ? rawLineId : (parseInt(String(rawLineId)) || fsLineCounter);
+
+      fsLineInserts.push({
+        sessionId,
+        lineId,
+        statementType: stType || null,
+        fsSection: fsSection || null,
+        majorHead: majorHead || null,
+        lineItem: lineItem || null,
+        subLineItem: subLineItem || null,
+        accountName: accountName || null,
+        accountCode: accountCode || null,
+        noteNo: noteNo || null,
+        currentYear: String(cy),
+        priorYear: String(py),
+        debitTransactionValue: String(debitVal),
+        creditTransactionValue: String(creditVal),
+        normalBalance: normalBalance || null,
+        wpArea: wpArea || null,
+        riskLevel: riskLevel || null,
+      });
+      fsLineCounter++;
 
       tbInserts.push({
         sessionId,
@@ -13227,6 +13257,14 @@ router.post("/sessions/:sessionId/upload-template", requireRoles(...WP_ROLES_WRI
       const batchSize = 50;
       for (let i = 0; i < tbInserts.length; i += batchSize) {
         await db.insert(wpTrialBalanceLinesTable).values(tbInserts.slice(i, i + batchSize));
+      }
+    }
+
+    await db.delete(wpFsLinesTable).where(eq(wpFsLinesTable.sessionId, sessionId));
+    if (fsLineInserts.length > 0) {
+      const batchSize = 50;
+      for (let i = 0; i < fsLineInserts.length; i += batchSize) {
+        await db.insert(wpFsLinesTable).values(fsLineInserts.slice(i, i + batchSize));
       }
     }
 
@@ -13278,6 +13316,7 @@ router.post("/sessions/:sessionId/upload-template", requireRoles(...WP_ROLES_WRI
       success: true,
       summary: {
         totalLines: tbInserts.length,
+        fsLines: fsLineInserts.length,
         bsLines: bsTotal,
         plLines: plTotal,
         cfLines: tbInserts.filter(t => t.classification?.includes("Cash")).length,

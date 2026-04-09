@@ -1711,8 +1711,11 @@ export default function WorkingPapers() {
       });
       if (res.ok) {
         const data = await res.json();
-        toast({ title: `Template loaded: ${data.summary?.totalLines} lines, ${data.summary?.wpAreas?.length} areas` });
+        const fsCount = data.summary?.fsLines ?? data.summary?.totalLines ?? 0;
+        const areas = data.summary?.wpAreas?.length ?? 0;
+        toast({ title: `Template loaded: ${fsCount} FS lines, ${areas} WP areas` });
         await fetchSession(activeSession.id);
+        await fetchFsLines();
       } else {
         const err = await res.json();
         toast({ title: "Upload failed", description: err.error, variant: "destructive" });
