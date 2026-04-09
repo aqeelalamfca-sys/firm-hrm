@@ -12,7 +12,7 @@ version = "1.0.0"
 [[services]]
 name = "web"
 paths = [ "/" ]
-localPort = 18479
+localPort = 3000
 
 [services.development]
 run = "pnpm --filter @workspace/hrm-system run dev"
@@ -27,6 +27,6 @@ from = "/*"
 to = "/index.html"
 
 [services.env]
-PORT = "18479"
+PORT = "3000"
 BASE_PATH = "/"
-API_PORT = "8080"
+API_PORT = "5000"
