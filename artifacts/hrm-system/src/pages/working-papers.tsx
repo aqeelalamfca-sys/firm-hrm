@@ -461,7 +461,7 @@ export default function WorkingPapers() {
       });
       if (res.ok) {
         const session = await res.json();
-        toast({ title: "Session created", description: `${newClientName} — ${newEntityType}` });
+        toast({ title: "Session created successfully!", description: `${newClientName} — ${newEntityType}. Now upload your financial statements.` });
         setNewClientName("");
         setNewNtn("");
         setNewStrn("");
@@ -470,8 +470,10 @@ export default function WorkingPapers() {
         setNewAuditFirmName("");
         setNewAuditFirmLogo(null);
         setLogoPreview("");
+        stageInitialisedRef.current = false;
         await fetchSessions();
         await fetchSession(session.id);
+        setStage("upload");
       } else {
         const err = await res.json().catch(() => ({ error: "Unknown error" }));
         toast({ title: "Failed to create session", description: err.error || "Server error", variant: "destructive" });

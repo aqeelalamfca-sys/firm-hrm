@@ -76,6 +76,15 @@ const FILE_SIZE_LIMITS: Record<string, number> = {
 const VALID_SESSION_STATUSES = ["upload", "extraction", "data_sheet", "arranged_data", "variables", "wp_listing", "generation", "audit_chain", "review", "export", "completed"] as const;
 const VALID_ENTITY_TYPES = ["Public Limited (Listed)", "Public Limited (Unlisted)", "Private Limited", "Private Limited Company", "Single Member Company (SMC)", "Single Member", "Not-for-Profit (Section 42)", "NGO/NPO", "Limited Liability Partnership (LLP)", "LLP", "Association of Persons (AOP)", "AOP", "Trust", "Sole Proprietorship", "Sole Proprietor", "Government Entity", "Branch Office"] as const;
 const VALID_ENGAGEMENT_TYPES = ["statutory_audit", "group_audit", "limited_review", "special_audit", "compliance_audit"] as const;
+const ENGAGEMENT_TYPE_MAP: Record<string, string> = {
+  "Statutory Audit": "statutory_audit", "Group Audit": "group_audit",
+  "Limited Review": "limited_review", "Special Audit": "special_audit",
+  "Compliance Audit": "compliance_audit",
+};
+const CONTINUITY_MAP: Record<string, string> = {
+  "First Time Engagement": "first_time", "First Time": "first_time",
+  "Recurring": "recurring", "Recurring Engagement": "recurring",
+};
 const VALID_RISK_LEVELS = ["Low", "Medium", "High", "Critical"] as const;
 const VALID_REPORTING_FRAMEWORKS = ["IFRS", "IFRS for SMEs", "AFRS", "IPSAS", "Custom", "Fourth Schedule", "Fifth Schedule"] as const;
 
@@ -161,8 +170,8 @@ const createSessionSchema = z.object({
   periodStart: z.string().min(1, "Period start is required"),
   periodEnd: z.string().min(1, "Period end is required"),
   reportingFramework: z.enum(VALID_REPORTING_FRAMEWORKS),
-  engagementType: z.enum(VALID_ENGAGEMENT_TYPES),
-  engagementContinuity: z.enum(["first_time", "recurring"]).optional().default("first_time"),
+  engagementType: z.preprocess((v) => typeof v === "string" ? (ENGAGEMENT_TYPE_MAP[v] || v) : v, z.enum(VALID_ENGAGEMENT_TYPES)),
+  engagementContinuity: z.preprocess((v) => typeof v === "string" ? (CONTINUITY_MAP[v] || v) : v, z.enum(["first_time", "recurring"])).optional().default("first_time"),
   auditFirmName: z.string().max(200).optional().nullable(),
   auditFirmLogo: z.string().max(500).optional().nullable(),
   preparerId: z.number().optional().nullable(),
