@@ -4179,10 +4179,9 @@ function dxFirmHeader(firmName: string, clientName: string, docTitle: string, pe
 
 function dxSection(title: string): Paragraph {
   return new Paragraph({
-    children: [new TextRun({ text: title, bold: true, size: 22, color: DOCX_BLUE, font: "Calibri" })],
-    heading: HeadingLevel.HEADING_2,
-    spacing: { before: 300, after: 120 },
-    border: { bottom: { style: BorderStyle.SINGLE, color: DOCX_BLUE, size: 6 } },
+    children: [new TextRun({ text: `  ${title}`, bold: true, size: 22, color: "FFFFFF", font: "Calibri" })],
+    spacing: { before: 320, after: 80 },
+    shading: { type: ShadingType.SOLID, color: "auto", fill: DOCX_NAVY },
   });
 }
 
@@ -4806,10 +4805,15 @@ router.post("/sessions/:id/heads/:headIndex/export", requireRoles(...WP_ROLES_WR
         };
 
         const sectionTitle = (text: string) => {
-          doc.moveDown(0.4);
-          drawHRule(BLUE);
-          doc.moveDown(0.2).font("Helvetica-Bold").fontSize(10).fillColor(BLUE).text(text).moveDown(0.3);
-          doc.font("Helvetica").fontSize(9).fillColor("#1E293B");
+          doc.moveDown(0.5);
+          const sy = doc.y;
+          const barH = 16;
+          doc.rect(45, sy, pgW, barH).fill(NAVY);
+          doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#FFFFFF")
+             .text("  " + text, 51, sy + 3.5, { width: pgW - 12, lineBreak: false });
+          doc.fillColor("#1E293B").font("Helvetica").fontSize(9)
+             .text("", 45, sy + barH + 3, { lineBreak: false });
+          doc.moveDown(0.2);
         };
 
         const kv = (label: string, value: string, indent = 0) => {
