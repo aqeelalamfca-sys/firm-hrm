@@ -7284,7 +7284,7 @@ router.get("/sessions/:id/wp-recommendations", async (req: Request, res: Respons
       reportingFramework: session.reportingFramework || "IFRS",
     };
 
-    const results: Array<{ code: string; name: string; phase: string; isa: string; riskLevel: string; assertions: string; fsArea: string; isCore: boolean | undefined; applicable: boolean; recommended: boolean; reason: string }> = [];
+    const results: any[] = [];
     let totalApplicable = 0;
     let totalRecommended = 0;
 
@@ -7292,6 +7292,14 @@ router.get("/sessions/:id/wp-recommendations", async (req: Request, res: Respons
       const { applicable, reason, recommended } = isWpApplicable(code, meta, ctx);
       if (applicable) totalApplicable++;
       if (recommended) totalRecommended++;
+      const linkedVars: string[] = [];
+      if (meta.applicableTo?.length) linkedVars.push("entity_type");
+      if (meta.industry?.length) linkedVars.push("industry");
+      if (meta.controlledBy?.groupAuditOnly) linkedVars.push("group_audit");
+      if (meta.controlledBy?.firstYearOnly) linkedVars.push("engagement_continuity");
+      if (meta.controlledBy?.itEnvRequired?.length) linkedVars.push("it_environment");
+      if (meta.controlledBy?.taxStatus?.length) linkedVars.push("tax_status");
+      if (meta.controlledBy?.specialCond?.length) linkedVars.push("special_conditions");
       results.push({
         code,
         name: meta.name,
@@ -7304,6 +7312,7 @@ router.get("/sessions/:id/wp-recommendations", async (req: Request, res: Respons
         applicable,
         recommended,
         reason,
+        linkedVariables: linkedVars,
       });
     }
 
@@ -7331,14 +7340,53 @@ router.get("/sessions/:id/wp-recommendations", async (req: Request, res: Respons
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// POST /sessions/:id/selected-wp-codes
+// Save the list of selected WP codes for this session
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/sessions/:id/selected-wp-codes", requireRoles(...WP_ROLES_WRITE), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    const { codes } = req.body as { codes: string[] };
+    if (!Array.isArray(codes)) return res.status(400).json({ error: "codes must be an array" });
+    await db.update(wpSessionsTable).set({ selectedWpCodes: JSON.stringify(codes) }).where(eq(wpSessionsTable.id, sessionId));
+    res.json({ ok: true, count: codes.length });
+  } catch (err: any) {
+    logger.error({ err }, "save selected-wp-codes error");
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /sessions/:id/selected-wp-codes
+// Get the list of selected WP codes for this session
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/sessions/:id/selected-wp-codes", async (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    const [session] = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
+    if (!session) return res.status(404).json({ error: "Session not found" });
+    let codes: string[] = [];
+    try { codes = session.selectedWpCodes ? JSON.parse(session.selectedWpCodes) : []; } catch {}
+    res.json({ codes });
+  } catch (err: any) {
+    logger.error({ err }, "get selected-wp-codes error");
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET /sessions/:id/categories/status
-// Returns all 17 A-Q categories with totalWp / wpUsed counts
+// Returns all 17 A-Q categories with totalWp / wpUsed / selectedWp counts
 // ─────────────────────────────────────────────────────────────────────────────
 router.get("/sessions/:id/categories/status", async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(p(req.params.id));
     const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
     if (!session) return res.status(404).json({ error: "Session not found" });
+
+    let selectedCodes: string[] = [];
+    try { selectedCodes = session.selectedWpCodes ? JSON.parse(session.selectedWpCodes) : []; } catch {}
+    const selectedSet = new Set(selectedCodes);
 
     const wpsByCategory = getWpsByCategory();
 
@@ -7351,20 +7399,23 @@ router.get("/sessions/:id/categories/status", async (req: Request, res: Response
 
     const categories = WP_CATEGORIES.map(cat => {
       const codes = wpsByCategory[cat.key] || [];
-      const wpUsed = codes.filter(c => generatedSet.has(c)).length;
+      const selectedInCat = codes.filter(c => selectedSet.has(c));
+      const wpUsed = selectedInCat.filter(c => generatedSet.has(c)).length;
       return {
         key: cat.key,
         name: cat.name,
         totalWp: codes.length,
+        selectedWp: selectedInCat.length,
         wpUsed,
-        complete: codes.length > 0 && wpUsed >= codes.length,
+        complete: selectedInCat.length > 0 && wpUsed >= selectedInCat.length,
         codes,
+        selectedCodes: selectedInCat,
       };
     });
 
-    const allComplete = categories.every(c => c.totalWp === 0 || c.complete);
+    const allComplete = categories.every(c => c.selectedWp === 0 || c.complete);
 
-    res.json({ categories, allComplete });
+    res.json({ categories, allComplete, totalSelected: selectedCodes.length });
   } catch (err: any) {
     logger.error({ err }, "categories/status error");
     res.status(500).json({ error: err.message });
@@ -7390,8 +7441,14 @@ router.post("/sessions/:id/categories/:catKey/generate-next", requireRoles(...WP
     if (!ai) return res.status(503).json({ error: "AI service not configured" });
 
     const wpsByCategory = getWpsByCategory();
-    const catCodes = wpsByCategory[catKey] || [];
-    if (catCodes.length === 0) return res.json({ done: true, message: "No WPs in this category", categoryComplete: true });
+    const allCatCodes = wpsByCategory[catKey] || [];
+    if (allCatCodes.length === 0) return res.json({ done: true, message: "No WPs in this category", categoryComplete: true });
+
+    let selectedCodes: string[] = [];
+    try { selectedCodes = session.selectedWpCodes ? JSON.parse(session.selectedWpCodes) : []; } catch {}
+    const selectedSet = new Set(selectedCodes);
+    const catCodes = selectedSet.size > 0 ? allCatCodes.filter(c => selectedSet.has(c)) : allCatCodes;
+    if (catCodes.length === 0) return res.json({ done: true, message: "No selected WPs in this category", categoryComplete: true });
 
     const existingDocs = await db.select({ paperCode: wpHeadDocumentsTable.paperCode })
       .from(wpHeadDocumentsTable)
@@ -7686,6 +7743,50 @@ router.post("/sessions/:id/categories/export-all-docx", requireRoles(...WP_ROLES
         }),
       ],
     });
+
+    const tocChildren: any[] = [];
+    tocChildren.push(new Paragraph({
+      children: [new TextRun({ text: "Table of Contents", bold: true, size: 32, color: DOCX_NAVY, font: "Calibri" })],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 200 },
+    }));
+
+    const tocHeaderRow = new TableRow({
+      tableHeader: true,
+      children: [
+        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "S.No", bold: true, size: 18, font: "Calibri", color: "FFFFFF" })], alignment: AlignmentType.CENTER })], shading: { fill: DOCX_NAVY, type: ShadingType.SOLID }, width: { size: 800, type: WidthType.DXA } }),
+        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Phase", bold: true, size: 18, font: "Calibri", color: "FFFFFF" })] })], shading: { fill: DOCX_NAVY, type: ShadingType.SOLID }, width: { size: 3000, type: WidthType.DXA } }),
+        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Working Paper Title", bold: true, size: 18, font: "Calibri", color: "FFFFFF" })] })], shading: { fill: DOCX_NAVY, type: ShadingType.SOLID }, width: { size: 4500, type: WidthType.DXA } }),
+        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "FS/Scope", bold: true, size: 18, font: "Calibri", color: "FFFFFF" })] })], shading: { fill: DOCX_NAVY, type: ShadingType.SOLID }, width: { size: 2000, type: WidthType.DXA } }),
+        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "WP Ref", bold: true, size: 18, font: "Calibri", color: "FFFFFF" })], alignment: AlignmentType.CENTER })], shading: { fill: DOCX_NAVY, type: ShadingType.SOLID }, width: { size: 1500, type: WidthType.DXA } }),
+      ],
+    });
+
+    let serialNo = 0;
+    const tocDataRows: any[] = [];
+    for (const cat of WP_CATEGORIES) {
+      const catCodes = wpsByCategory[cat.key] || [];
+      const catDocs = catCodes.map(c => docMap.get(c)).filter(Boolean);
+      for (const doc of catDocs) {
+        if (!doc) continue;
+        serialNo++;
+        const wpMeta = WP_FULL_LIBRARY[doc.paperCode];
+        tocDataRows.push(new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(serialNo), size: 16, font: "Calibri" })], alignment: AlignmentType.CENTER })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: `${cat.key} — ${cat.name}`, size: 16, font: "Calibri" })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: doc.paperName || wpMeta?.name || "", size: 16, font: "Calibri" })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: wpMeta?.fsArea || "—", size: 16, font: "Calibri" })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: doc.paperCode, size: 16, font: "Calibri" })], alignment: AlignmentType.CENTER })] }),
+          ],
+        }));
+      }
+    }
+
+    if (tocDataRows.length > 0) {
+      tocChildren.push(new Table({ rows: [tocHeaderRow, ...tocDataRows], width: { size: 100, type: WidthType.PERCENTAGE } }));
+    }
+    sections.push({ children: tocChildren });
 
     for (const cat of WP_CATEGORIES) {
       const catCodes = wpsByCategory[cat.key] || [];

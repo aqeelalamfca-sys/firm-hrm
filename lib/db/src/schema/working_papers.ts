@@ -148,6 +148,7 @@ export const wpSessionsTable = pgTable("wp_sessions", {
   approverName: text("approver_name"),
   eqcrId: integer("eqcr_id"),
   eqcrName: text("eqcr_name"),
+  selectedWpCodes: text("selected_wp_codes"),
   status: wpSessionStatus("status").notNull().default("upload"),
   currentHeadIndex: integer("current_head_index").default(0),
   createdBy: integer("created_by"),

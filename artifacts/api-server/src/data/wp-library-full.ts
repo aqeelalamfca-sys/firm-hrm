@@ -457,63 +457,28 @@ export const WP_CATEGORIES: { key: string; name: string }[] = [
   { key: "Q", name: "Specialized / Conditional Templates" },
 ];
 
-const ASSET_BS_CODES = new Set([
-  "EX-BS-01", "EX-BS-02", "EX-BS-04", "EX-BS-05", "EX-BS-07", "EX-BS-08",
-  "EX-BS-09", "EX-BS-10", "EX-BS-14", "EX-BS-15", "EX-BS-16", "EX-BS-17",
-  "EX-BS-18", "EX-BS-19", "EX-BS-20", "EX-BS-26", "EX-BS-27",
-]);
-const LIABILITY_BS_CODES = new Set([
-  "EX-BS-03", "EX-BS-06", "EX-BS-11", "EX-BS-12", "EX-BS-13",
-  "EX-BS-21", "EX-BS-22", "EX-BS-23", "EX-BS-24", "EX-BS-25",
-]);
+const WP_CODE_TO_CATEGORY: Record<string, string> = {
+  "PP-01":"A","PP-02":"A","PP-03":"A","PP-04":"A","PP-05":"A","PP-06":"A","PP-07":"A","PP-08":"A","PP-09":"A","PP-10":"A","PP-11":"A","PP-12":"A","PP-13":"A","PP-14":"A","PP-15":"A",
+  "PL-01":"B","PL-02":"B","PL-05":"B","PL-06":"B","PL-07":"B","PL-08":"B","PL-09":"B","PL-10":"B","PL-11":"B","PL-12":"B","PL-13":"B","PL-14":"B","PL-31":"B","PL-32":"B","DI-06":"B","DI-01":"B","DI-02":"B","DI-04":"B",
+  "PL-03":"C","PL-26":"C","DI-07":"C","PL-20":"C","PL-21":"C","PL-22":"C","PL-23":"C","PL-24":"C","PP-18":"C","DI-18":"C","DI-19":"C","EX-01":"C",
+  "PL-04":"D","DI-05":"D","DI-03":"D","DI-14":"D","DI-15":"D","DI-16":"D","DI-17":"D","DI-08":"D","DI-09":"D","DI-12":"D",
+  "PL-25":"E","EX-IC-01":"E","EX-IC-02":"E","EX-IC-03":"E","EX-IC-04":"E","EX-IC-05":"E","EX-IC-06":"E","EX-IC-07":"E","EX-IC-08":"E","EX-IC-09":"E","EX-IC-10":"E","EX-IC-11":"E","PP-16":"E","DI-10":"E","DI-11":"E","DI-13":"E","DI-20":"E",
+  "EX-BS-01":"F","EX-BS-02":"F","EX-BS-04":"F","EX-BS-05":"F","EX-BS-07":"F","EX-BS-08":"F","EX-BS-09":"F","EX-BS-10":"F","EX-BS-14":"F","EX-BS-15":"F","EX-BS-16":"F","EX-BS-17":"F","EX-BS-18":"F","EX-BS-19":"F","EX-BS-20":"F","EX-BS-26":"F","EX-BS-27":"F","OB-01":"F","OB-02":"F","OB-03":"F","OB-04":"F",
+  "EX-08":"G","EX-09":"G","EX-BS-03":"G","EX-BS-06":"G","EX-BS-11":"G","EX-BS-12":"G","EX-BS-13":"G","EX-BS-21":"G","EX-BS-22":"G","EX-BS-23":"G","EX-BS-24":"G","EX-BS-25":"G","OB-05":"G","OB-06":"G","OB-07":"G","OB-08":"G","OB-09":"G","OB-10":"G","EX-02":"G",
+  "EX-PL-01":"H","EX-PL-02":"H","EX-PL-03":"H","EX-PL-04":"H","EX-PL-05":"H","EX-PL-06":"H","EX-PL-07":"H","EX-PL-08":"H","EX-PL-09":"H","EX-PL-10":"H","EX-PL-11":"H","EX-PL-12":"H","EX-PL-13":"H","EX-PL-14":"H","EX-PAY-01":"H","EX-PAY-02":"H","EX-PAY-03":"H","EX-PAY-04":"H","EX-PAY-05":"H","EX-PL-15":"H",
+  "PL-27":"I","EX-TAX-01":"I","EX-TAX-02":"I","EX-TAX-03":"I","EX-TAX-04":"I","EX-TAX-05":"I","EX-TAX-06":"I","EX-TAX-07":"I","EX-TAX-08":"I","EX-TAX-09":"I","EX-TAX-10":"I","EX-TAX-11":"I","EX-TAX-12":"I","PL-15":"I","PL-16":"I","PL-17":"I","PL-18":"I","REG-01":"I","REG-02":"I","PL-19":"I",
+  "EX-EST-01":"J","EX-EST-02":"J","EX-EST-03":"J","EX-EST-04":"J","EX-EST-05":"J","EX-EST-06":"J","EX-EST-07":"J","EX-EST-08":"J","GC-01":"J","EX-03":"J","EX-04":"J","EX-06":"J","EV-04":"J","EV-05":"J","EV-07":"J","PP-17":"J",
+  "PL-28":"K","PL-29":"K","PL-30":"K","EX-RP-01":"K","EX-RP-02":"K","EX-RP-03":"K","EX-RP-04":"K","EX-RP-05":"K","EX-RP-06":"K","SECP-F29":"K","SECP-FA":"K","CCG-01":"K","REG-03":"K","REG-04":"K","REG-05":"K","EX-05":"K","EX-10":"K","EX-07":"K",
+  "IR-01":"L","IR-02":"L","IR-03":"L","IR-04":"L","IR-05":"L","IR-06":"L","IR-07":"L","IR-08":"L","IR-09":"L","IR-10":"L","IR-11":"L","IR-12":"L","EV-01":"L","EV-02":"L","EV-03":"L",
+  "FN-01":"M","FN-02":"M","FN-03":"M","FN-04":"M","FN-05":"M","FN-06":"M","FN-07":"M","FN-08":"M","FN-09":"M","FN-10":"M","FN-11":"M","FN-12":"M","FN-13":"M","FN-14":"M",
+  "FH-01":"N","FH-02":"N","FH-03":"N","FH-04":"N","FH-05":"N","FH-06":"N","FH-07":"N","DL-01":"N","DL-06":"N","DL-07":"N",
+  "QR-01":"O","QR-02":"O","QR-03":"O","QR-04":"O","QR-05":"O","EV-06":"O","EV-08":"O","EV-09":"O","FN-15":"O","FN-16":"O","FN-17":"O","FN-18":"O","DL-08":"O","DL-09":"O","DL-10":"O","DL-11":"O",
+  "IN-01":"P","IN-02":"P","IN-03":"P","IN-04":"P","IN-05":"P","DL-02":"P","DL-03":"P","DL-04":"P","DL-05":"P","DL-12":"P","DL-13":"P",
+  "M1":"Q","M2":"Q","M3":"Q","M4":"Q","M5":"Q","M6":"Q","M7":"Q","M8":"Q","M9":"Q","M10":"Q","M11":"Q","M12":"Q","M13":"Q","M14":"Q","M15":"Q","M16":"Q","M17":"Q","M18":"Q","M19":"Q","M20":"Q","M21":"Q","EX-PL-16":"Q",
+};
 
 export function wpCodeToCategory(code: string): string {
-  if (code.startsWith("PP-")) return "A";
-  if (code.startsWith("DI-")) return "B";
-  if (code.startsWith("OB-")) return "B";
-  if (code.startsWith("IR-")) return "L";
-
-  if (code.startsWith("PL-")) {
-    if (["PL-03", "PL-26"].includes(code)) return "C";
-    if (["PL-04"].includes(code)) return "D";
-    if (["PL-25"].includes(code)) return "E";
-    if (["PL-27"].includes(code)) return "I";
-    if (["PL-28", "PL-29", "PL-30"].includes(code)) return "K";
-    return "B";
-  }
-
-  if (code.startsWith("EX-IC-")) return "E";
-  if (code.startsWith("EX-EST-")) return "J";
-  if (code.startsWith("EX-TAX-")) return "I";
-  if (code.startsWith("EX-RP-")) return "K";
-  if (code.startsWith("EX-PAY-")) return "H";
-  if (code.startsWith("EX-PL-")) return "H";
-
-  if (code.startsWith("EX-BS-")) {
-    if (ASSET_BS_CODES.has(code)) return "F";
-    if (LIABILITY_BS_CODES.has(code)) return "G";
-    return "F";
-  }
-
-  if (code.startsWith("EX-")) {
-    if (["EX-04"].includes(code)) return "L";
-    if (["EX-07"].includes(code)) return "L";
-    if (["EX-08", "EX-09"].includes(code)) return "G";
-    if (["EX-05", "EX-06", "EX-10"].includes(code)) return "L";
-    return "L";
-  }
-
-  if (code.startsWith("EV-")) return "L";
-  if (code === "GC-01") return "J";
-  if (code.startsWith("FH-")) return "N";
-  if (code.startsWith("FN-")) return "M";
-  if (code.startsWith("DL-")) return "N";
-  if (code.startsWith("QR-")) return "O";
-  if (code.startsWith("IN-")) return "P";
-  if (code.startsWith("SECP-") || code.startsWith("CCG-") || code.startsWith("REG-")) return "K";
-  if (code.startsWith("M")) return "Q";
-
-  return "Q";
+  return WP_CODE_TO_CATEGORY[code] || "Q";
 }
 
 export function getWpsByCategory(): Record<string, string[]> {
@@ -522,10 +487,15 @@ export function getWpsByCategory(): Record<string, string[]> {
     result[cat.key] = [];
   }
   for (const code of Object.keys(WP_LIBRARY)) {
-    const cat = wpCodeToCategory(code);
+    if (!WP_CODE_TO_CATEGORY[code]) continue;
+    const cat = WP_CODE_TO_CATEGORY[code];
     if (result[cat]) result[cat].push(code);
   }
   return result;
+}
+
+export function getActiveCodes(): string[] {
+  return Object.keys(WP_CODE_TO_CATEGORY);
 }
 
 /**

@@ -6999,7 +6999,8 @@ function GenerationStage({ session, onNext, ...legacyProps }: any) {
 
     for (const cat of cats) {
       if (stopRef.current) break;
-      if (cat.complete || cat.totalWp === 0) continue;
+      const sel = cat.selectedWp ?? cat.totalWp ?? 0;
+      if (cat.complete || sel === 0) continue;
 
       setActiveCat(cat.key);
       while (!stopRef.current) {
@@ -7007,8 +7008,23 @@ function GenerationStage({ session, onNext, ...legacyProps }: any) {
         if (result.stopped || result.categoryComplete) break;
       }
 
-      if (!stopRef.current && cat.key !== "Q") {
-        toast({ title: `Category ${cat.key} complete`, description: `${cat.name} — all working papers generated` });
+      if (!stopRef.current) {
+        toast({ title: `Phase ${cat.key} complete`, description: `${cat.name} — auto-downloading DOCX...` });
+        try {
+          const dlRes = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/categories/${cat.key}/export-docx`, {
+            method: "POST", headers: authHeaders,
+          });
+          if (dlRes.ok) {
+            const blob = await dlRes.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            const disposition = dlRes.headers.get("Content-Disposition");
+            a.download = disposition?.match(/filename="(.+)"/)?.[1] || `Phase_${cat.key}_${cat.name.replace(/[^a-zA-Z0-9]/g, "_")}.docx`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }
+        } catch {}
       }
     }
 
@@ -7018,7 +7034,8 @@ function GenerationStage({ session, onNext, ...legacyProps }: any) {
     setActiveWpName("");
     await fetchCategoryStatus();
     if (!stopRef.current) {
-      toast({ title: "All categories complete", description: "All working papers have been generated successfully" });
+      setSummaryVisible(true);
+      toast({ title: "All phases complete!", description: "All selected working papers have been generated. Summary table is ready." });
     }
   };
 
@@ -7075,28 +7092,33 @@ function GenerationStage({ session, onNext, ...legacyProps }: any) {
     setDownloading(null);
   };
 
-  const totalWps = catStatus.reduce((s: number, c: any) => s + (c.totalWp || 0), 0);
+  const [totalSelected, setTotalSelected] = useState(0);
+  const [summaryVisible, setSummaryVisible] = useState(false);
+  const totalWps = catStatus.reduce((s: number, c: any) => s + (c.selectedWp ?? c.totalWp ?? 0), 0);
   const totalUsed = catStatus.reduce((s: number, c: any) => s + (c.wpUsed || 0), 0);
   const progress = totalWps > 0 ? Math.round((totalUsed / totalWps) * 100) : 0;
   const completedCats = catStatus.filter((c: any) => c.complete).length;
 
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
 
-  const catProgress = (cat: any) => cat.totalWp > 0 ? Math.round((cat.wpUsed / cat.totalWp) * 100) : 0;
+  const catSelectedCount = (cat: any) => cat.selectedWp ?? cat.totalWp ?? 0;
+  const catProgress = (cat: any) => { const sel = catSelectedCount(cat); return sel > 0 ? Math.round((cat.wpUsed / sel) * 100) : 0; };
 
   const catStatusLabel = (cat: any) => {
+    const sel = catSelectedCount(cat);
     if (cat.complete) return "Complete";
     if (generating && activeCat === cat.key) return "Generating...";
     if (cat.wpUsed > 0) return "In Progress";
-    if (cat.totalWp === 0) return "N/A";
+    if (sel === 0) return "No Selection";
     return "Pending";
   };
 
   const catStatusColor = (cat: any) => {
+    const sel = catSelectedCount(cat);
     if (cat.complete) return "bg-emerald-100 text-emerald-700 border-emerald-200";
     if (generating && activeCat === cat.key) return "bg-blue-100 text-blue-700 border-blue-200";
     if (cat.wpUsed > 0) return "bg-amber-100 text-amber-700 border-amber-200";
-    if (cat.totalWp === 0) return "bg-slate-100 text-slate-400 border-slate-200";
+    if (sel === 0) return "bg-slate-100 text-slate-400 border-slate-200";
     return "bg-slate-50 text-slate-500 border-slate-200";
   };
 
@@ -7271,7 +7293,7 @@ function GenerationStage({ session, onNext, ...legacyProps }: any) {
                             )} style={{ width: `${pct}%` }} />
                           </div>
                           <span className="text-[11px] text-slate-400 tabular-nums">
-                            {cat.wpUsed}/{cat.totalWp} WPs
+                            {cat.wpUsed}/{catSelectedCount(cat)} WPs{cat.totalWp !== catSelectedCount(cat) ? ` (${cat.totalWp} total)` : ""}
                           </span>
                         </div>
                       )}
@@ -7286,7 +7308,7 @@ function GenerationStage({ session, onNext, ...legacyProps }: any) {
                           Download
                         </Button>
                       )}
-                      {!generating && !isDone && cat.totalWp > 0 && (
+                      {!generating && !isDone && catSelectedCount(cat) > 0 && (
                         <Button size="sm"
                           onClick={async () => {
                             setGenerating(true);
@@ -7311,8 +7333,8 @@ function GenerationStage({ session, onNext, ...legacyProps }: any) {
                           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Running
                         </span>
                       )}
-                      {cat.totalWp === 0 && (
-                        <span className="text-xs text-slate-400 italic px-2">No WPs</span>
+                      {catSelectedCount(cat) === 0 && (
+                        <span className="text-xs text-slate-400 italic px-2">No Selection</span>
                       )}
                     </div>
 
@@ -7328,12 +7350,12 @@ function GenerationStage({ session, onNext, ...legacyProps }: any) {
                             <p className="font-semibold text-slate-700">{cat.key} — {cat.name}</p>
                           </div>
                           <div>
-                            <p className="text-slate-400 font-medium uppercase tracking-wider text-[10px] mb-1">Total WPs</p>
-                            <p className="font-semibold text-slate-700">{cat.totalWp} working papers</p>
+                            <p className="text-slate-400 font-medium uppercase tracking-wider text-[10px] mb-1">Selected / Total</p>
+                            <p className="font-semibold text-slate-700">{catSelectedCount(cat)} / {cat.totalWp} working papers</p>
                           </div>
                           <div>
                             <p className="text-slate-400 font-medium uppercase tracking-wider text-[10px] mb-1">Generated</p>
-                            <p className={cn("font-semibold", isDone ? "text-emerald-600" : cat.wpUsed > 0 ? "text-blue-600" : "text-slate-400")}>{cat.wpUsed} of {cat.totalWp}</p>
+                            <p className={cn("font-semibold", isDone ? "text-emerald-600" : cat.wpUsed > 0 ? "text-blue-600" : "text-slate-400")}>{cat.wpUsed} of {catSelectedCount(cat)}</p>
                           </div>
                           <div>
                             <p className="text-slate-400 font-medium uppercase tracking-wider text-[10px] mb-1">Progress</p>
@@ -7388,6 +7410,83 @@ function GenerationStage({ session, onNext, ...legacyProps }: any) {
           </div>
         </div>
       </div>
+
+      {(summaryVisible || allComplete) && catStatus.some((c: any) => c.wpUsed > 0) && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                <FileText className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Generation Summary</h3>
+                <p className="text-xs text-slate-500">{totalUsed} working papers generated across {catStatus.filter((c: any) => c.wpUsed > 0).length} phases</p>
+              </div>
+            </div>
+            <Button size="sm" onClick={downloadAllDocx} disabled={downloading === "ALL"}
+              className="h-9 px-5 bg-gradient-to-r from-[#0F3460] to-blue-700 hover:from-[#0e2d55] hover:to-blue-800 text-white font-semibold shadow-sm">
+              {downloading === "ALL" ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+              Download Merged DOCX (with TOC)
+            </Button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="text-center px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase w-12">S.No</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase">Phase</th>
+                  <th className="text-center px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase w-20">Selected</th>
+                  <th className="text-center px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase w-20">Generated</th>
+                  <th className="text-center px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase w-24">Status</th>
+                  <th className="text-center px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase w-20">DOCX</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {catStatus.filter((c: any) => catSelectedCount(c) > 0).map((cat: any, idx: number) => (
+                  <tr key={cat.key} className={cn("hover:bg-slate-50", cat.complete ? "bg-emerald-50/30" : "")}>
+                    <td className="px-3 py-2 text-center text-slate-500 font-mono">{idx + 1}</td>
+                    <td className="px-3 py-2">
+                      <span className="font-semibold text-slate-800">{cat.key}</span>
+                      <span className="text-slate-500 ml-1.5">— {cat.name}</span>
+                    </td>
+                    <td className="px-3 py-2 text-center font-semibold text-slate-700">{catSelectedCount(cat)}</td>
+                    <td className="px-3 py-2 text-center font-semibold text-emerald-700">{cat.wpUsed}</td>
+                    <td className="px-3 py-2 text-center">
+                      <span className={cn("px-2 py-0.5 rounded-full text-[9px] font-semibold", catStatusColor(cat))}>
+                        {catStatusLabel(cat)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      {cat.wpUsed > 0 && (
+                        <button onClick={() => downloadCategoryDocx(cat.key)} disabled={downloading === cat.key}
+                          className="text-[10px] text-blue-600 hover:text-blue-800 font-medium underline">
+                          {downloading === cat.key ? "..." : "Download"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-slate-50 border-t border-slate-200">
+                <tr>
+                  <td className="px-3 py-2.5" colSpan={2}>
+                    <span className="text-sm font-bold text-slate-800">Total</span>
+                  </td>
+                  <td className="px-3 py-2.5 text-center font-bold text-slate-700">{totalWps}</td>
+                  <td className="px-3 py-2.5 text-center font-bold text-emerald-700">{totalUsed}</td>
+                  <td className="px-3 py-2.5 text-center">
+                    <span className={cn("px-2 py-0.5 rounded-full text-[9px] font-semibold",
+                      allComplete ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                      {allComplete ? "All Complete" : `${progress}%`}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
 
       {onNext && (
         <div className="flex justify-end pt-2">
@@ -9745,16 +9844,57 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
   const [fType, setFType]             = useState("all");
   const [fRisk, setFRisk]             = useState("all");
   const [fComplexity, setFComplexity] = useState("all");
-  const [fStatus, setFStatus]         = useState("all"); // all | mandatory | ai_recommended | optional | selected | unselected
+  const [fStatus, setFStatus]         = useState("all");
   const [preview, setPreview]         = useState<WpItem | null>(null);
   const [executionWp, setExecutionWp] = useState<WpItem | null>(null);
   const [collapsed, setCollapsed]     = useState<Set<string>>(new Set());
-  const [viewMode, setViewMode]       = useState<"library" | "recommendations">("library");
+  const [viewMode, setViewMode]       = useState<"library" | "recommendations">("recommendations");
   const [wpRecs, setWpRecs]           = useState<any>(null);
   const [wpRecsLoading, setWpRecsLoading] = useState(false);
   const [wpRecsSearch, setWpRecsSearch] = useState("");
   const [wpRecsPhaseFilter, setWpRecsPhaseFilter] = useState("all");
   const [wpRecsStatusFilter, setWpRecsStatusFilter] = useState("all");
+  const [recSelected, setRecSelected] = useState<Set<string>>(new Set());
+  const [savingSelection, setSavingSelection] = useState(false);
+  const [selectionLoaded, setSelectionLoaded] = useState(false);
+
+  const fetchSavedSelection = async () => {
+    if (!session?.id) return;
+    try {
+      const headers: Record<string, string> = getToken() ? { Authorization: `Bearer ${getToken()}` } : {};
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/selected-wp-codes`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.codes && data.codes.length > 0) {
+          setRecSelected(new Set(data.codes));
+          setSelectionLoaded(true);
+          return true;
+        }
+      }
+    } catch {}
+    return false;
+  };
+
+  const saveSelection = async () => {
+    if (!session?.id) return;
+    setSavingSelection(true);
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (getToken()) headers.Authorization = `Bearer ${getToken()}`;
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/selected-wp-codes`, {
+        method: "POST", headers, body: JSON.stringify({ codes: Array.from(recSelected) }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast({ title: "Selection saved", description: `${data.count} working papers selected for generation` });
+      } else {
+        toast({ title: "Save failed", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+    }
+    setSavingSelection(false);
+  };
 
   const fetchWpRecommendations = async () => {
     if (!session?.id) return;
@@ -9762,14 +9902,26 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
     try {
       const headers: Record<string, string> = getToken() ? { Authorization: `Bearer ${getToken()}` } : {};
       const res = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/wp-recommendations`, { headers });
-      if (res.ok) setWpRecs(await res.json());
-    } catch { /* silent */ }
+      if (res.ok) {
+        const data = await res.json();
+        setWpRecs(data);
+        if (!selectionLoaded) {
+          const recommended = (data.papers || []).filter((p: any) => p.recommended || p.isCore).map((p: any) => p.code);
+          setRecSelected(new Set(recommended));
+        }
+      }
+    } catch {}
     finally { setWpRecsLoading(false); }
   };
 
   useEffect(() => {
-    if (viewMode === "recommendations" && !wpRecs) fetchWpRecommendations();
-  }, [viewMode, session?.id]);
+    if (session?.id) {
+      fetchSavedSelection().then(hasSaved => {
+        if (!hasSaved) setSelectionLoaded(false);
+        fetchWpRecommendations();
+      });
+    }
+  }, [session?.id]);
 
   const triggeredCodes = new Set(allTriggers.filter((t: any) => t.triggered).map((t: any) => t.wpCode));
   const triggerConf: Record<string, number> = {};
@@ -10071,6 +10223,8 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
                 <select className="h-8 text-[11px] border border-slate-200 rounded-md px-2 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-300"
                   value={wpRecsStatusFilter} onChange={e => setWpRecsStatusFilter(e.target.value)}>
                   <option value="all">All</option>
+                  <option value="selected">Selected ({recSelected.size})</option>
+                  <option value="unselected">Unselected</option>
                   <option value="recommended">Recommended</option>
                   <option value="applicable">Applicable (not recommended)</option>
                   <option value="not_applicable">Not Applicable</option>
@@ -10093,18 +10247,58 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
                 ))}
               </div>
 
-              {/* WP table */}
+              {/* Selection actions bar */}
+              <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="text-sm font-semibold text-slate-700">{recSelected.size} WPs selected</span>
+                  <span className="text-xs text-slate-400">for generation</span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button onClick={() => {
+                    const recommended = (wpRecs.papers || []).filter((p: any) => p.recommended || p.isCore).map((p: any) => p.code);
+                    setRecSelected(new Set(recommended));
+                  }} className="text-[11px] px-2.5 py-1 border border-emerald-200 rounded-lg text-emerald-700 hover:bg-emerald-50 font-medium">
+                    Auto-Select Recommended
+                  </button>
+                  <button onClick={() => {
+                    const all = (wpRecs.papers || []).map((p: any) => p.code);
+                    setRecSelected(new Set(all));
+                  }} className="text-[11px] px-2.5 py-1 border border-blue-200 rounded-lg text-blue-700 hover:bg-blue-50 font-medium">
+                    Select All 274
+                  </button>
+                  <button onClick={() => setRecSelected(new Set())}
+                    className="text-[11px] px-2.5 py-1 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-medium">
+                    Clear All
+                  </button>
+                  <Button size="sm" onClick={async () => { await saveSelection(); if (onNext) onNext(); }}
+                    disabled={savingSelection || recSelected.size === 0}
+                    className="h-8 px-4 text-xs bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold shadow-sm">
+                    {savingSelection ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />Saving…</> : <><CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />Save Selection & Continue</>}
+                  </Button>
+                </div>
+              </div>
+
+              {/* WP table with selection */}
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
+                        <th className="px-3 py-2 w-10">
+                          <input type="checkbox"
+                            checked={recSelected.size === (wpRecs.papers || []).length && recSelected.size > 0}
+                            onChange={(e) => {
+                              if (e.target.checked) setRecSelected(new Set((wpRecs.papers || []).map((p: any) => p.code)));
+                              else setRecSelected(new Set());
+                            }}
+                            className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                        </th>
                         <th className="text-left px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-20">Code</th>
                         <th className="text-left px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Working Paper Title</th>
                         <th className="text-left px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-32">Phase</th>
                         <th className="text-left px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-24">Risk</th>
                         <th className="text-left px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-24">Status</th>
-                        <th className="text-left px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Reason</th>
+                        <th className="text-left px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Variables / Reason</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -10116,10 +10310,32 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
                         if (wpRecsStatusFilter === "applicable" && (!p.applicable || p.recommended)) return false;
                         if (wpRecsStatusFilter === "not_applicable" && p.applicable) return false;
                         if (wpRecsStatusFilter === "core" && !p.isCore) return false;
+                        if (wpRecsStatusFilter === "selected" && !recSelected.has(p.code)) return false;
+                        if (wpRecsStatusFilter === "unselected" && recSelected.has(p.code)) return false;
                         return true;
                       }).map((p: any) => (
-                        <tr key={p.code} className={cn("hover:bg-slate-50 transition-colors",
-                          !p.applicable ? "opacity-50" : "")}>
+                        <tr key={p.code}
+                          className={cn("hover:bg-slate-50 transition-colors cursor-pointer",
+                            recSelected.has(p.code) ? "bg-emerald-50/30" : "",
+                            !p.applicable ? "opacity-50" : "")}
+                          onClick={() => {
+                            setRecSelected(prev => {
+                              const n = new Set(prev);
+                              n.has(p.code) ? n.delete(p.code) : n.add(p.code);
+                              return n;
+                            });
+                          }}>
+                          <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                            <input type="checkbox" checked={recSelected.has(p.code)}
+                              onChange={() => {
+                                setRecSelected(prev => {
+                                  const n = new Set(prev);
+                                  n.has(p.code) ? n.delete(p.code) : n.add(p.code);
+                                  return n;
+                                });
+                              }}
+                              className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                          </td>
                           <td className="px-3 py-2 font-mono text-[11px] font-semibold text-indigo-700">{p.code}</td>
                           <td className="px-3 py-2">
                             <div className="font-medium text-slate-800 leading-tight">{p.name}</div>
@@ -10152,7 +10368,22 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
                               </span>
                             )}
                           </td>
-                          <td className="px-3 py-2 text-[10px] text-slate-500 max-w-[200px] truncate" title={p.reason}>{p.reason}</td>
+                          <td className="px-3 py-2 text-[10px] text-slate-500 max-w-[220px]">
+                            {p.linkedVariables && p.linkedVariables.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {p.linkedVariables.slice(0, 3).map((v: string) => (
+                                  <span key={v} className="px-1.5 py-0.5 bg-violet-50 text-violet-700 rounded text-[9px] border border-violet-100">
+                                    {v.replace(/_/g, " ")}
+                                  </span>
+                                ))}
+                                {p.linkedVariables.length > 3 && (
+                                  <span className="px-1 py-0.5 text-[9px] text-slate-400">+{p.linkedVariables.length - 3}</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="truncate" title={p.reason}>{p.reason}</span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
