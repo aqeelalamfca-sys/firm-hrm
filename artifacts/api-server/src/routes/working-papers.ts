@@ -9636,6 +9636,35 @@ router.post("/sessions/:id/parse-one-sheet-template", requireRoles(...WP_ROLES_W
         });
       if (glInserts.length > 0) await db.insert(wpGlAccountsTable).values(glInserts as any);
 
+      // ── STEP 2B: PERSIST FS LINES ────────────────────────────────────────
+      await db.delete(wpFsLinesTable).where(eq(wpFsLinesTable.sessionId, sessionId));
+      const fsLineInserts = rows.map((row: ParsedTemplateRow, idx: number) => ({
+        sessionId,
+        lineId: typeof row.lineId === "number" ? row.lineId : idx + 1,
+        statementType: row.statementType || null,
+        fsSection: row.fsSection || null,
+        majorHead: row.majorHead || null,
+        lineItem: row.lineItem || null,
+        subLineItem: row.subLineItem || null,
+        accountName: row.accountName || null,
+        accountCode: row.accountCode || null,
+        noteNo: row.noteNo || null,
+        currentYear: row.currentYear != null ? String(row.currentYear) : null,
+        priorYear: row.priorYear != null ? String(row.priorYear) : null,
+        debitTransactionValue: row.debitTransactionValue != null ? String(row.debitTransactionValue) : null,
+        creditTransactionValue: row.creditTransactionValue != null ? String(row.creditTransactionValue) : null,
+        normalBalance: row.normalBalance || null,
+        wpArea: row.wpArea || null,
+        riskLevel: row.riskLevel || null,
+      }));
+      if (fsLineInserts.length > 0) {
+        const BATCH_SIZE = 100;
+        for (let i = 0; i < fsLineInserts.length; i += BATCH_SIZE) {
+          await db.insert(wpFsLinesTable).values(fsLineInserts.slice(i, i + BATCH_SIZE) as any);
+        }
+      }
+      logger.info({ sessionId, fsLinesInserted: fsLineInserts.length }, "FS Lines populated from template");
+
       // ── STEP 3: AUTO-POPULATE VARIABLES FROM TEMPLATE ────────────────────
       // Returns structured exception report: mapped, skipped, conflicts, missingMandatory
       const varMapping = await autoFillVariablesFromTemplate(sessionId, meta, rows, periodStart, periodEnd, engagementYear);

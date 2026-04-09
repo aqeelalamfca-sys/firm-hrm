@@ -634,12 +634,14 @@ export default function WorkingPapers() {
 
   const handleExtractData = async () => {
     if (!activeSession) return;
-    setExtractionStep("Step 1/3: Creating variable rows from session metadata…");
+    setExtractionStep("Step 1/4: Creating variable rows from session metadata…");
     await autoFillVariables();
-    setExtractionStep("Step 2/3: Parsing template and mapping financial data…");
+    setExtractionStep("Step 2/4: Parsing template and mapping financial data…");
     await handleParseTemplate();
-    setExtractionStep("Step 3/3: Syncing all variables…");
+    setExtractionStep("Step 3/4: Syncing all variables…");
     await fetchVariables();
+    setExtractionStep("Step 4/4: Loading financial statement lines…");
+    await fetchFsLines();
     setExtractionStep("");
     setStage("extraction");
   };
