@@ -310,6 +310,14 @@ export default function WorkingPapers() {
     }
   }, [activeSession]);
 
+  const variablesAutoFilledRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (stage === "variables" && activeSession && variablesAutoFilledRef.current !== activeSession.id) {
+      variablesAutoFilledRef.current = activeSession.id;
+      autoFillVariables();
+    }
+  }, [stage, activeSession]);
+
   const fetchSessions = async () => {
     try {
       const res = await fetch(`${API_BASE}/working-papers/sessions`, { headers });

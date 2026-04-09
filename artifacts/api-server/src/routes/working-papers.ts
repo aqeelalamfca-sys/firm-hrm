@@ -2820,7 +2820,8 @@ router.get("/sessions/:id/variables", async (req: Request, res: Response) => {
       locked: variables.filter(v => v.isLocked).length,
     };
 
-    res.json({ variables, grouped, stats: totalStats, changeLog, groups: VARIABLE_GROUPS });
+    const enrichedVariables = variables.map(v => ({ ...v, definition: defMap[v.variableCode] || null }));
+    res.json({ variables: enrichedVariables, grouped, stats: totalStats, changeLog, groups: VARIABLE_GROUPS });
   } catch (err: any) {
     logger.error({ err }, "Failed to fetch variables");
     res.status(500).json({ error: "Failed to fetch variables" });
