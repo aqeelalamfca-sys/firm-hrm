@@ -3857,7 +3857,7 @@ router.post("/sessions/:id/heads/auto-process-all", requireRoles(...WP_ROLES_WRI
                 model: ai.model,
                 messages: [
                   { role: "system", content: `You are a Big-4 trained senior audit partner generating 100% ISA-compliant, ISQM-1 compliant, audit-defensible working papers for Pakistan (ICAP) audits. Return ONLY valid JSON.` },
-                  { role: "user", content: (() => { const m = WP_METADATA[paperCode] || { name: paperCode, isa: "ISA 500", phase: headDef.name, riskLevel: "Medium", assertions: "C, E, V", fsArea: "All FS Areas" }; return `Generate working paper "${paperCode}" — "${m.name}" for the "${headDef.name}" phase.\n\nCLIENT: ${session.clientName || "Unknown"}\nENGAGEMENT: ENG-${session.engagementYear || "2026"}-${String(sessionId).padStart(3,"0")}\nENTITY TYPE: ${session.entityType || "Private Limited"}\nYEAR: ${session.engagementYear || "2026"}\nFRAMEWORK: ${session.reportingFramework || "IFRS"}\nISA REFS: ${m.isa}\nRISK LEVEL: ${m.riskLevel}\nASSERTIONS: ${m.assertions}\nFS AREA: ${m.fsArea}\n\nVARIABLES:\n${smartChunk(varSummary, 2500)}\n\nTRIAL BALANCE:\n${smartChunk(tbSummary, 2500)}\n\nReturn JSON: {"paper_code":"${paperCode}","paper_name":"${m.name}","version":"v1.0","status":"Draft","objective":"string","risk_assertion_table":[{"risk_id":"R001","risk_description":"string","risk_type":"Inherent|Control|Fraud","fs_area":"string","assertions_impacted":"E,C,V","risk_level":"High","isa_reference":"ISA 315 para 25","risk_register_ref":"${paperCode}"}],"procedures_table":[{"proc_id":"P001","nature":"Substantive","description":"string","isa_reference":"ISA 330","performed_by":"Senior","planned_date":"During fieldwork","status":"Planned"}],"testing_results":{"population_description":"string","population_size_pkr":"string","sampling_method":"MUS","sample_size":"string","items_tested":"string","exceptions_identified":0,"exception_rate_pct":"0%","exceptions_detail":["No exceptions noted"],"tb_cross_ref":"string","gl_cross_ref":"string"},"evidence_table":[{"evidence_id":"E001","type":"External","source":"string","reliability":"High","linked_procedure":"P001","description":"string"}],"auditor_judgement":"string","conclusion":{"status":"Satisfactory","basis":"string","impact_on_opinion":"No impact","further_actions":"None required","misstatements_identified":"None"},"action_points":[{"issue_id":"AP001","description":"string","risk_impact":"Low","assigned_to":"Manager","deadline":"Before sign-off","status":"Open"}],"cross_references":["string"],"exceptions":[]}`; })() },
+                  { role: "user", content: (() => { const m = WP_METADATA[paperCode] || { name: paperCode, isa: "ISA 500", phase: headDef.name, riskLevel: "Medium", assertions: "C, E, V", fsArea: "All FS Areas" }; return `Generate working paper "${paperCode}" — "${m.name}" for the "${headDef.name}" phase.\n\nCLIENT: ${session.clientName || "Unknown"}\nENGAGEMENT: ENG-${session.engagementYear || "2026"}-${String(sessionId).padStart(3,"0")}\nENTITY TYPE: ${session.entityType || "Private Limited"}\nYEAR: ${session.engagementYear || "2026"}\nFRAMEWORK: ${session.reportingFramework || "IFRS"}\nISA REFS: ${m.isa}\nRISK LEVEL: ${m.riskLevel}\nASSERTIONS: ${m.assertions}\nFS AREA: ${m.fsArea}\n\nVARIABLES:\n${smartChunk(varSummary, 2500)}\n\nTRIAL BALANCE:\n${smartChunk(tbSummary, 2500)}\n\nReturn JSON: {"paper_code":"${paperCode}","paper_name":"${m.name}","version":"v1.0","status":"Draft","objective":"string","risk_assertion_table":[{"risk_id":"R001","risk_description":"string","risk_type":"Inherent|Control|Fraud","fs_area":"string","assertions_impacted":"E,C,V","risk_level":"High","isa_reference":"ISA 315 para 25","risk_register_ref":"${paperCode}","mitigating_control":"Practical mitigating control specific to entity industry and Pakistani regulatory environment (FBR SECP SBP) — minimum 2 sentences"}],"procedures_table":[{"proc_id":"P001","nature":"Substantive","description":"string","isa_reference":"ISA 330","performed_by":"Senior","planned_date":"During fieldwork","status":"Planned"}],"testing_results":{"population_description":"string","population_size_pkr":"string","sampling_method":"MUS","sample_size":"string","items_tested":"string","exceptions_identified":0,"exception_rate_pct":"0%","exceptions_detail":["No exceptions noted"],"tb_cross_ref":"string","gl_cross_ref":"string"},"evidence_table":[{"evidence_id":"E001","type":"External","source":"string","reliability":"High","linked_procedure":"P001","description":"string"}],"auditor_judgement":"string","conclusion":{"status":"Satisfactory","basis":"string","impact_on_opinion":"No impact","further_actions":"None required","misstatements_identified":"None"},"action_points":[{"issue_id":"AP001","description":"string","risk_impact":"Low","assigned_to":"Manager","deadline":"Before sign-off","status":"Open"}],"cross_references":["string"],"exceptions":[]}`; })() },
                 ],
                 max_tokens: 5000, temperature: 0.2,
                 response_format: { type: "json_object" },
@@ -4177,6 +4177,72 @@ function dxFirmHeader(firmName: string, clientName: string, docTitle: string, pe
   ];
 }
 
+// ── Pakistan-specific mitigating control fallback ─────────────────────────
+// Used when the AI-generated working paper has not filled mitigating_control.
+// Keys on FS Area first, then risk type. Covers all common audit areas for
+// Pakistani private / listed entities per Companies Act 2017, FBR, SECP, SBP.
+function getMitigatingControl(fsArea = "", riskType = "", _riskDesc = ""): string {
+  const a = fsArea.toLowerCase();
+  const t = riskType.toLowerCase();
+
+  if (a.includes("revenue") || a.includes("income") || a.includes("sales") || a.includes("turnover")) {
+    if (t.includes("fraud")) return "Segregation of duties between order entry, billing, and cash collection; management approval of manual journal entries; IT controls over ERP billing module; FBR e-invoicing reconciled to GL monthly; independent customer confirmations for top-10 accounts.";
+    return "Monthly revenue reconciliation to GL and bank statements; IFRS 15 revenue recognition policy reviewed by CFO; FBR sales-tax returns cross-checked to invoices; automated billing controls in ERP; internal audit covers revenue cycle annually.";
+  }
+  if (a.includes("inventory") || a.includes("stock") || a.includes("cost of sales") || a.includes("cogs")) {
+    return "Semi-annual physical stock count by independent team; perpetual inventory system maintained in ERP; FIFO / WAC costing policy consistently applied per IAS 2; COGS variance analysis reviewed by management monthly; FBR valuation rules applied for tax purposes.";
+  }
+  if (a.includes("receiv") || a.includes("debtor") || a.includes("trade receiv")) {
+    return "Aging analysis reviewed monthly by Finance Manager; credit limit policy approved by Board; independent confirmation letters sent to significant debtors per ISA 505; provision for doubtful debts calculated per management's ECL model (IFRS 9); post-period cash receipts verified during audit fieldwork.";
+  }
+  if (a.includes("payable") || a.includes("creditor") || a.includes("trade pay")) {
+    return "Three-way matching (PO / GRN / invoice) enforced in ERP; vendor statement reconciliations performed monthly; WHT deducted at source per FBR applicable rates and deposited timely; cut-off procedures at period-end reviewed by Accounts Manager; SECP related-party disclosures for group company payables.";
+  }
+  if (a.includes("property") || a.includes("ppe") || a.includes("fixed asset") || a.includes("plant") || a.includes("equipment")) {
+    return "Fixed asset register reconciled to GL quarterly; annual physical verification by internal audit; revaluation by SECP-approved independent valuers every 3–5 years; depreciation rates reviewed per IAS 16 / management policy; SECP Form A disclosure for capital additions exceeding 5% of net assets.";
+  }
+  if (a.includes("payroll") || a.includes("staff cost") || a.includes("wages") || a.includes("salary") || a.includes("remuneration")) {
+    return "HR-approved payroll input; independent payroll calculation and CFO authorization; EOBI, PESSI/SESSI contributions remitted timely; income-tax WHT per FBR tax card deducted monthly; salary paid by bank transfer (FBR prohibits cash >PKR 25,000); annual payroll audit by internal audit team.";
+  }
+  if (a.includes("cash") || a.includes("bank") || a.includes("liquid")) {
+    return "Daily bank reconciliation signed off by Finance Manager; dual-signatory policy for payments above PKR 100,000; petty cash maintained under imprest system with surprise counts; SBP AML/CFT/KYC compliance procedures documented; online banking dual-approval workflow active.";
+  }
+  if (a.includes("tax") || a.includes("deferred tax") || a.includes("income tax")) {
+    return "Timely filing of income tax, sales tax, and WHT statements per FBR schedule; deferred-tax computation reviewed by external tax advisor; advance-tax instalments per Section 147, Income Tax Ordinance 2001; regular tax-position memos maintained; FBR notices responded to within statutory timeframes.";
+  }
+  if (a.includes("related party") || a.includes("related-party") || a.includes("rpt")) {
+    return "Board / SECP approval for RPTs per Companies Act 2017 Section 208; RPT policy ratified by Audit Committee; IAS 24 disclosures prepared and reviewed by external auditor; independent valuation for material transactions; legal counsel opinion on SECP compliance obtained annually.";
+  }
+  if (a.includes("borrow") || a.includes("debt") || a.includes("loan") || a.includes("finance cost") || a.includes("interest")) {
+    return "Loan agreement terms reviewed by legal counsel before signing; SBP / DFI lender covenants monitored quarterly by CFO; interest computation verified independently; SECP Section 199 compliance certificate for inter-company loans; debt covenant compliance certificate obtained semi-annually from bank.";
+  }
+  if (a.includes("provision") || a.includes("contingenc") || a.includes("accrual")) {
+    return "Legal counsel assessment of pending litigation provided quarterly; provisioning policy reviewed by Audit Committee per IAS 37; sensitivity analysis performed on management estimates; SECP disclosure of all material contingencies in Directors' Report and notes.";
+  }
+  if (a.includes("going concern") || a.includes("solvency") || a.includes("liquidit")) {
+    return "Monthly cash-flow forecast reviewed by Board; banking-facility headroom monitored; SECP Section 464 compliance; management mitigation plan documented per ISA 570; auditor communication to Those Charged with Governance per ISA 260 and ISA 570.";
+  }
+  if (a.includes("fraud") || a.includes("misstatement") || a.includes("irregularit")) {
+    return "Surprise cash counts and inventory checks; whistleblower / hotline mechanism per SECP CCG 2019; internal audit function independent of management; anti-fraud policy ratified by Board; NAB / FIA referral procedures documented.";
+  }
+  if (a.includes("investment") || a.includes("securities") || a.includes("psx")) {
+    return "Investment mandate approved by Board; IFRS 9 classification and measurement reviewed; PSX market price used for fair-value measurement; SECP investment disclosure requirements; custodian / broker confirmation obtained annually.";
+  }
+  if (a.includes("capital") || a.includes("equity") || a.includes("share")) {
+    return "Share register maintained and reconciled to SECP filings; Board / EGM resolutions for all capital changes; SECP Form-3 / Form-4 filings current; dividend declared per Articles of Association and Companies Act 2017; legal counsel confirms compliance.";
+  }
+  if (a.includes("intangible") || a.includes("goodwill")) {
+    return "Annual impairment test per IAS 36 reviewed by CFO; assumptions cross-referenced to Board-approved budget; independent business valuer engaged for material goodwill; SECP disclosure requirements for intangible assets complied with.";
+  }
+
+  // Generic fallback keyed on risk type
+  if (t.includes("fraud")) return "Segregation of duties enforced; management review of journal entries; surprise internal-audit checks; whistleblower hotline per SECP CCG 2019; transactions above materiality reviewed by CFO before posting.";
+  if (t.includes("inherent")) return "Management review of significant estimates and judgements; independent expert valuation where required; accounting policies aligned to applicable IFRS/IAS; sensitivity analysis performed and disclosed; Audit Committee oversight of key estimates.";
+  if (t.includes("control")) return "Control design assessment performed by internal audit; remediation plan for identified gaps approved by Audit Committee; IT general controls reviewed; management testing of key controls semi-annually; external auditor recommendations followed up quarterly.";
+
+  return "Regular management review and approval; independent internal audit testing; reconciliation to supporting documentation; compliance with applicable IFRS and SECP/FBR regulations; Audit Committee oversight of financial reporting process.";
+}
+
 function dxSection(title: string): Paragraph {
   return new Paragraph({
     children: [new TextRun({ text: `  ${title}`, bold: true, size: 22, color: "FFFFFF", font: "Calibri" })],
@@ -4274,7 +4340,7 @@ function parseStructuredWP(wp: any): (Paragraph | Table)[] {
     out.push(dxSection("2.  RISK & ASSERTION LINKAGE  (ISA 315 / ISA 330)"));
     out.push(dxTable(
       ["Risk ID", "Risk Description", "Type", "FS Area", "Assertions", "Risk Level", "ISA Ref", "Mitigating Control"],
-      wp.risk_assertion_table.map((r: any) => [r.risk_id, r.risk_description, r.risk_type, r.fs_area, r.assertions_impacted, r.risk_level, r.isa_reference || (r.risk_register_ref ? (WP_METADATA[r.risk_register_ref]?.isa || "ISA 315") : "ISA 315"), r.mitigating_control || "—"]),
+      wp.risk_assertion_table.map((r: any) => [r.risk_id, r.risk_description, r.risk_type, r.fs_area, r.assertions_impacted, r.risk_level, r.isa_reference || (r.risk_register_ref ? (WP_METADATA[r.risk_register_ref]?.isa || "ISA 315") : "ISA 315"), (r.mitigating_control && r.mitigating_control !== "—") ? r.mitigating_control : getMitigatingControl(r.fs_area, r.risk_type, r.risk_description)]),
       [6, 22, 9, 12, 11, 9, 9, 22]
     ));
     out.push(sp());
@@ -4917,7 +4983,7 @@ router.post("/sessions/:id/heads/:headIndex/export", requireRoles(...WP_ROLES_WR
           if (wpData.risk_assertion_table?.length) {
             sectionTitle("2. RISK & ASSERTION LINKAGE  (ISA 315 / ISA 330)");
             simpleTable(["Risk ID", "Risk Description", "Type", "FS Area", "Assertions", "Level", "ISA Ref", "Mitigating Control"],
-              wpData.risk_assertion_table.map((r: any) => [r.risk_id, r.risk_description, r.risk_type, r.fs_area, r.assertions_impacted, r.risk_level, r.isa_reference || (r.risk_register_ref ? (WP_METADATA[r.risk_register_ref]?.isa || "ISA 315") : "ISA 315"), r.mitigating_control || "—"]),
+              wpData.risk_assertion_table.map((r: any) => [r.risk_id, r.risk_description, r.risk_type, r.fs_area, r.assertions_impacted, r.risk_level, r.isa_reference || (r.risk_register_ref ? (WP_METADATA[r.risk_register_ref]?.isa || "ISA 315") : "ISA 315"), (r.mitigating_control && r.mitigating_control !== "—") ? r.mitigating_control : getMitigatingControl(r.fs_area, r.risk_type, r.risk_description)]),
               [6, 22, 9, 11, 10, 8, 10, 24]);
           }
           if (wpData.procedures_table?.length) {
