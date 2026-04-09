@@ -15,12 +15,12 @@ GREEN='\033[0;32m'; RED='\033[0;31m'; BLUE='\033[0;34m'; NC='\033[0m'
 log() { echo -e "${BLUE}[$(date '+%H:%M:%S')]${NC} $1"; }
 err() { echo -e "${RED}✗${NC} $1"; exit 1; }
 
-[ -z "$VPS_SSH_KEY" ] && err "VPS_SSH_KEY secret not set."
+[ -z "$VPS_SSH_PRIVATE_KEY" ] && err "VPS_SSH_PRIVATE_KEY secret not set."
 
 export SSH_KEY_PATH="$SSH_KEY"
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
 node - << 'JSEOF'
-const raw = process.env.VPS_SSH_KEY;
+const raw = process.env.VPS_SSH_PRIVATE_KEY;
 const m = raw.match(/(-----BEGIN [^\n-]+ (?:PRIVATE )?KEY-----)([\s\S]*?)(-----END [^\n-]+ (?:PRIVATE )?KEY-----)/);
 if (!m) { process.exit(1); }
 const body = m[2].replace(/\s+/g, '');

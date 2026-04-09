@@ -52,6 +52,11 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 ## Production Notes (VPS: ana-ca.com)
 
 - **CI/CD**: Replit → GitHub → VPS pipeline via `scripts/deploy.sh`
+- **Secrets required**: `GITHUB_TOKEN` (PAT with repo access), `VPS_SSH_PRIVATE_KEY` (full RSA/Ed25519 private key for VPS root user)
+- **Deploy command**: `bash scripts/deploy.sh` — pushes to GitHub then builds Docker container on VPS
+- **Push only**: `bash scripts/deploy.sh` → or `bash scripts/push.sh` for GitHub-only push
+- **VPS status**: `bash scripts/vps-status.sh` — shows container health, nginx, SSL, disk
+- **VPS logs**: `bash scripts/vps-logs.sh` — live backend logs
 - **VPS**: 187.77.130.117, containers: `ana-db` (PostgreSQL) + `ana-backend` (app)
 - **Auto Schema Sync**: `deploy/entrypoint.sh` runs `drizzle-kit push` before every app startup to keep DB in sync with schema
 - **Admin credentials**: `admin@calfirm.com` / `Admin@123`

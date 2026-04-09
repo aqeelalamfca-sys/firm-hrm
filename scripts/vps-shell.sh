@@ -9,12 +9,12 @@ VPS_IP="${VPS_HOST:-187.77.130.117}"
 VPS_PORT="${VPS_PORT:-22}"
 SSH_KEY="$HOME/.ssh/vps_deploy"
 
-[ -z "$VPS_SSH_KEY" ] && echo "ERROR: VPS_SSH_KEY secret not set." && exit 1
+[ -z "$VPS_SSH_PRIVATE_KEY" ] && echo "ERROR: VPS_SSH_PRIVATE_KEY secret not set." && exit 1
 
 export SSH_KEY_PATH="$SSH_KEY"
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
 node - << 'JSEOF'
-const raw = process.env.VPS_SSH_KEY;
+const raw = process.env.VPS_SSH_PRIVATE_KEY;
 const m = raw.match(/(-----BEGIN [^\n-]+ (?:PRIVATE )?KEY-----)([\s\S]*?)(-----END [^\n-]+ (?:PRIVATE )?KEY-----)/);
 if (!m) { process.exit(1); }
 const body = m[2].replace(/\s+/g, '');

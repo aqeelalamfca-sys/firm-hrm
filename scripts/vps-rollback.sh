@@ -19,12 +19,12 @@ ok()   { echo -e "${GREEN}✓${NC} $1"; }
 warn() { echo -e "${YELLOW}⚠${NC} $1"; }
 err()  { echo -e "${RED}✗${NC} $1"; exit 1; }
 
-[ -z "$VPS_SSH_KEY" ] && err "VPS_SSH_KEY secret not set."
+[ -z "$VPS_SSH_PRIVATE_KEY" ] && err "VPS_SSH_PRIVATE_KEY secret not set."
 
 export SSH_KEY_PATH="$SSH_KEY"
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
 node - << 'JSEOF'
-const raw = process.env.VPS_SSH_KEY;
+const raw = process.env.VPS_SSH_PRIVATE_KEY;
 const m = raw.match(/(-----BEGIN [^\n-]+ (?:PRIVATE )?KEY-----)([\s\S]*?)(-----END [^\n-]+ (?:PRIVATE )?KEY-----)/);
 if (!m) { process.exit(1); }
 const body = m[2].replace(/\s+/g, '');
