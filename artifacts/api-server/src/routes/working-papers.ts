@@ -74,10 +74,10 @@ const FILE_SIZE_LIMITS: Record<string, number> = {
 };
 
 const VALID_SESSION_STATUSES = ["upload", "extraction", "data_sheet", "arranged_data", "variables", "wp_listing", "generation", "audit_chain", "review", "export", "completed"] as const;
-const VALID_ENTITY_TYPES = ["Public Limited (Listed)", "Public Limited (Unlisted)", "Private Limited", "Single Member Company (SMC)", "Not-for-Profit (Section 42)", "Limited Liability Partnership (LLP)", "Association of Persons (AOP)", "Trust", "Sole Proprietorship"] as const;
+const VALID_ENTITY_TYPES = ["Public Limited (Listed)", "Public Limited (Unlisted)", "Private Limited", "Private Limited Company", "Single Member Company (SMC)", "Single Member", "Not-for-Profit (Section 42)", "NGO/NPO", "Limited Liability Partnership (LLP)", "LLP", "Association of Persons (AOP)", "AOP", "Trust", "Sole Proprietorship", "Sole Proprietor", "Government Entity", "Branch Office"] as const;
 const VALID_ENGAGEMENT_TYPES = ["statutory_audit", "group_audit", "limited_review", "special_audit", "compliance_audit"] as const;
 const VALID_RISK_LEVELS = ["Low", "Medium", "High", "Critical"] as const;
-const VALID_REPORTING_FRAMEWORKS = ["IFRS", "AFRS", "IPSAS", "Custom"] as const;
+const VALID_REPORTING_FRAMEWORKS = ["IFRS", "IFRS for SMEs", "AFRS", "IPSAS", "Custom", "Fourth Schedule", "Fifth Schedule"] as const;
 
 function parsePagination(req: Request, defaultLimit = 200, maxLimit = 1000): { limit: number; offset: number } {
   const limit = Math.min(Math.max(parseInt(String(req.query.limit)) || defaultLimit, 1), maxLimit);

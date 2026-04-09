@@ -429,7 +429,7 @@ export default function WorkingPapers() {
         const formData = new FormData();
         formData.append("file", newAuditFirmLogo);
         const uploadRes = await fetch(`${API_BASE}/working-papers/upload-logo`, {
-          method: "POST", headers, body: formData,
+          method: "POST", headers: { Authorization: headers.Authorization || "" }, body: formData,
         });
         if (uploadRes.ok) {
           const uploadData = await uploadRes.json();
@@ -472,8 +472,11 @@ export default function WorkingPapers() {
         setLogoPreview("");
         await fetchSessions();
         await fetchSession(session.id);
+      } else {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        toast({ title: "Failed to create session", description: err.error || "Server error", variant: "destructive" });
       }
-    } catch { toast({ title: "Failed to create session", variant: "destructive" }); }
+    } catch (e: any) { toast({ title: "Failed to create session", description: e?.message || "Network error", variant: "destructive" }); }
     finally { setLoading(false); }
   };
 
