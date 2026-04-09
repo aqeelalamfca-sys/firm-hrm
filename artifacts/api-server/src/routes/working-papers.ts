@@ -4125,11 +4125,6 @@ function dxFirmHeader(firmName: string, clientName: string, docTitle: string, pe
       alignment: AlignmentType.CENTER,
       spacing: { after: 60 },
     }),
-    new Paragraph({
-      children: [new TextRun({ text: "Chartered Accountants — Registered with ICAP | QCR-Rated | ICAEW Authorized Employer", size: 18, color: DOCX_SLATE, font: "Calibri", italics: true })],
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 160 },
-    }),
     new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
       rows: [new TableRow({ children: [new TableCell({
@@ -4164,9 +4159,6 @@ function dxFirmHeader(firmName: string, clientName: string, docTitle: string, pe
         ["Risk Level", extra?.riskLevel || "—"],
         ["FS Area / Scope", extra?.fsArea || "—"],
         ["Assertions Covered", extra?.assertions || "—"],
-        ["AI Generated", extra?.aiGenerated ? "Yes — all fields editable before lock" : "No"],
-        ["Lock Status", extra?.lockStatus || "Draft"],
-        ["Generated", new Date().toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" })],
         ["CONFIDENTIAL", "For Audit Use Only — ISA / ISQM-1 Compliant — Do not distribute"],
       ],
       [30, 70]
@@ -4885,8 +4877,7 @@ router.post("/sessions/:id/heads/:headIndex/export", requireRoles(...WP_ROLES_WR
             ["WP Version", wpData.version || "v1.0"], ["Phase", meta?.phase || headDef.name],
             ["ISA References", meta?.isa || headIsaR[headIndex] || "ISA 500"], ["Risk Level", meta?.riskLevel || "Medium"],
             ["FS Area / Scope", meta?.fsArea || headDef.name], ["Assertions Covered", meta?.assertions || "C, E, A, V"],
-            ["Lead Schedule Ref", wpData.lead_schedule_ref || "—"], ["AI Generated", wpData.ai_generated ? "Yes — all fields editable before lock" : "No"],
-            ["Lock Status", wpData.lock_status || "draft"], ["Generated Date", new Date().toLocaleDateString("en-GB")],
+            ["Lead Schedule Ref", wpData.lead_schedule_ref || "—"],
           ];
           doc.moveDown(0.3);
           metaRows.forEach(([k, v]) => kv(k, v, 0));
