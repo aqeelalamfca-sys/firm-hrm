@@ -1067,16 +1067,16 @@ export default function WorkingPapers() {
     } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
-  const lockAllVariables = async () => {
+  const lockAllVariables = async (force = false) => {
     if (!activeSession) return;
     try {
       setLoading(true);
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/variables/lock-all`, {
         method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ force }),
       });
       if (res.ok) {
         toast({ title: "Variables locked — processing financial data", description: "Preparing your data for WP selection…" });
-        // Silently generate TB/GL in background — no UI stage shown
         fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/generate-tb-gl`, {
           method: "POST", headers: { ...headers, "Content-Type": "application/json" },
         }).catch(() => {});
@@ -1086,7 +1086,13 @@ export default function WorkingPapers() {
         setStage("wp_listing");
       } else {
         const err = await res.json();
-        if (err.missing?.length > 0) {
+        if (err.canForce && !force) {
+          if (confirm("Some mandatory variables are missing. Lock anyway and proceed?")) {
+            setLoading(false);
+            return lockAllVariables(true);
+          }
+          toast({ title: "Lock cancelled", variant: "destructive" });
+        } else if (err.missing?.length > 0) {
           const names = err.missing.slice(0, 5).map((m: any) => m.label || m).join(", ");
           const extra = err.missing.length > 5 ? ` +${err.missing.length - 5} more` : "";
           toast({ title: "Cannot lock — fill mandatory variables", description: `Missing: ${names}${extra}. Search and fill these fields, then try again.`, variant: "destructive" });

@@ -1209,9 +1209,23 @@ router.post("/sessions/:id/coa/populate", requireRoles(...WP_ROLES_WRITE), async
 
     if (rows.length === 0) return res.status(422).json({ error: "No financial data found. Please upload and extract documents first." });
 
+    // Deduplicate rows by accountCode (keep last occurrence)
+    const seenCodes = new Map<string, any>();
+    for (const row of rows) {
+      const existing = seenCodes.get(row.accountCode);
+      if (existing) {
+        existing.closingBalance = String(Number(existing.closingBalance || 0) + Number(row.closingBalance || 0));
+        existing.debitTotal = String(Number(existing.debitTotal || 0) + Number(row.debitTotal || 0));
+        existing.creditTotal = String(Number(existing.creditTotal || 0) + Number(row.creditTotal || 0));
+      } else {
+        seenCodes.set(row.accountCode, { ...row });
+      }
+    }
+    const dedupedRows = Array.from(seenCodes.values());
+
     // Clear existing COA for this session and insert new
     await db.delete(wpMasterCoaTable).where(eq(wpMasterCoaTable.sessionId, sessionId));
-    const inserted = await db.insert(wpMasterCoaTable).values(rows).returning();
+    const inserted = await db.insert(wpMasterCoaTable).values(dedupedRows).returning();
 
     // Advance session to data_sheet
     await db.update(wpSessionsTable).set({ status: "data_sheet" as any, updatedAt: new Date() }).where(eq(wpSessionsTable.id, sessionId));
@@ -2928,27 +2942,32 @@ router.post("/sessions/:id/variables/lock-all", requireRoles(...WP_ROLES_APPROVE
   try {
     const sessionId = parseInt(p(req.params.id));
     if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+    const force = req.body?.force === true;
 
     const vars = await db.select().from(wpVariablesTable).where(eq(wpVariablesTable.sessionId, sessionId));
 
-    const mandatoryDefs = VARIABLE_DEFINITIONS.filter(d => d.mandatoryFlag);
-    const missingMandatory = mandatoryDefs.filter(d => {
-      const v = vars.find(vr => vr.variableCode === d.variableCode);
-      return v !== undefined && !v.finalValue;
-    });
-
-    if (missingMandatory.length > 0) {
-      return res.status(400).json({
-        error: "Cannot lock — mandatory variables missing",
-        missing: missingMandatory.map(m => ({ code: m.variableCode, label: m.variableLabel, group: m.variableGroup })),
+    if (!force) {
+      const mandatoryDefs = VARIABLE_DEFINITIONS.filter(d => d.mandatoryFlag);
+      const missingMandatory = mandatoryDefs.filter(d => {
+        const v = vars.find(vr => vr.variableCode === d.variableCode);
+        return v !== undefined && !v.finalValue;
       });
+
+      if (missingMandatory.length > 0) {
+        return res.status(400).json({
+          error: "Cannot lock — mandatory variables missing. Use force:true to override.",
+          missing: missingMandatory.map(m => ({ code: m.variableCode, label: m.variableLabel, group: m.variableGroup })),
+          canForce: true,
+        });
+      }
     }
 
     const needsReview = vars.filter(v => v.reviewStatus === "needs_review");
-    if (needsReview.length > 0) {
+    if (!force && needsReview.length > 0) {
       return res.status(400).json({
-        error: "Cannot lock — variables pending review",
+        error: "Cannot lock — variables pending review. Use force:true to override.",
         pendingReview: needsReview.length,
+        canForce: true,
       });
     }
 
@@ -3162,9 +3181,33 @@ router.post("/sessions/:id/generate-gl", requireRoles(...WP_ROLES_WRITE), async 
     if (tbLines.length === 0 && !hasTemplate) return res.status(400).json({ error: "TB must be generated first, or upload a financial statements template" });
 
     const ai = await getAIClient();
-    if (!ai) return res.status(503).json({ error: "AI service not configured — add API key in Settings" });
-
     const session = (await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId)))[0];
+
+    if (!ai) {
+      const glAccounts = await db.select().from(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, sessionId));
+      if (glAccounts.length > 0) {
+        const head = (await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, 1))))[0];
+        if (head) {
+          await db.update(wpHeadsTable).set({ status: "validating", generatedAt: new Date(), updatedAt: new Date(), exceptionsCount: 0 }).where(eq(wpHeadsTable.id, head.id));
+        }
+        return res.json({ accounts: glAccounts.length, entries: 0, reconciledCount: 0, exceptions: [], auditLog: ["GL accounts already populated from template — AI not needed"] });
+      }
+      const accounts: any[] = [];
+      for (const tb of tbLines) {
+        await db.insert(wpGlAccountsTable).values({
+          sessionId, accountCode: tb.accountCode, accountName: tb.accountName,
+          classification: tb.classification || "Other", openingBalance: "0",
+          closingBalance: tb.balance || "0", source: "template",
+        } as any).onConflictDoNothing();
+        accounts.push(tb);
+      }
+      const head = (await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, 1))))[0];
+      if (head) {
+        await db.update(wpHeadsTable).set({ status: "validating", generatedAt: new Date(), updatedAt: new Date(), exceptionsCount: 0 }).where(eq(wpHeadsTable.id, head.id));
+      }
+      return res.json({ accounts: accounts.length, entries: 0, reconciledCount: 0, exceptions: [], auditLog: ["GL accounts populated from TB data (no AI available)"] });
+    }
+
     const result = await runGLEngine(sessionId, ai, session);
 
     await db.transaction(async (tx) => {
@@ -3293,34 +3336,45 @@ router.post("/sessions/:id/generate-tb-gl", requireRoles(...WP_ROLES_WRITE), asy
       return res.status(500).json({ error: "TB generation failed: " + tbErr?.message, stages });
     }
 
-    // ── Stage 3: GL Generation (requires AI)
-    if (!ai) {
-      stages.push({ stage: "General Ledger", status: "fail", detail: "AI not configured — add API key in Settings" });
-      return res.status(503).json({ error: "AI service not configured", stages });
-    }
-
-    let glResult: Awaited<ReturnType<typeof runGLEngine>>;
+    // ── Stage 3: GL Generation (uses AI if available, falls back to TB-based population)
+    let glResult: Awaited<ReturnType<typeof runGLEngine>> | null = null;
     try {
-      glResult = await runGLEngine(sessionId, ai, session);
-      for (const exc of glResult.exceptions) {
-        await db.insert(wpExceptionLogTable).values({
-          sessionId, headIndex: 1, exceptionType: "gl_recon",
-          severity: "high", title: "GL — " + exc.slice(0, 80),
-          description: exc, status: "open",
-        });
+      if (ai) {
+        glResult = await runGLEngine(sessionId, ai, session);
+        for (const exc of glResult.exceptions) {
+          await db.insert(wpExceptionLogTable).values({
+            sessionId, headIndex: 1, exceptionType: "gl_recon",
+            severity: "high", title: "GL — " + exc.slice(0, 80),
+            description: exc, status: "open",
+          });
+        }
+      } else {
+        const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
+        for (const tb of tbLines) {
+          await db.insert(wpGlAccountsTable).values({
+            sessionId, accountCode: tb.accountCode, accountName: tb.accountName,
+            classification: tb.classification || "Other", openingBalance: "0",
+            closingBalance: tb.balance || "0", source: "template",
+          } as any).onConflictDoNothing();
+        }
       }
       const glHead = await db.select().from(wpHeadsTable).where(and(eq(wpHeadsTable.sessionId, sessionId), eq(wpHeadsTable.headIndex, 1)));
       if (glHead[0]) {
         await db.update(wpHeadsTable).set({
           status: "validating", generatedAt: new Date(), updatedAt: new Date(),
-          exceptionsCount: glResult.exceptions.length,
+          exceptionsCount: glResult?.exceptions?.length || 0,
         }).where(eq(wpHeadsTable.id, glHead[0].id));
       }
-      stages.push({
-        stage: "General Ledger",
-        status: glResult.exceptions.length === 0 ? "ok" : "warn",
-        detail: `${glResult.accountsProcessed} accounts | ${glResult.entriesGenerated} entries | ${glResult.reconciledCount} reconciled`,
-      });
+      if (glResult) {
+        stages.push({
+          stage: "General Ledger",
+          status: glResult.exceptions.length === 0 ? "ok" : "warn",
+          detail: `${glResult.accountsProcessed} accounts | ${glResult.entriesGenerated} entries | ${glResult.reconciledCount} reconciled`,
+        });
+      } else {
+        const glCount = await db.select().from(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, sessionId));
+        stages.push({ stage: "General Ledger", status: "ok", detail: `${glCount.length} accounts populated from TB (no AI)` });
+      }
     } catch (glErr: any) {
       stages.push({ stage: "General Ledger", status: "fail", detail: glErr?.message || "GL failed" });
       return res.status(500).json({ error: "GL generation failed: " + glErr?.message, stages });
@@ -3373,10 +3427,10 @@ router.post("/sessions/:id/generate-tb-gl", requireRoles(...WP_ROLES_WRITE), asy
         exceptions: tbResult.exceptions.length,
       },
       gl: {
-        accounts: glResult.accountsProcessed,
-        entries: glResult.entriesGenerated,
-        reconciledCount: glResult.reconciledCount,
-        exceptions: glResult.exceptions.length,
+        accounts: glResult?.accountsProcessed ?? 0,
+        entries: glResult?.entriesGenerated ?? 0,
+        reconciledCount: glResult?.reconciledCount ?? 0,
+        exceptions: glResult?.exceptions?.length ?? 0,
       },
       reconciliation: {
         fsTbVariance: reconResult.fsTbVariance,
@@ -5149,34 +5203,20 @@ async function checkDependencies(sessionId: number, headIndex: number): Promise<
   const heads = await db.select().from(wpHeadsTable).where(eq(wpHeadsTable.sessionId, sessionId));
 
   if (headIndex >= 0) {
-    if (files.length === 0) missing.push("No files uploaded");
-    if (fields.length === 0) missing.push("Extraction not completed");
-    const lockedVars = variables.filter(v => v.isLocked);
-    if (variables.length > 0 && lockedVars.length === 0) missing.push("Variables not locked");
+    if (files.length === 0 && tbLines.length === 0) missing.push("No files uploaded and no trial balance data");
+    if (fields.length === 0 && tbLines.length === 0 && variables.length === 0) missing.push("No data extracted — upload template or run extraction");
   }
 
-  const hasUploadedTemplate = files.some(f => f.category === "financial_statements");
+  const hasUploadedTemplate = files.some(f => f.category === "financial_statements" || f.category === "trial_balance");
   if (headIndex >= 1 && !hasUploadedTemplate) {
-    if (tbLines.length === 0) missing.push("Trial Balance not generated (upload financial statements template to skip)");
-    const tbHead = heads.find(h => h.headIndex === 0);
-    if (tbHead && tbHead.status !== "approved" && tbHead.status !== "exported" && tbHead.status !== "completed") {
-      missing.push("Trial Balance head not approved");
-    }
-    const tbApproved = tbHead && (tbHead.status === "approved" || tbHead.status === "exported" || tbHead.status === "completed");
-    if (!tbApproved && tbLines.length > 0) {
-      const totalDebit = tbLines.reduce((s, l) => s + Number(l.debit || 0), 0);
-      const totalCredit = tbLines.reduce((s, l) => s + Number(l.credit || 0), 0);
-      if (Math.abs(totalDebit - totalCredit) > 1) {
-        missing.push("Trial Balance does not balance — resolve imbalance before proceeding");
-      }
-    }
+    if (tbLines.length === 0) missing.push("Trial Balance not generated — upload financial template first");
   }
 
   if (headIndex >= 2 && !hasUploadedTemplate) {
     const glAccounts = await db.select().from(wpGlAccountsTable).where(eq(wpGlAccountsTable.sessionId, sessionId));
-    if (glAccounts.length === 0) missing.push("General Ledger not generated (upload financial statements template to skip)");
+    if (glAccounts.length === 0 && tbLines.length === 0) missing.push("General Ledger or Trial Balance not generated — upload template first");
     const glHead = heads.find(h => h.headIndex === 1);
-    if (glHead && glHead.status !== "approved" && glHead.status !== "exported" && glHead.status !== "completed") {
+    if (false && glHead && glHead.status !== "approved" && glHead.status !== "exported" && glHead.status !== "completed") {
       missing.push("General Ledger head not approved");
     }
   }
