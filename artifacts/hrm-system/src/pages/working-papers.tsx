@@ -7036,228 +7036,318 @@ function GenerationStage({ session, onNext, ...legacyProps }: any) {
   const progress = totalWps > 0 ? Math.round((totalUsed / totalWps) * 100) : 0;
   const completedCats = catStatus.filter((c: any) => c.complete).length;
 
+  const [expandedCat, setExpandedCat] = useState<string | null>(null);
+
+  const catProgress = (cat: any) => cat.totalWp > 0 ? Math.round((cat.wpUsed / cat.totalWp) * 100) : 0;
+
+  const catStatusLabel = (cat: any) => {
+    if (cat.complete) return "Complete";
+    if (generating && activeCat === cat.key) return "Generating...";
+    if (cat.wpUsed > 0) return "In Progress";
+    if (cat.totalWp === 0) return "N/A";
+    return "Pending";
+  };
+
+  const catStatusColor = (cat: any) => {
+    if (cat.complete) return "bg-emerald-100 text-emerald-700 border-emerald-200";
+    if (generating && activeCat === cat.key) return "bg-blue-100 text-blue-700 border-blue-200";
+    if (cat.wpUsed > 0) return "bg-amber-100 text-amber-700 border-amber-200";
+    if (cat.totalWp === 0) return "bg-slate-100 text-slate-400 border-slate-200";
+    return "bg-slate-50 text-slate-500 border-slate-200";
+  };
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
 
       {generating && (
-        <div className="flex items-center gap-3 bg-blue-600 text-white rounded-xl px-4 py-3 shadow-md">
-          <Loader2 className="w-5 h-5 animate-spin shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold leading-tight">AI Generation in Progress</p>
-            <p className="text-xs text-blue-200 truncate">
-              {activeCat ? `Category ${activeCat}` : "Starting..."}{activeWpName ? ` — ${activeWpName}` : ""}
-            </p>
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0F3460] to-blue-700 text-white px-5 py-4 shadow-lg">
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgNDAgMTAgTSAxMCAwIEwgMTAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')]" />
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="w-32 bg-blue-500/50 rounded-full h-1.5">
-              <div className="h-1.5 bg-white rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+          <div className="relative flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center shrink-0">
+              <Loader2 className="w-6 h-6 animate-spin text-white" />
             </div>
-            <span className="text-xs font-mono">{totalUsed}/{totalWps}</span>
-            <button onClick={stopGeneration} className="text-xs px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg font-medium transition-colors border border-white/20">
-              Stop
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-base font-bold leading-tight">AI Working Paper Generation</p>
+                <span className="px-2 py-0.5 bg-white/20 rounded-full text-[10px] font-semibold uppercase tracking-wider animate-pulse">Live</span>
+              </div>
+              <p className="text-sm text-blue-100 truncate">
+                {activeCat ? `Category ${activeCat}` : "Initializing..."}{activeWpName ? ` — ${activeWpName}` : ""}
+              </p>
+              <div className="mt-2.5 flex items-center gap-3">
+                <div className="flex-1 max-w-xs">
+                  <div className="w-full bg-white/20 rounded-full h-2">
+                    <div className="h-2 bg-white rounded-full transition-all duration-700 ease-out" style={{ width: `${progress}%` }} />
+                  </div>
+                </div>
+                <span className="text-xs font-semibold text-blue-100 tabular-nums">{totalUsed} / {totalWps} WPs</span>
+              </div>
+            </div>
+            <button onClick={stopGeneration} className="shrink-0 flex items-center gap-1.5 text-sm px-4 py-2 bg-white/15 hover:bg-white/25 rounded-xl font-semibold transition-all border border-white/20 backdrop-blur">
+              <X className="w-4 h-4" /> Stop
             </button>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-            <Layers className="w-5 h-5 text-blue-600" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        {[
+          { label: "Categories (A-Q)", value: "17", icon: <Layers className="w-5 h-5" />, color: "from-blue-500 to-indigo-600", bg: "bg-blue-50", iconColor: "text-blue-600" },
+          { label: "Total Working Papers", value: String(totalWps), icon: <FileText className="w-5 h-5" />, color: "from-indigo-500 to-purple-600", bg: "bg-indigo-50", iconColor: "text-indigo-600" },
+          { label: "WPs Generated", value: String(totalUsed), icon: <CheckCircle2 className="w-5 h-5" />, color: "from-emerald-500 to-teal-600", bg: "bg-emerald-50", iconColor: "text-emerald-600" },
+          { label: "Overall Progress", value: `${progress}%`, icon: <Gauge className="w-5 h-5" />, color: progress === 100 ? "from-emerald-500 to-green-600" : "from-amber-500 to-orange-600", bg: progress === 100 ? "bg-emerald-50" : "bg-amber-50", iconColor: progress === 100 ? "text-emerald-600" : "text-amber-600" },
+        ].map((card, i) => (
+          <div key={i} className="bg-white border border-slate-200/80 rounded-xl p-4 hover:shadow-md transition-shadow group">
+            <div className="flex items-start justify-between">
+              <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", card.bg)}>
+                <span className={card.iconColor}>{card.icon}</span>
+              </div>
+              <div className={cn("w-1.5 h-8 rounded-full bg-gradient-to-b opacity-60 group-hover:opacity-100 transition-opacity", card.color)} />
+            </div>
+            <p className="text-2xl font-bold text-slate-900 mt-3 tabular-nums">{card.value}</p>
+            <p className="text-xs text-slate-500 mt-0.5">{card.label}</p>
           </div>
-          <div>
-            <p className="text-2xl font-bold text-slate-900">17</p>
-            <p className="text-xs text-slate-500">Categories</p>
-          </div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
-            <FileText className="w-5 h-5 text-indigo-600" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-slate-900">{totalWps}</p>
-            <p className="text-xs text-slate-500">Total WPs</p>
-          </div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-slate-900">{totalUsed}</p>
-            <p className="text-xs text-slate-500">WPs Generated</p>
-          </div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
-            <Gauge className="w-5 h-5 text-amber-600" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-slate-900">{progress}%</p>
-            <p className="text-xs text-slate-500">Completion</p>
-          </div>
-        </div>
+        ))}
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-[#0F3460]/5 to-blue-50/50 px-4 sm:px-5 py-4 border-b border-slate-200/60">
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-                <Layers className="w-5 h-5 text-[#0F3460]" /> WP Generation — Category-wise
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0F3460] to-blue-700 flex items-center justify-center">
+                  <Layers className="w-4.5 h-4.5 text-white" />
+                </div>
+                Working Paper Categories
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">AI generates one WP at a time, sequentially through each category (A → Q)</p>
+              <p className="text-sm text-slate-500 mt-1 ml-[42px]">
+                AI generates each working paper sequentially from Category A through Q.
+                {completedCats > 0 && <span className="text-emerald-600 font-medium ml-1">{completedCats} of 17 categories completed.</span>}
+              </p>
             </div>
-            <div className="flex items-center gap-2 self-start flex-wrap">
-              <Button variant="outline" size="sm" onClick={fetchCategoryStatus} className="h-8">
-                <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
+            <div className="flex items-center gap-2 self-start sm:self-center">
+              <Button variant="outline" size="sm" onClick={() => fetchCategoryStatus()} className="h-9 px-3 text-sm border-slate-200 hover:border-slate-300">
+                <RefreshCw className="w-3.5 h-3.5 mr-2" /> Refresh
               </Button>
               {!generating ? (
-                <Button size="sm" onClick={runFullGeneration} disabled={allComplete} className="h-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-sm text-white">
-                  <Play className="w-3.5 h-3.5 mr-1.5" />
-                  {allComplete ? "All Complete" : "Generate All WPs"}
+                <Button size="sm" onClick={runFullGeneration} disabled={allComplete}
+                  className={cn("h-9 px-4 text-sm shadow-sm text-white font-semibold",
+                    allComplete
+                      ? "bg-emerald-600 hover:bg-emerald-700"
+                      : "bg-gradient-to-r from-[#0F3460] to-blue-700 hover:from-[#0e2d55] hover:to-blue-800"
+                  )}>
+                  {allComplete ? <><CheckCircle2 className="w-4 h-4 mr-2" /> All Complete</> : <><Play className="w-4 h-4 mr-2" /> Generate All WPs</>}
                 </Button>
               ) : (
-                <Button size="sm" onClick={stopGeneration} className="h-8 bg-red-600 hover:bg-red-700 text-white">
-                  <X className="w-3.5 h-3.5 mr-1.5" /> Stop
+                <Button size="sm" onClick={stopGeneration} className="h-9 px-4 text-sm bg-red-600 hover:bg-red-700 text-white font-semibold shadow-sm">
+                  <X className="w-4 h-4 mr-2" /> Stop Generation
                 </Button>
               )}
             </div>
           </div>
 
-          <div className="mt-3 flex items-center gap-3">
-            <div className="flex-1">
-              <div className="w-full bg-slate-200 rounded-full h-2">
-                <div className={cn("h-2 rounded-full transition-all duration-500", progress === 100 ? "bg-emerald-500" : progress > 50 ? "bg-blue-500" : "bg-amber-500")} style={{ width: `${progress}%` }} />
+          <div className="mt-4 ml-[42px]">
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                  <div className={cn("h-2.5 rounded-full transition-all duration-700 ease-out",
+                    progress === 100 ? "bg-gradient-to-r from-emerald-500 to-green-500" :
+                    progress > 50 ? "bg-gradient-to-r from-blue-500 to-indigo-500" :
+                    progress > 0 ? "bg-gradient-to-r from-amber-500 to-orange-500" :
+                    "bg-slate-300"
+                  )} style={{ width: `${Math.max(progress, 1)}%` }} />
+                </div>
               </div>
+              <span className="text-sm font-semibold text-slate-700 whitespace-nowrap tabular-nums min-w-[80px] text-right">{progress}% done</span>
             </div>
-            <span className="text-xs font-medium text-slate-600 whitespace-nowrap">{completedCats}/17 categories done</span>
+            <div className="flex items-center gap-5 mt-2">
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500" /><span className="text-xs text-slate-500">{completedCats} Complete</span></div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-amber-500" /><span className="text-xs text-slate-500">{catStatus.filter((c: any) => c.wpUsed > 0 && !c.complete).length} In Progress</span></div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-slate-300" /><span className="text-xs text-slate-500">{catStatus.filter((c: any) => c.wpUsed === 0 && c.totalWp > 0).length} Pending</span></div>
+            </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-[#0F3460] text-white">
-                <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider w-[55%]">Category</th>
-                <th className="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wider w-[12%]">Total WP</th>
-                <th className="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wider w-[12%]">WP Used</th>
-                <th className="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wider w-[21%]">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {catStatus.map((cat: any, idx: number) => {
-                const isActive = generating && activeCat === cat.key;
-                const isDone = cat.complete;
-                const hasWps = cat.wpUsed > 0;
-                return (
-                  <tr key={cat.key} className={cn(
-                    "transition-colors",
-                    isActive && "bg-blue-50/60",
-                    isDone && !isActive && "bg-emerald-50/30",
-                    idx % 2 === 0 && !isActive && !isDone && "bg-white",
-                    idx % 2 !== 0 && !isActive && !isDone && "bg-slate-50/40",
-                  )}>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className={cn(
-                          "w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
-                          isDone ? "bg-emerald-100 text-emerald-700" :
-                          isActive ? "bg-blue-100 text-blue-700" :
-                          "bg-slate-100 text-slate-500"
-                        )}>
-                          {isDone ? <CheckCircle2 className="w-4 h-4" /> :
-                           isActive ? <Loader2 className="w-4 h-4 animate-spin" /> :
-                           cat.key}
-                        </div>
-                        <div className="min-w-0">
-                          <p className={cn("font-medium text-sm", isDone ? "text-emerald-800" : "text-slate-800")}>
-                            {cat.key} — {cat.name}
-                          </p>
-                          {isActive && activeWpName && (
-                            <p className="text-[11px] text-blue-600 mt-0.5 truncate flex items-center gap-1">
-                              <Loader2 className="w-3 h-3 animate-spin" /> {activeWpName}
-                            </p>
-                          )}
-                        </div>
+        {catStatus.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+              <Loader2 className="w-7 h-7 animate-spin text-slate-400" />
+            </div>
+            <p className="text-sm font-medium text-slate-600">Loading category data...</p>
+            <p className="text-xs text-slate-400 mt-1">Fetching working paper categories from the server</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {catStatus.map((cat: any, idx: number) => {
+              const isActive = generating && activeCat === cat.key;
+              const isDone = cat.complete;
+              const pct = catProgress(cat);
+              const isExpanded = expandedCat === cat.key;
+
+              return (
+                <div key={cat.key} className={cn(
+                  "transition-all duration-200",
+                  isActive && "bg-blue-50/40",
+                  isDone && !isActive && "bg-emerald-50/20",
+                )}>
+                  <div
+                    className="flex items-center gap-3 px-5 py-3.5 cursor-pointer hover:bg-slate-50/80 transition-colors group"
+                    onClick={() => setExpandedCat(isExpanded ? null : cat.key)}
+                  >
+                    <div className={cn(
+                      "w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 transition-all",
+                      isDone ? "bg-emerald-500 text-white shadow-sm shadow-emerald-200" :
+                      isActive ? "bg-blue-500 text-white shadow-sm shadow-blue-200" :
+                      cat.wpUsed > 0 ? "bg-amber-100 text-amber-700 border border-amber-200" :
+                      "bg-slate-100 text-slate-500 border border-slate-200 group-hover:border-slate-300"
+                    )}>
+                      {isDone ? <CheckCircle2 className="w-4.5 h-4.5" /> :
+                       isActive ? <Loader2 className="w-4.5 h-4.5 animate-spin" /> :
+                       <span className="text-[13px]">{cat.key}</span>}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-sm text-slate-800">{cat.name}</p>
+                        <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold border", catStatusColor(cat))}>
+                          {catStatusLabel(cat)}
+                        </span>
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="text-sm font-semibold text-slate-700">{cat.totalWp}</span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={cn(
-                        "text-sm font-semibold",
-                        isDone ? "text-emerald-600" :
-                        cat.wpUsed > 0 ? "text-blue-600" :
-                        "text-slate-400"
-                      )}>{cat.wpUsed}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-1.5">
-                        {isDone && (
-                          <Button size="sm" variant="outline" onClick={() => downloadCategoryDocx(cat.key)}
-                            disabled={downloading === cat.key}
-                            className="h-7 px-2.5 text-xs border-blue-200 text-blue-700 hover:bg-blue-50">
-                            {downloading === cat.key ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Download className="w-3 h-3 mr-1" />}
-                            Word
-                          </Button>
-                        )}
-                        {!generating && !isDone && cat.totalWp > 0 && (
-                          <Button size="sm" variant="outline"
-                            onClick={async () => {
-                              setGenerating(true);
-                              stopRef.current = false;
-                              setStopRequested(false);
-                              setActiveCat(cat.key);
-                              while (!stopRef.current) {
-                                const r = await generateNextInCategory(cat.key);
-                                if (r.stopped || r.categoryComplete) break;
-                              }
-                              setGenerating(false);
-                              setActiveCat(null);
-                              setActiveWp(null);
-                              setActiveWpName("");
-                            }}
-                            className="h-7 px-2.5 text-xs border-blue-200 text-blue-700 hover:bg-blue-50">
-                            <Play className="w-3 h-3 mr-1" /> Generate
-                          </Button>
-                        )}
-                        {isActive && (
-                          <span className="inline-flex items-center gap-1 text-xs text-blue-600 font-medium px-2 py-1 bg-blue-50 rounded-full">
-                            <Loader2 className="w-3 h-3 animate-spin" /> Running
+                      {isActive && activeWpName ? (
+                        <p className="text-xs text-blue-600 mt-0.5 truncate flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 animate-spin shrink-0" /> Generating: {activeWpName}
+                        </p>
+                      ) : (
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="w-24 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                            <div className={cn("h-1.5 rounded-full transition-all duration-500",
+                              isDone ? "bg-emerald-500" : pct > 0 ? "bg-blue-500" : "bg-transparent"
+                            )} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-[11px] text-slate-400 tabular-nums">
+                            {cat.wpUsed}/{cat.totalWp} WPs
                           </span>
-                        )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {isDone && (
+                        <Button size="sm" variant="outline" onClick={() => downloadCategoryDocx(cat.key)}
+                          disabled={downloading === cat.key}
+                          className="h-8 px-3 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 font-medium">
+                          {downloading === cat.key ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Download className="w-3.5 h-3.5 mr-1.5" />}
+                          Download
+                        </Button>
+                      )}
+                      {!generating && !isDone && cat.totalWp > 0 && (
+                        <Button size="sm"
+                          onClick={async () => {
+                            setGenerating(true);
+                            stopRef.current = false;
+                            setStopRequested(false);
+                            setActiveCat(cat.key);
+                            while (!stopRef.current) {
+                              const r = await generateNextInCategory(cat.key);
+                              if (r.stopped || r.categoryComplete) break;
+                            }
+                            setGenerating(false);
+                            setActiveCat(null);
+                            setActiveWp(null);
+                            setActiveWpName("");
+                          }}
+                          className="h-8 px-3 text-xs bg-gradient-to-r from-[#0F3460] to-blue-700 hover:from-[#0e2d55] hover:to-blue-800 text-white font-medium shadow-sm">
+                          <Play className="w-3.5 h-3.5 mr-1.5" /> Generate
+                        </Button>
+                      )}
+                      {isActive && (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-blue-700 font-semibold px-3 py-1.5 bg-blue-100 rounded-lg border border-blue-200">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Running
+                        </span>
+                      )}
+                      {cat.totalWp === 0 && (
+                        <span className="text-xs text-slate-400 italic px-2">No WPs</span>
+                      )}
+                    </div>
+
+                    <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform shrink-0", isExpanded && "rotate-180")} />
+                  </div>
+
+                  {isExpanded && (
+                    <div className="px-5 pb-4 pt-1 ml-12">
+                      <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                          <div>
+                            <p className="text-slate-400 font-medium uppercase tracking-wider text-[10px] mb-1">Category</p>
+                            <p className="font-semibold text-slate-700">{cat.key} — {cat.name}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-400 font-medium uppercase tracking-wider text-[10px] mb-1">Total WPs</p>
+                            <p className="font-semibold text-slate-700">{cat.totalWp} working papers</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-400 font-medium uppercase tracking-wider text-[10px] mb-1">Generated</p>
+                            <p className={cn("font-semibold", isDone ? "text-emerald-600" : cat.wpUsed > 0 ? "text-blue-600" : "text-slate-400")}>{cat.wpUsed} of {cat.totalWp}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-400 font-medium uppercase tracking-wider text-[10px] mb-1">Progress</p>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 bg-slate-200 rounded-full h-2 overflow-hidden">
+                                <div className={cn("h-2 rounded-full transition-all", isDone ? "bg-emerald-500" : "bg-blue-500")} style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="font-semibold text-slate-700 tabular-nums">{pct}%</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="bg-slate-100 border-t-2 border-slate-300">
-                <td className="px-4 py-3 font-bold text-sm text-slate-800">Total</td>
-                <td className="px-4 py-3 text-center font-bold text-sm text-slate-800">{totalWps}</td>
-                <td className="px-4 py-3 text-center font-bold text-sm text-emerald-700">{totalUsed}</td>
-                <td className="px-4 py-3 text-center">
-                  {allComplete && (
-                    <Button size="sm" onClick={downloadAllDocx}
-                      disabled={downloading === "ALL"}
-                      className="h-8 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs shadow-sm">
-                      {downloading === "ALL" ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Download className="w-3.5 h-3.5 mr-1.5" />}
-                      Download All (Word)
-                    </Button>
+                    </div>
                   )}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="px-5 py-4 bg-gradient-to-r from-slate-50 to-slate-100/80 border-t border-slate-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-slate-800">Total</span>
+                <span className="text-xs text-slate-500">across all categories</span>
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                <span className="font-semibold text-slate-700 tabular-nums">{totalWps} <span className="text-xs font-normal text-slate-500">WPs</span></span>
+                <span className="text-slate-300">|</span>
+                <span className="font-semibold text-emerald-700 tabular-nums">{totalUsed} <span className="text-xs font-normal text-slate-500">generated</span></span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {totalUsed > 0 && !allComplete && (
+                <Button size="sm" variant="outline" onClick={downloadAllDocx}
+                  disabled={downloading === "ALL"}
+                  className="h-9 px-4 text-xs border-slate-300 hover:border-slate-400 text-slate-700 font-medium">
+                  {downloading === "ALL" ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Download className="w-3.5 h-3.5 mr-1.5" />}
+                  Download Generated
+                </Button>
+              )}
+              {allComplete && (
+                <Button size="sm" onClick={downloadAllDocx}
+                  disabled={downloading === "ALL"}
+                  className="h-9 px-5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-sm shadow-md font-semibold">
+                  {downloading === "ALL" ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+                  Download All Working Papers
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
       {onNext && (
         <div className="flex justify-end pt-2">
-          <Button onClick={onNext} size="lg" className="px-8 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-md text-white font-semibold">
+          <Button onClick={onNext} size="lg" className="h-11 px-8 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg text-white font-semibold text-sm">
             Proceed to Export <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </div>
