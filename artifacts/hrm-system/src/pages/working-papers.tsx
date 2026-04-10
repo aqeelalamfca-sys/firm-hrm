@@ -4283,27 +4283,27 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
             <Button onClick={() => onAddFsLine({})} className="bg-emerald-600 hover:bg-emerald-700 gap-2 text-xs"><Plus className="w-3.5 h-3.5" /> Add First Row</Button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-auto" style={{ maxHeight: "70vh" }}>
             <table className="w-full text-[10px] border-collapse min-w-[1800px]">
-              <thead>
+              <thead className="sticky top-0 z-20">
                 <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[50px] sticky left-0 bg-slate-50 z-10">Line ID</th>
-                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[110px]">Statement Type</th>
-                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[100px]">FS Section</th>
-                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[120px]">Major Head</th>
-                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[110px]">Line Item</th>
-                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[100px]">Sub Line Item</th>
-                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[120px]">Account Name</th>
-                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[80px]">Account Code</th>
-                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[70px]">Note No</th>
-                  <th className="text-right px-2 py-2 font-semibold text-slate-600 min-w-[100px]">Current Year</th>
-                  <th className="text-right px-2 py-2 font-semibold text-slate-600 min-w-[100px]">Prior Year</th>
-                  <th className="text-right px-2 py-2 font-semibold text-slate-600 min-w-[90px]">Debit Value</th>
-                  <th className="text-right px-2 py-2 font-semibold text-slate-600 min-w-[90px]">Credit Value</th>
-                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[70px]">Dr/Cr</th>
-                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[90px]">WP Area</th>
-                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[80px]">Risk Level</th>
-                  <th className="text-center px-2 py-2 font-semibold text-slate-600 min-w-[40px]"></th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[50px] sticky left-0 bg-slate-50 z-30 border-r border-slate-200">Line ID</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[110px] bg-slate-50">Statement Type</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[100px] bg-slate-50">FS Section</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[120px] bg-slate-50">Major Head</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[110px] bg-slate-50">Line Item</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[100px] bg-slate-50">Sub Line Item</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[120px] bg-slate-50">Account Name</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[80px] bg-slate-50">Account Code</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[70px] bg-slate-50">Note No</th>
+                  <th className="text-right px-2 py-2 font-semibold text-slate-600 min-w-[100px] bg-slate-50">Current Year</th>
+                  <th className="text-right px-2 py-2 font-semibold text-slate-600 min-w-[100px] bg-slate-50">Prior Year</th>
+                  <th className="text-right px-2 py-2 font-semibold text-slate-600 min-w-[90px] bg-slate-50">Debit Value</th>
+                  <th className="text-right px-2 py-2 font-semibold text-slate-600 min-w-[90px] bg-slate-50">Credit Value</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[70px] bg-slate-50">Dr/Cr</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[90px] bg-slate-50">WP Area</th>
+                  <th className="text-left px-2 py-2 font-semibold text-slate-600 min-w-[80px] bg-slate-50">Risk Level</th>
+                  <th className="text-center px-2 py-2 font-semibold text-slate-600 min-w-[40px] bg-slate-50"></th>
                 </tr>
               </thead>
               <tbody>
@@ -4312,7 +4312,7 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
                   const subItems = SUB_LINE_ITEM_MAP[row.lineItem] || [];
                   return (
                     <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                      <td className="px-2 py-1 font-mono font-semibold text-indigo-600 sticky left-0 bg-white z-10">{row.lineId}</td>
+                      <td className="px-2 py-1 font-mono font-semibold text-indigo-600 sticky left-0 bg-white z-10 border-r border-slate-200">{row.lineId}</td>
                       <td className="px-1 py-1"><FsSelect value={row.statementType} options={STATEMENT_TYPES} rowId={row.id} field="statementType" /></td>
                       <td className="px-1 py-1"><FsSelect value={row.fsSection} options={FS_SECTIONS} rowId={row.id} field="fsSection" /></td>
                       <td className="px-1 py-1"><FsSelect value={row.majorHead} options={MAJOR_HEADS} rowId={row.id} field="majorHead" /></td>
