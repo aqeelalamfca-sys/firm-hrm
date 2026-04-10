@@ -1136,6 +1136,22 @@ export default function WorkingPapers() {
     } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
+  const upsertVariable = async (code: string, value: string, reason: string = "User edit") => {
+    if (!activeSession) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/variables/upsert`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ code, value, reason, editedBy: user?.id }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "Save failed", description: err.error || "Unknown error", variant: "destructive" });
+      } else {
+        await fetchVariables();
+      }
+    } catch (err: any) { toast?.({ title: "Save failed", description: err?.message || "An error occurred", variant: "destructive" }); }
+  };
+
   const lockAllVariables = async (force = false) => {
     if (!activeSession) return;
     try {
@@ -2474,6 +2490,7 @@ export default function WorkingPapers() {
           loading={loading || parseLoading}
           confidenceBadge={confidenceBadge}
           onSaveVariable={saveVariableDirect}
+          onUpsertVariable={upsertVariable}
           fsLines={fsLines}
           onAddFsLine={addFsLine}
           onUpdateFsLine={updateFsLine}
@@ -3817,12 +3834,13 @@ function TemplateParsedPanel({ result, onClear }: { result: any; onClear: () => 
   );
 }
 
-function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun, onAiFill, onOpenAiSettings, loading, confidenceBadge, onSaveVariable, fsLines, onAddFsLine, onUpdateFsLine, onDeleteFsLine, onFetchFsLines, onNext }: any) {
+function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun, onAiFill, onOpenAiSettings, loading, confidenceBadge, onSaveVariable, onUpsertVariable, fsLines, onAddFsLine, onUpdateFsLine, onDeleteFsLine, onFetchFsLines, onNext }: any) {
   const { toast } = useToast();
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editVal, setEditVal] = useState("");
   const [editingFsCell, setEditingFsCell] = useState<string | null>(null);
   const [editFsCellVal, setEditFsCellVal] = useState("");
+  const [savedFields, setSavedFields] = useState<Set<string>>(new Set());
 
   useEffect(() => { if (onFetchFsLines) onFetchFsLines(); }, []);
 
@@ -3835,131 +3853,159 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
   };
   const varId = (code: string): number | null => varFind(code)?.id || null;
 
-  const saveField = async (code: string, value: string) => {
-    const id = varId(code);
-    if (id && onSaveVariable) {
-      await onSaveVariable(id, value, "Updated from extraction form");
+  const flashSaved = (code: string) => {
+    setSavedFields(prev => new Set(prev).add(code));
+    setTimeout(() => setSavedFields(prev => { const n = new Set(prev); n.delete(code); return n; }), 1500);
+  };
+
+  const saveByCode = async (code: string, value: string, reason = "User edit") => {
+    if (onUpsertVariable) {
+      await onUpsertVariable(code, value, reason);
+      flashSaved(code);
     }
+  };
+
+  const saveField = async (code: string, value: string) => {
+    await saveByCode(code, value, "Updated from extraction form");
     setEditingField(null);
   };
 
-  const ENTITY_TYPES = ["Private Limited","Public Limited (Unlisted)","Public Limited (Listed)","Single Member","LLP","AOP","Sole Proprietor","Bank / DFI","Insurance Company","NGO/NPO","Trust","Government Entity","SME","Branch Office","Other"];
+  const ENTITY_TYPES = ["Private Limited Company","Public Limited Company","Listed Company","Unlisted Public Company","Sole Proprietorship","Partnership","LLP","Trust","NGO / NPO","Government Entity","Branch Office","Liaison Office","Other"];
   const ENGAGEMENT_YEARS = Array.from({ length: 10 }, (_, i) => String(new Date().getFullYear() - i));
-  const FRAMEWORKS = ["IFRS","IFRS for SMEs","AFRS","Fourth Schedule","Fifth Schedule"];
-  const ENGAGEMENT_TYPES = ["statutory_audit","limited_review","group_audit","internal_audit","review_engagement","agreed_upon_procedures","tax_audit"];
+  const FRAMEWORKS = ["IFRS (Full)","IFRS for SMEs","IAS","IFAS","Companies Act 2017 (Pakistan)","Banking Companies Ordinance","Insurance Ordinance","NBFCs Regulations","GAAP","Other"];
+  const ENGAGEMENT_TYPES = ["Statutory Audit","Tax Audit","Internal Audit","Review Engagement","Agreed Upon Procedures","Special Purpose Audit","Forensic Audit","Due Diligence","Compilation","Regulatory Inspection"];
   const CONTINUITY = ["First Time","Recurring"];
-  const INDUSTRY_SECTORS = ["Manufacturing","Services","Trading","Construction","IT/Software","Financial Services","Healthcare","Education","Energy","Textiles","FMCG","Real Estate","Agriculture","Telecommunications","Other"];
+  const INDUSTRY_SECTORS = ["Manufacturing","Textile","Trading","Services","Construction","Technology","Financial Services","Banking","Insurance","Healthcare","Education","Energy","Oil and Gas","Agriculture","Real Estate","Retail","Hospitality","Telecoms","Transport and Logistics","Pharmaceuticals","Mining","Leasing","Other"];
   const ACCOUNTING_SYSTEMS = ["QuickBooks","Sage","Xero","SAP","Oracle","Tally","Custom ERP","Manual Books","Other"];
+  const CURRENCIES = ["PKR","USD","GBP","EUR","AED","CAD","AUD","CHF","CNY","JPY","SAR","Other"];
+  const ENTITY_SIZES = ["Small","Medium","Large","Very Large","Listed Entity"];
+  const AUDIT_SCOPES = ["Basic","Standard","Expanded","Nil"];
 
-  const STATEMENT_TYPES = ["BS","P&L","CF","OCI","EQ","Notes","Balance Sheet","Profit & Loss","Cash Flow","Statement of Changes in Equity"];
-  const FS_SECTIONS = ["Assets","Liabilities","Equity","Income","Revenue","Expenses","Cost of Sales","Operating Expenses","Other Income","Finance Cost","Taxation","Cash Flow"];
+  const STATEMENT_TYPES = ["BS","P&L","CF","OCI","EQ","Notes"];
+  const FS_SECTIONS = ["Assets","Liabilities","Equity","Income","Expenses","Cash Flow","OCI","Notes to Accounts","Statement of Changes in Equity"];
   const MAJOR_HEADS = [
-    "Non-Current Assets","Current Assets","Non-Current Liabilities","Current Liabilities","Equity",
-    "Revenue","Cost of Sales","Selling and Distribution","Administrative Expenses","Other income",
-    "Finance Cost","Taxation",
-    "Property Plant & Equipment","Intangibles","Inventory","Trade Debtors","Cash & Bank",
-    "Share Capital","Reserves","Trade Creditors","Accrued Liabilities","Distribution Cost","Other",
+    "Non-Current Assets","Current Assets","Non-Current Liabilities","Current Liabilities",
+    "Equity","Share Capital and Reserves","Revenue","Gross Profit","Cost of Sales",
+    "Selling and Distribution","Administrative Expenses","Other Expenses","Other Income",
+    "Finance Cost","Taxation","Operating Activities","Investing Activities","Financing Activities",
+    "Other Comprehensive Income",
   ];
   const ALL_LINE_ITEMS = [
-    "Property, plant and equipment","Intangible assets","Long-term investments","Long-term loans","Long-term loans and advances",
-    "Capital work in progress","Inventories","Trade debts","Advances and deposits","Other receivables",
-    "Short-term investments","Cash and bank balances","Sales","Scrap sales","Direct material",
-    "Direct labour","Manufacturing overhead","Salaries and benefits","Advertisement and marketing",
-    "Communication expenses","Depreciation","Amortisation","Freight outward","Printing and stationery",
-    "Repair and maintenance","Travelling and conveyance","Utilities","Interest income","Gain on disposal",
-    "Markup on borrowings","Current tax","Deferred tax","Share capital","Reserves","Retained earnings",
-    "Short-term borrowings","Trade and other payables","Accrued liabilities","Staff retirement benefits","Taxation",
+    "Property, plant and equipment","Intangible assets","Long-term investments","Long-term loans and advances",
+    "Capital work in progress","Deferred tax asset","Right-of-use assets",
+    "Inventories","Trade debts","Advances and deposits","Other receivables","Short-term investments",
+    "Cash and bank balances","Current portion of long-term loans","Accrued liabilities","Advance from customers",
+    "Sales","Export sales","Contract revenue","By-product sales","Scrap sales","Dividend income",
+    "Exchange gain","Interest income","Gain on disposal of assets",
+    "Direct material","Direct labour","Manufacturing overhead","Cost of goods sold","Depreciation",
+    "Amortisation","Salaries and benefits","Advertisement and marketing","Communication expenses",
+    "Freight outward","Printing and stationery","Repair and maintenance","Travelling and conveyance",
+    "Utilities","Insurance","Audit fee","Bank charges and commission","Exchange loss",
+    "Markup on borrowings","Current tax","Deferred tax expense","Deferred tax liability",
+    "Share capital","Accumulated losses","Reserves","Retained earnings",
+    "Short-term borrowings","Trade and other payables","Staff retirement benefits","Taxation",
   ];
   const LINE_ITEM_MAP: Record<string, string[]> = {
-    "Non-Current Assets": ["Property, plant and equipment","Intangible assets","Long-term investments","Long-term loans","Long-term loans and advances","Capital work in progress"],
-    "Current Assets": ["Inventories","Trade debts","Advances and deposits","Other receivables","Short-term investments","Cash and bank balances"],
-    "Revenue": ["Sales","Scrap sales","Interest income","Gain on disposal"],
-    "Cost of Sales": ["Direct material","Direct labour","Manufacturing overhead"],
+    "Non-Current Assets": ["Property, plant and equipment","Intangible assets","Long-term investments","Long-term loans and advances","Capital work in progress","Deferred tax asset","Right-of-use assets"],
+    "Current Assets": ["Inventories","Trade debts","Advances and deposits","Other receivables","Short-term investments","Cash and bank balances","Current portion of long-term loans","Accrued liabilities","Advance from customers"],
+    "Non-Current Liabilities": ["Long-term loans and advances","Staff retirement benefits","Deferred tax liability"],
+    "Current Liabilities": ["Short-term borrowings","Trade and other payables","Accrued liabilities","Advance from customers","Taxation","Current portion of long-term loans"],
+    "Equity": ["Share capital","Accumulated losses","Reserves","Retained earnings"],
+    "Share Capital and Reserves": ["Share capital","Accumulated losses","Reserves","Retained earnings"],
+    "Revenue": ["Sales","Export sales","Contract revenue","By-product sales","Scrap sales"],
+    "Gross Profit": ["Sales","Cost of goods sold"],
+    "Cost of Sales": ["Direct material","Direct labour","Manufacturing overhead","Cost of goods sold","Depreciation"],
     "Selling and Distribution": ["Advertisement and marketing","Communication expenses","Freight outward","Travelling and conveyance","Salaries and benefits"],
-    "Administrative Expenses": ["Salaries and benefits","Depreciation","Amortisation","Printing and stationery","Repair and maintenance","Utilities","Travelling and conveyance","Communication expenses"],
-    "Other income": ["Interest income","Gain on disposal"],
-    "Finance Cost": ["Markup on borrowings"],
-    "Taxation": ["Current tax","Deferred tax","Taxation"],
-    "Equity": ["Share capital","Reserves","Retained earnings"],
-    "Non-Current Liabilities": ["Long-term loans","Staff retirement benefits"],
-    "Current Liabilities": ["Short-term borrowings","Trade and other payables","Accrued liabilities","Taxation"],
-    "Property Plant & Equipment": ["Land","Buildings","Plant & Machinery","Vehicles","Furniture & Fixtures","Office Equipment","Computer Equipment","Capital WIP"],
-    "Intangibles": ["Goodwill","Software","Patents & Trademarks","Licenses","Other Intangibles"],
-    "Inventory": ["Raw Materials","Work in Progress","Finished Goods","Stores & Spares","Goods in Transit"],
-    "Trade Debtors": ["Local Debtors","Export Debtors","Related Party Receivables","Provision for Doubtful Debts"],
-    "Cash & Bank": ["Cash in Hand","Current Accounts","Savings Accounts","Term Deposits","Petty Cash"],
-    "Share Capital": ["Ordinary Shares","Preference Shares","Share Premium","Bonus Shares"],
-    "Reserves": ["General Reserve","Revenue Reserve","Revaluation Surplus","Hedging Reserve","Translation Reserve"],
-    "Trade Creditors": ["Local Creditors","Import Creditors","Related Party Payables","Accrued Expenses"],
-    "Accrued Liabilities": ["Accrued Salaries","Accrued Utilities","Accrued Interest","Provision for Taxation","Other Accruals"],
-    "Sales": ["Local Sales","Export Sales","Services Revenue","Rental Income","Other Revenue"],
-    "Distribution Cost": ["Distribution Salaries","Freight & Carriage","Marketing & Advertising","Commission","Travel & Conveyance","Other Distribution"],
-    "Other": ["Other Assets","Other Liabilities","Other Income Items","Other Expenses"],
+    "Administrative Expenses": ["Salaries and benefits","Depreciation","Amortisation","Printing and stationery","Repair and maintenance","Utilities","Travelling and conveyance","Communication expenses","Insurance","Audit fee","Bank charges and commission"],
+    "Other Expenses": ["Exchange loss","Bank charges and commission","Insurance"],
+    "Other Income": ["Dividend income","Exchange gain","Interest income","Gain on disposal of assets","By-product sales","Scrap sales"],
+    "Finance Cost": ["Markup on borrowings","Bank charges and commission"],
+    "Taxation": ["Current tax","Deferred tax expense","Taxation"],
+    "Operating Activities": ["Cash generated from operations","Income tax paid","Finance cost paid"],
+    "Investing Activities": ["Purchase of property, plant and equipment","Proceeds from disposal of assets","Investments made"],
+    "Financing Activities": ["Proceeds from long-term borrowings","Repayment of long-term borrowings","Dividends paid"],
+    "Other Comprehensive Income": ["Surplus on revaluation","Actuarial gains / losses","Exchange differences"],
   };
   const SUB_LINE_ITEM_MAP: Record<string, string[]> = {
     "Property, plant and equipment": ["Land","Building","Plant and machinery","Furniture and fixtures","Office equipment","Vehicles","Capital work in progress"],
     "Land": ["Freehold land","Leasehold land"],
     "Building": ["Factory building","Office building","Warehouse"],
     "Plant and machinery": ["Factory machinery","Generator","Compressor"],
-    "Vehicles": ["Company vehicles","Delivery vehicles"],
-    "Intangible assets": ["ERP software","Patents and trademarks"],
-    "Long-term investments": ["Investments in subsidiaries","Treasury bills"],
-    "Long-term loans": ["Diminishing musharaka","Term finance"],
+    "Vehicles": ["Company cars","Delivery vehicles"],
+    "Intangible assets": ["ERP software","CRM software","Accounting software","Patents and trademarks"],
+    "Long-term investments": ["Investments in subsidiaries","Available-for-sale investments","Treasury bills"],
+    "Long-term loans and advances": ["Diminishing musharaka — Meezan","Term finance","Running finance"],
+    "Capital work in progress": ["Capital work in progress — plant expansion"],
     "Inventories": ["Raw materials","Packing materials","Work in progress","Finished goods","Stores and spares"],
-    "Raw materials": ["Purchases","Raw material consumed"],
-    "Finished goods": ["Finished products","Scrap sales"],
     "Trade debts": ["Local customers","Export customers","Government receivables"],
-    "Advances and deposits": ["Advances to employees","Advances to suppliers","Security deposits","Prepayments"],
-    "Other receivables": ["Income tax refundable","Sales tax refundable","Income tax payable"],
+    "Advances and deposits": ["Advances to suppliers","Advance income tax","Advance tax","Security deposits","Prepayments"],
+    "Other receivables": ["Income tax refundable","Sales tax refundable"],
     "Cash and bank balances": ["Cash in hand","Current account","Savings account","Foreign currency account","Cash credit"],
-    "Sales": ["Local sales","Export sales","Service revenue","Scrap sales"],
-    "Direct material": ["Purchases","Raw material consumed","Packing materials"],
+    "Sales": ["Local sales","Export sales","Service revenue","By-product sales","Scrap sales"],
+    "Export sales": ["Export sales"],
+    "Direct material": ["Purchases","Raw material consumed","Packing materials","Cost of raw material consumed"],
     "Direct labour": ["Factory salaries","Factory wages","Factory insurance","Factory utilities","Factory rent"],
-    "Manufacturing overhead": ["Depreciation expense","Repair and maintenance"],
+    "Manufacturing overhead": ["Depreciation — plant and machinery","Depreciation — buildings","Repair and maintenance"],
+    "Cost of goods sold": ["Opening stock","Purchases","Closing stock"],
+    "Depreciation": ["Depreciation — buildings","Depreciation — plant and machinery","Depreciation — vehicles"],
+    "Amortisation": ["Amortisation — intangibles"],
     "Salaries and benefits": ["Admin salaries","Admin wages","Provident fund","Gratuity"],
-    "Advertisement and marketing": ["Advertisement and marketing"],
-    "Communication expenses": ["Communication expenses"],
-    "Depreciation": ["Depreciation expense"],
-    "Amortisation": ["Amortisation expense"],
+    "Advertisement and marketing": ["Advertisement and marketing","Advertisement"],
+    "Communication expenses": ["Communication expenses","Conveyance"],
     "Freight outward": ["Delivery expense","Forwarding expense"],
     "Printing and stationery": ["Printing and stationery"],
     "Repair and maintenance": ["Repair and maintenance","Repair and maintenance (admin)"],
-    "Travelling and conveyance": ["Travelling and conveyance"],
+    "Travelling and conveyance": ["Travelling and conveyance","Company cars"],
     "Utilities": ["Office utilities","Factory utilities"],
     "Interest income": ["Interest income"],
-    "Gain on disposal": ["Gain on disposal of assets"],
-    "Markup on borrowings": ["Markup on running finance","Markup on term finance","Bank charges"],
-    "Current tax": ["Current tax expense","Income tax payable","Withholding tax payable","Sales tax payable"],
-    "Deferred tax": ["Deferred tax expense","Deferred tax liability"],
+    "Gain on disposal of assets": ["Gain on disposal of assets"],
+    "Dividend income": ["Dividend income"],
+    "Markup on borrowings": ["Bank markup","Bank charges and commission","Current maturity of term finance"],
+    "Bank charges and commission": ["Bank charges and commission"],
+    "Current tax": ["Current tax expense","Current tax provision","Income tax payable","Withholding tax payable","Sales tax payable"],
+    "Deferred tax expense": ["Deferred tax charge","Deferred tax income"],
+    "Taxation": ["Income tax payable","Sales tax payable","Current tax provision"],
     "Share capital": ["Ordinary shares","Preference shares"],
+    "Accumulated losses": ["Accumulated loss","Accumulated losses"],
     "Reserves": ["General reserve","Capital reserve","Surplus on revaluation of fixed assets"],
     "Retained earnings": ["Accumulated profit"],
-    "Long-term loans and advances": ["Term finance","Diminishing musharaka","Running finance"],
-    "Short-term borrowings": ["Running finance","Cash credit","Current maturity of long-term loan","Loan from directors"],
-    "Trade and other payables": ["Suppliers","Advance from customers"],
-    "Accrued liabilities": ["Accrued expenses","Accrued wages","Sales tax payable","Withholding tax payable"],
+    "Short-term borrowings": ["Running finance","Cash credit","Cash credit facility","Current maturity of long-term loan","Loan from directors"],
+    "Trade and other payables": ["Suppliers","Advance from customers","Customer advances"],
+    "Accrued liabilities": ["Accrued expenses","Accrued wages","Accrued salaries","Sales tax payable","Withholding tax payable"],
+    "Advance from customers": ["Advance from customers","Customer advances"],
     "Staff retirement benefits": ["Gratuity","Provident fund"],
-    "Taxation": ["Income tax payable","Sales tax payable","Current tax expense"],
   };
-  const NOTE_NOS = Array.from({ length: 40 }, (_, i) => String(i + 1));
+  const NOTE_NOS = Array.from({ length: 100 }, (_, i) => String(i + 1));
   const NORMAL_BALANCES = ["Debit","Credit"];
-  const WP_AREAS = ["PPE","Intangibles","Inventory","Receivables","Cash and Bank","Other Assets","Payables","Provisions","Borrowings","Equity","Revenue","Cost of Sales","Operating Expenses","Other Income","Taxation","Fixed Assets","Cash & Bank","Compliance","Other"];
-  const RISK_LEVELS = ["Low","Medium","High","Significant"];
+  const WP_AREAS = [
+    "PPE","CWIP","Right-of-Use Assets","Intangibles","Long-term Investments","Inventory",
+    "Receivables","Advances and Deposits","Short-term Investments","Cash and Bank","Other Assets",
+    "Payables","Borrowings","Lease Liabilities","Provisions","Staff Retirement Benefits",
+    "Customer Advances","Contingencies and Commitments","Deferred Tax","Equity",
+    "Revenue","Cost of Sales","Operating Expenses","Other Income","Finance Cost",
+    "Taxation","Related Party Transactions","Going Concern","Subsequent Events","Accrued Liabilities",
+  ];
+  const RISK_LEVELS = ["Low","Medium","High","Not Applicable"];
 
   const TextField = ({ code, label, placeholder }: { code: string; label: string; placeholder?: string }) => {
     const val = varVal(code);
     const isEditing = editingField === code;
+    const isSaved = savedFields.has(code);
     return (
       <div className="flex flex-col gap-1">
         <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{label}</label>
         {isEditing ? (
           <div className="flex gap-1">
-            <Input className="h-8 text-xs" value={editVal} onChange={e => setEditVal(e.target.value)} autoFocus onKeyDown={e => { if (e.key === "Enter") saveField(code, editVal); if (e.key === "Escape") setEditingField(null); }} />
+            <Input className="h-8 text-xs" value={editVal} onChange={e => setEditVal(e.target.value)} autoFocus
+              onKeyDown={e => { if (e.key === "Enter") saveField(code, editVal); if (e.key === "Escape") setEditingField(null); }} />
             <Button size="sm" className="h-8 w-8 p-0 bg-emerald-600 hover:bg-emerald-700" onClick={() => saveField(code, editVal)}><Check className="w-3 h-3" /></Button>
             <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setEditingField(null)}><X className="w-3 h-3" /></Button>
           </div>
         ) : (
-          <div className="h-8 px-2.5 flex items-center rounded-md border border-slate-200 bg-white cursor-pointer hover:border-indigo-300 transition-colors text-xs text-slate-800" onClick={() => { setEditingField(code); setEditVal(val); }}>
+          <div className={cn("h-8 px-2.5 flex items-center rounded-md border bg-white cursor-pointer transition-colors text-xs text-slate-800",
+            isSaved ? "border-emerald-400 bg-emerald-50" : "border-slate-200 hover:border-indigo-300")}
+            onClick={() => { setEditingField(code); setEditVal(val); }}>
+            {isSaved ? <Check className="w-3 h-3 text-emerald-500 mr-1.5 shrink-0" /> : null}
             {val || <span className="text-slate-300 italic">{placeholder || "Click to enter"}</span>}
           </div>
         )}
@@ -3969,23 +4015,40 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
 
   const DropdownField = ({ code, label, options }: { code: string; label: string; options: string[] }) => {
     const val = varVal(code);
+    const isSaved = savedFields.has(code);
+    const effectiveOptions = val && !options.includes(val) ? [val, ...options] : options;
     return (
       <div className="flex flex-col gap-1">
         <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{label}</label>
-        <select className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-800 cursor-pointer hover:border-indigo-300 transition-colors" value={val} onChange={e => { const id = varId(code); if (id && onSaveVariable) onSaveVariable(id, e.target.value, "Dropdown selection"); }}>
-          <option value="">— Select —</option>
-          {options.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
+        <div className="relative">
+          <select
+            className={cn("h-8 w-full px-2 rounded-md border text-xs text-slate-800 cursor-pointer transition-colors appearance-none pr-7",
+              isSaved ? "border-emerald-400 bg-emerald-50" : "border-slate-200 bg-white hover:border-indigo-300")}
+            value={val}
+            onChange={async e => { await saveByCode(code, e.target.value, "Dropdown selection"); }}>
+            <option value="">— Select —</option>
+            {effectiveOptions.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+          {isSaved && <Check className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-emerald-500 pointer-events-none" />}
+        </div>
       </div>
     );
   };
 
   const DateField = ({ code, label }: { code: string; label: string }) => {
     const val = varVal(code);
+    const isSaved = savedFields.has(code);
     return (
       <div className="flex flex-col gap-1">
         <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{label}</label>
-        <input type="date" className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-800 cursor-pointer hover:border-indigo-300 transition-colors" value={val} onChange={e => { const id = varId(code); if (id && onSaveVariable) onSaveVariable(id, e.target.value, "Date selection"); }} />
+        <div className="relative">
+          <input type="date"
+            className={cn("h-8 w-full px-2 rounded-md border text-xs text-slate-800 cursor-pointer transition-colors",
+              isSaved ? "border-emerald-400 bg-emerald-50" : "border-slate-200 bg-white hover:border-indigo-300")}
+            value={val}
+            onChange={async e => { await saveByCode(code, e.target.value, "Date selection"); }} />
+          {isSaved && <Check className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-emerald-500 pointer-events-none" />}
+        </div>
       </div>
     );
   };
@@ -3993,10 +4056,13 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
   const CheckboxField = ({ code, label }: { code: string; label: string }) => {
     const val = varVal(code);
     const checked = val === "true" || val === "1" || val === "yes";
+    const isSaved = savedFields.has(code);
     return (
       <label className="flex items-center gap-2 cursor-pointer group">
-        <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" checked={checked} onChange={e => { const id = varId(code); if (id && onSaveVariable) onSaveVariable(id, e.target.checked ? "true" : "false", "Checkbox toggle"); }} />
-        <span className="text-xs text-slate-700 group-hover:text-indigo-700 transition-colors">{label}</span>
+        <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+          checked={checked} onChange={async e => { await saveByCode(code, e.target.checked ? "true" : "false", "Checkbox toggle"); }} />
+        <span className={cn("text-xs transition-colors", isSaved ? "text-emerald-600" : "text-slate-700 group-hover:text-indigo-700")}>{label}</span>
+        {isSaved && <Check className="w-3 h-3 text-emerald-500" />}
       </label>
     );
   };
@@ -4004,10 +4070,13 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
   const ToggleField = ({ code, label }: { code: string; label: string }) => {
     const val = varVal(code);
     const on = val === "true" || val === "1" || val === "yes";
+    const isSaved = savedFields.has(code);
     return (
-      <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-slate-100 bg-white hover:border-indigo-200 transition-colors">
+      <div className={cn("flex items-center justify-between gap-2 px-3 py-2 rounded-lg border transition-colors",
+        isSaved ? "border-emerald-300 bg-emerald-50" : "border-slate-100 bg-white hover:border-indigo-200")}>
         <span className="text-xs text-slate-700">{label}</span>
-        <button className={cn("relative w-10 h-5 rounded-full transition-colors", on ? "bg-indigo-600" : "bg-slate-200")} onClick={() => { const id = varId(code); if (id && onSaveVariable) onSaveVariable(id, on ? "false" : "true", "Toggle"); }}>
+        <button className={cn("relative w-10 h-5 rounded-full transition-colors", on ? "bg-indigo-600" : "bg-slate-200")}
+          onClick={async () => { await saveByCode(code, on ? "false" : "true", "Toggle"); }}>
           <span className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform", on ? "translate-x-5" : "translate-x-0.5")} />
         </button>
       </div>
@@ -4118,12 +4187,16 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
         <div className="px-5 py-3 bg-purple-50/60 border-b border-purple-100 flex items-center gap-2">
           <SlidersHorizontal className="w-4 h-4 text-purple-600" />
           <span className="text-sm font-semibold text-purple-900">Section 3 — WP Controlling Variables</span>
-          <span className="text-[9px] font-bold bg-purple-100 text-purple-600 rounded-full px-2 py-0.5 uppercase tracking-wide ml-auto">Sr. 11-13</span>
+          <span className="text-[9px] font-bold bg-purple-100 text-purple-600 rounded-full px-2 py-0.5 uppercase tracking-wide ml-auto">Sr. 11-17</span>
         </div>
-        <div className="p-5 grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-4">
+        <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-4">
           <DropdownField code="industry_sector" label="11. Industry / Sector" options={INDUSTRY_SECTORS} />
           <DropdownField code="accounting_software" label="12. IT / Accounting System" options={ACCOUNTING_SYSTEMS} />
-          <ToggleField code="group_entity_flag" label="13. Group / Consolidated Audit" />
+          <DropdownField code="reporting_currency" label="13. Reporting Currency" options={CURRENCIES} />
+          <DropdownField code="entity_size" label="14. Entity Size" options={ENTITY_SIZES} />
+          <DropdownField code="audit_scope" label="15. Audit Scope" options={AUDIT_SCOPES} />
+          <ToggleField code="group_entity_flag" label="16. Group / Consolidated Audit" />
+          <ToggleField code="listed_status" label="17. Listed Entity (PSX / Foreign Exchange)" />
         </div>
       </div>
 

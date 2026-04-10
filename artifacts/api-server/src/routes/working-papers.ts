@@ -3201,6 +3201,67 @@ router.post("/sessions/:id/variables/validate", requireRoles(...WP_ROLES_WRITE),
   }
 });
 
+router.post("/sessions/:id/variables/upsert", requireRoles(...WP_ROLES_WRITE), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = parseInt(p(req.params.id));
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session ID" });
+
+    const { code, value, reason, editedBy } = req.body;
+    if (!code) return res.status(400).json({ error: "Variable code is required" });
+
+    const session = await db.select().from(wpSessionsTable).where(eq(wpSessionsTable.id, sessionId));
+    if (!session[0]) return res.status(404).json({ error: "Session not found" });
+
+    const existing = await db.select().from(wpVariablesTable)
+      .where(and(eq(wpVariablesTable.sessionId, sessionId), eq(wpVariablesTable.variableCode, code)));
+
+    if (existing[0]) {
+      if (existing[0].isLocked) return res.status(400).json({ error: "Variable is locked. Unlock before editing." });
+
+      await db.insert(wpVariableChangeLogTable).values({
+        sessionId, variableId: existing[0].id,
+        variableCode: code,
+        fieldName: existing[0].variableName,
+        oldValue: existing[0].finalValue,
+        newValue: value,
+        editedBy: editedBy || null,
+        reason: reason || "User edit",
+        sourceOfChange: "manual",
+      });
+
+      const [updated] = await db.update(wpVariablesTable).set({
+        userEditedValue: value, finalValue: value,
+        sourceType: "user_edit", editedBy: editedBy || null,
+        editedAt: new Date(), reasonForChange: reason || null,
+        versionNo: (existing[0].versionNo || 1) + 1,
+        reviewStatus: "reviewed", updatedAt: new Date(),
+      }).where(eq(wpVariablesTable.id, existing[0].id)).returning();
+
+      return res.json({ variable: updated, created: false });
+    }
+
+    const def = VARIABLE_DEFINITIONS.find(d => d.variableCode === code);
+    const [created] = await db.insert(wpVariablesTable).values({
+      sessionId,
+      variableCode: code,
+      variableName: def?.variableLabel || code,
+      variableSection: def?.section || "general",
+      dataType: def?.dataType || "text",
+      mandatoryFlag: def?.mandatoryFlag || false,
+      userEditedValue: value, finalValue: value,
+      sourceType: "user_edit", editedBy: editedBy || null,
+      editedAt: new Date(), reasonForChange: reason || "User entry",
+      reviewStatus: "reviewed", versionNo: 1,
+      isLocked: false,
+    }).returning();
+
+    return res.status(201).json({ variable: created, created: true });
+  } catch (err: any) {
+    logger.error({ err }, "Failed to upsert variable");
+    res.status(500).json({ error: "Failed to upsert variable" });
+  }
+});
+
 async function checkVariableImpact(sessionId: number, variableCode: string): Promise<string[]> {
   const affectedWps: string[] = [];
   for (const rule of DEPENDENCY_RULES) {
