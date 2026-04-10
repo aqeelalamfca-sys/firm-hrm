@@ -4268,7 +4268,12 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-bold bg-teal-100 text-teal-700 rounded-full px-2.5 py-0.5">{(fsLines || []).length} rows</span>
+            <span className="text-[10px] font-bold bg-teal-100 text-teal-700 rounded-full px-2.5 py-0.5">
+              {(fsLines || []).filter((r: any) => STATEMENT_TYPES.includes(r.statementType)).length} rows
+              {(fsLines || []).length !== (fsLines || []).filter((r: any) => STATEMENT_TYPES.includes(r.statementType)).length && (
+                <span className="ml-1 text-teal-500 font-normal">/ {(fsLines || []).length} total</span>
+              )}
+            </span>
             <Button size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700" onClick={() => onAddFsLine({})}>
               <Plus className="w-3 h-3 mr-1" /> Add Row
             </Button>
@@ -4307,7 +4312,7 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
                 </tr>
               </thead>
               <tbody>
-                {(fsLines || []).map((row: any) => {
+                {(fsLines || []).filter((row: any) => STATEMENT_TYPES.includes(row.statementType)).map((row: any) => {
                   const lineItems = LINE_ITEM_MAP[row.majorHead] || [];
                   const subItems = SUB_LINE_ITEM_MAP[row.lineItem] || [];
                   return (
