@@ -7863,6 +7863,8 @@ function GenerationStage({ session, onNext, ...legacyProps }: any) {
         </div>
       )}
 
+      <TickMarkLegend tickMarks={STANDARD_TICK_MARKS} />
+
       {onNext && (
         <div className="flex justify-end pt-2">
           <Button onClick={onNext} size="lg" className="h-11 px-8 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg text-white font-semibold text-sm">
