@@ -180,9 +180,67 @@ export default function WorkingPapers() {
   const [newStrn, setNewStrn] = useState("");
   const [newRegNo, setNewRegNo] = useState("");
   const [newPeriodEnd, setNewPeriodEnd] = useState("");
-  const [newPlanningStart, setNewPlanningStart] = useState("");
-  const [newFieldworkStart, setNewFieldworkStart] = useState("");
-  const [newReportDeadline, setNewReportDeadline] = useState("");
+
+  const [datYearStart, setDatYearStart] = useState("");
+  const [datYearEnd, setDatYearEnd] = useState("");
+  const [datReportSigning, setDatReportSigning] = useState("");
+  const [datConsentLetter, setDatConsentLetter] = useState("");
+  const [datEngagementLetter, setDatEngagementLetter] = useState("");
+  const [datEngagementStart, setDatEngagementStart] = useState("");
+  const [datPlanningStart, setDatPlanningStart] = useState("");
+  const [datPlanningEnd, setDatPlanningEnd] = useState("");
+  const [datExecutionStart, setDatExecutionStart] = useState("");
+  const [datExecutionEnd, setDatExecutionEnd] = useState("");
+  const [datFinalizationStart, setDatFinalizationStart] = useState("");
+  const [datFinalizationEnd, setDatFinalizationEnd] = useState("");
+  const [datReportingDeadline, setDatReportingDeadline] = useState("");
+  const [datBoardApproval, setDatBoardApproval] = useState("");
+  const [datMgmtRepLetter, setDatMgmtRepLetter] = useState("");
+  const [datSubsequentEventsEnd, setDatSubsequentEventsEnd] = useState("");
+  const [datEqcrReviewStart, setDatEqcrReviewStart] = useState("");
+  const [datEqcrReviewEnd, setDatEqcrReviewEnd] = useState("");
+  const [datesExpanded, setDatesExpanded] = useState(false);
+
+  const addDays = (dateStr: string, days: number): string => {
+    const d = new Date(dateStr);
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split("T")[0];
+  };
+
+  const autoCalcDates = (yearStart: string, yearEnd: string, reportSigning: string) => {
+    if (!yearEnd) return;
+    setNewPeriodEnd(yearEnd);
+    if (yearStart) {
+      setDatConsentLetter(addDays(yearEnd, -60));
+      setDatEngagementLetter(addDays(yearEnd, -30));
+    }
+    setDatEngagementStart(addDays(yearEnd, 1));
+    setDatPlanningStart(addDays(yearEnd, 7));
+    setDatPlanningEnd(addDays(yearEnd, 37));
+    setDatExecutionStart(addDays(yearEnd, 38));
+    if (reportSigning) {
+      setDatExecutionEnd(addDays(reportSigning, -45));
+      setDatFinalizationStart(addDays(reportSigning, -44));
+      setDatFinalizationEnd(addDays(reportSigning, -14));
+      setDatReportingDeadline(reportSigning);
+      setDatBoardApproval(addDays(reportSigning, -7));
+      setDatMgmtRepLetter(addDays(reportSigning, -3));
+      setDatSubsequentEventsEnd(addDays(reportSigning, -1));
+      setDatEqcrReviewStart(addDays(reportSigning, -21));
+      setDatEqcrReviewEnd(addDays(reportSigning, -5));
+    } else {
+      const defaultSigning = addDays(yearEnd, 120);
+      setDatExecutionEnd(addDays(defaultSigning, -45));
+      setDatFinalizationStart(addDays(defaultSigning, -44));
+      setDatFinalizationEnd(addDays(defaultSigning, -14));
+      setDatReportingDeadline(defaultSigning);
+      setDatBoardApproval(addDays(defaultSigning, -7));
+      setDatMgmtRepLetter(addDays(defaultSigning, -3));
+      setDatSubsequentEventsEnd(addDays(defaultSigning, -1));
+      setDatEqcrReviewStart(addDays(defaultSigning, -21));
+      setDatEqcrReviewEnd(addDays(defaultSigning, -5));
+    }
+  };
   const [newAuditFirmName, setNewAuditFirmName] = useState("");
   const [newAuditFirmLogo, setNewAuditFirmLogo] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>("");
@@ -457,12 +515,30 @@ export default function WorkingPapers() {
         method: "POST", headers: { ...headers, "Content-Type": "application/json" },
         body: JSON.stringify({
           clientName: newClientName,
-          engagementYear: newPeriodEnd ? String(new Date(newPeriodEnd).getFullYear()) : String(new Date().getFullYear()),
+          engagementYear: datYearEnd ? String(new Date(datYearEnd).getFullYear()) : (newPeriodEnd ? String(new Date(newPeriodEnd).getFullYear()) : String(new Date().getFullYear())),
           entityType: newEntityType,
           ntn: newNtn,
           strn: newStrn || undefined,
           registrationNo: newRegNo || undefined,
-          periodEnd: newPeriodEnd || undefined,
+          periodEnd: newPeriodEnd || datYearEnd || undefined,
+          yearStartDate: datYearStart || undefined,
+          yearEndDate: datYearEnd || undefined,
+          reportSigningDate: datReportSigning || undefined,
+          consentLetterDate: datConsentLetter || undefined,
+          engagementLetterDate: datEngagementLetter || undefined,
+          engagementStartDate: datEngagementStart || undefined,
+          planningStartDate: datPlanningStart || undefined,
+          planningEndDate: datPlanningEnd || undefined,
+          executionStartDate: datExecutionStart || undefined,
+          executionEndDate: datExecutionEnd || undefined,
+          finalizationStartDate: datFinalizationStart || undefined,
+          finalizationEndDate: datFinalizationEnd || undefined,
+          reportingDeadline: datReportingDeadline || undefined,
+          boardApprovalDate: datBoardApproval || undefined,
+          mgmtRepLetterDate: datMgmtRepLetter || undefined,
+          subsequentEventsEndDate: datSubsequentEventsEnd || undefined,
+          eqcrReviewStartDate: datEqcrReviewStart || undefined,
+          eqcrReviewEndDate: datEqcrReviewEnd || undefined,
           auditFirmName: newAuditFirmName || undefined,
           auditFirmLogo: logoUrl || undefined,
           preparerId: newPreparerIds.length > 0 ? parseInt(newPreparerIds[0]) : (newPreparerId ? parseInt(newPreparerId) : undefined),
@@ -483,8 +559,13 @@ export default function WorkingPapers() {
         setNewClientName("");
         setNewNtn("");
         setNewStrn("");
-        setNewPeriodStart("");
         setNewPeriodEnd("");
+        setDatYearStart(""); setDatYearEnd(""); setDatReportSigning("");
+        setDatConsentLetter(""); setDatEngagementLetter(""); setDatEngagementStart("");
+        setDatPlanningStart(""); setDatPlanningEnd(""); setDatExecutionStart("");
+        setDatExecutionEnd(""); setDatFinalizationStart(""); setDatFinalizationEnd("");
+        setDatReportingDeadline(""); setDatBoardApproval(""); setDatMgmtRepLetter("");
+        setDatSubsequentEventsEnd(""); setDatEqcrReviewStart(""); setDatEqcrReviewEnd("");
         setNewAuditFirmName("");
         setNewAuditFirmLogo(null);
         setLogoPreview("");
@@ -1919,10 +2000,6 @@ export default function WorkingPapers() {
                     <label className="text-xs font-medium text-slate-600">Registration No.</label>
                     <Input placeholder="e.g. 0012345" value={newRegNo} onChange={e => setNewRegNo(e.target.value)} className="h-9" />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">Period Ended</label>
-                    <Input type="date" value={newPeriodEnd} onChange={e => setNewPeriodEnd(e.target.value)} className="h-9" />
-                  </div>
                 </div>
               </div>
 
@@ -2019,22 +2096,116 @@ export default function WorkingPapers() {
               <div className="border-t border-dashed border-slate-200 pt-4">
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  Timeline
+                  Dates &amp; Timeline
+                  <span className="text-[10px] font-normal text-slate-400 normal-case ml-1">set 3 key dates — all others auto-calculate</span>
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">Planning Start</label>
-                    <Input type="date" value={newPlanningStart} onChange={e => setNewPlanningStart(e.target.value)} className="h-9" />
+                    <label className="text-xs font-medium text-slate-600">Year Start Date <span className="text-red-500">*</span></label>
+                    <Input type="date" value={datYearStart} onChange={e => { setDatYearStart(e.target.value); autoCalcDates(e.target.value, datYearEnd, datReportSigning); }} className="h-9" />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">Fieldwork Start</label>
-                    <Input type="date" value={newFieldworkStart} onChange={e => setNewFieldworkStart(e.target.value)} className="h-9" />
+                    <label className="text-xs font-medium text-slate-600">Year End Date <span className="text-red-500">*</span></label>
+                    <Input type="date" value={datYearEnd} onChange={e => { setDatYearEnd(e.target.value); setNewPeriodEnd(e.target.value); autoCalcDates(datYearStart, e.target.value, datReportSigning); }} className="h-9" />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">Report Deadline</label>
-                    <Input type="date" value={newReportDeadline} onChange={e => setNewReportDeadline(e.target.value)} className="h-9" />
+                    <label className="text-xs font-medium text-slate-600">Report Signing Date</label>
+                    <Input type="date" value={datReportSigning} onChange={e => { setDatReportSigning(e.target.value); autoCalcDates(datYearStart, datYearEnd, e.target.value); }} className="h-9" />
                   </div>
                 </div>
+
+                {(datYearEnd || datConsentLetter) && (
+                  <div className="mt-3">
+                    <button type="button" onClick={() => setDatesExpanded(!datesExpanded)}
+                      className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">
+                      {datesExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                      {datesExpanded ? "Hide" : "Show"} auto-calculated dates ({15} fields)
+                    </button>
+
+                    {datesExpanded && (
+                      <div className="mt-3 space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">Consent Letter Date</label>
+                            <Input type="date" value={datConsentLetter} onChange={e => setDatConsentLetter(e.target.value)} className="h-9 bg-blue-50/50 border-blue-200" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">Engagement Letter Date</label>
+                            <Input type="date" value={datEngagementLetter} onChange={e => setDatEngagementLetter(e.target.value)} className="h-9 bg-blue-50/50 border-blue-200" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">Engagement Start Date</label>
+                            <Input type="date" value={datEngagementStart} onChange={e => setDatEngagementStart(e.target.value)} className="h-9 bg-blue-50/50 border-blue-200" />
+                          </div>
+                        </div>
+
+                        <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider pt-1">Planning Phase</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">Planning Start</label>
+                            <Input type="date" value={datPlanningStart} onChange={e => setDatPlanningStart(e.target.value)} className="h-9 bg-blue-50/50 border-blue-200" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">Planning End</label>
+                            <Input type="date" value={datPlanningEnd} onChange={e => setDatPlanningEnd(e.target.value)} className="h-9 bg-blue-50/50 border-blue-200" />
+                          </div>
+                        </div>
+
+                        <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider pt-1">Execution Phase</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">Execution Start</label>
+                            <Input type="date" value={datExecutionStart} onChange={e => setDatExecutionStart(e.target.value)} className="h-9 bg-blue-50/50 border-blue-200" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">Execution End</label>
+                            <Input type="date" value={datExecutionEnd} onChange={e => setDatExecutionEnd(e.target.value)} className="h-9 bg-blue-50/50 border-blue-200" />
+                          </div>
+                        </div>
+
+                        <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider pt-1">Finalization &amp; Reporting</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">Finalization Start</label>
+                            <Input type="date" value={datFinalizationStart} onChange={e => setDatFinalizationStart(e.target.value)} className="h-9 bg-blue-50/50 border-blue-200" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">Finalization End</label>
+                            <Input type="date" value={datFinalizationEnd} onChange={e => setDatFinalizationEnd(e.target.value)} className="h-9 bg-blue-50/50 border-blue-200" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">Reporting Deadline</label>
+                            <Input type="date" value={datReportingDeadline} onChange={e => setDatReportingDeadline(e.target.value)} className="h-9 bg-blue-50/50 border-blue-200" />
+                          </div>
+                        </div>
+
+                        <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider pt-1">Compliance &amp; Quality</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">Board Approval Date</label>
+                            <Input type="date" value={datBoardApproval} onChange={e => setDatBoardApproval(e.target.value)} className="h-9 bg-blue-50/50 border-blue-200" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">Management Rep. Letter Date</label>
+                            <Input type="date" value={datMgmtRepLetter} onChange={e => setDatMgmtRepLetter(e.target.value)} className="h-9 bg-blue-50/50 border-blue-200" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">Subsequent Events Review End</label>
+                            <Input type="date" value={datSubsequentEventsEnd} onChange={e => setDatSubsequentEventsEnd(e.target.value)} className="h-9 bg-blue-50/50 border-blue-200" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">EQCR Review Start</label>
+                            <Input type="date" value={datEqcrReviewStart} onChange={e => setDatEqcrReviewStart(e.target.value)} className="h-9 bg-blue-50/50 border-blue-200" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">EQCR Review End</label>
+                            <Input type="date" value={datEqcrReviewEnd} onChange={e => setDatEqcrReviewEnd(e.target.value)} className="h-9 bg-blue-50/50 border-blue-200" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end pt-2">
