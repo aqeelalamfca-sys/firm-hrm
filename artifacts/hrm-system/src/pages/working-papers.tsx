@@ -4247,13 +4247,13 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
           </div>
         </div>
         <div className="flex gap-2 shrink-0 flex-wrap">
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onRerun} disabled={filling}>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onRerun()} disabled={filling}>
             <RefreshCw className={cn("w-3 h-3 mr-1", loading && "animate-spin")} /> Re-extract
           </Button>
-          <Button size="sm" className="h-7 text-xs bg-violet-600 hover:bg-violet-700 shadow-sm" onClick={onAiFill} disabled={filling}>
+          <Button size="sm" className="h-7 text-xs bg-violet-600 hover:bg-violet-700 shadow-sm" onClick={() => onAiFill()} disabled={filling}>
             {filling ? <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Filling...</> : <><Sparkles className="w-3 h-3 mr-1" /> AI Fill</>}
           </Button>
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onRefreshVariables} disabled={filling}>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onRefreshVariables()} disabled={filling}>
             <RefreshCw className="w-3 h-3 mr-1" /> Refresh
           </Button>
         </div>
@@ -7156,7 +7156,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
 
             {/* Action buttons */}
             <div className="flex gap-1.5 flex-wrap shrink-0">
-              <Button variant="outline" size="sm" onClick={onFetch} disabled={loading} className="h-7 text-xs">
+              <Button variant="outline" size="sm" onClick={() => onFetch()} disabled={loading} className="h-7 text-xs">
                 <RefreshCw className="w-3 h-3 mr-1" /> Refresh
               </Button>
               {onAiFill && (
@@ -7171,7 +7171,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
               )}
               <Button
                 size="sm"
-                onClick={onLockAll}
+                onClick={() => onLockAll()}
                 disabled={!canLockAll}
                 title={canLockAll
                   ? "Finalize — lock all variables once you have reviewed and confirmed all values"
