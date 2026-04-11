@@ -10943,6 +10943,7 @@ const FORMAT_LABEL: Record<string, string> = {
 // ISA AUDIT CHAIN STAGE
 // ═══════════════════════════════════════════════════════════════════════════════
 function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, onRefresh, onExportCsv, onNext }: any) {
+  const [selectedLead, setSelectedLead] = useState<any>(null);
   useEffect(() => { if (session?.id) onRefresh(); }, [session?.id]);
 
   const schedules = leadSchedules || [];
@@ -10950,6 +10951,10 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
   const totalClosing = schedules.reduce((s: number, ls: any) => s + Number(ls.closingBalance || 0), 0);
   const totalVariance = totalClosing - totalOpening;
   const highRiskCount = schedules.filter((ls: any) => ls.riskLevel === "High").length;
+
+  const relatedSchedules = selectedLead
+    ? schedules.filter((ls: any) => ls.wpArea === selectedLead.wpArea && ls.id !== selectedLead.id)
+    : [];
 
   return (
     <div className="space-y-4">
@@ -11042,7 +11047,12 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                 {schedules.map((ls: any, idx: number) => (
                   <tr key={ls.id || idx} className="hover:bg-slate-50 transition-colors">
                     <td className="px-2 py-2.5 text-center text-[10px] text-slate-400 font-mono">{idx + 1}</td>
-                    <td className="px-3 py-2.5 font-mono text-[11px] font-semibold text-violet-600">{ls.scheduleRef}</td>
+                    <td className="px-3 py-2.5">
+                      <button onClick={() => setSelectedLead(ls)}
+                        className="font-mono text-[11px] font-semibold text-violet-600 hover:text-violet-800 hover:underline underline-offset-2 cursor-pointer transition-colors">
+                        {ls.scheduleRef}
+                      </button>
+                    </td>
                     <td className="px-3 py-2.5 text-[11px] font-medium text-slate-800">{ls.wpArea}</td>
                     <td className="px-3 py-2.5 text-[11px] text-slate-600">{ls.majorHead}</td>
                     <td className="px-3 py-2.5 text-center text-[11px] text-slate-500">{ls.noteNo || "—"}</td>
@@ -11087,6 +11097,244 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
             </table>
           </div>
         </div>
+      )}
+
+      {selectedLead && createPortal(
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.72)" }}>
+          <div className="absolute inset-0" onClick={() => setSelectedLead(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col w-full max-w-3xl max-h-[90vh]">
+            <div className="bg-gradient-to-r from-violet-700 to-indigo-800 px-6 py-4 text-white shrink-0">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <span className="text-sm font-bold bg-white/20 border border-white/30 px-2.5 py-0.5 rounded font-mono">{selectedLead.scheduleRef}</span>
+                    <span className={cn("text-[10px] px-2 py-0.5 rounded font-semibold border border-white/20",
+                      selectedLead.riskLevel === "High" ? "bg-red-400/50" : selectedLead.riskLevel === "Medium" ? "bg-amber-400/50" : "bg-emerald-400/50")}>
+                      {selectedLead.riskLevel?.toUpperCase()} RISK
+                    </span>
+                    {selectedLead.materialityFlag && <span className="text-[10px] bg-red-500/80 px-2 py-0.5 rounded font-semibold border border-red-300/40">MATERIAL</span>}
+                    <span className={cn("text-[10px] px-2 py-0.5 rounded border border-white/20",
+                      selectedLead.status === "draft" ? "bg-white/15" : selectedLead.status === "reviewed" ? "bg-emerald-400/40" : "bg-white/15")}>
+                      {(selectedLead.status || "draft").toUpperCase()}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold leading-snug">{selectedLead.wpArea} — {selectedLead.majorHead}</h3>
+                  <p className="text-[11px] text-violet-200 mt-0.5">
+                    Lead Schedule Working Paper · Note {selectedLead.noteNo || "—"} · {session?.clientName || "—"} · {session?.periodEnd || "FY 2025"}
+                  </p>
+                </div>
+                <button onClick={() => setSelectedLead(null)} className="text-white/60 hover:text-white shrink-0 mt-0.5">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto flex-1 p-6 space-y-5">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                  { label: "Opening Balance", value: `PKR ${Number(selectedLead.openingBalance || 0).toLocaleString()}`, color: "text-slate-800" },
+                  { label: "Closing Balance", value: `PKR ${Number(selectedLead.closingBalance || 0).toLocaleString()}`, color: "text-slate-800" },
+                  { label: "Variance", value: `PKR ${Number(selectedLead.variance || 0).toLocaleString()}`, color: Number(selectedLead.variance || 0) < 0 ? "text-red-600" : "text-emerald-600" },
+                  { label: "Variance %", value: `${selectedLead.variancePct || "0"}%`, color: Math.abs(Number(selectedLead.variancePct || 0)) > 20 ? "text-red-600" : "text-slate-800" },
+                ].map(item => (
+                  <div key={item.label} className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{item.label}</p>
+                    <p className={cn("text-lg font-bold font-mono mt-0.5", item.color)}>{item.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200">
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-violet-500" /> Schedule Details
+                  </h4>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {[
+                    ["WP Area / FS Section", selectedLead.wpArea],
+                    ["Major Head", selectedLead.majorHead],
+                    ["Line Item", selectedLead.lineItem || selectedLead.majorHead],
+                    ["FS Section", selectedLead.fsSection || "—"],
+                    ["Note Reference", selectedLead.noteNo ? `Note ${selectedLead.noteNo}` : "—"],
+                    ["Prior Year Balance", `PKR ${Number(selectedLead.priorYear || selectedLead.openingBalance || 0).toLocaleString()}`],
+                    ["GL Cross-Reference", selectedLead.glCrossRef || "—"],
+                    ["FS Cross-Reference", selectedLead.fsCrossRef || "—"],
+                    ["Prepared By", selectedLead.preparedBy || "—"],
+                    ["Reviewed By", selectedLead.reviewedBy || "—"],
+                  ].map(([label, value]) => (
+                    <div key={label as string} className="flex px-4 py-2">
+                      <span className="text-[11px] text-slate-500 font-medium w-40 shrink-0">{label}</span>
+                      <span className="text-[11px] text-slate-800 font-medium">{value || "—"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {selectedLead.additions !== undefined && (
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200">
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                      <Calculator className="w-3.5 h-3.5 text-blue-500" /> Movement Schedule
+                    </h4>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 border-b">
+                        <tr>
+                          {["Opening", "Additions", "Disposals", "Transfers", "Revaluation", "Depreciation", "Impairment", "Closing"].map(h => (
+                            <th key={h} className="text-right px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          {[
+                            selectedLead.openingBalance, selectedLead.additions, selectedLead.disposals,
+                            selectedLead.transfers, selectedLead.revaluation, selectedLead.depreciation,
+                            selectedLead.impairment, selectedLead.closingBalance,
+                          ].map((val, i) => (
+                            <td key={i} className={cn("text-right px-3 py-2.5 font-mono text-[11px]",
+                              Number(val || 0) < 0 ? "text-red-600" : "text-slate-800")}>
+                              {Number(val || 0).toLocaleString()}
+                            </td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {Array.isArray(selectedLead.tbAccountCodes) && selectedLead.tbAccountCodes.length > 0 && (
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200">
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                      <Database className="w-3.5 h-3.5 text-teal-500" /> Trial Balance Account Codes
+                    </h4>
+                  </div>
+                  <div className="px-4 py-3 flex flex-wrap gap-1.5">
+                    {selectedLead.tbAccountCodes.map((code: string, i: number) => (
+                      <span key={i} className="text-[10px] font-mono px-2 py-1 bg-teal-50 text-teal-700 border border-teal-200 rounded-lg">{code}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {Array.isArray(selectedLead.wpCrossRefs) && selectedLead.wpCrossRefs.length > 0 && (
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200">
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                      <GitMerge className="w-3.5 h-3.5 text-indigo-500" /> Working Paper Cross-References
+                    </h4>
+                  </div>
+                  <div className="px-4 py-3 flex flex-wrap gap-1.5">
+                    {selectedLead.wpCrossRefs.map((ref: string, i: number) => (
+                      <span key={i} className="text-[10px] font-mono px-2 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg">{ref}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {Array.isArray(selectedLead.tickMarks) && selectedLead.tickMarks.length > 0 && (
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200">
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Tick Marks
+                    </h4>
+                  </div>
+                  <div className="px-4 py-3 space-y-1">
+                    {selectedLead.tickMarks.map((tm: any, i: number) => (
+                      <div key={i} className="flex items-center gap-2 text-[11px]">
+                        <span className="text-lg">{tm.symbol || tm.code || "✓"}</span>
+                        <span className="text-slate-700">{tm.meaning || tm.description || tm}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedLead.auditConclusion && (
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200">
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-emerald-500" /> Audit Conclusion
+                    </h4>
+                  </div>
+                  <div className="px-4 py-3">
+                    <p className="text-[11px] text-slate-700 leading-relaxed whitespace-pre-wrap">{selectedLead.auditConclusion}</p>
+                  </div>
+                </div>
+              )}
+
+              {relatedSchedules.length > 0 && (
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200">
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-amber-500" /> Related Schedules — {selectedLead.wpArea}
+                    </h4>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 border-b">
+                        <tr>
+                          {["Ref", "Major Head", "Note", "Opening", "Closing", "Variance", "Risk"].map(h => (
+                            <th key={h} className="text-left px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {relatedSchedules.map((rs: any) => (
+                          <tr key={rs.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedLead(rs)}>
+                            <td className="px-3 py-2 font-mono text-[11px] font-semibold text-violet-600 hover:underline">{rs.scheduleRef}</td>
+                            <td className="px-3 py-2 text-[11px] text-slate-700">{rs.majorHead}</td>
+                            <td className="px-3 py-2 text-[11px] text-slate-500">{rs.noteNo || "—"}</td>
+                            <td className="px-3 py-2 text-right font-mono text-[11px]">{Number(rs.openingBalance || 0).toLocaleString()}</td>
+                            <td className="px-3 py-2 text-right font-mono text-[11px]">{Number(rs.closingBalance || 0).toLocaleString()}</td>
+                            <td className={cn("px-3 py-2 text-right font-mono text-[11px]", Number(rs.variance || 0) < 0 ? "text-red-600" : "text-emerald-600")}>
+                              {Number(rs.variance || 0).toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2">
+                              <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-semibold",
+                                rs.riskLevel === "High" ? "bg-red-100 text-red-700" :
+                                rs.riskLevel === "Medium" ? "bg-amber-100 text-amber-700" :
+                                "bg-emerald-100 text-emerald-700")}>{rs.riskLevel}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-slate-200 px-6 py-3 bg-slate-50 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                {(() => {
+                  const currentIdx = schedules.findIndex((s: any) => s.id === selectedLead.id);
+                  return (
+                    <>
+                      <Button variant="outline" size="sm" disabled={currentIdx <= 0} className="h-7 text-[11px] px-2.5"
+                        onClick={() => { if (currentIdx > 0) setSelectedLead(schedules[currentIdx - 1]); }}>
+                        <ArrowLeft className="w-3 h-3 mr-1" /> Previous
+                      </Button>
+                      <span className="text-[10px] text-slate-400">{currentIdx + 1} of {schedules.length}</span>
+                      <Button variant="outline" size="sm" disabled={currentIdx >= schedules.length - 1} className="h-7 text-[11px] px-2.5"
+                        onClick={() => { if (currentIdx < schedules.length - 1) setSelectedLead(schedules[currentIdx + 1]); }}>
+                        Next <ArrowRight className="w-3 h-3 ml-1" />
+                      </Button>
+                    </>
+                  );
+                })()}
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setSelectedLead(null)} className="h-7 text-[11px] px-3">
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
