@@ -11127,8 +11127,40 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
     if (e.key === "Escape") setEditCell(null);
   };
 
+  const LEAD_DROPDOWN_OPTIONS: Record<string, string[]> = {
+    wpArea: [
+      "PPE","CWIP","Right-of-Use Assets","Intangibles","Long-term Investments","Inventory",
+      "Receivables","Advances and Deposits","Short-term Investments","Cash and Bank","Other Assets",
+      "Payables","Borrowings","Lease Liabilities","Provisions","Staff Retirement Benefits",
+      "Customer Advances","Contingencies and Commitments","Deferred Tax","Equity",
+      "Revenue","Cost of Sales","Operating Expenses","Other Income","Finance Cost",
+      "Taxation","Related Party Transactions","Going Concern","Subsequent Events","Accrued Liabilities",
+    ],
+    majorHead: [
+      "Non-Current Assets","Current Assets","Non-Current Liabilities","Current Liabilities",
+      "Equity","Share Capital and Reserves","Revenue","Gross Profit","Cost of Sales",
+      "Selling and Distribution","Administrative Expenses","Other Expenses","Other Income",
+      "Finance Cost","Taxation","Operating Activities","Investing Activities","Financing Activities",
+      "Other Comprehensive Income",
+    ],
+    direction: ["Favorable","Unfavorable","Neutral"],
+    riskLevel: ["High","Medium","Low"],
+  };
+
   const renderEditableCell = (ls: any, field: string, displayValue: string, className?: string, align?: string) => {
     const isEditing = editCell?.id === ls.id && editCell?.field === field;
+    const dropdownOpts = LEAD_DROPDOWN_OPTIONS[field];
+    if (isEditing && dropdownOpts) {
+      const opts = editValue && !dropdownOpts.includes(editValue) ? [editValue, ...dropdownOpts] : dropdownOpts;
+      return (
+        <select ref={editRef as any} value={editValue}
+          onChange={e => { setEditValue(e.target.value); setTimeout(() => saveEdit(), 0); }}
+          onBlur={saveEdit} onKeyDown={handleKeyDown}
+          className="w-full bg-white border border-violet-400 rounded px-1 py-0.5 text-[11px] outline-none ring-1 ring-violet-300 cursor-pointer">
+          {opts.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      );
+    }
     if (isEditing) {
       return (
         <input ref={editRef} value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={handleKeyDown}
@@ -11137,7 +11169,7 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
     }
     return (
       <span onDoubleClick={() => startEdit(ls, field)}
-        className={cn("cursor-text hover:bg-violet-50 hover:outline hover:outline-1 hover:outline-violet-300 rounded px-0.5 -mx-0.5 inline-block", className)}>
+        className={cn("cursor-pointer hover:bg-violet-50 hover:outline hover:outline-1 hover:outline-violet-300 rounded px-0.5 -mx-0.5 inline-block", className)}>
         {displayValue}
       </span>
     );
@@ -11353,27 +11385,16 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                       {renderEditableCell(ls, "variancePct", `${ls.variancePct}%`, "", "right")}
                     </td>
                     <td className="px-3 py-2.5 text-center">
-                      <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-semibold",
+                      {renderEditableCell(ls, "direction", ls.direction || "—", cn("text-[9px] px-1.5 py-0.5 rounded-full font-semibold",
                         ls.direction === "Favorable" ? "bg-emerald-100 text-emerald-700" :
                         ls.direction === "Unfavorable" ? "bg-red-100 text-red-700" :
-                        "bg-slate-100 text-slate-500")}>{ls.direction || "—"}</span>
+                        "bg-slate-100 text-slate-500"), "center")}
                     </td>
                     <td className="px-3 py-2.5 text-center">
-                      {editCell?.id === ls.id && editCell?.field === "riskLevel" ? (
-                        <select ref={editRef as any} value={editValue} onChange={e => { setEditValue(e.target.value); }}
-                          onBlur={saveEdit} onKeyDown={handleKeyDown}
-                          className="text-[10px] border border-violet-400 rounded px-1 py-0.5 outline-none ring-1 ring-violet-300 bg-white">
-                          <option value="High">High</option>
-                          <option value="Medium">Medium</option>
-                          <option value="Low">Low</option>
-                        </select>
-                      ) : (
-                        <span onDoubleClick={() => startEdit(ls, "riskLevel")} title={ls.riskJustification || ""}
-                          className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-semibold cursor-pointer hover:ring-1 hover:ring-violet-300",
-                          ls.riskLevel === "High" ? "bg-red-100 text-red-700" :
-                          ls.riskLevel === "Medium" ? "bg-amber-100 text-amber-700" :
-                          "bg-emerald-100 text-emerald-700")}>{ls.riskLevel}</span>
-                      )}
+                      {renderEditableCell(ls, "riskLevel", ls.riskLevel || "—", cn("text-[9px] px-1.5 py-0.5 rounded-full font-semibold",
+                        ls.riskLevel === "High" ? "bg-red-100 text-red-700" :
+                        ls.riskLevel === "Medium" ? "bg-amber-100 text-amber-700" :
+                        "bg-emerald-100 text-emerald-700"), "center")}
                     </td>
                     <td className="px-2 py-2.5 text-center relative">
                       {leadTickMarks[ls.id] ? (
