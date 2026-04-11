@@ -2,7 +2,7 @@
 # =============================================================================
 # Replit → GitHub → VPS Deploy Script
 # Usage: bash scripts/deploy.sh ["optional commit message"]
-# Requires secrets: GITHUB_TOKEN, VPS_SSH_PRIVATE_KEY
+# Requires secrets: GITHUB_TOKEN, VPS_SSH_KEY
 # Requires env vars: VPS_HOST, VPS_USERNAME, VPS_PORT, DB_PASSWORD,
 #                    JWT_SECRET, ENCRYPTION_KEY, GITHUB_REPO
 # =============================================================================
@@ -30,7 +30,7 @@ echo ""
 # ── 1. Validate required secrets ──────────────────────────────────────────────
 validate_env() {
   local missing=0
-  for var in GITHUB_TOKEN VPS_SSH_PRIVATE_KEY DB_PASSWORD JWT_SECRET ENCRYPTION_KEY; do
+  for var in GITHUB_TOKEN VPS_SSH_KEY DB_PASSWORD JWT_SECRET ENCRYPTION_KEY; do
     if [ -z "${!var}" ]; then
       warn "Missing required: $var"
       missing=1
@@ -47,8 +47,8 @@ setup_ssh() {
   log "Writing VPS SSH key from secret..."
   export SSH_KEY_PATH="$SSH_KEY"
   node - << 'JSEOF'
-const raw = process.env.VPS_SSH_PRIVATE_KEY;
-if (!raw) { process.stderr.write("VPS_SSH_PRIVATE_KEY is empty\n"); process.exit(1); }
+const raw = process.env.VPS_SSH_KEY;
+if (!raw) { process.stderr.write("VPS_SSH_KEY is empty\n"); process.exit(1); }
 const m = raw.match(/(-----BEGIN [^\n-]+ (?:PRIVATE )?KEY-----)([\s\S]*?)(-----END [^\n-]+ (?:PRIVATE )?KEY-----)/);
 if (!m) { process.stderr.write("Cannot parse SSH key — paste the full key including BEGIN/END lines\n"); process.exit(1); }
 const body = m[2].replace(/\s+/g, '');
@@ -60,7 +60,7 @@ JSEOF
 
   chmod 600 "$SSH_KEY"
   if ! ssh-keygen -y -f "$SSH_KEY" > /dev/null 2>&1; then
-    err "SSH key validation failed — verify VPS_SSH_PRIVATE_KEY secret contains a valid private key"
+    err "SSH key validation failed — verify VPS_SSH_KEY secret contains a valid private key"
   fi
   ok "SSH key validated"
 
@@ -71,7 +71,7 @@ JSEOF
 
   log "Testing SSH connection to $VPS_IP..."
   if ! $SSH_CMD "${VPS_USER}@${VPS_IP}" "echo 'SSH OK'" 2>/dev/null | grep -q "SSH OK"; then
-    err "SSH failed. Make sure the public key for VPS_SSH_PRIVATE_KEY is in /root/.ssh/authorized_keys on the VPS."
+    err "SSH failed. Make sure the public key for VPS_SSH_KEY is in /root/.ssh/authorized_keys on the VPS."
   fi
   ok "SSH connection verified"
 }

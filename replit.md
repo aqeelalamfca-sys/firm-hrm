@@ -52,12 +52,18 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 ## Production Notes (VPS: ana-ca.com)
 
 - **CI/CD**: Replit → GitHub → VPS pipeline via `scripts/deploy.sh`
-- **Secrets required**: `GITHUB_TOKEN` (PAT with repo access), `VPS_SSH_PRIVATE_KEY` (full RSA/Ed25519 private key for VPS root user)
-- **Deploy command**: `bash scripts/deploy.sh` — pushes to GitHub then builds Docker container on VPS
-- **Push only**: `bash scripts/deploy.sh` → or `bash scripts/push.sh` for GitHub-only push
+- **Secrets stored in Replit Secrets** (do not change names):
+  - `GITHUB_TOKEN` — GitHub PAT with repo + workflow scopes
+  - `VPS_SSH_KEY` — Ed25519 private key for VPS root user (label: replit-auditwise-deploy)
+- **GitHub repo**: `aqeelalamfca-sys/firm-hrm` — GitHub Actions workflow at `.github/workflows/deploy.yml` auto-deploys on push to `main`
+- **GitHub Secrets set** (for Actions CI/CD): `VPS_SSH_KEY`, `VPS_HOST`, `VPS_USERNAME`, `VPS_PORT`, `DB_PASSWORD`, `JWT_SECRET`, `ENCRYPTION_KEY`
+- **Deploy command**: `bash scripts/deploy.sh` — pushes to GitHub then SSH-builds Docker container on VPS
+- **Push only**: `bash scripts/push.sh` — GitHub push only, triggers GitHub Actions deploy
 - **VPS status**: `bash scripts/vps-status.sh` — shows container health, nginx, SSL, disk
-- **VPS logs**: `bash scripts/vps-logs.sh` — live backend logs
-- **VPS**: 187.77.130.117, containers: `ana-db` (PostgreSQL) + `ana-backend` (app)
+- **VPS logs**: `bash scripts/vps-logs.sh [backend|db|build|nginx]` — live logs
+- **VPS rollback**: `bash scripts/vps-rollback.sh [commit-hash]` — rollback to previous commit
+- **VPS**: 187.77.130.117 (Hostinger), running Docker containers: `ana-db` (PostgreSQL 16) + `ana-backend` (Node.js app)
+- **Nginx**: Proxies `https://ana-ca.com` → `127.0.0.1:5002` (ana-backend), SSL via Let's Encrypt (auto-renews)
 - **Auto Schema Sync**: `deploy/entrypoint.sh` runs `drizzle-kit push` before every app startup to keep DB in sync with schema
 - **Admin credentials**: `admin@calfirm.com` / `Admin@123`
 - **April 2026 Fix**: Added `deleted_at` to all 38 WP tables and missing `wp_session_status` enum values (`wp_listing`, `audit_chain`, `review`) on VPS. Also added `updated_at` to 19 WP/audit tables (`wp_uploaded_files`, `wp_trigger_defs`, `analytics_session`, `evidence_log`, `recon_engine`, `wp_gl_accounts`, etc.) that were missing this column. Root cause: production DB was created from an older schema snapshot. All 36 GET endpoints now return HTTP 200. Future deployments auto-sync via entrypoint.sh → drizzle-kit push.
