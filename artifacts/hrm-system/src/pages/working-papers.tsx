@@ -11054,7 +11054,6 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                   <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-16">Var %</th>
                   <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-20">Direction</th>
                   <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-16">Risk</th>
-                  <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-20">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -11099,10 +11098,6 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                         ls.riskLevel === "High" ? "bg-red-100 text-red-700" :
                         ls.riskLevel === "Medium" ? "bg-amber-100 text-amber-700" :
                         "bg-emerald-100 text-emerald-700")}>{ls.riskLevel}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-medium",
-                        ls.isOrphan ? "bg-slate-200 text-slate-500" : "bg-slate-100 text-slate-600")}>{ls.isOrphan ? "orphan" : ls.status}</span>
                     </td>
                   </tr>
                 ))}
