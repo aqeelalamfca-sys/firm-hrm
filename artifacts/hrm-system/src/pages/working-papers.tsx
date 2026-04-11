@@ -5921,7 +5921,7 @@ function AuditEngineStage({
                     <span className="font-mono text-slate-500">{job.jobType}</span>
                     <span className="text-slate-400">{job.recordCount ? `${job.recordCount} records` : ""}</span>
                     <span className="text-slate-300 ml-auto">{job.triggeredBy}</span>
-                    <span className="text-slate-300">{job.createdAt ? new Date(job.createdAt).toLocaleString("en-PK", { dateStyle: "short", timeStyle: "short" }) : "—"}</span>
+                    <span className="text-slate-300">{job.createdAt ? safeFormatDate(job.createdAt, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</span>
                   </div>
                 ))}
               </div>
@@ -5957,7 +5957,7 @@ function AuditEngineStage({
                 <div className="bg-white border border-emerald-100 rounded-xl p-3"><span className="text-slate-400 block">Archive ref (ISA 230)</span><span className="font-mono text-indigo-600 text-[11px]">{lockStatus.lock.archiveRef}</span></div>
                 <div className="bg-white border border-emerald-100 rounded-xl p-3"><span className="text-slate-400 block">Retention until</span><span className="font-semibold text-slate-800">{lockStatus.lock.retentionEndDate}</span></div>
                 <div className="bg-white border border-emerald-100 rounded-xl p-3"><span className="text-slate-400 block">EQCR completed</span><span className={cn("font-semibold", lockStatus.lock.eqcrCompleted ? "text-emerald-700" : "text-amber-600")}>{lockStatus.lock.eqcrCompleted ? "Yes" : "Pending"}</span></div>
-                <div className="bg-white border border-emerald-100 rounded-xl p-3"><span className="text-slate-400 block">Locked at</span><span className="font-semibold text-slate-800">{lockStatus.lock.lockedAt ? new Date(lockStatus.lock.lockedAt).toLocaleDateString("en-PK") : "—"}</span></div>
+                <div className="bg-white border border-emerald-100 rounded-xl p-3"><span className="text-slate-400 block">Locked at</span><span className="font-semibold text-slate-800">{lockStatus.lock.lockedAt ? safeFormatDate(lockStatus.lock.lockedAt) : "—"}</span></div>
               </div>
             </div>
           ) : (
@@ -6020,7 +6020,7 @@ function AuditEngineStage({
                   const typeStyle: Record<string, string> = { WP_PREPARED: "bg-amber-100 text-amber-700", WP_REVIEWED: "bg-violet-100 text-violet-700", WP_APPROVED: "bg-emerald-100 text-emerald-700", VALIDATION_RUN: "bg-blue-100 text-blue-700", OUTPUT_GENERATED: "bg-teal-100 text-teal-700", SESSION_LOCKED: "bg-slate-800 text-white", SESSION_UNLOCKED: "bg-orange-100 text-orange-700" };
                   return (
                     <div key={i} className="px-4 py-2.5 flex items-start gap-3 text-xs">
-                      <span className="text-slate-300 shrink-0 mt-0.5 tabular-nums">{event.timestamp ? new Date(event.timestamp).toLocaleString("en-PK", { dateStyle: "short", timeStyle: "short" }) : "—"}</span>
+                      <span className="text-slate-300 shrink-0 mt-0.5 tabular-nums">{event.timestamp ? safeFormatDate(event.timestamp, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</span>
                       <span className={cn("px-2 py-0.5 rounded text-[10px] font-semibold shrink-0", typeStyle[event.type] || "bg-slate-100 text-slate-600")}>{event.type?.replace(/_/g, " ")}</span>
                       <span className="text-slate-700 flex-1">{event.detail}</span>
                       <span className="text-slate-400 shrink-0">{event.actor}</span>
@@ -6386,7 +6386,16 @@ function safeParseArray(val: string): string[] {
 function safeFormatDate(d: string, opts?: Intl.DateTimeFormatOptions): string {
   if (!d || d === "—") return "—";
   const date = new Date(d.includes("T") ? d : d + "T00:00:00");
-  return isNaN(date.getTime()) ? d : date.toLocaleDateString("en-GB", opts || { day: "2-digit", month: "short", year: "numeric" });
+  if (isNaN(date.getTime())) return d;
+  if (opts) {
+    const formatted = date.toLocaleDateString("en-GB", opts);
+    return formatted.replace(/\s/g, "-");
+  }
+  const day = String(date.getDate()).padStart(2, "0");
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const mon = months[date.getMonth()];
+  const year = date.getFullYear();
+  return `${day}-${mon}-${year}`;
 }
 function MultiSelectInput({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
   const selected: string[] = safeParseArray(value);
@@ -8030,7 +8039,7 @@ function TbGenerationStage({ coaData, tbGlProgress, onGenerateTbGl, onPopulate, 
             { label: "TB Accounts",      value: tb.lineCount ?? "—",  color: "blue",   icon: Database },
             { label: "TB Status",        value: tb.balanced ? "Balanced ✓" : "Imbalanced ✗",  color: tb.balanced ? "emerald" : "red", icon: CheckCircle2 },
             { label: "Difference",       value: tb.difference != null ? (tb.difference === 0 ? "0.00 ✓" : tb.difference.toLocaleString()) : "—", color: tb.difference === 0 ? "emerald" : "red", icon: Calculator },
-            { label: "Last Generated",   value: tbGlProgress?.result?.generatedAt ? new Date(tbGlProgress.result.generatedAt).toLocaleTimeString() : "—", color: "slate", icon: Clock },
+            { label: "Last Generated",   value: tbGlProgress?.result?.generatedAt ? safeFormatDate(tbGlProgress.result.generatedAt, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—", color: "slate", icon: Clock },
           ].map(stat => (
             <div key={stat.label} className={cn(
               "bg-white border rounded-2xl p-4 text-center shadow-sm",
@@ -10239,7 +10248,7 @@ function WpExecutionModal({ wp, session, onClose }: { wp: any; session: any; onC
                     <div className="text-center space-y-2">
                       <Lock className="w-8 h-8 text-white mx-auto" />
                       <p className="text-white font-semibold">Working Paper Locked</p>
-                      <p className="text-slate-400 text-xs">Locked by {exec.lockedBy} on {exec.lockedAt ? new Date(exec.lockedAt).toLocaleDateString() : "—"}</p>
+                      <p className="text-slate-400 text-xs">Locked by {exec.lockedBy} on {exec.lockedAt ? safeFormatDate(exec.lockedAt) : "—"}</p>
                       <p className="text-slate-500 text-[10px]">ISA 230 — Audit documentation assembled and locked within 60 days of report date</p>
                     </div>
                   ) : (
@@ -11947,7 +11956,7 @@ function ComplianceDocsPanel({ docs, complianceLoading, onGenerate, onSign, onUp
                         {complianceLoading === doc.docType ? <span className="animate-spin">⟳</span> : "↺"} Regenerate
                       </button>
                       {doc.generatedAt && (
-                        <span className="text-xs text-slate-400 self-center">v{doc.version} · {new Date(doc.generatedAt).toLocaleDateString("en-GB")}</span>
+                        <span className="text-xs text-slate-400 self-center">v{doc.version} · {safeFormatDate(doc.generatedAt)}</span>
                       )}
                     </div>
                   )}
