@@ -11255,10 +11255,63 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {schedules.map((ls: any, idx: number) => (
-                  <tr key={ls.id || idx} className={cn("hover:bg-slate-50 transition-colors",
-                    ls.zeroOpeningFlag ? "bg-amber-50/60" : "",
-                    ls.validationWarnings?.length > 0 ? "border-l-2 border-l-amber-400" : "")}>
+                {(() => {
+                  const WP_AREA_COLORS: Record<string, { base: string; shades: string[]; border: string; text: string; badge: string }> = {
+                    "Borrowings":        { base: "bg-rose-50",    shades: ["bg-rose-50", "bg-rose-100/60", "bg-rose-50/40"],          border: "border-l-rose-400",    text: "text-rose-800",    badge: "bg-rose-200 text-rose-800" },
+                    "Cash and Bank":     { base: "bg-sky-50",     shades: ["bg-sky-50", "bg-sky-100/60", "bg-sky-50/40"],             border: "border-l-sky-400",     text: "text-sky-800",     badge: "bg-sky-200 text-sky-800" },
+                    "Revenue":           { base: "bg-emerald-50", shades: ["bg-emerald-50", "bg-emerald-100/60", "bg-emerald-50/40"], border: "border-l-emerald-400", text: "text-emerald-800", badge: "bg-emerald-200 text-emerald-800" },
+                    "Fixed Assets":      { base: "bg-amber-50",   shades: ["bg-amber-50", "bg-amber-100/60", "bg-amber-50/40"],      border: "border-l-amber-400",   text: "text-amber-800",   badge: "bg-amber-200 text-amber-800" },
+                    "Trade Receivables": { base: "bg-violet-50",  shades: ["bg-violet-50", "bg-violet-100/60", "bg-violet-50/40"],    border: "border-l-violet-400",  text: "text-violet-800",  badge: "bg-violet-200 text-violet-800" },
+                    "Inventory":         { base: "bg-orange-50",  shades: ["bg-orange-50", "bg-orange-100/60", "bg-orange-50/40"],    border: "border-l-orange-400",  text: "text-orange-800",  badge: "bg-orange-200 text-orange-800" },
+                    "Trade Payables":    { base: "bg-teal-50",    shades: ["bg-teal-50", "bg-teal-100/60", "bg-teal-50/40"],          border: "border-l-teal-400",    text: "text-teal-800",    badge: "bg-teal-200 text-teal-800" },
+                    "Expenses":          { base: "bg-pink-50",    shades: ["bg-pink-50", "bg-pink-100/60", "bg-pink-50/40"],          border: "border-l-pink-400",    text: "text-pink-800",    badge: "bg-pink-200 text-pink-800" },
+                    "Equity":            { base: "bg-indigo-50",  shades: ["bg-indigo-50", "bg-indigo-100/60", "bg-indigo-50/40"],    border: "border-l-indigo-400",  text: "text-indigo-800",  badge: "bg-indigo-200 text-indigo-800" },
+                    "Investments":       { base: "bg-cyan-50",    shades: ["bg-cyan-50", "bg-cyan-100/60", "bg-cyan-50/40"],          border: "border-l-cyan-400",    text: "text-cyan-800",    badge: "bg-cyan-200 text-cyan-800" },
+                    "Tax":               { base: "bg-lime-50",    shades: ["bg-lime-50", "bg-lime-100/60", "bg-lime-50/40"],          border: "border-l-lime-500",    text: "text-lime-800",    badge: "bg-lime-200 text-lime-800" },
+                    "Provisions":        { base: "bg-fuchsia-50", shades: ["bg-fuchsia-50", "bg-fuchsia-100/60", "bg-fuchsia-50/40"],border: "border-l-fuchsia-400", text: "text-fuchsia-800", badge: "bg-fuchsia-200 text-fuchsia-800" },
+                    "Intangibles":       { base: "bg-purple-50",  shades: ["bg-purple-50", "bg-purple-100/60", "bg-purple-50/40"],    border: "border-l-purple-400",  text: "text-purple-800",  badge: "bg-purple-200 text-purple-800" },
+                  };
+                  const FALLBACK_COLORS = [
+                    { base: "bg-blue-50",   shades: ["bg-blue-50", "bg-blue-100/60", "bg-blue-50/40"],     border: "border-l-blue-400",   text: "text-blue-800",   badge: "bg-blue-200 text-blue-800" },
+                    { base: "bg-green-50",  shades: ["bg-green-50", "bg-green-100/60", "bg-green-50/40"],   border: "border-l-green-400",  text: "text-green-800",  badge: "bg-green-200 text-green-800" },
+                    { base: "bg-yellow-50", shades: ["bg-yellow-50", "bg-yellow-100/60", "bg-yellow-50/40"],border: "border-l-yellow-400", text: "text-yellow-800", badge: "bg-yellow-200 text-yellow-800" },
+                    { base: "bg-red-50",    shades: ["bg-red-50", "bg-red-100/60", "bg-red-50/40"],         border: "border-l-red-400",    text: "text-red-800",    badge: "bg-red-200 text-red-800" },
+                  ];
+                  const areaColorMap: Record<string, typeof FALLBACK_COLORS[0]> = {};
+                  let fallbackIdx = 0;
+                  schedules.forEach((ls: any) => {
+                    const area = ls.wpArea || "Other";
+                    if (!areaColorMap[area]) {
+                      areaColorMap[area] = WP_AREA_COLORS[area] || FALLBACK_COLORS[fallbackIdx++ % FALLBACK_COLORS.length];
+                    }
+                  });
+                  const majorHeadIndexMap: Record<string, Record<string, number>> = {};
+                  schedules.forEach((ls: any) => {
+                    const area = ls.wpArea || "Other";
+                    const mh = ls.majorHead || "Other";
+                    if (!majorHeadIndexMap[area]) majorHeadIndexMap[area] = {};
+                    if (majorHeadIndexMap[area][mh] === undefined) {
+                      majorHeadIndexMap[area][mh] = Object.keys(majorHeadIndexMap[area]).length;
+                    }
+                  });
+                  let prevArea = "";
+
+                  return schedules.map((ls: any, idx: number) => {
+                    const area = ls.wpArea || "Other";
+                    const mh = ls.majorHead || "Other";
+                    const areaColor = areaColorMap[area];
+                    const mhIdx = majorHeadIndexMap[area]?.[mh] || 0;
+                    const shadeBg = areaColor.shades[mhIdx % areaColor.shades.length];
+                    const isNewArea = area !== prevArea;
+                    prevArea = area;
+
+                    return (
+                    <tr key={ls.id || idx} className={cn("transition-colors border-l-3",
+                      shadeBg, areaColor.border,
+                      isNewArea && idx > 0 ? "border-t-2 border-t-slate-300" : "",
+                      ls.validationWarnings?.length > 0 ? "ring-1 ring-inset ring-amber-300" : "",
+                      `hover:brightness-95`
+                    )}>
                     <td className="px-2 py-2.5 text-center text-[10px] text-slate-400 font-mono">
                       <div className="flex items-center justify-center gap-0.5">
                         {ls.validationWarnings?.length > 0 && <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" title={ls.validationWarnings.join("; ")} />}
@@ -11274,8 +11327,17 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                         {renderEditableCell(ls, "scheduleRef", ls.scheduleRef, "font-mono text-[11px] font-semibold text-violet-600")}
                       </div>
                     </td>
-                    <td className="px-3 py-2.5 text-[11px]">{renderEditableCell(ls, "wpArea", ls.wpArea, "font-medium text-slate-800")}</td>
-                    <td className="px-3 py-2.5 text-[11px]">{renderEditableCell(ls, "majorHead", ls.majorHead, "text-slate-600")}</td>
+                    <td className="px-3 py-2.5 text-[11px]">
+                      <span className={cn("inline-flex items-center gap-1 font-semibold", areaColor.text)}>
+                        {isNewArea && <span className={cn("inline-block w-2 h-2 rounded-full shrink-0", areaColor.badge.split(" ")[0])} />}
+                        {renderEditableCell(ls, "wpArea", ls.wpArea, `font-medium ${areaColor.text}`)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-[11px]">
+                      <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", areaColor.badge)}>
+                        {renderEditableCell(ls, "majorHead", ls.majorHead, "")}
+                      </span>
+                    </td>
                     <td className="px-3 py-2.5 text-center text-[11px]">{renderEditableCell(ls, "noteNo", ls.noteNo || "—", "text-slate-500", "center")}</td>
                     <td className={cn("px-3 py-2.5 text-right font-mono text-[11px]", ls.zeroOpeningFlag ? "text-amber-600 font-semibold" : "")}>
                       {ls.zeroOpeningFlag && <AlertTriangle className="w-3 h-3 text-amber-500 inline mr-0.5 mb-0.5" />}
@@ -11335,7 +11397,9 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                       )}
                     </td>
                   </tr>
-                ))}
+                    );
+                  });
+                })()}
               </tbody>
               {schedules.length > 0 && (
                 <tfoot className="bg-slate-50 border-t-2 border-slate-300">
