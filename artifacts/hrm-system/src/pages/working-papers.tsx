@@ -241,7 +241,7 @@ export default function WorkingPapers() {
       setDatEqcrReviewEnd(addDays(defaultSigning, -5));
     }
   };
-  const [newAuditFirmName, setNewAuditFirmName] = useState("");
+  const [newAuditFirmName, setNewAuditFirmName] = useState("Alam & Aulakh (Chartered Accountants)");
   const [newAuditFirmLogo, setNewAuditFirmLogo] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>("");
   const logoInputRef = useRef<HTMLInputElement | null>(null);
