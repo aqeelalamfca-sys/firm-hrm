@@ -34,6 +34,22 @@ const STAGES = [
   { key: "export",        label: "Export",         icon: Download,            phase: "output",   desc: "WP Excel · WP Word · Full Audit Bundle" },
 ] as const;
 
+const STANDARD_TICK_MARKS = [
+  { symbol: "✓", meaning: "Agreed to source document / verified", color: "#16A34A", category: "verification" },
+  { symbol: "✗", meaning: "Exception / discrepancy noted", color: "#DC2626", category: "verification" },
+  { symbol: "®", meaning: "Recalculated and agreed", color: "#2563EB", category: "computation" },
+  { symbol: "©", meaning: "Confirmed via external confirmation", color: "#7C3AED", category: "verification" },
+  { symbol: "△", meaning: "Traced to/from source", color: "#EA580C", category: "tracing" },
+  { symbol: "♦", meaning: "Vouched to supporting document", color: "#0891B2", category: "vouching" },
+  { symbol: "◊", meaning: "Inspected physical evidence", color: "#65A30D", category: "verification" },
+  { symbol: "★", meaning: "Agreed to prior year working paper", color: "#CA8A04", category: "verification" },
+  { symbol: "▲", meaning: "Footed / cross-footed and agreed", color: "#4F46E5", category: "computation" },
+  { symbol: "●", meaning: "Observation performed", color: "#0D9488", category: "verification" },
+  { symbol: "■", meaning: "Management inquiry response noted", color: "#6366F1", category: "verification" },
+  { symbol: "⊕", meaning: "Selected for sampling", color: "#F59E0B", category: "verification" },
+  { symbol: "⊗", meaning: "Not applicable / excluded from scope", color: "#9CA3AF", category: "verification" },
+];
+
 const FILE_CATEGORIES = [
   { value: "financial_statements", label: "Financial Statements", format: "Excel (.xlsx)" },
   { value: "bank_statement", label: "Bank Statement", format: "Excel (.xlsx)" },
@@ -2381,8 +2397,8 @@ export default function WorkingPapers() {
                     }
                     if (s.key === "wp_listing") { fetchWpTriggers(); fetchSession(activeSession.id); }
                     if (s.key === "generation" || s.key === "export") { fetchSession(activeSession.id); fetchExceptions(); }
+                    if (s.key === "lead") { fetchLeadSchedules(); }
                     if (s.key === "audit_chain") { fetchAuditChain(); fetchLeadSchedules(); fetchFsNoteMappings(); }
-                    if (s.key === "review") { fetchReviewNotes(); fetchComplianceGates(); fetchTickMarks(); fetchVersionHistory(); fetchSamplingDetails(); }
                   }}
                 >
                   {isPast ? <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" /> : <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
@@ -10925,14 +10941,100 @@ const FORMAT_LABEL: Record<string, string> = {
 // ═══════════════════════════════════════════════════════════════════════════════
 // ISA AUDIT CHAIN STAGE
 // ═══════════════════════════════════════════════════════════════════════════════
+function TickMarkLegend({ tickMarks, usageCounts }: { tickMarks: typeof STANDARD_TICK_MARKS; usageCounts?: Record<string, number> }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors">
+        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Tick Mark Legend
+        </h4>
+        <ChevronRight className={cn("w-4 h-4 text-slate-400 transition-transform", expanded && "rotate-90")} />
+      </button>
+      {expanded && (
+        <div className="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 border-t border-slate-200">
+          {tickMarks.map((tm) => (
+            <div key={tm.symbol} className="flex items-center gap-3 py-1.5">
+              <span className="text-xl w-7 text-center shrink-0" style={{ color: tm.color }}>{tm.symbol}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-medium text-slate-800 leading-tight">{tm.meaning}</p>
+                <p className="text-[9px] text-slate-400">{tm.category}{usageCounts?.[tm.symbol] ? ` · Used ${usageCounts[tm.symbol]} times` : " · Used 0 times"}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TickMarkPicker({ onSelect, onClose }: { onSelect: (tm: typeof STANDARD_TICK_MARKS[0]) => void; onClose: () => void }) {
+  return (
+    <div className="absolute z-50 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl p-2 w-64 max-h-60 overflow-y-auto" style={{ right: 0 }}>
+      <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide px-2 py-1 mb-1">Apply Tick Mark</div>
+      {STANDARD_TICK_MARKS.map((tm) => (
+        <button key={tm.symbol} onClick={() => { onSelect(tm); onClose(); }}
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-50 transition-colors text-left">
+          <span className="text-base w-5 text-center shrink-0" style={{ color: tm.color }}>{tm.symbol}</span>
+          <span className="text-[10px] text-slate-700 leading-tight truncate">{tm.meaning}</span>
+        </button>
+      ))}
+      <button onClick={onClose} className="w-full text-[10px] text-slate-400 hover:text-slate-600 mt-1 py-1 text-center">Cancel</button>
+    </div>
+  );
+}
+
 function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, onRefresh, onExportCsv, onNext }: any) {
   const [selectedLead, setSelectedLead] = useState<any>(null);
   const [editCell, setEditCell] = useState<{ id: number; field: string } | null>(null);
   const [editValue, setEditValue] = useState<string>("");
   const editRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const [leadTickMarks, setLeadTickMarks] = useState<Record<number, string>>({});
+  const [tickPickerOpen, setTickPickerOpen] = useState<number | null>(null);
 
-  useEffect(() => { if (session?.id) onRefresh(); }, [session?.id]);
+  const applyTickMark = async (scheduleId: number, tm: typeof STANDARD_TICK_MARKS[0], scheduleRef: string) => {
+    const prev = leadTickMarks[scheduleId];
+    setLeadTickMarks(p => ({ ...p, [scheduleId]: tm.symbol }));
+    try {
+      const hdrs: Record<string, string> = { "Content-Type": "application/json" };
+      const tk = localStorage.getItem("hrm_token") || localStorage.getItem("token");
+      if (tk) hdrs["Authorization"] = `Bearer ${tk}`;
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/tick-marks/apply`, {
+        method: "POST", headers: hdrs,
+        body: JSON.stringify({ symbol: tm.symbol, wpCode: scheduleRef, lineRef: `LS-${scheduleId}`, appliedBy: "auditor" }),
+      });
+      if (!res.ok) throw new Error("Failed to save tick mark");
+    } catch (err: any) {
+      setLeadTickMarks(p => ({ ...p, [scheduleId]: prev || "" }));
+      toast({ title: "Tick Mark Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  useEffect(() => {
+    if (!session?.id) return;
+    onRefresh();
+    const hdrs: Record<string, string> = {};
+    const tk = localStorage.getItem("hrm_token") || localStorage.getItem("token");
+    if (tk) hdrs["Authorization"] = `Bearer ${tk}`;
+    fetch(`${API_BASE}/working-papers/sessions/${session.id}/tick-marks`, { headers: hdrs })
+      .then(async r => {
+        if (r.ok) {
+          const data = await r.json();
+          const usageMap: Record<number, string> = {};
+          (data.usages || []).forEach((u: any) => {
+            if (u.lineRef?.startsWith("LS-")) {
+              const id = parseInt(u.lineRef.replace("LS-", ""));
+              if (!isNaN(id)) usageMap[id] = u.symbol;
+            }
+          });
+          setLeadTickMarks(usageMap);
+        }
+      }).catch(() => {});
+    fetch(`${API_BASE}/working-papers/sessions/${session.id}/tick-marks/initialize`, {
+      method: "POST", headers: { ...hdrs, "Content-Type": "application/json" },
+    }).catch(() => {});
+  }, [session?.id]);
   useEffect(() => { if (editCell && editRef.current) editRef.current.focus(); }, [editCell]);
 
   const startEdit = (ls: any, field: string) => {
@@ -11105,6 +11207,7 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                   <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-16">Var %</th>
                   <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-20">Direction</th>
                   <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-16">Risk</th>
+                  <th className="text-center px-2 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-10">TM</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -11166,6 +11269,27 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                           "bg-emerald-100 text-emerald-700")}>{ls.riskLevel}</span>
                       )}
                     </td>
+                    <td className="px-2 py-2.5 text-center relative">
+                      {leadTickMarks[ls.id] ? (
+                        <button onClick={() => setTickPickerOpen(tickPickerOpen === ls.id ? null : ls.id)}
+                          className="text-lg leading-none hover:scale-125 transition-transform"
+                          style={{ color: STANDARD_TICK_MARKS.find(t => t.symbol === leadTickMarks[ls.id])?.color }}
+                          title={STANDARD_TICK_MARKS.find(t => t.symbol === leadTickMarks[ls.id])?.meaning}>
+                          {leadTickMarks[ls.id]}
+                        </button>
+                      ) : (
+                        <button onClick={() => setTickPickerOpen(tickPickerOpen === ls.id ? null : ls.id)}
+                          className="text-slate-300 hover:text-slate-500 transition-colors text-[10px]" title="Apply tick mark">
+                          <Plus className="w-3.5 h-3.5 mx-auto" />
+                        </button>
+                      )}
+                      {tickPickerOpen === ls.id && (
+                        <TickMarkPicker
+                          onSelect={(tm) => applyTickMark(ls.id, tm, ls.scheduleRef)}
+                          onClose={() => setTickPickerOpen(null)}
+                        />
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -11183,10 +11307,10 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                     <td className="px-3 py-2.5 text-right">
                       {totalOpening !== 0 ? ((totalVariance / totalOpening) * 100).toFixed(1) + "%" : "—"}
                     </td>
-                    <td colSpan={3}></td>
+                    <td colSpan={4}></td>
                   </tr>
                   <tr className={cn("text-[10px] border-t", footingOk ? "bg-emerald-50" : "bg-red-50")}>
-                    <td colSpan={12} className="px-4 py-2">
+                    <td colSpan={13} className="px-4 py-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         {footingOk
                           ? <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /><span className="font-semibold text-emerald-700">FOOTING CROSS-CHECK PASSED</span><span className="text-emerald-600">Opening ({totalOpening.toLocaleString()}) + Variance ({totalVariance.toLocaleString()}) = Closing ({totalClosing.toLocaleString()})</span></>
@@ -11201,6 +11325,10 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
             </table>
           </div>
         </div>
+      )}
+
+      {schedules.length > 0 && (
+        <TickMarkLegend tickMarks={STANDARD_TICK_MARKS} />
       )}
 
       {selectedLead && createPortal(
@@ -11576,6 +11704,48 @@ function AuditChainStage({ chains, summary, loading, leadSchedules, fsNoteMappin
   const [expandedArea, setExpandedArea] = useState<string | null>(null);
   const [expandedNode, setExpandedNode] = useState<number | null>(null);
   const [chainSearch, setChainSearch] = useState("");
+  const [chainTickMarks, setChainTickMarks] = useState<Record<number, string>>({});
+  const [chainTickPicker, setChainTickPicker] = useState<number | null>(null);
+  const { toast: chainToast } = useToast();
+
+  useEffect(() => {
+    if (!session?.id) return;
+    const hdrs: Record<string, string> = {};
+    const tk = localStorage.getItem("hrm_token") || localStorage.getItem("token");
+    if (tk) hdrs["Authorization"] = `Bearer ${tk}`;
+    fetch(`${API_BASE}/working-papers/sessions/${session.id}/tick-marks`, { headers: hdrs })
+      .then(async r => {
+        if (r.ok) {
+          const data = await r.json();
+          const usageMap: Record<number, string> = {};
+          (data.usages || []).forEach((u: any) => {
+            if (u.lineRef?.startsWith("AC-")) {
+              const id = parseInt(u.lineRef.replace("AC-", ""));
+              if (!isNaN(id)) usageMap[id] = u.symbol;
+            }
+          });
+          setChainTickMarks(usageMap);
+        }
+      }).catch(() => {});
+  }, [session?.id]);
+
+  const applyChainTickMark = async (nodeId: number, tm: typeof STANDARD_TICK_MARKS[0], procedureId: string) => {
+    const prev = chainTickMarks[nodeId];
+    setChainTickMarks(p => ({ ...p, [nodeId]: tm.symbol }));
+    try {
+      const hdrs: Record<string, string> = { "Content-Type": "application/json" };
+      const tk = localStorage.getItem("hrm_token") || localStorage.getItem("token");
+      if (tk) hdrs["Authorization"] = `Bearer ${tk}`;
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/tick-marks/apply`, {
+        method: "POST", headers: hdrs,
+        body: JSON.stringify({ symbol: tm.symbol, wpCode: procedureId, lineRef: `AC-${nodeId}`, appliedBy: "auditor" }),
+      });
+      if (!res.ok) throw new Error("Failed to save tick mark");
+    } catch (err: any) {
+      setChainTickMarks(p => ({ ...p, [nodeId]: prev || "" }));
+      chainToast({ title: "Tick Mark Error", description: err.message, variant: "destructive" });
+    }
+  };
   const allChains = chains || [];
   const filteredChains = chainSearch ? allChains.filter((c: any) => [c.fsArea, c.procedureDescription, c.procedureId, c.procedureIsaRef, c.riskLevel].some(f => f && String(f).toLowerCase().includes(chainSearch.toLowerCase()))) : allChains;
   const areaGroups: Record<string, any[]> = {};
@@ -11673,7 +11843,12 @@ function AuditChainStage({ chains, summary, loading, leadSchedules, fsNoteMappin
                             <span className="text-[10px] font-mono bg-slate-100 px-1.5 py-0.5 rounded">{node.procedureId}</span>
                             <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", statusColors[node.procedureStatus || "planned"])}>{(node.procedureStatus || "planned").replace(/_/g, " ")}</span>
                             <span className="text-[10px] text-violet-600 font-medium">{node.procedureIsaRef}</span>
-                            {node.tickMarkCode && <span className="text-base" title={node.tickMarkMeaning}>{node.tickMarkCode}</span>}
+                            {(chainTickMarks[node.id] || node.tickMarkCode) && (
+                              <span className="text-base" title={chainTickMarks[node.id] ? STANDARD_TICK_MARKS.find(t => t.symbol === chainTickMarks[node.id])?.meaning : node.tickMarkMeaning}
+                                style={{ color: STANDARD_TICK_MARKS.find(t => t.symbol === (chainTickMarks[node.id] || node.tickMarkCode))?.color }}>
+                                {chainTickMarks[node.id] || node.tickMarkCode}
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm text-slate-800 font-medium">{node.procedureDescription}</p>
                           <div className="flex flex-wrap gap-3 mt-2 text-[11px] text-slate-500">
@@ -11701,6 +11876,20 @@ function AuditChainStage({ chains, summary, loading, leadSchedules, fsNoteMappin
                           {node.procedureStatus === "performed" && !node.conclusion && (
                             <button onClick={() => onUpdateNode(node.id, { conclusion: "satisfactory", conclusionNarrative: "No exceptions noted. Evidence is sufficient and appropriate.", evidenceSufficiency: "sufficient", chainComplete: true })} className="text-[10px] px-2 py-1 bg-violet-50 text-violet-700 rounded hover:bg-violet-100">Conclude</button>
                           )}
+                          <div className="relative">
+                            <button onClick={() => setChainTickPicker(chainTickPicker === node.id ? null : node.id)}
+                              className="text-[10px] px-2 py-1 bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100 flex items-center gap-0.5" title="Apply tick mark">
+                              {chainTickMarks[node.id] ? (
+                                <span style={{ color: STANDARD_TICK_MARKS.find(t => t.symbol === chainTickMarks[node.id])?.color }}>{chainTickMarks[node.id]}</span>
+                              ) : "✓ Mark"}
+                            </button>
+                            {chainTickPicker === node.id && (
+                              <TickMarkPicker
+                                onSelect={(tm) => applyChainTickMark(node.id, tm, node.procedureId)}
+                                onClose={() => setChainTickPicker(null)}
+                              />
+                            )}
+                          </div>
                           <button onClick={() => setExpandedNode(expandedNode === node.id ? null : node.id)} className="text-[10px] px-2 py-1 bg-slate-50 text-slate-600 rounded hover:bg-slate-100">
                             {expandedNode === node.id ? "Less" : "Detail"}
                           </button>
@@ -11729,6 +11918,9 @@ function AuditChainStage({ chains, summary, loading, leadSchedules, fsNoteMappin
               )}
             </div>
           ))}
+          {areas.length > 0 && (
+            <TickMarkLegend tickMarks={STANDARD_TICK_MARKS} />
+          )}
         </div>
       )}
 
