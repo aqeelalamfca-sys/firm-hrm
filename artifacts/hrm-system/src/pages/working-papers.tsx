@@ -21,12 +21,13 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
-// Pipeline: Upload → Data Extraction → Variables → WP Listing → WP Generation → Audit Chain → Review → Export
+// Pipeline: Upload → Data Extraction → Variables → WP Listing → Lead → WP Generation → Audit Chain → Review → Export
 const STAGES = [
   { key: "upload",        label: "Upload",         icon: Upload,              phase: "facts",    desc: "Download the financial data template, fill it in, and upload the completed file" },
   { key: "extraction",    label: "Data Extraction",icon: Sparkles,            phase: "facts",    desc: "Template-parsed variables — inline review, AI fill, exceptions & confirmation" },
   { key: "variables",     label: "Variables",      icon: SlidersHorizontal,   phase: "facts",    desc: "Review and lock all engagement variables before WP generation" },
   { key: "wp_listing",    label: "WP Listing",     icon: ClipboardList,       phase: "output",   desc: "AI-recommended WP selection — choose which papers to generate" },
+  { key: "lead",          label: "Lead",           icon: Table2,              phase: "output",   desc: "Lead schedules linking WPs to Trial Balance, FS heads, and audit report cross-references" },
   { key: "generation",    label: "WP Generation",  icon: FileCheck,           phase: "output",   desc: "Sequential AI generation of all WP sections (ISA Compliant)" },
   { key: "audit_chain",   label: "Audit Chain",    icon: Shield,              phase: "audit",    desc: "Risk→Assertion→Procedure→Evidence→Conclusion with ISA clause mapping" },
   { key: "review",        label: "Review & QC",    icon: CheckCircle2,        phase: "audit",    desc: "Multi-level review (Staff→Senior→Manager→Partner→EQCR), compliance gates, tick marks" },
@@ -2205,7 +2206,7 @@ export default function WorkingPapers() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {sessions.map((s: any) => {
-                  const stageOrder = ["upload","extraction","variables","wp_listing","generation","audit_chain","review","export"];
+                  const stageOrder = ["upload","extraction","variables","wp_listing","lead","generation","audit_chain","review","export"];
                   const stageIdx = stageOrder.indexOf(s.status);
                   const progressPct = stageIdx < 0 ? 0 : Math.round(((stageIdx + 1) / stageOrder.length) * 100);
                   const isDone = s.status === "completed" || s.status === "exported";
@@ -2405,12 +2406,13 @@ export default function WorkingPapers() {
             { step: "Data Extraction", phase: "facts",  active: stage === "extraction" },
             { step: "Variables",       phase: "facts",  active: stage === "variables" },
             { step: "WP Listing",      phase: "output", active: stage === "wp_listing" },
+            { step: "Lead",            phase: "output", active: stage === "lead" },
             { step: "WP Generation",   phase: "output", active: stage === "generation" },
             { step: "Audit Chain",     phase: "audit",  active: stage === "audit_chain" },
             { step: "Review & QC",     phase: "audit",  active: stage === "review" },
             { step: "Export",          phase: "output", active: stage === "export" },
           ].map((item, idx) => {
-            const stageOrder = ["upload","extraction","variables","wp_listing","generation","audit_chain","review","export"];
+            const stageOrder = ["upload","extraction","variables","wp_listing","lead","generation","audit_chain","review","export"];
             const pastIdx = stageOrder.indexOf(stage);
             const isPast = pastIdx > idx;
             return (
@@ -2606,6 +2608,22 @@ export default function WorkingPapers() {
           onEvaluateTriggers={evaluateWpTriggers}
           onRefresh={() => { fetchWpTriggers(); fetchSession(activeSession.id); }}
           onNext={async () => {
+            await fetchLeadSchedules();
+            setStage("lead");
+          }}
+        />
+      )}
+
+      {/* TAB 5 — Lead Schedules */}
+      {stage === "lead" && (
+        <LeadStage
+          session={activeSession}
+          leadSchedules={leadSchedules}
+          loading={isaLoading}
+          onGenerateLeadSchedules={generateLeadSchedules}
+          onRefresh={fetchLeadSchedules}
+          onExportCsv={exportToCsv}
+          onNext={async () => {
             try {
               const statusRes = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/status`, {
                 method: "PATCH", headers: { ...headers, "Content-Type": "application/json" },
@@ -2627,7 +2645,7 @@ export default function WorkingPapers() {
         />
       )}
 
-      {/* TAB 4 — WP Generation */}
+      {/* TAB 6 — WP Generation */}
       {stage === "generation" && (
         <GenerationStage
           heads={heads}
@@ -10924,6 +10942,156 @@ const FORMAT_LABEL: Record<string, string> = {
 // ═══════════════════════════════════════════════════════════════════════════════
 // ISA AUDIT CHAIN STAGE
 // ═══════════════════════════════════════════════════════════════════════════════
+function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, onRefresh, onExportCsv, onNext }: any) {
+  useEffect(() => { if (session?.id) onRefresh(); }, [session?.id]);
+
+  const schedules = leadSchedules || [];
+  const totalOpening = schedules.reduce((s: number, ls: any) => s + Number(ls.openingBalance || 0), 0);
+  const totalClosing = schedules.reduce((s: number, ls: any) => s + Number(ls.closingBalance || 0), 0);
+  const totalVariance = totalClosing - totalOpening;
+  const highRiskCount = schedules.filter((ls: any) => ls.riskLevel === "High").length;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-gradient-to-r from-violet-800 to-indigo-900 rounded-2xl p-5 text-white shadow-lg">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+            <Table2 className="w-6 h-6 text-violet-200" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-bold">Lead Schedules & Cross-Referencing</h2>
+            <p className="text-sm text-violet-200 mt-0.5 leading-relaxed">
+              Master lead schedule linking all WPs to Trial Balance, Financial Statements, and audit report with ISA 230 cross-reference index.
+            </p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {[
+                { label: "Total Schedules", value: schedules.length, color: "bg-white/10" },
+                { label: "High Risk", value: highRiskCount, color: "bg-red-500/30" },
+                { label: "Opening Total", value: `PKR ${(totalOpening / 1e6).toFixed(1)}M`, color: "bg-white/10" },
+                { label: "Closing Total", value: `PKR ${(totalClosing / 1e6).toFixed(1)}M`, color: "bg-white/10" },
+                { label: "Net Variance", value: `PKR ${(totalVariance / 1e6).toFixed(1)}M`, color: totalVariance < 0 ? "bg-red-500/30" : "bg-emerald-500/30" },
+              ].map(s => (
+                <div key={s.label} className={cn("px-2.5 py-1 rounded-lg text-center min-w-[80px]", s.color)}>
+                  <div className="text-base font-bold">{s.value}</div>
+                  <div className="text-[10px] text-violet-200">{s.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center flex-wrap gap-2">
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => onRefresh()} disabled={loading} className="h-8 text-xs">
+            <RefreshCw className={cn("w-3.5 h-3.5 mr-1.5", loading && "animate-spin")} /> Refresh
+          </Button>
+          {onExportCsv && schedules.length > 0 && (
+            <Button variant="outline" size="sm" onClick={() => onExportCsv(schedules.map((ls: any) => ({
+              Ref: ls.scheduleRef, WPArea: ls.wpArea, MajorHead: ls.majorHead, NoteNo: ls.noteNo,
+              OpeningBalance: ls.openingBalance, ClosingBalance: ls.closingBalance,
+              Variance: ls.variance, VariancePct: ls.variancePct, Risk: ls.riskLevel, Status: ls.status
+            })), `lead_schedules_${session?.clientName || "export"}.csv`)} className="h-8 text-xs">
+              <Download className="w-3.5 h-3.5 mr-1.5" /> Export CSV
+            </Button>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => onGenerateLeadSchedules()} disabled={loading}
+            className="h-8 text-xs bg-violet-600 hover:bg-violet-700">
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Table2 className="w-3.5 h-3.5 mr-1.5" />}
+            Generate Lead Schedules
+          </Button>
+          <Button size="sm" onClick={onNext} className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700">
+            Continue to WP Generation <ChevronRight className="w-3.5 h-3.5 ml-1" />
+          </Button>
+        </div>
+      </div>
+
+      {schedules.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
+          <Table2 className="w-14 h-14 text-slate-200 mx-auto mb-4" />
+          <p className="text-slate-600 font-semibold text-base">No lead schedules generated yet</p>
+          <p className="text-sm text-slate-400 mt-1 mb-5">Generate lead schedules from uploaded trial balance data to link WPs with FS heads</p>
+          <Button size="sm" onClick={() => onGenerateLeadSchedules()} disabled={loading}
+            className="bg-violet-600 hover:bg-violet-700 h-9 px-5">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <Table2 className="w-4 h-4 mr-1.5" />}
+            Generate Lead Schedules
+          </Button>
+        </div>
+      ) : (
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="overflow-x-auto max-h-[65vh] overflow-y-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
+                <tr>
+                  <th className="text-center px-2 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-8">#</th>
+                  <th className="text-left px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-20">Ref</th>
+                  <th className="text-left px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">WP Area</th>
+                  <th className="text-left px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Major Head</th>
+                  <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-14">Note</th>
+                  <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-28">Opening</th>
+                  <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-28">Closing</th>
+                  <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-28">Variance</th>
+                  <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-16">Var %</th>
+                  <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-16">Risk</th>
+                  <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-20">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {schedules.map((ls: any, idx: number) => (
+                  <tr key={ls.id || idx} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-2 py-2.5 text-center text-[10px] text-slate-400 font-mono">{idx + 1}</td>
+                    <td className="px-3 py-2.5 font-mono text-[11px] font-semibold text-violet-600">{ls.scheduleRef}</td>
+                    <td className="px-3 py-2.5 text-[11px] font-medium text-slate-800">{ls.wpArea}</td>
+                    <td className="px-3 py-2.5 text-[11px] text-slate-600">{ls.majorHead}</td>
+                    <td className="px-3 py-2.5 text-center text-[11px] text-slate-500">{ls.noteNo || "—"}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-[11px]">{Number(ls.openingBalance || 0).toLocaleString()}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-[11px]">{Number(ls.closingBalance || 0).toLocaleString()}</td>
+                    <td className={cn("px-3 py-2.5 text-right font-mono text-[11px] font-medium", Number(ls.variance || 0) < 0 ? "text-red-600" : "text-emerald-600")}>
+                      {Number(ls.variance || 0).toLocaleString()}
+                    </td>
+                    <td className={cn("px-3 py-2.5 text-right text-[11px] font-medium", Math.abs(Number(ls.variancePct || 0)) > 20 ? "text-red-600" : "text-slate-600")}>
+                      {ls.variancePct}%
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-semibold",
+                        ls.riskLevel === "High" ? "bg-red-100 text-red-700" :
+                        ls.riskLevel === "Medium" ? "bg-amber-100 text-amber-700" :
+                        "bg-emerald-100 text-emerald-700")}>{ls.riskLevel}</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">{ls.status}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              {schedules.length > 0 && (
+                <tfoot className="bg-slate-50 border-t-2 border-slate-300">
+                  <tr className="font-semibold text-[11px]">
+                    <td className="px-2 py-2.5" colSpan={5}>
+                      <span className="text-slate-700">TOTAL ({schedules.length} schedules)</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono">{totalOpening.toLocaleString()}</td>
+                    <td className="px-3 py-2.5 text-right font-mono">{totalClosing.toLocaleString()}</td>
+                    <td className={cn("px-3 py-2.5 text-right font-mono", totalVariance < 0 ? "text-red-600" : "text-emerald-600")}>
+                      {totalVariance.toLocaleString()}
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      {totalOpening !== 0 ? ((totalVariance / totalOpening) * 100).toFixed(1) + "%" : "—"}
+                    </td>
+                    <td colSpan={2}></td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AuditChainStage({ chains, summary, loading, leadSchedules, fsNoteMappings, session, onGenerateChain, onUpdateNode, onGenerateLeadSchedules, onGenerateFsNotes, onRefresh, isaLoading, onExportCsv }: any) {
   const [activeSubTab, setActiveSubTab] = useState<"chain" | "lead_schedule" | "fs_notes">("chain");
   const [expandedArea, setExpandedArea] = useState<string | null>(null);
