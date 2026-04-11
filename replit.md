@@ -67,6 +67,8 @@ The project is structured as a monorepo using pnpm workspaces, consisting of a R
 - **Auto Schema Sync**: `deploy/entrypoint.sh` runs `drizzle-kit push` before every app startup to keep DB in sync with schema
 - **Admin credentials**: `admin@calfirm.com` / `Admin@123`
 - **April 2026 Fix**: Added `deleted_at` to all 38 WP tables and missing `wp_session_status` enum values (`wp_listing`, `audit_chain`, `review`) on VPS. Also added `updated_at` to 19 WP/audit tables (`wp_uploaded_files`, `wp_trigger_defs`, `analytics_session`, `evidence_log`, `recon_engine`, `wp_gl_accounts`, etc.) that were missing this column. Root cause: production DB was created from an older schema snapshot. All 36 GET endpoints now return HTTP 200. Future deployments auto-sync via entrypoint.sh → drizzle-kit push.
+- **April 2026 Fix #2**: Fixed `wp_variables` upsert route — INSERT was using non-existent columns (`variableSection`, `dataType`, `mandatoryFlag`) instead of the correct `category` column, causing "Failed to upsert variable" errors when users edited dropdowns/checkboxes on the Data Extraction stage. Also added real-time live field population with 1.5s polling during auto-fill/AI fill, visual highlights on updated fields, and fixed stale-closure + interval-leak bugs.
+- **Deploy process**: Build locally (`pnpm run build` in both `artifacts/api-server` and `artifacts/hrm-system`), copy frontend dist to `artifacts/api-server/dist/public/`, tar the dist, SCP to VPS, `docker cp` + `docker restart ana-backend`.
 
 ## External Dependencies
 
