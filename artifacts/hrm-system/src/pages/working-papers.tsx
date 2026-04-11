@@ -21,7 +21,7 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
-// Pipeline: Upload → Data Extraction → Variables → WP Listing → Lead → WP Generation → Audit Chain → Review → Export
+// Pipeline: Upload → Data Extraction → Variables → WP Listing → Lead → WP Generation → Review → Export
 const STAGES = [
   { key: "upload",        label: "Upload",         icon: Upload,              phase: "facts",    desc: "Download the financial data template, fill it in, and upload the completed file" },
   { key: "extraction",    label: "Data Extraction",icon: Sparkles,            phase: "facts",    desc: "Template-parsed variables — inline review, AI fill, exceptions & confirmation" },
@@ -29,8 +29,6 @@ const STAGES = [
   { key: "wp_listing",    label: "WP Listing",     icon: ClipboardList,       phase: "output",   desc: "AI-recommended WP selection — choose which papers to generate" },
   { key: "lead",          label: "Lead",           icon: Table2,              phase: "output",   desc: "Lead schedules linking WPs to Trial Balance, FS heads, and audit report cross-references" },
   { key: "generation",    label: "WP Generation",  icon: FileCheck,           phase: "output",   desc: "Sequential AI generation of all WP sections (ISA Compliant)" },
-  { key: "audit_chain",   label: "Audit Chain",    icon: Shield,              phase: "audit",    desc: "Risk→Assertion→Procedure→Evidence→Conclusion with ISA clause mapping" },
-
   { key: "export",        label: "Export",         icon: Download,            phase: "output",   desc: "WP Excel · WP Word · Full Audit Bundle" },
 ] as const;
 
@@ -278,9 +276,6 @@ export default function WorkingPapers() {
   const [complianceDocs, setComplianceDocs] = useState<any[]>([]);
   const [complianceLoading, setComplianceLoading] = useState<string | null>(null);
   const [showCompliancePanel, setShowCompliancePanel] = useState(false);
-  const [auditChains, setAuditChains] = useState<any[]>([]);
-  const [auditChainSummary, setAuditChainSummary] = useState<any>(null);
-  const [auditChainLoading, setAuditChainLoading] = useState(false);
   const [reviewNotes, setReviewNotes] = useState<any[]>([]);
   const [reviewSummary, setReviewSummary] = useState<any>(null);
   const [complianceGates, setComplianceGates] = useState<any[]>([]);
@@ -1668,40 +1663,6 @@ export default function WorkingPapers() {
     } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
 
-  const fetchAuditChain = async () => {
-    if (!activeSession) return;
-    try {
-      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/audit-chain`, { headers });
-      if (res.ok) { const data = await res.json(); setAuditChains(data.chains || []); setAuditChainSummary(data.summary || null); }
-    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
-  };
-
-  const generateAuditChain = async (fsArea?: string, useAI?: boolean) => {
-    if (!activeSession) return;
-    setAuditChainLoading(true);
-    try {
-      const endpoint = useAI ? "audit-chain/ai-generate" : "audit-chain/generate";
-      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/${endpoint}`, {
-        method: "POST", headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ fsArea }),
-      });
-      if (res.ok) { toast({ title: "Audit chain generated" }); await fetchAuditChain(); }
-      else { const err = await res.json(); toast({ title: "Failed", description: err.error, variant: "destructive" }); }
-    } catch (e: any) { toast({ title: "Failed", description: e.message, variant: "destructive" }); }
-    finally { setAuditChainLoading(false); }
-  };
-
-  const updateAuditChainNode = async (chainId: number, updates: any) => {
-    if (!activeSession) return;
-    try {
-      const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/audit-chain/${chainId}`, {
-        method: "PUT", headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
-      });
-      if (res.ok) { await fetchAuditChain(); }
-    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
-  };
-
   const fetchReviewNotes = async () => {
     if (!activeSession) return;
     try {
@@ -2250,7 +2211,7 @@ export default function WorkingPapers() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {sessions.map((s: any) => {
-                  const stageOrder = ["upload","extraction","variables","wp_listing","lead","generation","audit_chain","export"];
+                  const stageOrder = ["upload","extraction","variables","wp_listing","lead","generation","export"];
                   const stageIdx = stageOrder.indexOf(s.status);
                   const progressPct = stageIdx < 0 ? 0 : Math.round(((stageIdx + 1) / stageOrder.length) * 100);
                   const isDone = s.status === "completed" || s.status === "exported";
@@ -2372,7 +2333,7 @@ export default function WorkingPapers() {
             {([
               { label: "Facts", keys: ["upload","extraction"] as string[], color: "blue" },
               { label: "Defensible Output", keys: ["wp_listing","generation"] as string[], color: "emerald" },
-              { label: "ISA Audit", keys: ["audit_chain","review"] as string[], color: "violet" },
+              { label: "ISA Audit", keys: ["review"] as string[], color: "violet" },
               { label: "Delivery", keys: ["export"] as string[], color: "amber" },
             ]).map((ph, pi) => {
               const phaseStages = STAGES.filter(s => ph.keys.includes(s.key));
@@ -2426,7 +2387,6 @@ export default function WorkingPapers() {
                     if (s.key === "wp_listing") { fetchWpTriggers(); fetchSession(activeSession.id); }
                     if (s.key === "generation" || s.key === "export") { fetchSession(activeSession.id); fetchExceptions(); }
                     if (s.key === "lead") { fetchLeadSchedules(); }
-                    if (s.key === "audit_chain") { fetchAuditChain(); fetchLeadSchedules(); fetchFsNoteMappings(); }
                   }}
                 >
                   {isPast ? <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" /> : <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
@@ -2452,11 +2412,9 @@ export default function WorkingPapers() {
             { step: "WP Listing",      phase: "output", active: stage === "wp_listing" },
             { step: "Lead",            phase: "output", active: stage === "lead" },
             { step: "WP Generation",   phase: "output", active: stage === "generation" },
-            { step: "Audit Chain",     phase: "audit",  active: stage === "audit_chain" },
-
             { step: "Export",          phase: "output", active: stage === "export" },
           ].map((item, idx) => {
-            const stageOrder = ["upload","extraction","variables","wp_listing","lead","generation","audit_chain","export"];
+            const stageOrder = ["upload","extraction","variables","wp_listing","lead","generation","export"];
             const pastIdx = stageOrder.indexOf(stage);
             const isPast = pastIdx > idx;
             return (
@@ -2727,27 +2685,7 @@ export default function WorkingPapers() {
         />
       )}
 
-      {/* TAB 7 — Audit Chain (Risk→Assertion→Procedure→Evidence→Conclusion) */}
-      {stage === "audit_chain" && (
-        <AuditChainStage
-          chains={auditChains}
-          summary={auditChainSummary}
-          loading={auditChainLoading}
-          leadSchedules={leadSchedules}
-          fsNoteMappings={fsNoteMappings}
-          session={activeSession}
-          onGenerateChain={generateAuditChain}
-          onUpdateNode={updateAuditChainNode}
-          onGenerateLeadSchedules={generateLeadSchedules}
-          onGenerateFsNotes={generateFsNoteMappings}
-          onRefresh={() => { fetchAuditChain(); fetchLeadSchedules(); fetchFsNoteMappings(); }}
-          isaLoading={isaLoading}
-          onExportCsv={exportToCsv}
-        />
-      )}
-
-
-      {/* TAB 9 — Export */}
+      {/* TAB — Export */}
       {stage === "export" && (
         <ExportStage
           heads={heads}
@@ -11727,319 +11665,6 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
   );
 }
 
-function AuditChainStage({ chains, summary, loading, leadSchedules, fsNoteMappings, session, onGenerateChain, onUpdateNode, onGenerateLeadSchedules, onGenerateFsNotes, onRefresh, isaLoading, onExportCsv }: any) {
-  const [activeSubTab, setActiveSubTab] = useState<"chain" | "lead_schedule" | "fs_notes">("chain");
-  const [expandedArea, setExpandedArea] = useState<string | null>(null);
-  const [expandedNode, setExpandedNode] = useState<number | null>(null);
-  const [chainSearch, setChainSearch] = useState("");
-  const [chainTickMarks, setChainTickMarks] = useState<Record<number, string>>({});
-  const [chainTickPicker, setChainTickPicker] = useState<number | null>(null);
-  const { toast: chainToast } = useToast();
-
-  useEffect(() => {
-    if (!session?.id) return;
-    const hdrs: Record<string, string> = {};
-    const tk = localStorage.getItem("hrm_token") || localStorage.getItem("token");
-    if (tk) hdrs["Authorization"] = `Bearer ${tk}`;
-    fetch(`${API_BASE}/working-papers/sessions/${session.id}/tick-marks`, { headers: hdrs })
-      .then(async r => {
-        if (r.ok) {
-          const data = await r.json();
-          const usageMap: Record<number, string> = {};
-          (data.usages || []).forEach((u: any) => {
-            if (u.lineRef?.startsWith("AC-")) {
-              const id = parseInt(u.lineRef.replace("AC-", ""));
-              if (!isNaN(id)) usageMap[id] = u.symbol;
-            }
-          });
-          setChainTickMarks(usageMap);
-        }
-      }).catch(() => {});
-  }, [session?.id]);
-
-  const applyChainTickMark = async (nodeId: number, tm: typeof STANDARD_TICK_MARKS[0], procedureId: string) => {
-    const prev = chainTickMarks[nodeId];
-    setChainTickMarks(p => ({ ...p, [nodeId]: tm.symbol }));
-    try {
-      const hdrs: Record<string, string> = { "Content-Type": "application/json" };
-      const tk = localStorage.getItem("hrm_token") || localStorage.getItem("token");
-      if (tk) hdrs["Authorization"] = `Bearer ${tk}`;
-      const res = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/tick-marks/apply`, {
-        method: "POST", headers: hdrs,
-        body: JSON.stringify({ symbol: tm.symbol, wpCode: procedureId, lineRef: `AC-${nodeId}`, appliedBy: "auditor" }),
-      });
-      if (!res.ok) throw new Error("Failed to save tick mark");
-    } catch (err: any) {
-      setChainTickMarks(p => ({ ...p, [nodeId]: prev || "" }));
-      chainToast({ title: "Tick Mark Error", description: err.message, variant: "destructive" });
-    }
-  };
-  const allChains = chains || [];
-  const filteredChains = chainSearch ? allChains.filter((c: any) => [c.fsArea, c.procedureDescription, c.procedureId, c.procedureIsaRef, c.riskLevel].some(f => f && String(f).toLowerCase().includes(chainSearch.toLowerCase()))) : allChains;
-  const areaGroups: Record<string, any[]> = {};
-  filteredChains.forEach((c: any) => {
-    if (!areaGroups[c.fsArea]) areaGroups[c.fsArea] = [];
-    areaGroups[c.fsArea].push(c);
-  });
-  const areas = Object.keys(areaGroups);
-  const statusColors: Record<string, string> = { planned: "bg-slate-200 text-slate-700", in_progress: "bg-blue-100 text-blue-700", performed: "bg-emerald-100 text-emerald-700", deferred: "bg-amber-100 text-amber-700" };
-  const riskColors: Record<string, string> = { low: "text-emerald-600", medium: "text-amber-600", high: "text-red-600", significant: "text-red-700" };
-
-  return (
-    <div className="space-y-4 p-4 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Shield className="w-5 h-5 text-violet-600" /> ISA Audit Logic Chain</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Risk → Assertion → Procedure → Evidence → Conclusion</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={onRefresh} className="px-3 py-1.5 text-xs bg-slate-100 rounded-lg hover:bg-slate-200"><RefreshCw className="w-3 h-3 inline mr-1" />Refresh</button>
-          {onExportCsv && allChains.length > 0 && (
-            <button onClick={() => onExportCsv(allChains.map((c: any) => ({ Area: c.fsArea, ProcedureID: c.procedureId, Description: c.procedureDescription, ISA_Ref: c.procedureIsaRef, Risk: c.riskLevel, Status: c.procedureStatus, Nature: c.procedureNature, Timing: c.procedureTiming, Conclusion: c.conclusion || "", Exceptions: c.exceptionsFound || 0 })), `audit_chains_${session?.clientName || "export"}.csv`)} className="px-3 py-1.5 text-xs bg-slate-100 rounded-lg hover:bg-slate-200"><Download className="w-3 h-3 inline mr-1" />Export CSV</button>
-          )}
-          <button onClick={() => onGenerateChain(undefined, false)} disabled={loading} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50">
-            {loading ? <Loader2 className="w-3 h-3 animate-spin inline mr-1" /> : <Zap className="w-3 h-3 inline mr-1" />}Generate Chains
-          </button>
-          <button onClick={() => onGenerateChain(undefined, true)} disabled={loading} className="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
-            {loading ? <Loader2 className="w-3 h-3 animate-spin inline mr-1" /> : <Bot className="w-3 h-3 inline mr-1" />}AI Generate
-          </button>
-        </div>
-      </div>
-
-      {allChains.length > 5 && (
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" value={chainSearch} onChange={e => setChainSearch(e.target.value)} placeholder="Search by area, procedure, ISA ref, risk level..." className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none" />
-        </div>
-      )}
-
-      {summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {[
-            { label: "Total Procedures", value: summary.total, color: "blue" },
-            { label: "Completed Chains", value: summary.complete, color: "emerald" },
-            { label: "High Risk", value: summary.byRiskLevel?.high || 0, color: "red" },
-            { label: "Full Assertion Coverage", value: summary.assertionCoverage?.full || 0, color: "violet" },
-            { label: "Exceptions Found", value: summary.exceptionsTotal || 0, color: "amber" },
-          ].map(s => (
-            <div key={s.label} className={`bg-${s.color}-50 border border-${s.color}-200 rounded-xl p-3`}>
-              <p className={`text-2xl font-bold text-${s.color}-700`}>{s.value}</p>
-              <p className={`text-[11px] text-${s.color}-600`}>{s.label}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
-        {[
-          { key: "chain", label: "Audit Logic Chain", icon: Network },
-          { key: "lead_schedule", label: "Lead Schedules", icon: Table2 },
-          { key: "fs_notes", label: "FS Note Mapping", icon: BookOpen },
-        ].map(t => (
-          <button key={t.key} onClick={() => setActiveSubTab(t.key as any)} className={cn("flex-1 px-3 py-2 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-1.5", activeSubTab === t.key ? "bg-white shadow text-slate-900" : "text-slate-500 hover:text-slate-700")}>
-            <t.icon className="w-3.5 h-3.5" />{t.label}
-          </button>
-        ))}
-      </div>
-
-      {activeSubTab === "chain" && (
-        <div className="space-y-3">
-          {areas.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-xl border">
-              <Shield className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 font-medium">No audit chains generated yet</p>
-              <p className="text-sm text-slate-400 mt-1">Upload the financial data template first, then generate chains</p>
-            </div>
-          ) : areas.map(area => (
-            <div key={area} className="bg-white rounded-xl border overflow-hidden">
-              <button onClick={() => setExpandedArea(expandedArea === area ? null : area)} className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className={cn("w-2 h-2 rounded-full", areaGroups[area].every((c: any) => c.chainComplete) ? "bg-emerald-500" : "bg-amber-400")} />
-                  <span className="font-semibold text-sm text-slate-900">{area}</span>
-                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">{areaGroups[area].length} procedures</span>
-                  <span className={cn("text-[11px] font-medium", riskColors[areaGroups[area][0]?.riskLevel || "medium"])}>{(areaGroups[area][0]?.riskLevel || "medium").toUpperCase()} RISK</span>
-                </div>
-                {expandedArea === area ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
-              </button>
-              {expandedArea === area && (
-                <div className="border-t divide-y">
-                  {areaGroups[area].map((node: any) => (
-                    <div key={node.id} className="px-4 py-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[10px] font-mono bg-slate-100 px-1.5 py-0.5 rounded">{node.procedureId}</span>
-                            <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", statusColors[node.procedureStatus || "planned"])}>{(node.procedureStatus || "planned").replace(/_/g, " ")}</span>
-                            <span className="text-[10px] text-violet-600 font-medium">{node.procedureIsaRef}</span>
-                            {(chainTickMarks[node.id] || node.tickMarkCode) && (
-                              <span className="text-base" title={chainTickMarks[node.id] ? STANDARD_TICK_MARKS.find(t => t.symbol === chainTickMarks[node.id])?.meaning : node.tickMarkMeaning}
-                                style={{ color: STANDARD_TICK_MARKS.find(t => t.symbol === (chainTickMarks[node.id] || node.tickMarkCode))?.color }}>
-                                {chainTickMarks[node.id] || node.tickMarkCode}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-slate-800 font-medium">{node.procedureDescription}</p>
-                          <div className="flex flex-wrap gap-3 mt-2 text-[11px] text-slate-500">
-                            <span>Nature: <span className="font-medium text-slate-700">{node.procedureNature}</span></span>
-                            <span>Timing: <span className="font-medium text-slate-700">{node.procedureTiming}</span></span>
-                            {node.evidenceIds?.length > 0 && <span>Evidence: <span className="font-medium text-emerald-600">{node.evidenceIds.length} items</span></span>}
-                            {node.exceptionsFound > 0 && <span>Exceptions: <span className="font-medium text-red-600">{node.exceptionsFound}</span></span>}
-                          </div>
-                          {node.assertions && (
-                            <div className="flex gap-1 mt-2">
-                              {(node.assertions as any[]).map((a: any, ai: number) => (
-                                <span key={ai} className="text-[10px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">{a.code}: {a.name}</span>
-                              ))}
-                            </div>
-                          )}
-                          {node.conclusion && <p className="text-[11px] mt-2 text-slate-600"><span className="font-medium">Conclusion:</span> {node.conclusion} — {node.conclusionNarrative}</p>}
-                        </div>
-                        <div className="flex flex-col gap-1 ml-3 shrink-0">
-                          {node.procedureStatus === "planned" && (
-                            <button onClick={() => onUpdateNode(node.id, { procedureStatus: "in_progress" })} className="text-[10px] px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100">Start</button>
-                          )}
-                          {node.procedureStatus === "in_progress" && (
-                            <button onClick={() => onUpdateNode(node.id, { procedureStatus: "performed", resultSummary: "Procedure performed satisfactorily" })} className="text-[10px] px-2 py-1 bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100">Complete</button>
-                          )}
-                          {node.procedureStatus === "performed" && !node.conclusion && (
-                            <button onClick={() => onUpdateNode(node.id, { conclusion: "satisfactory", conclusionNarrative: "No exceptions noted. Evidence is sufficient and appropriate.", evidenceSufficiency: "sufficient", chainComplete: true })} className="text-[10px] px-2 py-1 bg-violet-50 text-violet-700 rounded hover:bg-violet-100">Conclude</button>
-                          )}
-                          <div className="relative">
-                            <button onClick={() => setChainTickPicker(chainTickPicker === node.id ? null : node.id)}
-                              className="text-[10px] px-2 py-1 bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100 flex items-center gap-0.5" title="Apply tick mark">
-                              {chainTickMarks[node.id] ? (
-                                <span style={{ color: STANDARD_TICK_MARKS.find(t => t.symbol === chainTickMarks[node.id])?.color }}>{chainTickMarks[node.id]}</span>
-                              ) : "✓ Mark"}
-                            </button>
-                            {chainTickPicker === node.id && (
-                              <TickMarkPicker
-                                onSelect={(tm) => applyChainTickMark(node.id, tm, node.procedureId)}
-                                onClose={() => setChainTickPicker(null)}
-                              />
-                            )}
-                          </div>
-                          <button onClick={() => setExpandedNode(expandedNode === node.id ? null : node.id)} className="text-[10px] px-2 py-1 bg-slate-50 text-slate-600 rounded hover:bg-slate-100">
-                            {expandedNode === node.id ? "Less" : "Detail"}
-                          </button>
-                        </div>
-                      </div>
-                      {expandedNode === node.id && (
-                        <div className="mt-3 p-3 bg-slate-50 rounded-lg text-[11px] space-y-2">
-                          <div className="grid grid-cols-2 gap-2">
-                            <div><span className="text-slate-500">Risk ID:</span> <span className="font-mono">{node.riskId}</span></div>
-                            <div><span className="text-slate-500">Risk Type:</span> <span className="font-medium">{node.riskType}</span></div>
-                            <div><span className="text-slate-500">ISA Risk Ref:</span> <span className="text-violet-600">{node.isaRiskRef}</span></div>
-                            <div><span className="text-slate-500">Risk Response:</span> {node.riskResponse}</div>
-                            <div><span className="text-slate-500">Evidence Type:</span> {node.evidenceType || "—"}</div>
-                            <div><span className="text-slate-500">Evidence Reliability:</span> {node.evidenceReliability || "—"}</div>
-                            <div><span className="text-slate-500">Sufficiency:</span> {node.evidenceSufficiency || "—"}</div>
-                            <div><span className="text-slate-500">Assertion Coverage:</span> {node.assertionCoverage}</div>
-                          </div>
-                          {node.riskDescription && <div><span className="text-slate-500">Risk Description:</span> {node.riskDescription}</div>}
-                          {node.procedureIsaClause && <div><span className="text-slate-500">ISA Clause:</span> <span className="italic">{node.procedureIsaClause}</span></div>}
-                          {node.impactOnOpinion && <div><span className="text-slate-500">Impact on Opinion:</span> <span className="font-medium text-red-600">{node.impactOnOpinion}</span></div>}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-          {areas.length > 0 && (
-            <TickMarkLegend tickMarks={STANDARD_TICK_MARKS} />
-          )}
-        </div>
-      )}
-
-      {activeSubTab === "lead_schedule" && (
-        <div className="space-y-3">
-          <div className="flex justify-end gap-2">
-            {onExportCsv && (leadSchedules || []).length > 0 && (
-              <button onClick={() => onExportCsv((leadSchedules || []).map((ls: any) => ({ Ref: ls.scheduleRef, WPArea: ls.wpArea, MajorHead: ls.majorHead, NoteNo: ls.noteNo, OpeningBalance: ls.openingBalance, ClosingBalance: ls.closingBalance, Variance: ls.variance, VariancePct: ls.variancePct, Risk: ls.riskLevel, Status: ls.status })), `lead_schedules_${session?.clientName || "export"}.csv`)} className="px-3 py-1.5 text-xs bg-slate-100 rounded-lg hover:bg-slate-200"><Download className="w-3 h-3 inline mr-1" />Export CSV</button>
-            )}
-            <button onClick={onGenerateLeadSchedules} disabled={isaLoading} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50">
-              {isaLoading ? <Loader2 className="w-3 h-3 animate-spin inline mr-1" /> : <Table2 className="w-3 h-3 inline mr-1" />}Generate Lead Schedules
-            </button>
-          </div>
-          {(leadSchedules || []).length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-xl border">
-              <Table2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 font-medium">No lead schedules generated</p>
-              <p className="text-sm text-slate-400 mt-1">Generate from uploaded trial balance data</p>
-            </div>
-          ) : (
-            <div className="bg-white rounded-xl border overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-slate-50 border-b">
-                    <tr>
-                      {["Ref", "WP Area", "Major Head", "Note", "Opening", "Closing", "Variance", "Var %", "Risk", "Status"].map(h => (
-                        <th key={h} className="px-3 py-2 text-left font-semibold text-slate-600">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {(leadSchedules || []).map((ls: any) => (
-                      <tr key={ls.id} className="hover:bg-slate-50">
-                        <td className="px-3 py-2 font-mono text-violet-600">{ls.scheduleRef}</td>
-                        <td className="px-3 py-2 font-medium">{ls.wpArea}</td>
-                        <td className="px-3 py-2">{ls.majorHead}</td>
-                        <td className="px-3 py-2">{ls.noteNo}</td>
-                        <td className="px-3 py-2 text-right font-mono">{Number(ls.openingBalance || 0).toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right font-mono">{Number(ls.closingBalance || 0).toLocaleString()}</td>
-                        <td className={cn("px-3 py-2 text-right font-mono", Number(ls.variance || 0) < 0 ? "text-red-600" : "text-emerald-600")}>{Number(ls.variance || 0).toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right">{ls.variancePct}%</td>
-                        <td className="px-3 py-2"><span className={cn("text-[10px] px-1.5 py-0.5 rounded-full", ls.riskLevel === "High" ? "bg-red-100 text-red-700" : ls.riskLevel === "Medium" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700")}>{ls.riskLevel}</span></td>
-                        <td className="px-3 py-2"><span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100">{ls.status}</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeSubTab === "fs_notes" && (
-        <div className="space-y-3">
-          <div className="flex justify-end gap-2">
-            {onExportCsv && (fsNoteMappings || []).length > 0 && (
-              <button onClick={() => onExportCsv((fsNoteMappings || []).map((nm: any) => ({ NoteNo: nm.noteNo, Title: nm.noteTitle, CurrentYear: nm.totalCY, PriorYear: nm.totalPY, Variance: nm.variance, Status: nm.disclosureStatus, Accounts: (nm.tbAccountCodes || []).join("; ") })), `fs_note_mappings_${session?.clientName || "export"}.csv`)} className="px-3 py-1.5 text-xs bg-slate-100 rounded-lg hover:bg-slate-200"><Download className="w-3 h-3 inline mr-1" />Export CSV</button>
-            )}
-            <button onClick={onGenerateFsNotes} disabled={isaLoading} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50">
-              {isaLoading ? <Loader2 className="w-3 h-3 animate-spin inline mr-1" /> : <BookOpen className="w-3 h-3 inline mr-1" />}Generate FS Note Mapping
-            </button>
-          </div>
-          {(fsNoteMappings || []).length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-xl border">
-              <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 font-medium">No FS note mappings generated</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {(fsNoteMappings || []).map((nm: any) => (
-                <div key={nm.id} className="bg-white rounded-xl border p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold text-sm text-slate-900">Note {nm.noteNo}: {nm.noteTitle}</h4>
-                    <span className={cn("text-[10px] px-2 py-0.5 rounded-full", nm.disclosureStatus === "finalized" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600")}>{nm.disclosureStatus}</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div className="bg-blue-50 rounded p-2"><p className="text-blue-600 text-[10px]">Current Year</p><p className="font-bold text-blue-800">PKR {Number(nm.totalCY || 0).toLocaleString()}</p></div>
-                    <div className="bg-slate-50 rounded p-2"><p className="text-slate-500 text-[10px]">Prior Year</p><p className="font-bold text-slate-700">PKR {Number(nm.totalPY || 0).toLocaleString()}</p></div>
-                    <div className={cn("rounded p-2", Number(nm.variance || 0) >= 0 ? "bg-emerald-50" : "bg-red-50")}><p className="text-[10px]">Variance</p><p className={cn("font-bold", Number(nm.variance || 0) >= 0 ? "text-emerald-700" : "text-red-700")}>PKR {Number(nm.variance || 0).toLocaleString()}</p></div>
-                  </div>
-                  {nm.tbAccountCodes && <p className="text-[10px] text-slate-400 mt-2">Accounts: {(nm.tbAccountCodes as string[]).join(", ")}</p>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─── Compliance Documents Panel ──────────────────────────────────────────────
 function ComplianceDocsPanel({ docs, complianceLoading, onGenerate, onSign, onUpdateItem, session }: any) {
