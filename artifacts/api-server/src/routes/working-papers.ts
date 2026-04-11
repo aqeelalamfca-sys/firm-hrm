@@ -7401,10 +7401,22 @@ router.post("/seed-wp-library", async (_req: Request, res: Response) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /wp-library  — Browse full library with optional filters
 // Query params: family, phase, mandatory, search, entityType, industry, risk, fsHead
+// Falls back to in-memory WP_LIBRARY seed when DB table is empty
 // ─────────────────────────────────────────────────────────────────────────────
 router.get("/wp-library", async (req: Request, res: Response) => {
   try {
-    const all = await db.select().from(wpLibraryMasterTable).orderBy(asc(wpLibraryMasterTable.displayOrder));
+    let all = await db.select().from(wpLibraryMasterTable).orderBy(asc(wpLibraryMasterTable.displayOrder));
+
+    if (all.length === 0) {
+      all = WP_LIBRARY.map((wp, idx) => ({
+        ...wp,
+        id: idx + 1,
+        displayOrder: wp.displayOrder ?? idx + 1,
+        mandatoryFlag: wp.mandatoryFlag ?? false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })) as any;
+    }
 
     const { family, phase, mandatory, search, entityType, industry, risk, fsHead } = req.query as Record<string, string>;
 

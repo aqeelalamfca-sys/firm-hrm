@@ -4848,7 +4848,7 @@ function AuditEngineStage({
   const [libSeeding, setLibSeeding] = useState(false);
   const [libSearch, setLibSearch] = useState("");
   const [libFamily, setLibFamily] = useState("");
-  const [libView, setLibView] = useState<"browse" | "session">("session");
+  const [libView, setLibView] = useState<"browse" | "session">("browse");
   const [libActivationResult, setLibActivationResult] = useState<any>(null);
   const [libSeedResult, setLibSeedResult] = useState<any>(null);
 
@@ -5614,7 +5614,7 @@ function AuditEngineStage({
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <h3 className="text-base font-bold flex items-center gap-2"><BookOpen className="w-5 h-5 text-violet-300" /> ISA WORKING PAPER LIBRARY</h3>
-                <p className="text-indigo-200 text-xs mt-0.5">IAASB 2025 Handbook · ISAs as applicable in Pakistan (ICAP) · 240+ papers · 14 code families · A–N + Z</p>
+                <p className="text-indigo-200 text-xs mt-0.5">IAASB 2025 Handbook · ISAs as applicable in Pakistan (ICAP) · {wpLibrary.length || "385+"} papers · 14 code families · A–N + Z</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="text-center px-3 py-1.5 bg-white/10 rounded-lg">
@@ -5640,7 +5640,7 @@ function AuditEngineStage({
             <div className="flex gap-2 mt-4 flex-wrap">
               <button onClick={seedLibrary} disabled={libSeeding} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 rounded-lg text-xs font-medium transition-colors disabled:opacity-60">
                 {libSeeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookOpen className="w-3.5 h-3.5" />}
-                {libSeeding ? "Seeding..." : "Seed Library (240 papers)"}
+                {libSeeding ? "Seeding..." : "Seed Library to DB"}
               </button>
               <button onClick={activateLibrary} disabled={libActivating} className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-500 hover:bg-violet-400 rounded-lg text-xs font-medium transition-colors disabled:opacity-60">
                 {libActivating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
@@ -5683,7 +5683,7 @@ function AuditEngineStage({
                 <span className="flex items-center gap-1.5"><Zap className="w-3 h-3" />Session WPs ({sessionLibrary.length})</span>
               </button>
               <button onClick={() => setLibView("browse")} className={cn("px-3 py-1.5 text-xs font-medium transition-colors", libView === "browse" ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}>
-                <span className="flex items-center gap-1.5"><BookOpen className="w-3 h-3" />Full Library ({wpLibrary.length || "240+"})</span>
+                <span className="flex items-center gap-1.5"><BookOpen className="w-3 h-3" />Full Library ({wpLibrary.length || "..."})</span>
               </button>
             </div>
 
@@ -5738,9 +5738,9 @@ function AuditEngineStage({
                 <div className="py-14 text-center border border-dashed border-slate-200 rounded-2xl">
                   <BookOpen className="w-10 h-10 text-slate-200 mx-auto mb-3" />
                   <p className="text-slate-500 text-sm font-medium">Library not seeded</p>
-                  <p className="text-slate-400 text-xs mt-1 mb-4">Click "Seed Library" to load all 384+ ISA/ICAP papers into the database</p>
-                  <button onClick={seedLibrary} disabled={libSeeding} className="px-4 py-2 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-1.5 mx-auto">
-                    {libSeeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookOpen className="w-3.5 h-3.5" />}Seed Library (384+ papers)
+                  <p className="text-slate-400 text-xs mt-1 mb-4">Loading all ISA/ICAP papers...</p>
+                  <button onClick={fetchWpLibrary} disabled={libLoading} className="px-4 py-2 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-1.5 mx-auto">
+                    {libLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookOpen className="w-3.5 h-3.5" />}Load Full Library
                   </button>
                 </div>
               ) : (
