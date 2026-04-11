@@ -145,9 +145,15 @@ export default function WorkingPapers() {
   const headers: Record<string, string> = getToken() ? { Authorization: `Bearer ${getToken()}` } : {};
   const [showBackConfirm, setShowBackConfirm] = useState(false);
   const [extractionStep, setExtractionStep] = useState<string>("");
+  const [filling, setFilling] = useState(false);
+  const fillingRef = useRef(false);
+  const [recentlyUpdatedVars, setRecentlyUpdatedVars] = useState<Set<string>>(new Set());
+  const [fillProgress, setFillProgress] = useState<{ filled: number; total: number; label: string }>({ filled: 0, total: 0, label: "" });
+  const prevVarSnapshotRef = useRef<Record<string, string>>({});
 
   const [sessions, setSessions] = useState<any[]>([]);
   const [activeSession, setActiveSession] = useState<any>(null);
+  useEffect(() => { prevVarSnapshotRef.current = {}; setRecentlyUpdatedVars(new Set()); }, [activeSession?.id]);
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState<string>("upload");
 
@@ -1037,7 +1043,9 @@ export default function WorkingPapers() {
   const autoFillVariables = async () => {
     if (!activeSession) return;
     try {
-      setLoading(true);
+      setFilling(true); fillingRef.current = true;
+      setFillProgress({ filled: 0, total: 0, label: "Auto-populating from session data…" });
+      startFillPolling();
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/variables/auto-fill`, {
         method: "POST", headers: { ...headers, "Content-Type": "application/json" },
       });
@@ -1047,25 +1055,29 @@ export default function WorkingPapers() {
           title: `Variables Populated`,
           description: result.message || `${result.created} created, ${result.updated} updated from template data.`
         });
+        setFillProgress(p => ({ ...p, label: "Auto-fill complete" }));
       }
-      // Always fetch — template-filled variables may already be in DB even if auto-fill fails
       await fetchVariables();
-    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); } finally { setLoading(false); }
+    } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); } finally { stopFillPolling(); setFilling(false); fillingRef.current = false; }
   };
 
   const handleAiFill = async () => {
     if (!activeSession) return;
     try {
       setLoading(true);
+      setFilling(true); fillingRef.current = true;
+      setFillProgress({ filled: 0, total: 0, label: "AI reading documents and filling variables…" });
+      startFillPolling();
       toast({
         title: "AI Fill in progress…",
-        description: "Reading all uploaded documents and filling missing variables. This may take 30–60 seconds.",
+        description: "Reading all uploaded documents and filling missing variables. Fields will update live.",
       });
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/variables/ai-fill`, {
         method: "POST", headers: { ...headers, "Content-Type": "application/json" },
       });
       if (res.ok) {
         const result = await res.json();
+        setFillProgress(p => ({ ...p, label: "AI Fill complete" }));
         await fetchVariables();
         toast({
           title: `AI Fill complete`,
@@ -1083,7 +1095,7 @@ export default function WorkingPapers() {
       }
     } catch (e: any) {
       toast({ title: "AI Fill failed", description: e?.message || "Network error", variant: "destructive" });
-    } finally { setLoading(false); }
+    } finally { stopFillPolling(); setFilling(false); fillingRef.current = false; setLoading(false); }
   };
 
   const fetchVariables = async () => {
@@ -1092,13 +1104,53 @@ export default function WorkingPapers() {
       const res = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/variables`, { headers });
       if (res.ok) {
         const data = await res.json();
-        setVariables(data.variables || []);
+        const newVars = data.variables || [];
+        const oldSnap = prevVarSnapshotRef.current;
+        const justUpdated = new Set<string>();
+        let filledCount = 0;
+        for (const v of newVars) {
+          const code = v.variableCode;
+          const val = v.finalValue || "";
+          if (val && val !== "N/A" && val.trim()) filledCount++;
+          if (oldSnap[code] !== undefined && oldSnap[code] !== val && val && val !== "N/A") {
+            justUpdated.add(code);
+          }
+        }
+        if (justUpdated.size > 0) {
+          setRecentlyUpdatedVars(prev => {
+            const merged = new Set(prev);
+            justUpdated.forEach(c => merged.add(c));
+            return merged;
+          });
+          setTimeout(() => {
+            setRecentlyUpdatedVars(prev => {
+              const next = new Set(prev);
+              justUpdated.forEach(c => next.delete(c));
+              return next;
+            });
+          }, 3000);
+        }
+        const newSnap: Record<string, string> = {};
+        for (const v of newVars) newSnap[v.variableCode] = v.finalValue || "";
+        prevVarSnapshotRef.current = newSnap;
+        if (fillingRef.current) setFillProgress(p => ({ ...p, filled: filledCount }));
+        setVariables(newVars);
         setVariableGroups(data.grouped || {});
         setVariableStats(data.stats || null);
         setChangeLog(data.changeLog || []);
       }
     } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
   };
+
+  const fillPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startFillPolling = () => {
+    if (fillPollRef.current) clearInterval(fillPollRef.current);
+    fillPollRef.current = setInterval(() => { fetchVariables(); }, 1500);
+  };
+  const stopFillPolling = () => {
+    if (fillPollRef.current) { clearInterval(fillPollRef.current); fillPollRef.current = null; }
+  };
+  useEffect(() => () => stopFillPolling(), []);
 
   const saveVariableEdit = async (varId: number) => {
     if (!activeSession) return;
@@ -1406,6 +1458,9 @@ export default function WorkingPapers() {
     finally { setDownloadingHeads(prev => { const s = new Set(prev); s.delete(headIndex); return s; }); }
   };
 
+  const autoProcessPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => () => { if (autoProcessPollRef.current) clearInterval(autoProcessPollRef.current); }, []);
+
   const autoProcessAll = async () => {
     if (!activeSession) return;
     try {
@@ -1416,17 +1471,16 @@ export default function WorkingPapers() {
       });
       const data = await res.json();
       if (res.status === 202 || res.ok) {
-        // Fire-and-forget: poll for completion
         let pollCount = 0;
-        const pollInterval = setInterval(async () => {
+        if (autoProcessPollRef.current) clearInterval(autoProcessPollRef.current);
+        autoProcessPollRef.current = setInterval(async () => {
           pollCount++;
           try {
             await fetchSession(activeSession.id);
             await fetchExceptions();
           } catch (err: any) { toast?.({ title: "Operation failed", description: err?.message || "An error occurred", variant: "destructive" }); }
-          // Stop polling after 10 minutes (40 × 15s) or if all heads approved
           if (pollCount >= 40) {
-            clearInterval(pollInterval);
+            if (autoProcessPollRef.current) { clearInterval(autoProcessPollRef.current); autoProcessPollRef.current = null; }
             setLoading(false);
             toast({ title: "Processing Complete", description: "All heads have been processed. Check the status above." });
           }
@@ -2488,6 +2542,9 @@ export default function WorkingPapers() {
           onAiFill={handleAiFill}
           onOpenAiSettings={() => setShowAiSettings(true)}
           loading={loading || parseLoading}
+          filling={filling}
+          fillProgress={fillProgress}
+          recentlyUpdatedVars={recentlyUpdatedVars}
           confidenceBadge={confidenceBadge}
           onSaveVariable={saveVariableDirect}
           onUpsertVariable={upsertVariable}
@@ -2522,6 +2579,9 @@ export default function WorkingPapers() {
           onFetch={fetchVariables}
           onLockAll={lockAllVariables}
           loading={loading}
+          filling={filling}
+          fillProgress={fillProgress}
+          recentlyUpdatedVars={recentlyUpdatedVars}
           confidenceBadge={confidenceBadge}
           onNext={async () => {
             try {
@@ -3834,7 +3894,7 @@ function TemplateParsedPanel({ result, onClear }: { result: any; onClear: () => 
   );
 }
 
-function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun, onAiFill, onOpenAiSettings, loading, confidenceBadge, onSaveVariable, onUpsertVariable, fsLines, onAddFsLine, onUpdateFsLine, onDeleteFsLine, onFetchFsLines, onNext }: any) {
+function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun, onAiFill, onOpenAiSettings, loading, filling, fillProgress, recentlyUpdatedVars, confidenceBadge, onSaveVariable, onUpsertVariable, fsLines, onAddFsLine, onUpdateFsLine, onDeleteFsLine, onFetchFsLines, onNext }: any) {
   const { toast } = useToast();
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editVal, setEditVal] = useState("");
@@ -3987,13 +4047,19 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
   ];
   const RISK_LEVELS = ["Low","Medium","High","Not Applicable"];
 
+  const isLiveUpdated = (code: string) => recentlyUpdatedVars?.has(code);
+
   const TextField = ({ code, label, placeholder }: { code: string; label: string; placeholder?: string }) => {
     const val = varVal(code);
     const isEditing = editingField === code;
     const isSaved = savedFields.has(code);
+    const isLive = isLiveUpdated(code);
     return (
       <div className="flex flex-col gap-1">
-        <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{label}</label>
+        <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+          {label}
+          {isLive && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+        </label>
         {isEditing ? (
           <div className="flex gap-1">
             <Input className="h-8 text-xs" value={editVal} onChange={e => setEditVal(e.target.value)} autoFocus
@@ -4002,10 +4068,11 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
             <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setEditingField(null)}><X className="w-3 h-3" /></Button>
           </div>
         ) : (
-          <div className={cn("h-8 px-2.5 flex items-center rounded-md border bg-white cursor-pointer transition-colors text-xs text-slate-800",
+          <div className={cn("h-8 px-2.5 flex items-center rounded-md border bg-white cursor-pointer transition-all duration-500 text-xs text-slate-800",
+            isLive ? "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200 shadow-sm shadow-emerald-100" :
             isSaved ? "border-emerald-400 bg-emerald-50" : "border-slate-200 hover:border-indigo-300")}
             onClick={() => { setEditingField(code); setEditVal(val); }}>
-            {isSaved ? <Check className="w-3 h-3 text-emerald-500 mr-1.5 shrink-0" /> : null}
+            {(isSaved || isLive) ? <Check className="w-3 h-3 text-emerald-500 mr-1.5 shrink-0" /> : null}
             {val || <span className="text-slate-300 italic">{placeholder || "Click to enter"}</span>}
           </div>
         )}
@@ -4016,20 +4083,25 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
   const DropdownField = ({ code, label, options }: { code: string; label: string; options: string[] }) => {
     const val = varVal(code);
     const isSaved = savedFields.has(code);
+    const isLive = isLiveUpdated(code);
     const effectiveOptions = val && !options.includes(val) ? [val, ...options] : options;
     return (
       <div className="flex flex-col gap-1">
-        <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{label}</label>
+        <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+          {label}
+          {isLive && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+        </label>
         <div className="relative">
           <select
-            className={cn("h-8 w-full px-2 rounded-md border text-xs text-slate-800 cursor-pointer transition-colors appearance-none pr-7",
+            className={cn("h-8 w-full px-2 rounded-md border text-xs text-slate-800 cursor-pointer transition-all duration-500 appearance-none pr-7",
+              isLive ? "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200 shadow-sm shadow-emerald-100" :
               isSaved ? "border-emerald-400 bg-emerald-50" : "border-slate-200 bg-white hover:border-indigo-300")}
             value={val}
             onChange={async e => { await saveByCode(code, e.target.value, "Dropdown selection"); }}>
             <option value="">— Select —</option>
             {effectiveOptions.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
-          {isSaved && <Check className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-emerald-500 pointer-events-none" />}
+          {(isSaved || isLive) && <Check className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-emerald-500 pointer-events-none" />}
         </div>
       </div>
     );
@@ -4038,16 +4110,21 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
   const DateField = ({ code, label }: { code: string; label: string }) => {
     const val = varVal(code);
     const isSaved = savedFields.has(code);
+    const isLive = isLiveUpdated(code);
     return (
       <div className="flex flex-col gap-1">
-        <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{label}</label>
+        <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+          {label}
+          {isLive && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+        </label>
         <div className="relative">
           <input type="date"
-            className={cn("h-8 w-full px-2 rounded-md border text-xs text-slate-800 cursor-pointer transition-colors",
+            className={cn("h-8 w-full px-2 rounded-md border text-xs text-slate-800 cursor-pointer transition-all duration-500",
+              isLive ? "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200 shadow-sm shadow-emerald-100" :
               isSaved ? "border-emerald-400 bg-emerald-50" : "border-slate-200 bg-white hover:border-indigo-300")}
             value={val}
             onChange={async e => { await saveByCode(code, e.target.value, "Date selection"); }} />
-          {isSaved && <Check className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-emerald-500 pointer-events-none" />}
+          {(isSaved || isLive) && <Check className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-emerald-500 pointer-events-none" />}
         </div>
       </div>
     );
@@ -4057,12 +4134,15 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
     const val = varVal(code);
     const checked = val === "true" || val === "1" || val === "yes";
     const isSaved = savedFields.has(code);
+    const isLive = isLiveUpdated(code);
     return (
-      <label className="flex items-center gap-2 cursor-pointer group">
+      <label className={cn("flex items-center gap-2 cursor-pointer group rounded-md px-1 py-0.5 transition-all duration-500",
+        isLive ? "bg-emerald-50 ring-1 ring-emerald-200" : "")}>
         <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
           checked={checked} onChange={async e => { await saveByCode(code, e.target.checked ? "true" : "false", "Checkbox toggle"); }} />
-        <span className={cn("text-xs transition-colors", isSaved ? "text-emerald-600" : "text-slate-700 group-hover:text-indigo-700")}>{label}</span>
-        {isSaved && <Check className="w-3 h-3 text-emerald-500" />}
+        <span className={cn("text-xs transition-colors", (isSaved || isLive) ? "text-emerald-600" : "text-slate-700 group-hover:text-indigo-700")}>{label}</span>
+        {(isSaved || isLive) && <Check className="w-3 h-3 text-emerald-500" />}
+        {isLive && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
       </label>
     );
   };
@@ -4071,10 +4151,15 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
     const val = varVal(code);
     const on = val === "true" || val === "1" || val === "yes";
     const isSaved = savedFields.has(code);
+    const isLive = isLiveUpdated(code);
     return (
-      <div className={cn("flex items-center justify-between gap-2 px-3 py-2 rounded-lg border transition-colors",
+      <div className={cn("flex items-center justify-between gap-2 px-3 py-2 rounded-lg border transition-all duration-500",
+        isLive ? "border-emerald-300 bg-emerald-50 ring-2 ring-emerald-200 shadow-sm shadow-emerald-100" :
         isSaved ? "border-emerald-300 bg-emerald-50" : "border-slate-100 bg-white hover:border-indigo-200")}>
-        <span className="text-xs text-slate-700">{label}</span>
+        <span className="text-xs text-slate-700 flex items-center gap-1">
+          {label}
+          {isLive && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+        </span>
         <button className={cn("relative w-10 h-5 rounded-full transition-colors", on ? "bg-indigo-600" : "bg-slate-200")}
           onClick={async () => { await saveByCode(code, on ? "false" : "true", "Toggle"); }}>
           <span className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform", on ? "translate-x-5" : "translate-x-0.5")} />
@@ -4130,6 +4215,27 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
   return (
     <div className="space-y-4">
 
+      {filling && (
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-5 py-3.5 shadow-lg">
+          <div className="absolute inset-0 opacity-10 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgNDAgMTAgTSAxMCAwIEwgMTAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')]" />
+          <div className="relative flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-white/15 backdrop-blur flex items-center justify-center shrink-0">
+              <Loader2 className="w-5 h-5 animate-spin text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <p className="text-sm font-bold">Live Field Population</p>
+                <span className="px-2 py-0.5 bg-white/20 rounded-full text-[9px] font-bold uppercase tracking-wider animate-pulse">Live</span>
+              </div>
+              <p className="text-xs text-emerald-100">{fillProgress.label}</p>
+              {fillProgress.filled > 0 && (
+                <p className="text-[10px] text-emerald-200 mt-0.5 tabular-nums">{fillProgress.filled} fields populated — fields update in real time below</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
@@ -4137,17 +4243,17 @@ function ExtractionStage({ data, session, variables, onRefreshVariables, onRerun
           </div>
           <div>
             <p className="font-semibold text-sm text-slate-900">Data Extraction & Input Fields</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Complete all fields below. Dropdowns and checkboxes control WP applicability and generation logic.</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">All fields are editable. Dropdowns and checkboxes control WP applicability and generation logic.</p>
           </div>
         </div>
         <div className="flex gap-2 shrink-0 flex-wrap">
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onRerun} disabled={loading}>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onRerun} disabled={filling}>
             <RefreshCw className={cn("w-3 h-3 mr-1", loading && "animate-spin")} /> Re-extract
           </Button>
-          <Button size="sm" className="h-7 text-xs bg-violet-600 hover:bg-violet-700 shadow-sm" onClick={onAiFill} disabled={loading}>
-            {loading ? <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Filling...</> : <><Sparkles className="w-3 h-3 mr-1" /> AI Fill</>}
+          <Button size="sm" className="h-7 text-xs bg-violet-600 hover:bg-violet-700 shadow-sm" onClick={onAiFill} disabled={filling}>
+            {filling ? <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Filling...</> : <><Sparkles className="w-3 h-3 mr-1" /> AI Fill</>}
           </Button>
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onRefreshVariables} disabled={loading}>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onRefreshVariables} disabled={filling}>
             <RefreshCw className="w-3 h-3 mr-1" /> Refresh
           </Button>
         </div>
@@ -6709,7 +6815,7 @@ const IMMEDIATE_SAVE_MODES = new Set([
   "radio", "date", "time", "datetime",
 ]);
 
-function VariableRow({ v, onSaveDirect, confidenceBadge }: any) {
+function VariableRow({ v, onSaveDirect, confidenceBadge, isLiveUpdated }: any) {
   const def = v.definition;
   const inputMode = def?.inputMode || "text";
   const isMandatory = def?.mandatoryFlag;
@@ -6784,18 +6890,20 @@ function VariableRow({ v, onSaveDirect, confidenceBadge }: any) {
   };
 
   // Row styling
-  const rowBg = isLocked          ? "bg-slate-50/50"
-    : isEmpty && isMandatory       ? "bg-red-50/30"
-    : isLowConf                    ? "bg-amber-50/20"
-    : isPrimaryFilled              ? "bg-emerald-50/10"
-    : isSecondaryCalc              ? "bg-indigo-50/10"
+  const rowBg = isLiveUpdated          ? "bg-emerald-50 ring-1 ring-emerald-200 shadow-sm shadow-emerald-50"
+    : isLocked                         ? "bg-slate-50/50"
+    : isEmpty && isMandatory           ? "bg-red-50/30"
+    : isLowConf                        ? "bg-amber-50/20"
+    : isPrimaryFilled                  ? "bg-emerald-50/10"
+    : isSecondaryCalc                  ? "bg-indigo-50/10"
     : "bg-white";
 
-  const leftAccent = isLocked          ? "border-l-2 border-l-slate-300"
-    : isEmpty && isMandatory           ? "border-l-2 border-l-red-400"
-    : isPrimaryFilled                  ? "border-l-2 border-l-emerald-400"
-    : isSecondaryCalc                  ? "border-l-2 border-l-indigo-400"
-    : isAiFilled                       ? "border-l-2 border-l-blue-300"
+  const leftAccent = isLiveUpdated          ? "border-l-2 border-l-emerald-500"
+    : isLocked                              ? "border-l-2 border-l-slate-300"
+    : isEmpty && isMandatory                ? "border-l-2 border-l-red-400"
+    : isPrimaryFilled                       ? "border-l-2 border-l-emerald-400"
+    : isSecondaryCalc                       ? "border-l-2 border-l-indigo-400"
+    : isAiFilled                            ? "border-l-2 border-l-blue-300"
     : "border-l-2 border-l-transparent";
 
   const groupLabel = (def?.variableGroup || "Other").replace(/_/g, " ");
@@ -6811,9 +6919,10 @@ function VariableRow({ v, onSaveDirect, confidenceBadge }: any) {
       {/* Variable name + status badge + source badge */}
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-1.5 flex-wrap">
-          <p className="text-[12.5px] font-medium text-slate-800 leading-tight">
+          <p className="text-[12.5px] font-medium text-slate-800 leading-tight flex items-center gap-1">
             {def?.variableLabel || (v.variableName || "").replace(/_/g, " ")}
             {isMandatory && <span className="ml-1 text-red-500 text-[10px]" title="Required">*</span>}
+            {isLiveUpdated && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" title="Just updated" />}
           </p>
           {statusKey && (
             <span className={cn(
@@ -6870,7 +6979,7 @@ function VariableRow({ v, onSaveDirect, confidenceBadge }: any) {
   );
 }
 
-function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDirect, onAiFill, onFetch, onLockAll, loading, confidenceBadge, onNext }: any) {
+function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDirect, onAiFill, onFetch, onLockAll, loading, filling, fillProgress, recentlyUpdatedVars, confidenceBadge, onNext }: any) {
   const [search, setSearch]           = useState("");
   const [filter, setFilter]           = useState<string>("all");
   const [showAuditTrail, setShowAuditTrail] = useState(false);
@@ -6959,6 +7068,26 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
 
   return (
     <div className="space-y-4">
+
+      {filling && (
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-5 py-3.5 shadow-lg">
+          <div className="relative flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-white/15 backdrop-blur flex items-center justify-center shrink-0">
+              <Loader2 className="w-5 h-5 animate-spin text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <p className="text-sm font-bold">Live Variable Population</p>
+                <span className="px-2 py-0.5 bg-white/20 rounded-full text-[9px] font-bold uppercase tracking-wider animate-pulse">Live</span>
+              </div>
+              <p className="text-xs text-emerald-100">{fillProgress?.label || "Filling variables…"}</p>
+              {fillProgress?.filled > 0 && (
+                <p className="text-[10px] text-emerald-200 mt-0.5 tabular-nums">{fillProgress.filled} variables populated so far</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Stat tiles ── */}
       <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
@@ -7130,7 +7259,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
               <button onClick={() => { setFilter("all"); setSearch(""); }} className="text-xs text-blue-600 underline mt-1">Clear filter</button>
             </div>
           ) : filteredVars.map((v: any) => (
-            <VariableRow key={v.id} v={v} onSaveDirect={onSaveDirect} confidenceBadge={confidenceBadge} />
+            <VariableRow key={v.id} v={v} onSaveDirect={onSaveDirect} confidenceBadge={confidenceBadge} isLiveUpdated={recentlyUpdatedVars?.has(v.variableCode)} />
           ))}
         </div>
 
