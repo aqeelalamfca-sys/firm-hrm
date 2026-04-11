@@ -11026,9 +11026,9 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
         </div>
       ) : (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div className="overflow-x-auto max-h-[65vh] overflow-y-auto">
+          <div className="overflow-x-auto">
             <table className="w-full text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
+              <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="text-center px-2 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-8">#</th>
                   <th className="text-left px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-20">Ref</th>
