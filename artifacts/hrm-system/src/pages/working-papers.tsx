@@ -2659,11 +2659,17 @@ export default function WorkingPapers() {
           onAutoProcessAll={autoProcessAll}
           onResolveException={resolveException}
           loading={loading}
-          onRefresh={() => { fetchSession(activeSession.id); fetchExceptions(); }}
+          onRefresh={() => { fetchSession(activeSession.id); fetchExceptions(); fetchComplianceDocs(); }}
           autoChainRunning={autoChainRunning}
           autoChainCurrentHead={autoChainCurrentHead}
           onStopChain={stopChain}
           onBulkApprove={bulkApproveHeads}
+          complianceDocs={complianceDocs}
+          complianceLoading={complianceLoading}
+          onGenerateComplianceDoc={generateComplianceDoc}
+          onSignComplianceDoc={signComplianceDoc}
+          onUpdateChecklistItem={updateChecklistItem}
+          onRefreshCompliance={() => fetchComplianceDocs()}
           onNext={async () => {
             try {
               const statusRes = await fetch(`${API_BASE}/working-papers/sessions/${activeSession.id}/status`, {
@@ -7292,7 +7298,7 @@ function VariablesStage({ variables, grouped, stats, changeLog, onSave, onSaveDi
   );
 }
 
-function GenerationStage({ session, onNext, ...legacyProps }: any) {
+function GenerationStage({ session, onNext, complianceDocs, complianceLoading, onGenerateComplianceDoc, onSignComplianceDoc, onUpdateChecklistItem, onRefreshCompliance, ...legacyProps }: any) {
   const { toast } = useToast();
   const API_BASE = (import.meta.env.VITE_API_URL || "/api");
   const token = localStorage.getItem("hrm_token");
@@ -7307,6 +7313,8 @@ function GenerationStage({ session, onNext, ...legacyProps }: any) {
   const [stopRequested, setStopRequested] = useState(false);
   const stopRef = useRef(false);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [tickMarkLegendData, setTickMarkLegendData] = useState<any[]>([]);
+  const [tickMarkUsages, setTickMarkUsages] = useState<any[]>([]);
 
   const fetchCategoryStatus = useCallback(async () => {
     if (!session?.id) return [];
@@ -7327,7 +7335,19 @@ function GenerationStage({ session, onNext, ...legacyProps }: any) {
     return [];
   }, [session?.id]);
 
-  useEffect(() => { fetchCategoryStatus(); }, [fetchCategoryStatus]);
+  const fetchTickMarks = useCallback(async () => {
+    if (!session?.id) return;
+    try {
+      const res = await fetch(`${API_BASE}/working-papers/sessions/${session.id}/tick-marks`, { headers: authHeaders });
+      if (res.ok) {
+        const data = await res.json();
+        setTickMarkLegendData(data.legend || []);
+        setTickMarkUsages(data.usages || []);
+      }
+    } catch {}
+  }, [session?.id]);
+
+  useEffect(() => { fetchCategoryStatus(); fetchTickMarks(); }, [fetchCategoryStatus, fetchTickMarks]);
 
   const generateNextInCategory = async (catKey: string): Promise<{ categoryComplete: boolean; stopped: boolean }> => {
     if (stopRef.current) return { categoryComplete: false, stopped: true };
@@ -7346,12 +7366,16 @@ function GenerationStage({ session, onNext, ...legacyProps }: any) {
       const data = await res.json();
       if (data.done || data.categoryComplete) {
         await fetchCategoryStatus();
+        await fetchTickMarks();
         return { categoryComplete: true, stopped: false };
       }
       setActiveWp(data.paperCode);
       setActiveWpName(`${data.paperCode} — ${data.paperName}`);
-      toast({ title: `Generated: ${data.paperCode}`, description: `${data.paperName} (${data.generatedInCategory}/${data.totalInCategory})` });
+      const tmApplied = data.tickMarksApplied || [];
+      const tmDesc = tmApplied.length > 0 ? ` | ${tmApplied.map((t: any) => t.symbol).join(" ")}` : "";
+      toast({ title: `Generated: ${data.paperCode}`, description: `${data.paperName} (${data.generatedInCategory}/${data.totalInCategory})${tmDesc}` });
       await fetchCategoryStatus();
+      await fetchTickMarks();
       return { categoryComplete: data.categoryComplete || false, stopped: false };
     } catch (err: any) {
       toast({ title: "Generation error", description: err.message, variant: "destructive" });
@@ -7716,9 +7740,18 @@ function GenerationStage({ session, onNext, ...legacyProps }: any) {
                     <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform shrink-0", isExpanded && "rotate-180")} />
                   </div>
 
-                  {isExpanded && (
+                  {isExpanded && (() => {
+                    const catUsages = tickMarkUsages.filter((u: any) => {
+                      const wpCodes: string[] = cat.selectedCodes || cat.codes || [];
+                      return wpCodes.includes(u.wpCode);
+                    });
+                    const catSymbolCounts: Record<string, number> = {};
+                    catUsages.forEach((u: any) => { catSymbolCounts[u.symbol] = (catSymbolCounts[u.symbol] || 0) + 1; });
+                    const catSymbols = Object.entries(catSymbolCounts).sort((a, b) => b[1] - a[1]);
+
+                    return (
                     <div className="px-5 pb-4 pt-1 ml-12">
-                      <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                      <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                           <div>
                             <p className="text-slate-400 font-medium uppercase tracking-wider text-[10px] mb-1">Category</p>
@@ -7742,9 +7775,26 @@ function GenerationStage({ session, onNext, ...legacyProps }: any) {
                             </div>
                           </div>
                         </div>
+                        {catSymbols.length > 0 && (
+                          <div className="border-t border-slate-200 pt-3">
+                            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-2">Tick Marks Applied</p>
+                            <div className="flex flex-wrap gap-2">
+                              {catSymbols.map(([sym, count]) => {
+                                const def = STANDARD_TICK_MARKS.find(t => t.symbol === sym);
+                                return (
+                                  <span key={sym} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs" title={def?.meaning || sym}>
+                                    <span style={{ color: def?.color || "#6B7280" }} className="text-sm font-bold">{sym}</span>
+                                    <span className="text-slate-500 font-medium">×{count}</span>
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
                 </div>
               );
             })}
@@ -7863,7 +7913,33 @@ function GenerationStage({ session, onNext, ...legacyProps }: any) {
         </div>
       )}
 
-      <TickMarkLegend tickMarks={STANDARD_TICK_MARKS} />
+      {(complianceDocs || []).length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-gradient-to-r from-indigo-700 to-indigo-800 px-5 py-4 flex items-center gap-3">
+            <span className="text-slate-200 text-lg">📁</span>
+            <div>
+              <h2 className="font-semibold text-white text-sm">Compliance Documents</h2>
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                Engagement Letter · Independence Confirmation · Management Rep Letter · EQCR Checklist · Going Concern · SECP/CCG
+              </p>
+            </div>
+          </div>
+          <div className="p-4">
+            <ComplianceDocsPanel
+              docs={complianceDocs}
+              complianceLoading={complianceLoading}
+              onGenerate={onGenerateComplianceDoc}
+              onSign={onSignComplianceDoc}
+              onUpdateItem={onUpdateChecklistItem}
+              session={session}
+            />
+          </div>
+        </div>
+      )}
+
+      <TickMarkLegend tickMarks={STANDARD_TICK_MARKS} usageCounts={
+        tickMarkLegendData.reduce((acc: Record<string, number>, t: any) => { acc[t.symbol] = t.count || 0; return acc; }, {})
+      } />
 
       {onNext && (
         <div className="flex justify-end pt-2">

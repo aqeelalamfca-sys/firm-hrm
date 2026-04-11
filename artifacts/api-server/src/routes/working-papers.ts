@@ -7712,6 +7712,25 @@ ${smartChunk(varSummary, 2000)}
 ═══ TRIAL BALANCE SUMMARY ═══
 ${smartChunk(tbSummary, 3000)}
 
+═══ TICK MARK LEGEND (Apply automatically to each procedure) ═══
+✓ = Agreed to source document / verified (verification)
+✗ = Exception / discrepancy noted (verification)
+® = Recalculated and agreed (computation)
+© = Confirmed via external confirmation (verification)
+△ = Traced to/from source (tracing)
+♦ = Vouched to supporting document (vouching)
+◊ = Inspected physical evidence (verification)
+★ = Agreed to prior year working paper (verification)
+▲ = Footed / cross-footed and agreed (computation)
+● = Observation performed (verification)
+■ = Management inquiry response noted (verification)
+⊕ = Selected for sampling (verification)
+⊗ = Not applicable / excluded from scope (verification)
+
+For EACH procedure in sec3_procedures_performed, you MUST assign the most appropriate tick mark(s).
+Include ALL applied tick marks in the "tick_marks_applied" array with the procedure step reference and specific notes.
+A typical working paper should have 3-8 tick marks depending on complexity.
+
 ═══ MANDATORY REQUIREMENTS ═══
 Generate a COMPLETE, SPECIFIC, NON-GENERIC working paper. Every field must reference actual client data, actual account balances from the TB above, or specific ISA paragraph numbers. No generic placeholders. All PKR amounts must be realistic and consistent with TB data.
 
@@ -7824,6 +7843,16 @@ Return ONLY valid JSON with this structure:
 
   "sec12_restriction_on_use": "This working paper is prepared for audit purposes only. It is intended solely for use by the engagement team and the firm's quality control reviewers. Not for third-party reliance without written consent of ${firmNameFull}.",
 
+  "tick_marks_applied": [
+    {
+      "symbol": "✓ or ® or © or △ or ♦ or ◊ or ★ or ▲ or ● or ■ or ⊕ or ✗ or ⊗",
+      "meaning": "e.g. Agreed to source document / verified",
+      "procedure_ref": "step_no from sec3 this tick mark applies to",
+      "line_ref": "WP line or evidence reference where tick mark is applied",
+      "notes": "Brief note on what was verified/recalculated/traced"
+    }
+  ],
+
   "objective": "Same as sec2_objectives_and_scope.objective (for backward compatibility)",
   "work_performed": "Detailed narrative minimum 6 sentences of what auditor did.",
   "materiality_linkage": { "overall_materiality": 0, "performance_materiality": 0, "basis": "Revenue or Total Assets", "percentage": "1.5%" },
@@ -7863,6 +7892,50 @@ Return ONLY valid JSON with this structure:
 
     await db.update(wpHeadsTable).set({ status: "in_progress", updatedAt: new Date() }).where(eq(wpHeadsTable.id, targetHead.id));
 
+    const tickMarksApplied: any[] = Array.isArray(raw.tick_marks_applied) ? raw.tick_marks_applied : [];
+    if (tickMarksApplied.length > 0) {
+      try {
+        for (const tm of tickMarksApplied) {
+          if (!tm.symbol) continue;
+          let tickRow = (await db.select().from(wpTickMarkTable).where(and(eq(wpTickMarkTable.sessionId, sessionId), eq(wpTickMarkTable.symbol, tm.symbol))))[0];
+          if (!tickRow) {
+            const TICK_DEFS: Record<string, { meaning: string; color: string; category: string }> = {
+              "✓": { meaning: "Agreed to source document / verified", color: "#16A34A", category: "verification" },
+              "✗": { meaning: "Exception / discrepancy noted", color: "#DC2626", category: "verification" },
+              "®": { meaning: "Recalculated and agreed", color: "#2563EB", category: "computation" },
+              "©": { meaning: "Confirmed via external confirmation", color: "#7C3AED", category: "verification" },
+              "△": { meaning: "Traced to/from source", color: "#EA580C", category: "tracing" },
+              "♦": { meaning: "Vouched to supporting document", color: "#0891B2", category: "vouching" },
+              "◊": { meaning: "Inspected physical evidence", color: "#65A30D", category: "verification" },
+              "★": { meaning: "Agreed to prior year working paper", color: "#CA8A04", category: "verification" },
+              "▲": { meaning: "Footed / cross-footed and agreed", color: "#4F46E5", category: "computation" },
+              "●": { meaning: "Observation performed", color: "#0D9488", category: "verification" },
+              "■": { meaning: "Management inquiry response noted", color: "#6366F1", category: "verification" },
+              "⊕": { meaning: "Selected for sampling", color: "#F59E0B", category: "verification" },
+              "⊗": { meaning: "Not applicable / excluded from scope", color: "#9CA3AF", category: "verification" },
+            };
+            const def = TICK_DEFS[tm.symbol] || { meaning: tm.meaning || "Unknown", color: "#6B7280", category: "verification" };
+            [tickRow] = await db.insert(wpTickMarkTable).values({
+              sessionId, symbol: tm.symbol, meaning: def.meaning, color: def.color, category: def.category, isStandard: true, usageCount: 0,
+            }).onConflictDoNothing().returning();
+            if (!tickRow) {
+              tickRow = (await db.select().from(wpTickMarkTable).where(and(eq(wpTickMarkTable.sessionId, sessionId), eq(wpTickMarkTable.symbol, tm.symbol))))[0];
+            }
+          }
+          if (tickRow) {
+            await db.insert(wpTickMarkUsageTable).values({
+              sessionId, tickMarkId: tickRow.id, symbol: tm.symbol,
+              wpCode: paperCode, lineRef: tm.line_ref || tm.procedure_ref || null,
+              notes: tm.notes || null, appliedBy: "AI",
+            });
+            await db.update(wpTickMarkTable).set({ usageCount: (tickRow.usageCount || 0) + 1, updatedAt: new Date() }).where(eq(wpTickMarkTable.id, tickRow.id));
+          }
+        }
+      } catch (tmErr: any) {
+        logger.warn({ err: tmErr }, "Non-critical: failed to save some tick marks");
+      }
+    }
+
     const remainingCount = pendingCodes.length - 1;
     const categoryComplete = remainingCount === 0;
 
@@ -7880,6 +7953,7 @@ Return ONLY valid JSON with this structure:
       remainingInCategory: remainingCount,
       totalInCategory: catCodes.length,
       generatedInCategory: catCodes.length - remainingCount,
+      tickMarksApplied: tickMarksApplied.map(tm => ({ symbol: tm.symbol, meaning: tm.meaning, notes: tm.notes })),
     });
   } catch (err: any) {
     logger.error({ err }, "category generate-next error");
