@@ -13,7 +13,7 @@ import {
   ArrowLeft, ArrowRight, RefreshCw, AlertCircle, Check, Clock, Settings, Settings2,
   FileCheck, Layers, ClipboardCheck, Pencil, Save, Mail, Phone,
   Globe, EyeOff, Calendar, Tag, Sparkles, Bot, Zap,
-  Info, AlertOctagon, Calculator, CircleDot,
+  Info, AlertOctagon, Calculator, CircleDot, TrendingUp,
   ExternalLink, Gauge, Table2, Trash2, Database,
   GitMerge, BarChart2, Cpu, CheckCheck, ListChecks, Network, BookOpen,
   Search, ClipboardList, XCircle, SlidersHorizontal, Printer,
@@ -10946,13 +10946,19 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
   const [selectedLead, setSelectedLead] = useState<any>(null);
   useEffect(() => { if (session?.id) onRefresh(); }, [session?.id]);
 
+  const [footingData, setFootingData] = useState<any>(null);
   const schedules = leadSchedules || [];
   const totalOpening = schedules.reduce((s: number, ls: any) => s + Number(ls.openingBalance || 0), 0);
   const totalClosing = schedules.reduce((s: number, ls: any) => s + Number(ls.closingBalance || 0), 0);
-  const totalVariance = totalClosing - totalOpening;
+  const totalVariance = schedules.reduce((s: number, ls: any) => s + Number(ls.variance || 0), 0);
+  const footingOk = Math.abs((totalOpening + totalVariance) - totalClosing) < 0.01;
+  const firstYearAudit = totalOpening === 0 && totalClosing > 0;
   const highRiskCount = schedules.filter((ls: any) => ls.riskLevel === "High").length;
+  const medRiskCount = schedules.filter((ls: any) => ls.riskLevel === "Medium").length;
   const warningCount = schedules.filter((ls: any) => ls.validationWarnings?.length > 0).length;
-  const zeroOpeningCount = schedules.filter((ls: any) => ls.zeroOpeningFlag).length;
+  const favorableCount = schedules.filter((ls: any) => ls.direction === "Favorable").length;
+  const unfavorableCount = schedules.filter((ls: any) => ls.direction === "Unfavorable").length;
+  const orphanCount = schedules.filter((ls: any) => ls.isOrphan).length;
 
   const relatedSchedules = selectedLead
     ? schedules.filter((ls: any) => ls.wpArea === selectedLead.wpArea && ls.id !== selectedLead.id)
@@ -10973,10 +10979,14 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
             <div className="flex flex-wrap gap-2 mt-3">
               {[
                 { label: "Total Schedules", value: schedules.length, color: "bg-white/10" },
+                { label: "Favorable", value: favorableCount, color: "bg-emerald-500/30" },
+                { label: "Unfavorable", value: unfavorableCount, color: "bg-red-500/30" },
                 { label: "High Risk", value: highRiskCount, color: "bg-red-500/30" },
+                { label: "Medium Risk", value: medRiskCount, color: "bg-amber-500/30" },
                 ...(warningCount > 0 ? [{ label: "Warnings", value: warningCount, color: "bg-amber-500/30" }] : []),
-                { label: "Opening Total", value: `PKR ${(totalOpening / 1e6).toFixed(1)}M`, color: "bg-white/10" },
-                { label: "Closing Total", value: `PKR ${(totalClosing / 1e6).toFixed(1)}M`, color: "bg-white/10" },
+                ...(orphanCount > 0 ? [{ label: "Orphans", value: orphanCount, color: "bg-slate-500/30" }] : []),
+                { label: "Opening", value: `PKR ${(totalOpening / 1e6).toFixed(1)}M`, color: "bg-white/10" },
+                { label: "Closing", value: `PKR ${(totalClosing / 1e6).toFixed(1)}M`, color: "bg-white/10" },
                 { label: "Net Variance", value: `PKR ${(totalVariance / 1e6).toFixed(1)}M`, color: totalVariance < 0 ? "bg-red-500/30" : "bg-emerald-500/30" },
               ].map(s => (
                 <div key={s.label} className={cn("px-2.5 py-1 rounded-lg text-center min-w-[80px]", s.color)}>
@@ -11042,6 +11052,7 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                   <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-28">Closing</th>
                   <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-28">Variance</th>
                   <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-16">Var %</th>
+                  <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-20">Direction</th>
                   <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-16">Risk</th>
                   <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-20">Status</th>
                 </tr>
@@ -11079,12 +11090,19 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                     </td>
                     <td className="px-3 py-2.5 text-center">
                       <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-semibold",
+                        ls.direction === "Favorable" ? "bg-emerald-100 text-emerald-700" :
+                        ls.direction === "Unfavorable" ? "bg-red-100 text-red-700" :
+                        "bg-slate-100 text-slate-500")}>{ls.direction || "—"}</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-center" title={ls.riskJustification || ""}>
+                      <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-semibold cursor-help",
                         ls.riskLevel === "High" ? "bg-red-100 text-red-700" :
                         ls.riskLevel === "Medium" ? "bg-amber-100 text-amber-700" :
                         "bg-emerald-100 text-emerald-700")}>{ls.riskLevel}</span>
                     </td>
                     <td className="px-3 py-2.5 text-center">
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">{ls.status}</span>
+                      <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-medium",
+                        ls.isOrphan ? "bg-slate-200 text-slate-500" : "bg-slate-100 text-slate-600")}>{ls.isOrphan ? "orphan" : ls.status}</span>
                     </td>
                   </tr>
                 ))}
@@ -11103,7 +11121,18 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                     <td className="px-3 py-2.5 text-right">
                       {totalOpening !== 0 ? ((totalVariance / totalOpening) * 100).toFixed(1) + "%" : "—"}
                     </td>
-                    <td colSpan={2}></td>
+                    <td colSpan={3}></td>
+                  </tr>
+                  <tr className={cn("text-[10px] border-t", footingOk ? "bg-emerald-50" : "bg-red-50")}>
+                    <td colSpan={12} className="px-4 py-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {footingOk
+                          ? <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /><span className="font-semibold text-emerald-700">FOOTING CROSS-CHECK PASSED</span><span className="text-emerald-600">Opening ({totalOpening.toLocaleString()}) + Variance ({totalVariance.toLocaleString()}) = Closing ({totalClosing.toLocaleString()})</span></>
+                          : <><AlertOctagon className="w-3.5 h-3.5 text-red-600" /><span className="font-bold text-red-700">FOOTING ERROR</span><span className="text-red-600">{totalOpening.toLocaleString()} + {totalVariance.toLocaleString()} ≠ {totalClosing.toLocaleString()} (diff: {((totalOpening + totalVariance) - totalClosing).toLocaleString()})</span></>
+                        }
+                        {firstYearAudit && <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[9px] font-semibold">FIRST-YEAR AUDIT / FRESH START</span>}
+                      </div>
+                    </td>
                   </tr>
                 </tfoot>
               )}
@@ -11122,10 +11151,15 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <span className="text-sm font-bold bg-white/20 border border-white/30 px-2.5 py-0.5 rounded font-mono">{selectedLead.scheduleRef}</span>
                     <span className={cn("text-[10px] px-2 py-0.5 rounded font-semibold border border-white/20",
+                      selectedLead.direction === "Favorable" ? "bg-emerald-400/50" : selectedLead.direction === "Unfavorable" ? "bg-red-400/50" : "bg-white/15")}>
+                      {selectedLead.direction?.toUpperCase() || "NEUTRAL"}
+                    </span>
+                    <span className={cn("text-[10px] px-2 py-0.5 rounded font-semibold border border-white/20",
                       selectedLead.riskLevel === "High" ? "bg-red-400/50" : selectedLead.riskLevel === "Medium" ? "bg-amber-400/50" : "bg-emerald-400/50")}>
                       {selectedLead.riskLevel?.toUpperCase()} RISK
                     </span>
                     {selectedLead.materialityFlag && <span className="text-[10px] bg-red-500/80 px-2 py-0.5 rounded font-semibold border border-red-300/40">MATERIAL</span>}
+                    {selectedLead.isOrphan && <span className="text-[10px] bg-slate-400/60 px-2 py-0.5 rounded font-semibold border border-white/20">ORPHAN</span>}
                     <span className={cn("text-[10px] px-2 py-0.5 rounded border border-white/20",
                       selectedLead.status === "draft" ? "bg-white/15" : selectedLead.status === "reviewed" ? "bg-emerald-400/40" : "bg-white/15")}>
                       {(selectedLead.status || "draft").toUpperCase()}
@@ -11225,6 +11259,57 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                 </div>
               )}
 
+              <div className={cn("border rounded-xl p-4",
+                selectedLead.direction === "Unfavorable" ? "bg-red-50 border-red-200" :
+                selectedLead.direction === "Favorable" ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-slate-200")}>
+                <h4 className="text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 mb-2">
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  <span className={cn(
+                    selectedLead.direction === "Unfavorable" ? "text-red-700" :
+                    selectedLead.direction === "Favorable" ? "text-emerald-700" : "text-slate-700"
+                  )}>Risk Assessment — {selectedLead.direction || "Neutral"}</span>
+                </h4>
+                <div className="text-[11px] space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold",
+                      selectedLead.riskLevel === "High" ? "bg-red-200 text-red-800" :
+                      selectedLead.riskLevel === "Medium" ? "bg-amber-200 text-amber-800" : "bg-emerald-200 text-emerald-800"
+                    )}>{selectedLead.riskLevel} RISK</span>
+                    <span className="text-slate-600 font-mono">{selectedLead.riskJustification}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 italic">
+                    Matrix: &gt;5% variance + Unfavorable = High · &gt;5% + Favorable = Medium · ≤5% = Low
+                  </div>
+                </div>
+              </div>
+
+              {selectedLead.ppeMovementCheck && (
+                <div className={cn("border rounded-xl p-4", selectedLead.ppeMovementCheck.ok ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-300")}>
+                  <h4 className="text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 mb-2">
+                    {selectedLead.ppeMovementCheck.ok
+                      ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      : <AlertOctagon className="w-3.5 h-3.5 text-red-600" />}
+                    <span className={selectedLead.ppeMovementCheck.ok ? "text-emerald-700" : "text-red-700"}>PPE Movement Reconciliation</span>
+                  </h4>
+                  <div className="text-[11px] font-mono space-y-1">
+                    <div className="text-slate-600">{selectedLead.ppeMovementCheck.formula}</div>
+                    <div className="flex justify-between border-t border-dashed pt-1">
+                      <span>Expected Closing</span>
+                      <span className="font-semibold">{Number(selectedLead.ppeMovementCheck.expected).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Actual Closing</span>
+                      <span className="font-semibold">{Number(selectedLead.ppeMovementCheck.actual).toLocaleString()}</span>
+                    </div>
+                    <div className={cn("flex justify-between pt-1 border-t font-semibold",
+                      selectedLead.ppeMovementCheck.ok ? "text-emerald-700" : "text-red-700")}>
+                      <span>{selectedLead.ppeMovementCheck.ok ? "RECONCILED" : "DIFFERENCE"}</span>
+                      <span>{selectedLead.ppeMovementCheck.ok ? "0" : (selectedLead.ppeMovementCheck.actual - selectedLead.ppeMovementCheck.expected).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200">
                   <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
@@ -11238,7 +11323,10 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                     ["Line Item", selectedLead.lineItem || selectedLead.majorHead],
                     ["FS Section", selectedLead.fsSection || "—"],
                     ["Note Reference", selectedLead.noteNo ? `Note ${selectedLead.noteNo}` : "—"],
+                    ["Direction", selectedLead.direction || "Neutral"],
+                    ["Risk Justification", selectedLead.riskJustification || "—"],
                     ["Prior Year Balance", `PKR ${Number(selectedLead.priorYear || selectedLead.openingBalance || 0).toLocaleString()}`],
+                    ["Related Schedules", Array.isArray(selectedLead.relatedSchedules) && selectedLead.relatedSchedules.length > 0 ? selectedLead.relatedSchedules.join(", ") : "None"],
                     ["GL Cross-Reference", selectedLead.glCrossRef || "—"],
                     ["FS Cross-Reference", selectedLead.fsCrossRef || "—"],
                     ["Prepared By", selectedLead.preparedBy || "—"],

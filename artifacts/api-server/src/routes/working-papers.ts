@@ -12887,10 +12887,16 @@ router.get("/sessions/:sessionId/lead-schedules", async (req: Request, res: Resp
   try {
     const sessionId = parseInt(p(req.params.sessionId));
     const rawSchedules = await db.select().from(wpLeadScheduleTable).where(eq(wpLeadScheduleTable.sessionId, sessionId)).orderBy(wpLeadScheduleTable.wpArea);
+
+    const liabilityHeads = ["Borrowings", "Payables", "Provisions", "Trade Payables", "Accrued Liabilities", "Deferred Revenue", "Lease Liabilities", "Current Liabilities", "Non-Current Liabilities"];
+    const incomeHeads = ["Revenue", "Other Income", "Sales", "Service Revenue", "Interest Income", "Rental Income", "Gain on Disposal", "Income"];
+
     const schedules = rawSchedules.map((ls: any) => {
       const opening = parseFloat(ls.openingBalance || "0");
       const closing = parseFloat(ls.closingBalance || "0");
       const priorYear = parseFloat(ls.priorYear || "0");
+      const variance = parseFloat(ls.variance || "0");
+      const varPct = parseFloat(ls.variancePct || "0");
       const additions = parseFloat(ls.additions || "0");
       const disposals = parseFloat(ls.disposals || "0");
       const transfers = parseFloat(ls.transfers || "0");
@@ -12902,13 +12908,53 @@ router.get("/sessions/:sessionId/lead-schedules", async (req: Request, res: Resp
       const balanceCheck = Math.abs(expectedClosing - closing) < 0.01;
       const hasMovements = (additions + disposals + transfers + revaluation + depreciation + impairment) !== 0;
       const zeroOpeningFlag = opening === 0 && priorYear !== 0;
+
+      const mh = ls.majorHead || "";
+      const expenseHeads = ["Cost", "Expense", "Depreciation", "Amortization", "Impairment", "Loss", "Administrative", "Selling", "Distribution", "Finance Cost", "Tax", "Operating Expenses"];
+      const isLiability = liabilityHeads.some(h => mh.toLowerCase().includes(h.toLowerCase()));
+      const isIncome = incomeHeads.some(h => mh.toLowerCase().includes(h.toLowerCase()));
+      const isExpense = expenseHeads.some(h => mh.toLowerCase().includes(h.toLowerCase()));
+      let direction = "Neutral";
+      if (variance !== 0) {
+        if (isLiability) direction = variance < 0 ? "Favorable" : "Unfavorable";
+        else if (isIncome) direction = variance > 0 ? "Favorable" : "Unfavorable";
+        else if (isExpense) direction = variance < 0 ? "Favorable" : "Unfavorable";
+        else direction = "Neutral";
+      }
+
+      const riskJustification = ls.auditConclusion || `${varPct.toFixed(1)}% ${direction} on ${mh}`;
+
+      const isPPE = (ls.wpArea || "").toUpperCase().includes("PPE") || mh.toLowerCase().includes("property") || mh.toLowerCase().includes("plant") || mh.toLowerCase().includes("equipment") || mh.toLowerCase().includes("fixed asset");
+      let ppeMovementCheck: any = null;
+      if (isPPE && hasMovements) {
+        const expected = priorYear + additions - disposals - depreciation;
+        const ok = Math.abs(expected - closing) < 0.01;
+        ppeMovementCheck = { expected, actual: closing, ok, formula: `PY(${priorYear.toLocaleString()}) + Add(${additions.toLocaleString()}) - Disp(${disposals.toLocaleString()}) - Dep(${depreciation.toLocaleString()}) = ${expected.toLocaleString()}` };
+      }
+
+      const relatedSchedules = rawSchedules
+        .filter((r: any) => r.id !== ls.id && r.majorHead === ls.majorHead && r.wpArea === ls.wpArea)
+        .map((r: any) => r.scheduleRef);
+
+      const isOrphan = !ls.noteNo || ls.noteNo === "";
+
       const validationWarnings: string[] = [];
       if (zeroOpeningFlag) validationWarnings.push("Opening is zero but prior year balance exists (PKR " + priorYear.toLocaleString() + ")");
       if (hasMovements && !balanceCheck) validationWarnings.push("Opening + net movements (" + netMovements.toLocaleString() + ") ≠ Closing (" + closing.toLocaleString() + ") — expected " + expectedClosing.toLocaleString());
       if (opening === 0 && closing === 0) validationWarnings.push("Both opening and closing are zero — verify data");
-      return { ...ls, validationWarnings, zeroOpeningFlag, balanceCheck: hasMovements ? balanceCheck : null };
+      if (isPPE && ppeMovementCheck && !ppeMovementCheck.ok) validationWarnings.push("PPE movement formula broken: " + ppeMovementCheck.formula + " ≠ Closing " + closing.toLocaleString());
+      if (isOrphan) validationWarnings.push("No note reference — potential orphan schedule");
+
+      return { ...ls, direction, riskJustification, relatedSchedules, ppeMovementCheck, isOrphan, validationWarnings, zeroOpeningFlag, balanceCheck: hasMovements ? balanceCheck : null };
     });
-    res.json({ schedules });
+
+    const totalOpening = schedules.reduce((s: number, ls: any) => s + parseFloat(ls.openingBalance || "0"), 0);
+    const totalClosing = schedules.reduce((s: number, ls: any) => s + parseFloat(ls.closingBalance || "0"), 0);
+    const totalVariance = schedules.reduce((s: number, ls: any) => s + parseFloat(ls.variance || "0"), 0);
+    const footingOk = Math.abs((totalOpening + totalVariance) - totalClosing) < 0.01;
+    const firstYearAudit = totalOpening === 0 && totalClosing > 0;
+
+    res.json({ schedules, footing: { totalOpening, totalClosing, totalVariance, footingOk, firstYearAudit } });
   } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
@@ -12958,6 +13004,9 @@ router.post("/sessions/:sessionId/lead-schedules/generate", requireRoles(...WP_R
       areaGroups[area].push(line);
     });
 
+    const liabilityHeads = ["Borrowings", "Payables", "Provisions", "Trade Payables", "Accrued Liabilities", "Deferred Revenue", "Lease Liabilities", "Current Liabilities", "Non-Current Liabilities"];
+    const incomeHeads = ["Revenue", "Other Income", "Sales", "Service Revenue", "Interest Income", "Rental Income", "Gain on Disposal", "Income"];
+
     await db.delete(wpLeadScheduleTable).where(eq(wpLeadScheduleTable.sessionId, sessionId));
     const schedules: any[] = [];
     let refCounter = 0;
@@ -12976,9 +13025,35 @@ router.post("/sessions/:sessionId/lead-schedules/generate", requireRoles(...WP_R
         const closingBal = cy;
         const variance = closingBal - openingBal;
         const variancePct = openingBal !== 0 ? ((variance / Math.abs(openingBal)) * 100) : (closingBal !== 0 ? 100 : 0);
-        const riskLevel = mhLines.some((l: any) => l.riskLevel === "High") ? "High" : mhLines.some((l: any) => l.riskLevel === "Medium") ? "Medium" : "Low";
+
+        const expenseHeads = ["Cost", "Expense", "Depreciation", "Amortization", "Impairment", "Loss", "Administrative", "Selling", "Distribution", "Finance Cost", "Tax", "Operating Expenses"];
+        const isLiabilityOrProvision = liabilityHeads.some(h => mh.toLowerCase().includes(h.toLowerCase()));
+        const isIncome = incomeHeads.some(h => mh.toLowerCase().includes(h.toLowerCase()));
+        const isExpense = expenseHeads.some(h => mh.toLowerCase().includes(h.toLowerCase()));
+        let direction = "Neutral";
+        if (variance !== 0) {
+          if (isLiabilityOrProvision) {
+            direction = variance < 0 ? "Favorable" : "Unfavorable";
+          } else if (isIncome) {
+            direction = variance > 0 ? "Favorable" : "Unfavorable";
+          } else if (isExpense) {
+            direction = variance < 0 ? "Favorable" : "Unfavorable";
+          } else {
+            direction = "Neutral";
+          }
+        }
+
+        let riskLevel = "Low";
+        if (Math.abs(variancePct) > 5 && direction === "Unfavorable") riskLevel = "High";
+        else if (Math.abs(variancePct) > 5 && direction === "Favorable") riskLevel = "Medium";
+        else if (mhLines.some((l: any) => l.riskLevel === "High")) riskLevel = "High";
+        else if (mhLines.some((l: any) => l.riskLevel === "Medium")) riskLevel = "Medium";
+
+        const riskJustification = `${variancePct.toFixed(1)}% ${direction} on ${mh}`;
+        const paddedRef = `LS-${String(refCounter).padStart(2, "0")}`;
+
         schedules.push({
-          sessionId, wpArea: area, scheduleRef: `LS-${refCounter}`,
+          sessionId, wpArea: area, scheduleRef: paddedRef,
           fsSection: mhLines[0]?.fsSection,
           majorHead: mh, lineItem: mhLines[0]?.lineItem || mh,
           noteNo: mhLines[0]?.noteNo,
@@ -12987,17 +13062,42 @@ router.post("/sessions/:sessionId/lead-schedules/generate", requireRoles(...WP_R
           variancePct: String(variancePct.toFixed(2)),
           tbAccountCodes: mhLines.map((l: any) => l.accountCode).filter(Boolean),
           riskLevel, materialityFlag: Math.abs(variance) > 500000,
+          auditConclusion: riskJustification,
           status: "draft",
         });
       }
     }
-    if (schedules.length > 0) {
+
+    for (let i = 0; i < schedules.length; i++) {
+      const s = schedules[i];
+      const related = schedules
+        .filter((_: any, j: number) => j !== i && _.majorHead === s.majorHead && _.wpArea === s.wpArea)
+        .map((r: any) => r.scheduleRef);
+      s.wpCrossRefs = related.length > 0 ? related : null;
+    }
+
+    const validSchedules = schedules.filter((s: any) => s.noteNo !== null && s.noteNo !== undefined && s.noteNo !== "");
+    const orphaned = schedules.filter((s: any) => !s.noteNo || s.noteNo === "");
+    const toInsert = [...validSchedules, ...orphaned];
+
+    if (toInsert.length > 0) {
       const batchSize = 50;
-      for (let i = 0; i < schedules.length; i += batchSize) {
-        await db.insert(wpLeadScheduleTable).values(schedules.slice(i, i + batchSize));
+      for (let i = 0; i < toInsert.length; i += batchSize) {
+        await db.insert(wpLeadScheduleTable).values(toInsert.slice(i, i + batchSize));
       }
     }
-    res.json({ success: true, schedulesGenerated: schedules.length, areas: Object.keys(areaGroups) });
+
+    const totalOpening = toInsert.reduce((s: number, ls: any) => s + parseFloat(ls.openingBalance || "0"), 0);
+    const totalClosing = toInsert.reduce((s: number, ls: any) => s + parseFloat(ls.closingBalance || "0"), 0);
+    const totalVariance = toInsert.reduce((s: number, ls: any) => s + parseFloat(ls.variance || "0"), 0);
+    const footingOk = Math.abs((totalOpening + totalVariance) - totalClosing) < 0.01;
+    const firstYearAudit = totalOpening === 0 && totalClosing > 0;
+
+    res.json({
+      success: true, schedulesGenerated: toInsert.length, areas: Object.keys(areaGroups),
+      validSchedules: validSchedules.length, orphanedSchedules: orphaned.length,
+      footing: { totalOpening, totalClosing, totalVariance, footingOk, firstYearAudit },
+    });
   } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
 
