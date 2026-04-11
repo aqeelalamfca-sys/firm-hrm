@@ -175,29 +175,14 @@ export default function WorkingPapers() {
   const [stage, setStage] = useState<string>("upload");
 
   const [newClientName, setNewClientName] = useState("");
-  const [newYear, setNewYear] = useState("2025");
   const [newEntityType, setNewEntityType] = useState("Private Limited");
   const [newNtn, setNewNtn] = useState("");
   const [newStrn, setNewStrn] = useState("");
-  const [newPeriodStart, setNewPeriodStart] = useState(`${2025 - 1}-07-01`);
-  const [newPeriodEnd, setNewPeriodEnd] = useState("2025-06-30");
-
-  const handleYearChange = (year: string) => {
-    setNewYear(year);
-    const y = parseInt(year);
-    if (!isNaN(y)) {
-      setNewPeriodStart(`${y - 1}-07-01`);
-      setNewPeriodEnd(`${y}-06-30`);
-    }
-  };
-  const [newFramework, setNewFramework] = useState("IFRS");
-  const [newEngagementType, setNewEngagementType] = useState("statutory_audit");
-  const [newEngagementContinuity, setNewEngagementContinuity] = useState("first_time");
-  const [newIndustryType, setNewIndustryType] = useState("Manufacturing");
-  const [newGroupAuditFlag, setNewGroupAuditFlag] = useState(false);
-  const [newItEnvironmentType, setNewItEnvironmentType] = useState("Spreadsheets Only (Excel / Google Sheets)");
-  const [newTaxStatusFlags, setNewTaxStatusFlags] = useState<string[]>([]);
-  const [newSpecialConditions, setNewSpecialConditions] = useState<string[]>([]);
+  const [newRegNo, setNewRegNo] = useState("");
+  const [newPeriodEnd, setNewPeriodEnd] = useState("");
+  const [newPlanningStart, setNewPlanningStart] = useState("");
+  const [newFieldworkStart, setNewFieldworkStart] = useState("");
+  const [newReportDeadline, setNewReportDeadline] = useState("");
   const [newAuditFirmName, setNewAuditFirmName] = useState("");
   const [newAuditFirmLogo, setNewAuditFirmLogo] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>("");
@@ -449,16 +434,9 @@ export default function WorkingPapers() {
   const createSession = async () => {
     const missing: string[] = [];
     if (!newClientName.trim()) missing.push("Client Name");
-    if (!newYear.trim()) missing.push("Engagement Year");
     if (!newNtn.trim()) missing.push("NTN");
-    if (!newPeriodStart) missing.push("Period Start");
-    if (!newPeriodEnd) missing.push("Period End");
     if (missing.length > 0) {
       toast({ title: "Required fields missing", description: missing.join(", "), variant: "destructive" });
-      return;
-    }
-    if (newPeriodStart && newPeriodEnd && new Date(newPeriodEnd) <= new Date(newPeriodStart)) {
-      toast({ title: "Invalid date range", description: "Period End must be after Period Start", variant: "destructive" });
       return;
     }
     try {
@@ -479,20 +457,12 @@ export default function WorkingPapers() {
         method: "POST", headers: { ...headers, "Content-Type": "application/json" },
         body: JSON.stringify({
           clientName: newClientName,
-          engagementYear: newYear,
+          engagementYear: newPeriodEnd ? String(new Date(newPeriodEnd).getFullYear()) : String(new Date().getFullYear()),
           entityType: newEntityType,
           ntn: newNtn,
           strn: newStrn || undefined,
-          periodStart: newPeriodStart,
-          periodEnd: newPeriodEnd,
-          reportingFramework: newFramework,
-          engagementType: newEngagementType,
-          engagementContinuity: newEngagementContinuity,
-          industryType: newIndustryType || undefined,
-          groupAuditFlag: newGroupAuditFlag,
-          itEnvironmentType: newItEnvironmentType || undefined,
-          taxStatusFlags: newTaxStatusFlags.length > 0 ? newTaxStatusFlags.join(",") : undefined,
-          specialConditions: newSpecialConditions.length > 0 ? newSpecialConditions.join(",") : undefined,
+          registrationNo: newRegNo || undefined,
+          periodEnd: newPeriodEnd || undefined,
           auditFirmName: newAuditFirmName || undefined,
           auditFirmLogo: logoUrl || undefined,
           preparerId: newPreparerIds.length > 0 ? parseInt(newPreparerIds[0]) : (newPreparerId ? parseInt(newPreparerId) : undefined),
@@ -1945,158 +1915,13 @@ export default function WorkingPapers() {
                     <label className="text-xs font-medium text-slate-600">STRN (Sales Tax)</label>
                     <Input placeholder="e.g. 32-00-1234-567-89" value={newStrn} onChange={e => setNewStrn(e.target.value)} className="h-9" />
                   </div>
-                </div>
-              </div>
-
-              <div className="border-t border-dashed border-slate-200 pt-4">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  Engagement Details
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">Engagement Year <span className="text-red-500">*</span></label>
-                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newYear} onChange={e => handleYearChange(e.target.value)}>
-                      {Array.from({ length: 15 }, (_, i) => new Date().getFullYear() - 5 + i).map(y => (
-                        <option key={y} value={String(y)}>{y}</option>
-                      ))}
-                    </select>
+                    <label className="text-xs font-medium text-slate-600">Registration No.</label>
+                    <Input placeholder="e.g. 0012345" value={newRegNo} onChange={e => setNewRegNo(e.target.value)} className="h-9" />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">Period Start <span className="text-red-500">*</span></label>
-                    <Input type="date" value={newPeriodStart} onChange={e => setNewPeriodStart(e.target.value)} className="h-9" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">Period End <span className="text-red-500">*</span></label>
+                    <label className="text-xs font-medium text-slate-600">Period Ended</label>
                     <Input type="date" value={newPeriodEnd} onChange={e => setNewPeriodEnd(e.target.value)} className="h-9" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">Reporting Framework <span className="text-red-500">*</span></label>
-                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newFramework} onChange={e => setNewFramework(e.target.value)}>
-                      <option value="IFRS">IFRS (Full)</option>
-                      <option value="IFRS for SMEs">IFRS for SMEs</option>
-                      <option value="AFRS">AFRS (Accounting Framework)</option>
-                      <option value="Fourth Schedule">Fourth Schedule (Companies Act 2017)</option>
-                      <option value="Fifth Schedule">Fifth Schedule (Banking/Insurance)</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">Engagement Type <span className="text-red-500">*</span></label>
-                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newEngagementType} onChange={e => setNewEngagementType(e.target.value)}>
-                      <option value="statutory_audit">Statutory Audit</option>
-                      <option value="limited_review">Limited Review / Review Engagement</option>
-                      <option value="group_audit">Group / Consolidated Audit</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">Continuity <span className="text-red-500">*</span></label>
-                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newEngagementContinuity} onChange={e => setNewEngagementContinuity(e.target.value)}>
-                      <option value="first_time">First Time Engagement</option>
-                      <option value="recurring">Recurring (Same Auditor)</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-dashed border-slate-200 pt-4">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                  WP Controlling Variables
-                  <span className="text-[10px] font-normal text-slate-400 normal-case ml-1">— drives dynamic visibility &amp; recommendation of all 274 working papers</span>
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">Industry / Sector <span className="text-red-500">*</span></label>
-                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newIndustryType} onChange={e => setNewIndustryType(e.target.value)}>
-                      <option value="Manufacturing">Manufacturing</option>
-                      <option value="Trading / Wholesale / Retail">Trading / Wholesale / Retail</option>
-                      <option value="Services / Consulting">Services / Consulting</option>
-                      <option value="Agriculture / Farming / Livestock">Agriculture / Farming / Livestock</option>
-                      <option value="Information Technology / Software">Information Technology / Software</option>
-                      <option value="Real Estate / Construction / Property">Real Estate / Construction / Property</option>
-                      <option value="Energy / Power / Oil & Gas">Energy / Power / Oil &amp; Gas</option>
-                      <option value="Telecommunications">Telecommunications</option>
-                      <option value="Pharmaceutical / Healthcare">Pharmaceutical / Healthcare</option>
-                      <option value="FMCG / Consumer Goods">FMCG / Consumer Goods</option>
-                      <option value="Textile / Garments / Spinning">Textile / Garments / Spinning</option>
-                      <option value="Cement / Building Materials">Cement / Building Materials</option>
-                      <option value="Chemical / Fertilizers">Chemical / Fertilizers</option>
-                      <option value="Sugar / Food Processing">Sugar / Food Processing</option>
-                      <option value="Steel / Iron / Metals">Steel / Iron / Metals</option>
-                      <option value="Financial Services (Non-banking)">Financial Services (Non-banking)</option>
-                      <option value="Education / NGO / NPO">Education / NGO / NPO</option>
-                      <option value="Hospitality / Tourism">Hospitality / Tourism</option>
-                      <option value="Transport / Logistics">Transport / Logistics</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">IT / Accounting System</label>
-                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newItEnvironmentType} onChange={e => setNewItEnvironmentType(e.target.value)}>
-                      <option value="ERP System (SAP / Oracle / Microsoft Dynamics)">ERP System (SAP / Oracle / Microsoft Dynamics)</option>
-                      <option value="Cloud-based Accounting (Xero / QuickBooks Online / Zoho)">Cloud-based Accounting (Xero / QuickBooks / Zoho)</option>
-                      <option value="Standalone Desktop Software (Tally / QuickBooks Desktop)">Standalone Desktop Software (Tally / QuickBooks)</option>
-                      <option value="Spreadsheets Only (Excel / Google Sheets)">Spreadsheets Only (Excel / Google Sheets)</option>
-                      <option value="Mixed / Hybrid Environment">Mixed / Hybrid Environment</option>
-                      <option value="Manual / Paper-based Records">Manual / Paper-based Records</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">Group / Consolidated Audit?</label>
-                    <div className="flex items-center gap-3 h-9">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="groupAuditFlag" checked={newGroupAuditFlag === true} onChange={() => { setNewGroupAuditFlag(true); if (newEngagementType !== "group_audit") setNewEngagementType("group_audit"); }} className="w-3.5 h-3.5 text-indigo-600" />
-                        <span className="text-sm text-slate-700">Yes — Group Audit (ISA 600)</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="groupAuditFlag" checked={newGroupAuditFlag === false} onChange={() => setNewGroupAuditFlag(false)} className="w-3.5 h-3.5 text-indigo-600" />
-                        <span className="text-sm text-slate-700">No</span>
-                      </label>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-xs font-medium text-slate-600">Tax Status Flags <span className="text-slate-400">(select all that apply)</span></label>
-                    <div className="flex flex-wrap gap-x-5 gap-y-2">
-                      {[
-                        { value: "ntn_holder", label: "NTN Registered" },
-                        { value: "gst_registered", label: "GST / Sales Tax Registered (STRN)" },
-                        { value: "strn_holder", label: "Provincial Sales Tax Registered" },
-                        { value: "active_taxpayer", label: "Active Taxpayer List (ATL)" },
-                        { value: "withholding_agent", label: "Withholding Tax Agent" },
-                        { value: "super_tax_applicable", label: "Super Tax Applicable (>150M income)" },
-                        { value: "transfer_pricing_risk", label: "Transfer Pricing / Cross-border Transactions" },
-                        { value: "tax_audit_history", label: "Prior FBR Tax Audit / Assessment Orders" },
-                      ].map(opt => (
-                        <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer text-sm text-slate-700">
-                          <input type="checkbox" checked={newTaxStatusFlags.includes(opt.value)}
-                            onChange={e => setNewTaxStatusFlags(prev => e.target.checked ? [...prev, opt.value] : prev.filter(v => v !== opt.value))}
-                            className="w-3.5 h-3.5 text-indigo-600 rounded" />
-                          {opt.label}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
-                    <label className="text-xs font-medium text-slate-600">Special Conditions <span className="text-slate-400">(select all that apply — adds targeted working papers)</span></label>
-                    <div className="flex flex-wrap gap-x-5 gap-y-2">
-                      {[
-                        { value: "going_concern", label: "Going Concern Risk" },
-                        { value: "fraud_risk", label: "Fraud Risk / ISA 240 Triggers" },
-                        { value: "related_party_heavy", label: "Significant Related Party Transactions" },
-                        { value: "aml_risk", label: "AML / KYC / CFT Risk" },
-                        { value: "donor_funded", label: "Donor / Grant Funded Entity" },
-                        { value: "public_interest", label: "Public Interest Entity (PIE)" },
-                        { value: "esg_reporting", label: "ESG / Sustainability Reporting" },
-                        { value: "cyber_risk", label: "Significant Cyber / IT Security Risk" },
-                      ].map(opt => (
-                        <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer text-sm text-slate-700">
-                          <input type="checkbox" checked={newSpecialConditions.includes(opt.value)}
-                            onChange={e => setNewSpecialConditions(prev => e.target.checked ? [...prev, opt.value] : prev.filter(v => v !== opt.value))}
-                            className="w-3.5 h-3.5 text-indigo-600 rounded" />
-                          {opt.label}
-                        </label>
-                      ))}
-                    </div>
                   </div>
                 </div>
               </div>
@@ -2104,7 +1929,7 @@ export default function WorkingPapers() {
               <div className="border-t border-dashed border-slate-200 pt-4">
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                  Audit Team & Firm
+                  Audit Team &amp; Firm
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
                   <div className="space-y-1.5">
@@ -2191,14 +2016,26 @@ export default function WorkingPapers() {
                 </div>
               </div>
 
-              {(newEntityType === "Public Limited (Listed)" || newEntityType === "Government Entity") && (
-                <div className="flex items-center gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
-                  <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+              <div className="border-t border-dashed border-slate-200 pt-4">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  Timeline
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Planning Start</label>
+                    <Input type="date" value={newPlanningStart} onChange={e => setNewPlanningStart(e.target.value)} className="h-9" />
                   </div>
-                  <span>{newEntityType === "Public Limited (Listed)" ? "Listed entities require EQCR review and enhanced disclosure working papers." : "Government entity engagements follow special reporting requirements."}</span>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Fieldwork Start</label>
+                    <Input type="date" value={newFieldworkStart} onChange={e => setNewFieldworkStart(e.target.value)} className="h-9" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Report Deadline</label>
+                    <Input type="date" value={newReportDeadline} onChange={e => setNewReportDeadline(e.target.value)} className="h-9" />
+                  </div>
                 </div>
-              )}
+              </div>
 
               <div className="flex justify-end pt-2">
                 <Button onClick={createSession} disabled={loading} size="lg" className="px-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-200/50">

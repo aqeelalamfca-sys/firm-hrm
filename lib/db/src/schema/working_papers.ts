@@ -126,6 +126,7 @@ export const wpSessionsTable = pgTable("wp_sessions", {
   entityType: text("entity_type"),
   ntn: text("ntn"),
   strn: text("strn"),
+  registrationNo: text("registration_no"),
   periodStart: text("period_start"),
   periodEnd: text("period_end"),
   reportingFramework: text("reporting_framework").default("IFRS"),

@@ -190,10 +190,11 @@ const createSessionSchema = z.object({
   entityType: z.enum(VALID_ENTITY_TYPES),
   ntn: z.string().min(1, "NTN is required").max(50),
   strn: z.string().max(50).optional().nullable(),
-  periodStart: z.string().min(1, "Period start is required"),
-  periodEnd: z.string().min(1, "Period end is required"),
-  reportingFramework: z.enum(VALID_REPORTING_FRAMEWORKS),
-  engagementType: z.preprocess((v) => typeof v === "string" ? (ENGAGEMENT_TYPE_MAP[v] || v) : v, z.enum(VALID_ENGAGEMENT_TYPES)),
+  registrationNo: z.string().max(50).optional().nullable(),
+  periodStart: z.string().optional().nullable(),
+  periodEnd: z.string().optional().nullable(),
+  reportingFramework: z.enum(VALID_REPORTING_FRAMEWORKS).optional().default("IFRS"),
+  engagementType: z.preprocess((v) => typeof v === "string" ? (ENGAGEMENT_TYPE_MAP[v] || v) : v, z.enum(VALID_ENGAGEMENT_TYPES)).optional().default("statutory_audit"),
   engagementContinuity: z.preprocess((v) => typeof v === "string" ? (CONTINUITY_MAP[v] || v) : v, z.enum(["first_time", "recurring"])).optional().default("first_time"),
   industryType: z.string().max(100).optional().nullable(),
   groupAuditFlag: z.boolean().optional().default(false),
@@ -614,7 +615,7 @@ router.post("/sessions", requireRoles(...WP_ROLES_WRITE), async (req: Authentica
   try {
     const parsed = validateBody(createSessionSchema, req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error });
-    const { clientName, engagementYear, entityType, ntn, strn, periodStart, periodEnd, reportingFramework, engagementType, engagementContinuity, industryType, groupAuditFlag, itEnvironmentType, taxStatusFlags, specialConditions, auditFirmName, auditFirmLogo, preparerId, preparerName, preparerIds, preparerNames, reviewerId, reviewerName, approverId, approverName, eqcrId, eqcrName } = parsed.data;
+    const { clientName, engagementYear, entityType, ntn, strn, registrationNo, periodStart, periodEnd, reportingFramework, engagementType, engagementContinuity, industryType, groupAuditFlag, itEnvironmentType, taxStatusFlags, specialConditions, auditFirmName, auditFirmLogo, preparerId, preparerName, preparerIds, preparerNames, reviewerId, reviewerName, approverId, approverName, eqcrId, eqcrName } = parsed.data;
 
     const session = await db.transaction(async (tx) => {
       const [created] = await tx.insert(wpSessionsTable).values({
@@ -622,8 +623,9 @@ router.post("/sessions", requireRoles(...WP_ROLES_WRITE), async (req: Authentica
         entityType,
         ntn,
         strn: strn || null,
-        periodStart,
-        periodEnd,
+        registrationNo: registrationNo || null,
+        periodStart: periodStart || null,
+        periodEnd: periodEnd || null,
         reportingFramework,
         engagementType,
         engagementContinuity: engagementContinuity || "first_time",
