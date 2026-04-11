@@ -7461,6 +7461,9 @@ router.get("/sessions/:id/wp-recommendations", async (req: Request, res: Respons
         recommended,
         reason,
         linkedVariables: linkedVars,
+        applicableTo: meta.applicableTo || null,
+        industry: meta.industry || null,
+        controlledBy: meta.controlledBy || null,
       });
     }
 
