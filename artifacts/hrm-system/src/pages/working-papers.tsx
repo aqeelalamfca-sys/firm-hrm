@@ -10465,21 +10465,19 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
                             }}
                             className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
                         </th>
-                        <th className="text-center px-1 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-8">#</th>
-                        <th className="text-left px-2 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-20">Code</th>
-                        <th className="text-left px-2 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide min-w-[180px]">Working Paper Title</th>
-                        <th className="text-left px-2 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-28">Phase</th>
-                        <th className="text-left px-2 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-20">Risk</th>
-                        <th className="text-left px-2 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-20">Assertions</th>
-                        <th className="text-left px-2 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-28">FS Area</th>
+                        <th className="text-center px-1 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-10">Sr. No.</th>
+                        <th className="text-left px-2 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-20">Ref. No.</th>
+                        <th className="text-left px-2 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide min-w-[160px]">Heading</th>
+                        <th className="text-left px-2 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-40">Standards Reference</th>
+                        <th className="text-left px-2 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide min-w-[120px]">Description</th>
+                        <th className="text-left px-2 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-44">Applicable To</th>
                         <th className="text-left px-2 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-24">Status</th>
-                        <th className="text-left px-2 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-36">Variables / Reason</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {(wpRecs.papers || []).filter((p: any) => {
                         const s = wpRecsSearch.toLowerCase();
-                        if (s && !p.code.toLowerCase().includes(s) && !p.name.toLowerCase().includes(s) && !(p.isa||"").toLowerCase().includes(s) && !(p.phase||"").toLowerCase().includes(s) && !(p.fsArea||"").toLowerCase().includes(s) && !(p.assertions||"").toLowerCase().includes(s)) return false;
+                        if (s && !p.code.toLowerCase().includes(s) && !p.name.toLowerCase().includes(s) && !(p.isa||"").toLowerCase().includes(s) && !(p.phase||"").toLowerCase().includes(s) && !(p.fsArea||"").toLowerCase().includes(s) && !(p.assertions||"").toLowerCase().includes(s) && !(p.applicableTo||[]).some((t: string) => t.toLowerCase().includes(s)) && !(p.industry||[]).some((t: string) => t.toLowerCase().includes(s))) return false;
                         if (wpRecsPhaseFilter !== "all" && p.phase !== wpRecsPhaseFilter) return false;
                         if (wpRecsStatusFilter === "recommended" && !p.recommended) return false;
                         if (wpRecsStatusFilter === "applicable" && (!p.applicable || p.recommended)) return false;
@@ -10515,39 +10513,63 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
                           <td className="px-2 py-2 font-mono text-[11px] font-semibold text-indigo-700">{p.code}</td>
                           <td className="px-2 py-2">
                             <div className="font-medium text-slate-800 leading-tight text-[11px]">{p.name}</div>
-                            <div className="text-[9px] text-slate-400 mt-0.5 leading-snug">{p.isa}</div>
                           </td>
-                          <td className="px-2 py-2 text-[10px] text-slate-600 whitespace-nowrap">{p.phase}</td>
-                          <td className="px-2 py-2">
-                            <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold",
-                              p.riskLevel === "Significant" ? "bg-red-200 text-red-800" :
-                              p.riskLevel === "High" ? "bg-red-100 text-red-700" :
-                              p.riskLevel === "Medium" ? "bg-amber-100 text-amber-700" :
-                              p.riskLevel === "Low" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600")}>
-                              {p.riskLevel || "—"}
-                            </span>
+                          <td className="px-2 py-2 text-[10px] text-slate-600">
+                            <span className="leading-snug">{p.isa || "—"}</span>
                           </td>
-                          <td className="px-2 py-2">
-                            {p.assertions && p.assertions !== "N/A" ? (
-                              <div className="flex flex-wrap gap-0.5">
-                                {p.assertions.split(",").map((a: string) => a.trim()).filter(Boolean).map((a: string) => (
-                                  <span key={a} className={cn("inline-block px-1 py-0.5 rounded text-[8px] font-bold",
-                                    a === "C" ? "bg-blue-100 text-blue-700" :
-                                    a === "E" ? "bg-emerald-100 text-emerald-700" :
-                                    a === "A" ? "bg-violet-100 text-violet-700" :
-                                    a === "V" ? "bg-amber-100 text-amber-700" :
-                                    a === "R" ? "bg-pink-100 text-pink-700" :
-                                    a === "P" ? "bg-cyan-100 text-cyan-700" :
-                                    "bg-slate-100 text-slate-600"
-                                  )}>{a}</span>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-[9px] text-slate-300">—</span>
-                            )}
+                          <td className="px-2 py-2 text-[10px] text-slate-500">
+                            <div className="leading-snug">
+                              <span className="font-medium text-slate-700">{p.phase}</span>
+                              {p.fsArea && p.fsArea !== "N/A" && <span className="text-slate-400"> · {p.fsArea}</span>}
+                              {p.riskLevel && (
+                                <span className={cn("ml-1 inline-flex items-center px-1 py-0 rounded text-[8px] font-semibold",
+                                  p.riskLevel === "Significant" ? "bg-red-200 text-red-800" :
+                                  p.riskLevel === "High" ? "bg-red-100 text-red-700" :
+                                  p.riskLevel === "Medium" ? "bg-amber-100 text-amber-700" :
+                                  p.riskLevel === "Low" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600")}>
+                                  {p.riskLevel}
+                                </span>
+                              )}
+                              {p.assertions && p.assertions !== "N/A" && (
+                                <span className="ml-1 text-[9px] text-slate-400">({p.assertions})</span>
+                              )}
+                            </div>
                           </td>
-                          <td className="px-2 py-2 text-[10px] text-slate-600 max-w-[160px]">
-                            <span className="line-clamp-2 leading-snug" title={p.fsArea || ""}>{p.fsArea || "—"}</span>
+                          <td className="px-2 py-2 text-[10px] max-w-[200px]">
+                            <div className="flex flex-wrap gap-0.5">
+                              {(() => {
+                                const tags: string[] = [];
+                                if (p.applicableTo?.length) tags.push(...p.applicableTo.map((t: string) => t.replace(/_/g, " ")));
+                                if (p.industry?.length) tags.push(...p.industry.map((t: string) => t.replace(/_/g, " ")));
+                                if (p.controlledBy?.groupAuditOnly) tags.push("Group Audit");
+                                if (p.controlledBy?.firstYearOnly) tags.push("First Year");
+                                if (p.controlledBy?.itEnvRequired?.length) tags.push(...p.controlledBy.itEnvRequired.map((t: string) => `IT: ${t}`));
+                                if (p.controlledBy?.taxStatus?.length) tags.push(...p.controlledBy.taxStatus.map((t: string) => t.replace(/_/g, " ")));
+                                if (p.controlledBy?.specialCond?.length) tags.push(...p.controlledBy.specialCond.map((t: string) => t.replace(/_/g, " ")));
+                                if (p.isCore) tags.unshift("Core");
+                                if (tags.length === 0) return <span className="text-[9px] text-slate-300">All entities</span>;
+                                return tags.slice(0, 6).map((t: string) => (
+                                  <span key={t} className={cn("px-1 py-0.5 rounded text-[8px] font-medium border",
+                                    t === "Core" ? "bg-indigo-50 text-indigo-700 border-indigo-200" :
+                                    t === "Group Audit" ? "bg-violet-50 text-violet-700 border-violet-200" :
+                                    t === "First Year" ? "bg-blue-50 text-blue-700 border-blue-200" :
+                                    t.startsWith("IT:") ? "bg-cyan-50 text-cyan-700 border-cyan-200" :
+                                    "bg-slate-50 text-slate-600 border-slate-200"
+                                  )}>{t}</span>
+                                ));
+                              })()}
+                              {(() => {
+                                const tags: string[] = [];
+                                if (p.applicableTo?.length) tags.push(...p.applicableTo);
+                                if (p.industry?.length) tags.push(...p.industry);
+                                if (p.controlledBy?.groupAuditOnly) tags.push("group");
+                                if (p.controlledBy?.firstYearOnly) tags.push("first");
+                                if (p.controlledBy?.itEnvRequired?.length) tags.push(...p.controlledBy.itEnvRequired);
+                                if (p.controlledBy?.taxStatus?.length) tags.push(...p.controlledBy.taxStatus);
+                                if (p.controlledBy?.specialCond?.length) tags.push(...p.controlledBy.specialCond);
+                                return tags.length > 6 ? <span className="px-1 py-0.5 text-[8px] text-slate-400">+{tags.length - 6}</span> : null;
+                              })()}
+                            </div>
                           </td>
                           <td className="px-2 py-2">
                             {p.isCore ? (
@@ -10567,22 +10589,6 @@ function WpListingStage({ heads, wpTriggers, session, loading, onEvaluateTrigger
                                 <XCircle className="w-2.5 h-2.5" /> N/A
                               </span>
                             )}
-                          </td>
-                          <td className="px-2 py-2 text-[10px] text-slate-500 max-w-[200px]">
-                            {p.linkedVariables && p.linkedVariables.length > 0 ? (
-                              <div className="flex flex-wrap gap-0.5">
-                                {p.linkedVariables.slice(0, 4).map((v: string) => (
-                                  <span key={v} className="px-1 py-0.5 bg-violet-50 text-violet-700 rounded text-[8px] border border-violet-100">
-                                    {v.replace(/_/g, " ")}
-                                  </span>
-                                ))}
-                                {p.linkedVariables.length > 4 && (
-                                  <span className="px-1 py-0.5 text-[8px] text-slate-400">+{p.linkedVariables.length - 4}</span>
-                                )}
-                              </div>
-                            ) : p.reason ? (
-                              <span className="truncate block" title={p.reason}>{p.reason}</span>
-                            ) : null}
                           </td>
                         </tr>
                       ))}
