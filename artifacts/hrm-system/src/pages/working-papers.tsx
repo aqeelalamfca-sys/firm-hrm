@@ -10944,7 +10944,75 @@ const FORMAT_LABEL: Record<string, string> = {
 // ═══════════════════════════════════════════════════════════════════════════════
 function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, onRefresh, onExportCsv, onNext }: any) {
   const [selectedLead, setSelectedLead] = useState<any>(null);
+  const [editCell, setEditCell] = useState<{ id: number; field: string } | null>(null);
+  const [editValue, setEditValue] = useState<string>("");
+  const editRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+
   useEffect(() => { if (session?.id) onRefresh(); }, [session?.id]);
+  useEffect(() => { if (editCell && editRef.current) editRef.current.focus(); }, [editCell]);
+
+  const startEdit = (ls: any, field: string) => {
+    const val = field === "openingBalance" || field === "closingBalance" || field === "variance" || field === "variancePct"
+      ? String(Number(ls[field] || 0)) : String(ls[field] || "");
+    setEditCell({ id: ls.id, field });
+    setEditValue(val);
+  };
+
+  const saveEdit = async () => {
+    if (!editCell) return;
+    const { id, field } = editCell;
+    const original = (leadSchedules || []).find((ls: any) => ls.id === id);
+    if (!original) { setEditCell(null); return; }
+    const origVal = field === "openingBalance" || field === "closingBalance" || field === "variance" || field === "variancePct"
+      ? String(Number(original[field] || 0)) : String(original[field] || "");
+    if (editValue === origVal) { setEditCell(null); return; }
+    try {
+      const numericFields = ["openingBalance", "closingBalance", "variance", "variancePct"];
+      const payload: any = {};
+      if (numericFields.includes(field)) {
+        payload[field] = editValue;
+        if (field === "openingBalance" || field === "closingBalance") {
+          const opening = field === "openingBalance" ? parseFloat(editValue) || 0 : parseFloat(original.openingBalance || "0");
+          const closing = field === "closingBalance" ? parseFloat(editValue) || 0 : parseFloat(original.closingBalance || "0");
+          payload.variance = String(closing - opening);
+          payload.variancePct = opening !== 0 ? String(((closing - opening) / Math.abs(opening) * 100).toFixed(2)) : (closing !== 0 ? "100" : "0");
+        }
+      } else {
+        payload[field] = editValue;
+      }
+      const res = await fetch(`${API_BASE}/wp/sessions/${session.id}/lead-schedules/${id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      setEditCell(null);
+      onRefresh();
+    } catch (err: any) {
+      toast({ title: "Save Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") { e.preventDefault(); saveEdit(); }
+    if (e.key === "Escape") setEditCell(null);
+  };
+
+  const renderEditableCell = (ls: any, field: string, displayValue: string, className?: string, align?: string) => {
+    const isEditing = editCell?.id === ls.id && editCell?.field === field;
+    if (isEditing) {
+      return (
+        <input ref={editRef} value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={handleKeyDown}
+          className={cn("w-full bg-white border border-violet-400 rounded px-1.5 py-0.5 text-[11px] font-mono outline-none ring-1 ring-violet-300", align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left")} />
+      );
+    }
+    return (
+      <span onDoubleClick={() => startEdit(ls, field)}
+        className={cn("cursor-text hover:bg-violet-50 hover:outline hover:outline-1 hover:outline-violet-300 rounded px-0.5 -mx-0.5 inline-block", className)}>
+        {displayValue}
+      </span>
+    );
+  };
 
   const [footingData, setFootingData] = useState<any>(null);
   const schedules = leadSchedules || [];
@@ -11068,24 +11136,29 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                       </div>
                     </td>
                     <td className="px-3 py-2.5">
-                      <button onClick={() => setSelectedLead(ls)}
-                        className="font-mono text-[11px] font-semibold text-violet-600 hover:text-violet-800 hover:underline underline-offset-2 cursor-pointer transition-colors">
-                        {ls.scheduleRef}
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => setSelectedLead(ls)}
+                          className="font-mono text-[11px] font-semibold text-violet-600 hover:text-violet-800 hover:underline underline-offset-2 cursor-pointer transition-colors shrink-0">
+                          <Eye className="w-3 h-3 inline mr-0.5" />
+                        </button>
+                        {renderEditableCell(ls, "scheduleRef", ls.scheduleRef, "font-mono text-[11px] font-semibold text-violet-600")}
+                      </div>
                     </td>
-                    <td className="px-3 py-2.5 text-[11px] font-medium text-slate-800">{ls.wpArea}</td>
-                    <td className="px-3 py-2.5 text-[11px] text-slate-600">{ls.majorHead}</td>
-                    <td className="px-3 py-2.5 text-center text-[11px] text-slate-500">{ls.noteNo || "—"}</td>
+                    <td className="px-3 py-2.5 text-[11px]">{renderEditableCell(ls, "wpArea", ls.wpArea, "font-medium text-slate-800")}</td>
+                    <td className="px-3 py-2.5 text-[11px]">{renderEditableCell(ls, "majorHead", ls.majorHead, "text-slate-600")}</td>
+                    <td className="px-3 py-2.5 text-center text-[11px]">{renderEditableCell(ls, "noteNo", ls.noteNo || "—", "text-slate-500", "center")}</td>
                     <td className={cn("px-3 py-2.5 text-right font-mono text-[11px]", ls.zeroOpeningFlag ? "text-amber-600 font-semibold" : "")}>
                       {ls.zeroOpeningFlag && <AlertTriangle className="w-3 h-3 text-amber-500 inline mr-0.5 mb-0.5" />}
-                      {Number(ls.openingBalance || 0).toLocaleString()}
+                      {renderEditableCell(ls, "openingBalance", Number(ls.openingBalance || 0).toLocaleString(), "", "right")}
                     </td>
-                    <td className="px-3 py-2.5 text-right font-mono text-[11px]">{Number(ls.closingBalance || 0).toLocaleString()}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-[11px]">
+                      {renderEditableCell(ls, "closingBalance", Number(ls.closingBalance || 0).toLocaleString(), "", "right")}
+                    </td>
                     <td className={cn("px-3 py-2.5 text-right font-mono text-[11px] font-medium", Number(ls.variance || 0) < 0 ? "text-red-600" : "text-emerald-600")}>
-                      {Number(ls.variance || 0).toLocaleString()}
+                      {renderEditableCell(ls, "variance", Number(ls.variance || 0).toLocaleString(), "", "right")}
                     </td>
                     <td className={cn("px-3 py-2.5 text-right text-[11px] font-medium", Math.abs(Number(ls.variancePct || 0)) > 20 ? "text-red-600" : "text-slate-600")}>
-                      {ls.variancePct}%
+                      {renderEditableCell(ls, "variancePct", `${ls.variancePct}%`, "", "right")}
                     </td>
                     <td className="px-3 py-2.5 text-center">
                       <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-semibold",
@@ -11093,11 +11166,22 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                         ls.direction === "Unfavorable" ? "bg-red-100 text-red-700" :
                         "bg-slate-100 text-slate-500")}>{ls.direction || "—"}</span>
                     </td>
-                    <td className="px-3 py-2.5 text-center" title={ls.riskJustification || ""}>
-                      <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-semibold cursor-help",
-                        ls.riskLevel === "High" ? "bg-red-100 text-red-700" :
-                        ls.riskLevel === "Medium" ? "bg-amber-100 text-amber-700" :
-                        "bg-emerald-100 text-emerald-700")}>{ls.riskLevel}</span>
+                    <td className="px-3 py-2.5 text-center">
+                      {editCell?.id === ls.id && editCell?.field === "riskLevel" ? (
+                        <select ref={editRef as any} value={editValue} onChange={e => { setEditValue(e.target.value); }}
+                          onBlur={saveEdit} onKeyDown={handleKeyDown}
+                          className="text-[10px] border border-violet-400 rounded px-1 py-0.5 outline-none ring-1 ring-violet-300 bg-white">
+                          <option value="High">High</option>
+                          <option value="Medium">Medium</option>
+                          <option value="Low">Low</option>
+                        </select>
+                      ) : (
+                        <span onDoubleClick={() => startEdit(ls, "riskLevel")} title={ls.riskJustification || ""}
+                          className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-semibold cursor-pointer hover:ring-1 hover:ring-violet-300",
+                          ls.riskLevel === "High" ? "bg-red-100 text-red-700" :
+                          ls.riskLevel === "Medium" ? "bg-amber-100 text-amber-700" :
+                          "bg-emerald-100 text-emerald-700")}>{ls.riskLevel}</span>
+                      )}
                     </td>
                   </tr>
                 ))}
