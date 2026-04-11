@@ -1962,31 +1962,17 @@ export default function WorkingPapers() {
               <p className="text-xs text-slate-500 mt-1">Fill in client and engagement details to start a new audit session</p>
             </div>
             <div className="p-5 space-y-5">
+
               <div>
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                   Client Information
+                  <span className="text-[10px] font-normal text-slate-400 normal-case ml-1">text fields</span>
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
                   <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
                     <label className="text-xs font-medium text-slate-600">Client / Entity Name <span className="text-red-500">*</span></label>
                     <Input placeholder="e.g. ABC Industries (Pvt.) Ltd." value={newClientName} onChange={e => setNewClientName(e.target.value)} className="h-9" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">Entity Type <span className="text-red-500">*</span></label>
-                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newEntityType} onChange={e => setNewEntityType(e.target.value)}>
-                      <option value="Private Limited">Private Limited Company</option>
-                      <option value="Public Limited (Listed)">Public Limited (Listed / PIE)</option>
-                      <option value="Public Limited (Unlisted)">Public Limited (Unlisted)</option>
-                      <option value="Single Member">Single Member Company</option>
-                      <option value="LLP">Limited Liability Partnership</option>
-                      <option value="AOP">Association of Persons (AOP)</option>
-                      <option value="Sole Proprietor">Sole Proprietor</option>
-                      <option value="NGO/NPO">NGO / NPO (Section 42)</option>
-                      <option value="Trust">Trust</option>
-                      <option value="Government Entity">Government Entity</option>
-                      <option value="Branch Office">Branch Office (Foreign Company)</option>
-                    </select>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-slate-600">NTN <span className="text-red-500">*</span></label>
@@ -2000,95 +1986,9 @@ export default function WorkingPapers() {
                     <label className="text-xs font-medium text-slate-600">Registration No.</label>
                     <Input placeholder="e.g. 0012345" value={newRegNo} onChange={e => setNewRegNo(e.target.value)} className="h-9" />
                   </div>
-                </div>
-              </div>
-
-              <div className="border-t border-dashed border-slate-200 pt-4">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                  Audit Team &amp; Firm
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-slate-600">Audit Firm Name</label>
                     <Input placeholder="e.g. Alam & Aulakh CA" value={newAuditFirmName} onChange={e => setNewAuditFirmName(e.target.value)} className="h-9" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">Audit Firm Logo</label>
-                    <div className="flex items-center gap-3 h-9">
-                      <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={e => {
-                        const f = e.target.files?.[0];
-                        if (f) { setNewAuditFirmLogo(f); setLogoPreview(URL.createObjectURL(f)); }
-                      }} />
-                      <Button type="button" variant="outline" size="sm" className="h-8" onClick={() => logoInputRef.current?.click()}>
-                        <Upload className="w-3.5 h-3.5 mr-1.5" /> {newAuditFirmLogo ? "Change" : "Upload"}
-                      </Button>
-                      {logoPreview && <img src={logoPreview} alt="Logo preview" className="h-8 w-auto rounded border" />}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3 mt-3">
-                  <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
-                    <label className="text-xs font-medium text-slate-600">Preparer(s) <span className="text-slate-400 font-normal">— select one or more</span></label>
-                    <div className="relative">
-                      <div className={cn("min-h-[36px] w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm flex flex-wrap gap-1.5 items-center cursor-pointer", newPreparerIds.length === 0 && "text-slate-400")}>
-                        {newPreparerIds.length === 0 && <span className="text-sm text-slate-400">Click to select preparers...</span>}
-                        {newPreparerIds.map(id => {
-                          const m = teamMembers.find((tm: any) => String(tm.id) === id);
-                          return m ? (
-                            <span key={id} className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-md px-2 py-0.5 text-xs font-medium">
-                              {m.name}
-                              <button type="button" onClick={(e) => { e.stopPropagation(); setNewPreparerIds(prev => prev.filter(p => p !== id)); }} className="hover:text-red-500 transition-colors ml-0.5">
-                                <X className="w-3 h-3" />
-                              </button>
-                            </span>
-                          ) : null;
-                        })}
-                      </div>
-                      <select
-                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                        value=""
-                        onChange={e => {
-                          const val = e.target.value;
-                          if (val && !newPreparerIds.includes(val)) {
-                            setNewPreparerIds(prev => [...prev, val]);
-                          }
-                        }}
-                      >
-                        <option value="">-- Add Preparer --</option>
-                        {teamMembers.filter((m: any) => !newPreparerIds.includes(String(m.id))).map((m: any) => (
-                          <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">Reviewer</label>
-                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newReviewerId} onChange={e => setNewReviewerId(e.target.value)}>
-                      <option value="">-- Select Reviewer --</option>
-                      {teamMembers.map((m: any) => (
-                        <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">Approver</label>
-                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newApproverId} onChange={e => setNewApproverId(e.target.value)}>
-                      <option value="">-- Select Approver --</option>
-                      {teamMembers.map((m: any) => (
-                        <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">EQCR <span className="text-slate-400 font-normal">(Engagement Quality Control Reviewer)</span></label>
-                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newEqcrId} onChange={e => setNewEqcrId(e.target.value)}>
-                      <option value="">-- Select EQCR --</option>
-                      {teamMembers.map((m: any) => (
-                        <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
-                      ))}
-                    </select>
                   </div>
                 </div>
               </div>
@@ -2206,6 +2106,126 @@ export default function WorkingPapers() {
                     )}
                   </div>
                 )}
+              </div>
+
+              <div className="border-t border-dashed border-slate-200 pt-4">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  Engagement Details
+                  <span className="text-[10px] font-normal text-slate-400 normal-case ml-1">dropdown selections</span>
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Entity Type <span className="text-red-500">*</span></label>
+                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newEntityType} onChange={e => setNewEntityType(e.target.value)}>
+                      <option value="Private Limited">Private Limited Company</option>
+                      <option value="Public Limited (Listed)">Public Limited (Listed / PIE)</option>
+                      <option value="Public Limited (Unlisted)">Public Limited (Unlisted)</option>
+                      <option value="Single Member">Single Member Company</option>
+                      <option value="LLP">Limited Liability Partnership</option>
+                      <option value="AOP">Association of Persons (AOP)</option>
+                      <option value="Sole Proprietor">Sole Proprietor</option>
+                      <option value="NGO/NPO">NGO / NPO (Section 42)</option>
+                      <option value="Trust">Trust</option>
+                      <option value="Government Entity">Government Entity</option>
+                      <option value="Branch Office">Branch Office (Foreign Company)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-dashed border-slate-200 pt-4">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                  Audit Team
+                  <span className="text-[10px] font-normal text-slate-400 normal-case ml-1">multi-select &amp; dropdowns</span>
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                  <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
+                    <label className="text-xs font-medium text-slate-600">Preparer(s) <span className="text-slate-400 font-normal">— select one or more</span></label>
+                    <div className="relative">
+                      <div className={cn("min-h-[36px] w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm flex flex-wrap gap-1.5 items-center cursor-pointer", newPreparerIds.length === 0 && "text-slate-400")}>
+                        {newPreparerIds.length === 0 && <span className="text-sm text-slate-400">Click to select preparers...</span>}
+                        {newPreparerIds.map(id => {
+                          const m = teamMembers.find((tm: any) => String(tm.id) === id);
+                          return m ? (
+                            <span key={id} className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-md px-2 py-0.5 text-xs font-medium">
+                              {m.name}
+                              <button type="button" onClick={(e) => { e.stopPropagation(); setNewPreparerIds(prev => prev.filter(p => p !== id)); }} className="hover:text-red-500 transition-colors ml-0.5">
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ) : null;
+                        })}
+                      </div>
+                      <select
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        value=""
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (val && !newPreparerIds.includes(val)) {
+                            setNewPreparerIds(prev => [...prev, val]);
+                          }
+                        }}
+                      >
+                        <option value="">-- Add Preparer --</option>
+                        {teamMembers.filter((m: any) => !newPreparerIds.includes(String(m.id))).map((m: any) => (
+                          <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Reviewer</label>
+                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newReviewerId} onChange={e => setNewReviewerId(e.target.value)}>
+                      <option value="">-- Select Reviewer --</option>
+                      {teamMembers.map((m: any) => (
+                        <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Approver</label>
+                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newApproverId} onChange={e => setNewApproverId(e.target.value)}>
+                      <option value="">-- Select Approver --</option>
+                      {teamMembers.map((m: any) => (
+                        <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">EQCR <span className="text-slate-400 font-normal">(Engagement Quality Control Reviewer)</span></label>
+                    <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" value={newEqcrId} onChange={e => setNewEqcrId(e.target.value)}>
+                      <option value="">-- Select EQCR --</option>
+                      {teamMembers.map((m: any) => (
+                        <option key={m.id} value={m.id}>{m.name}{m.designation ? ` — ${m.designation}` : ""}{m.role ? ` (${m.role.replace(/_/g, " ")})` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-dashed border-slate-200 pt-4">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                  Firm Logo
+                  <span className="text-[10px] font-normal text-slate-400 normal-case ml-1">file upload</span>
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Audit Firm Logo</label>
+                    <div className="flex items-center gap-3 h-9">
+                      <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={e => {
+                        const f = e.target.files?.[0];
+                        if (f) { setNewAuditFirmLogo(f); setLogoPreview(URL.createObjectURL(f)); }
+                      }} />
+                      <Button type="button" variant="outline" size="sm" className="h-8" onClick={() => logoInputRef.current?.click()}>
+                        <Upload className="w-3.5 h-3.5 mr-1.5" /> {newAuditFirmLogo ? "Change" : "Upload"}
+                      </Button>
+                      {logoPreview && <img src={logoPreview} alt="Logo preview" className="h-8 w-auto rounded border" />}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end pt-2">
