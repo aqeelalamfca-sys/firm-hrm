@@ -10951,6 +10951,8 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
   const totalClosing = schedules.reduce((s: number, ls: any) => s + Number(ls.closingBalance || 0), 0);
   const totalVariance = totalClosing - totalOpening;
   const highRiskCount = schedules.filter((ls: any) => ls.riskLevel === "High").length;
+  const warningCount = schedules.filter((ls: any) => ls.validationWarnings?.length > 0).length;
+  const zeroOpeningCount = schedules.filter((ls: any) => ls.zeroOpeningFlag).length;
 
   const relatedSchedules = selectedLead
     ? schedules.filter((ls: any) => ls.wpArea === selectedLead.wpArea && ls.id !== selectedLead.id)
@@ -10972,6 +10974,7 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
               {[
                 { label: "Total Schedules", value: schedules.length, color: "bg-white/10" },
                 { label: "High Risk", value: highRiskCount, color: "bg-red-500/30" },
+                ...(warningCount > 0 ? [{ label: "Warnings", value: warningCount, color: "bg-amber-500/30" }] : []),
                 { label: "Opening Total", value: `PKR ${(totalOpening / 1e6).toFixed(1)}M`, color: "bg-white/10" },
                 { label: "Closing Total", value: `PKR ${(totalClosing / 1e6).toFixed(1)}M`, color: "bg-white/10" },
                 { label: "Net Variance", value: `PKR ${(totalVariance / 1e6).toFixed(1)}M`, color: totalVariance < 0 ? "bg-red-500/30" : "bg-emerald-500/30" },
@@ -11045,8 +11048,15 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {schedules.map((ls: any, idx: number) => (
-                  <tr key={ls.id || idx} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-2 py-2.5 text-center text-[10px] text-slate-400 font-mono">{idx + 1}</td>
+                  <tr key={ls.id || idx} className={cn("hover:bg-slate-50 transition-colors",
+                    ls.zeroOpeningFlag ? "bg-amber-50/60" : "",
+                    ls.validationWarnings?.length > 0 ? "border-l-2 border-l-amber-400" : "")}>
+                    <td className="px-2 py-2.5 text-center text-[10px] text-slate-400 font-mono">
+                      <div className="flex items-center justify-center gap-0.5">
+                        {ls.validationWarnings?.length > 0 && <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" title={ls.validationWarnings.join("; ")} />}
+                        {idx + 1}
+                      </div>
+                    </td>
                     <td className="px-3 py-2.5">
                       <button onClick={() => setSelectedLead(ls)}
                         className="font-mono text-[11px] font-semibold text-violet-600 hover:text-violet-800 hover:underline underline-offset-2 cursor-pointer transition-colors">
@@ -11056,7 +11066,10 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
                     <td className="px-3 py-2.5 text-[11px] font-medium text-slate-800">{ls.wpArea}</td>
                     <td className="px-3 py-2.5 text-[11px] text-slate-600">{ls.majorHead}</td>
                     <td className="px-3 py-2.5 text-center text-[11px] text-slate-500">{ls.noteNo || "—"}</td>
-                    <td className="px-3 py-2.5 text-right font-mono text-[11px]">{Number(ls.openingBalance || 0).toLocaleString()}</td>
+                    <td className={cn("px-3 py-2.5 text-right font-mono text-[11px]", ls.zeroOpeningFlag ? "text-amber-600 font-semibold" : "")}>
+                      {ls.zeroOpeningFlag && <AlertTriangle className="w-3 h-3 text-amber-500 inline mr-0.5 mb-0.5" />}
+                      {Number(ls.openingBalance || 0).toLocaleString()}
+                    </td>
                     <td className="px-3 py-2.5 text-right font-mono text-[11px]">{Number(ls.closingBalance || 0).toLocaleString()}</td>
                     <td className={cn("px-3 py-2.5 text-right font-mono text-[11px] font-medium", Number(ls.variance || 0) < 0 ? "text-red-600" : "text-emerald-600")}>
                       {Number(ls.variance || 0).toLocaleString()}
@@ -11132,17 +11145,85 @@ function LeadStage({ session, leadSchedules, loading, onGenerateLeadSchedules, o
             <div className="overflow-y-auto flex-1 p-6 space-y-5">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
-                  { label: "Opening Balance", value: `PKR ${Number(selectedLead.openingBalance || 0).toLocaleString()}`, color: "text-slate-800" },
+                  { label: "Opening Balance (Audited PY Closing)", value: `PKR ${Number(selectedLead.openingBalance || 0).toLocaleString()}`, color: selectedLead.zeroOpeningFlag ? "text-amber-600" : "text-slate-800", flag: selectedLead.zeroOpeningFlag },
                   { label: "Closing Balance", value: `PKR ${Number(selectedLead.closingBalance || 0).toLocaleString()}`, color: "text-slate-800" },
                   { label: "Variance", value: `PKR ${Number(selectedLead.variance || 0).toLocaleString()}`, color: Number(selectedLead.variance || 0) < 0 ? "text-red-600" : "text-emerald-600" },
                   { label: "Variance %", value: `${selectedLead.variancePct || "0"}%`, color: Math.abs(Number(selectedLead.variancePct || 0)) > 20 ? "text-red-600" : "text-slate-800" },
-                ].map(item => (
-                  <div key={item.label} className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                    <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{item.label}</p>
+                ].map((item: any) => (
+                  <div key={item.label} className={cn("bg-slate-50 border rounded-xl p-3", item.flag ? "border-amber-300 bg-amber-50" : "border-slate-200")}>
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                      {item.flag && <AlertTriangle className="w-3 h-3 text-amber-500" />}
+                      {item.label}
+                    </p>
                     <p className={cn("text-lg font-bold font-mono mt-0.5", item.color)}>{item.value}</p>
                   </div>
                 ))}
               </div>
+
+              {(() => {
+                const opening = Number(selectedLead.openingBalance || 0);
+                const closing = Number(selectedLead.closingBalance || 0);
+                const additions = Number(selectedLead.additions || 0);
+                const disposals = Number(selectedLead.disposals || 0);
+                const transfers = Number(selectedLead.transfers || 0);
+                const revaluation = Number(selectedLead.revaluation || 0);
+                const depreciation = Number(selectedLead.depreciation || 0);
+                const impairment = Number(selectedLead.impairment || 0);
+                const netMovements = additions - disposals + transfers + revaluation - depreciation - impairment;
+                const hasMovements = (additions + disposals + transfers + revaluation + depreciation + impairment) !== 0;
+                const expectedClosing = opening + netMovements;
+                const balanceOk = Math.abs(expectedClosing - closing) < 0.01;
+                return (
+                  <div className={cn("border rounded-xl p-4", hasMovements && !balanceOk ? "bg-red-50 border-red-300" : "bg-emerald-50 border-emerald-200")}>
+                    <h4 className="text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 mb-2">
+                      {hasMovements && !balanceOk ? <AlertOctagon className="w-3.5 h-3.5 text-red-500" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                      <span className={hasMovements && !balanceOk ? "text-red-700" : "text-emerald-700"}>Balance Validation</span>
+                    </h4>
+                    <div className="text-[11px] space-y-1 font-mono">
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Opening (Audited PY Closing)</span>
+                        <span className={cn("font-semibold", selectedLead.zeroOpeningFlag ? "text-amber-600" : "text-slate-800")}>{opening.toLocaleString()}</span>
+                      </div>
+                      {hasMovements && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-600">+ Net Movements</span>
+                          <span className="font-semibold text-blue-700">{netMovements.toLocaleString()}</span>
+                        </div>
+                      )}
+                      <div className="border-t border-dashed pt-1 flex justify-between">
+                        <span className="text-slate-600">{hasMovements ? "= Expected Closing" : "Closing Balance"}</span>
+                        <span className="font-semibold text-slate-800">{hasMovements ? expectedClosing.toLocaleString() : closing.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Actual Closing</span>
+                        <span className="font-semibold text-slate-800">{closing.toLocaleString()}</span>
+                      </div>
+                      {hasMovements && (
+                        <div className={cn("flex justify-between pt-1 border-t", balanceOk ? "text-emerald-700" : "text-red-700")}>
+                          <span className="font-semibold">{balanceOk ? "BALANCED" : "DIFFERENCE"}</span>
+                          <span className="font-bold">{balanceOk ? "0" : (closing - expectedClosing).toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {Array.isArray(selectedLead.validationWarnings) && selectedLead.validationWarnings.length > 0 && (
+                <div className="bg-amber-50 border border-amber-300 rounded-xl p-4">
+                  <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wide flex items-center gap-1.5 mb-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Validation Warnings
+                  </h4>
+                  <ul className="space-y-1">
+                    {selectedLead.validationWarnings.map((w: string, i: number) => (
+                      <li key={i} className="text-[11px] text-amber-800 flex items-start gap-1.5">
+                        <span className="text-amber-500 mt-0.5 shrink-0">•</span>
+                        <span>{w}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200">

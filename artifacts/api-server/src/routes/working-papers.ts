@@ -12886,7 +12886,28 @@ router.post("/sessions/:sessionId/version-history", requireRoles(...WP_ROLES_WRI
 router.get("/sessions/:sessionId/lead-schedules", async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(p(req.params.sessionId));
-    const schedules = await db.select().from(wpLeadScheduleTable).where(eq(wpLeadScheduleTable.sessionId, sessionId)).orderBy(wpLeadScheduleTable.wpArea);
+    const rawSchedules = await db.select().from(wpLeadScheduleTable).where(eq(wpLeadScheduleTable.sessionId, sessionId)).orderBy(wpLeadScheduleTable.wpArea);
+    const schedules = rawSchedules.map((ls: any) => {
+      const opening = parseFloat(ls.openingBalance || "0");
+      const closing = parseFloat(ls.closingBalance || "0");
+      const priorYear = parseFloat(ls.priorYear || "0");
+      const additions = parseFloat(ls.additions || "0");
+      const disposals = parseFloat(ls.disposals || "0");
+      const transfers = parseFloat(ls.transfers || "0");
+      const revaluation = parseFloat(ls.revaluation || "0");
+      const depreciation = parseFloat(ls.depreciation || "0");
+      const impairment = parseFloat(ls.impairment || "0");
+      const netMovements = additions - disposals + transfers + revaluation - depreciation - impairment;
+      const expectedClosing = opening + netMovements;
+      const balanceCheck = Math.abs(expectedClosing - closing) < 0.01;
+      const hasMovements = (additions + disposals + transfers + revaluation + depreciation + impairment) !== 0;
+      const zeroOpeningFlag = opening === 0 && priorYear !== 0;
+      const validationWarnings: string[] = [];
+      if (zeroOpeningFlag) validationWarnings.push("Opening is zero but prior year balance exists (PKR " + priorYear.toLocaleString() + ")");
+      if (hasMovements && !balanceCheck) validationWarnings.push("Opening + net movements (" + netMovements.toLocaleString() + ") ≠ Closing (" + closing.toLocaleString() + ") — expected " + expectedClosing.toLocaleString());
+      if (opening === 0 && closing === 0) validationWarnings.push("Both opening and closing are zero — verify data");
+      return { ...ls, validationWarnings, zeroOpeningFlag, balanceCheck: hasMovements ? balanceCheck : null };
+    });
     res.json({ schedules });
   } catch (err: any) { logger.error({ err }, "Route error"); res.status(500).json({ error: err.message }); }
 });
@@ -12894,37 +12915,74 @@ router.get("/sessions/:sessionId/lead-schedules", async (req: Request, res: Resp
 router.post("/sessions/:sessionId/lead-schedules/generate", requireRoles(...WP_ROLES_WRITE), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const sessionId = parseInt(p(req.params.sessionId));
+
+    const fsLines = await db.select().from(wpFsLinesTable).where(eq(wpFsLinesTable.sessionId, sessionId));
     const tbLines = await db.select().from(wpTrialBalanceLinesTable).where(eq(wpTrialBalanceLinesTable.sessionId, sessionId));
-    if (!tbLines.length) return res.status(400).json({ error: "No trial balance data found. Upload template first." });
+
+    const sourceLines: any[] = [];
+
+    if (fsLines.length > 0) {
+      fsLines.forEach((l: any) => sourceLines.push({
+        wpArea: l.wpArea || l.fsSection || "General",
+        fsSection: l.statementType || l.fsSection,
+        majorHead: l.majorHead || l.lineItem || "General",
+        lineItem: l.lineItem,
+        accountCode: l.accountCode,
+        noteNo: l.noteNo,
+        currentYear: parseFloat(l.currentYear || "0") || 0,
+        priorYear: parseFloat(l.priorYear || "0") || 0,
+        riskLevel: l.riskLevel,
+      }));
+    }
+
+    if (sourceLines.length === 0 && tbLines.length > 0) {
+      tbLines.forEach((l: any) => sourceLines.push({
+        wpArea: (l as any).wpArea || (l as any).fsSection || l.classification || "General",
+        fsSection: (l as any).fsSection || l.classification,
+        majorHead: (l as any).majorHead || l.accountName || "General",
+        lineItem: l.accountName,
+        accountCode: l.accountCode,
+        noteNo: (l as any).noteNo,
+        currentYear: parseFloat(String(l.balance || "0")) || 0,
+        priorYear: parseFloat(String(l.priorYearBalance || "0")) || 0,
+        riskLevel: (l as any).riskLevel,
+      }));
+    }
+
+    if (!sourceLines.length) return res.status(400).json({ error: "No financial data found. Upload template first." });
+
     const areaGroups: Record<string, any[]> = {};
-    tbLines.forEach((line: any) => {
-      const area = line.wpArea || line.fsSection || "General";
+    sourceLines.forEach((line: any) => {
+      const area = line.wpArea;
       if (!areaGroups[area]) areaGroups[area] = [];
       areaGroups[area].push(line);
     });
 
     await db.delete(wpLeadScheduleTable).where(eq(wpLeadScheduleTable.sessionId, sessionId));
     const schedules: any[] = [];
+    let refCounter = 0;
     for (const [area, lines] of Object.entries(areaGroups)) {
-      const refCode = `LS-${area.replace(/\s+/g, "-").substring(0, 8).toUpperCase()}`;
       const majorHeads: Record<string, any[]> = {};
       lines.forEach((l: any) => {
-        const mh = l.majorHead || l.lineItem || "General";
+        const mh = l.majorHead;
         if (!majorHeads[mh]) majorHeads[mh] = [];
         majorHeads[mh].push(l);
       });
       for (const [mh, mhLines] of Object.entries(majorHeads)) {
-        const cy = mhLines.reduce((s: number, l: any) => s + parseFloat(l.currentYear || l.amount || "0"), 0);
-        const py = mhLines.reduce((s: number, l: any) => s + parseFloat(l.priorYear || "0"), 0);
-        const variance = cy - py;
-        const variancePct = py !== 0 ? ((variance / Math.abs(py)) * 100) : 0;
+        refCounter++;
+        const cy = mhLines.reduce((s: number, l: any) => s + l.currentYear, 0);
+        const py = mhLines.reduce((s: number, l: any) => s + l.priorYear, 0);
+        const openingBal = py;
+        const closingBal = cy;
+        const variance = closingBal - openingBal;
+        const variancePct = openingBal !== 0 ? ((variance / Math.abs(openingBal)) * 100) : (closingBal !== 0 ? 100 : 0);
         const riskLevel = mhLines.some((l: any) => l.riskLevel === "High") ? "High" : mhLines.some((l: any) => l.riskLevel === "Medium") ? "Medium" : "Low";
         schedules.push({
-          sessionId, wpArea: area, scheduleRef: refCode,
-          fsSection: mhLines[0]?.statementType || mhLines[0]?.fsSection,
+          sessionId, wpArea: area, scheduleRef: `LS-${refCounter}`,
+          fsSection: mhLines[0]?.fsSection,
           majorHead: mh, lineItem: mhLines[0]?.lineItem || mh,
           noteNo: mhLines[0]?.noteNo,
-          openingBalance: String(py), closingBalance: String(cy),
+          openingBalance: String(openingBal), closingBalance: String(closingBal),
           priorYear: String(py), variance: String(variance),
           variancePct: String(variancePct.toFixed(2)),
           tbAccountCodes: mhLines.map((l: any) => l.accountCode).filter(Boolean),
